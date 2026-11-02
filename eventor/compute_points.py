@@ -10,7 +10,8 @@ Per race and class (runners on the same course):
   * A leg is a mistake when the time lost against reference * level is
     more than 15 s and more than 25 %. Mistake time = sum of those losses.
   * Clean time c = finish time - mistake time.
-  * Technique T = 100 - mistake_minutes * 100 / controls (finish not a control).
+  * Technique T = 100 - 2 * mistake_minutes * 100 / controls (finish not a control),
+    so 1 minute lost per 100 controls gives 98 (user's choice 2026-11-02, was 1 point).
   * Physic P = min(100, 100 * c100 / c). Double the clean time = 50.
 
 Calibration of c100 (separate scales for women and men, since classes never mix):
@@ -28,6 +29,12 @@ Rating per runner, over the last 365 days:
   * physic: Tukey biweight (c = 4.685, scale = max(1.4826 * MAD, 5)) times weight
   * technique: weighted mean
   * visible in the game with >= 5 adjusted races, or any VM/EM/VC race.
+
+Merits (best races of the last 365 days, shown on the card close-up):
+  * race score = 100 * c100 / finish time, mistakes included, only adjusted races.
+    c100 already carries the strength of the field, so 20th against a strong field
+    can beat a win against a weak one.
+  * field = mean physic rating of the 5 best rated runners in that class.
 """
 
 import collections
@@ -70,6 +77,9 @@ TUKEY_C = 4.685
 MAD_FLOOR = 5.0
 MIN_GROUP = 3
 MAX_ITER = 400
+TECHNIQUE_PER_MINUTE = 2.0      # points lost per mistake minute per 100 controls
+MERITS_PER_RUNNER = 3
+FIELD_TOP = 5
 
 
 # ---------- identity ----------
@@ -193,7 +203,7 @@ def build_entries(races, ids):
                     "id": f"{race['event_id']}|{race.get('race_id', '')}|{cls['class']}|{len(groups)}",
                     "event": race["event_name"], "class": cls["class"], "date": date,
                     "anchor": anchor, "level": race.get("level"), "controls": len(codes),
-                    "runners": rs,
+                    "runners": rs, "class_ok": len(ok),
                 })
     return groups
 
@@ -262,7 +272,7 @@ def solve(groups, today):
                 continue
             for r in g["runners"]:
                 p = min(100.0, 100.0 * c100[g["id"]] / r["_clean"])
-                t = max(0.0, min(100.0, 100.0 - (r["_mistake"] / 60.0) * 100.0 / g["controls"]))
+                t = max(0.0, min(100.0, 100.0 - TECHNIQUE_PER_MINUTE * (r["_mistake"] / 60.0) * 100.0 / g["controls"]))
                 per_runner[r["_key"]].append((g["date"], p, t))
         rating = ratings(per_runner, today)
         changed = False
@@ -286,6 +296,30 @@ def solve(groups, today):
         if not changed:
             break
     return c100, adjusted, rating, it + 1
+
+
+# ---------- merits ----------
+
+def merits(groups, adjusted, c100, rating, today):
+    """key -> the runner's best races of the last year, best first."""
+    out = collections.defaultdict(list)
+    for g in groups:
+        if g["id"] not in adjusted or (today - g["date"]).days > WINDOW_DAYS:
+            continue
+        rated = sorted((rating[r["_key"]][0] for r in g["runners"] if r["_key"] in rating), reverse=True)
+        field = sum(rated[:FIELD_TOP]) / len(rated[:FIELD_TOP]) if rated else 0.0
+        by_time = sorted(g["runners"], key=lambda r: r["time"])
+        for i, r in enumerate(by_time):
+            place = int(r["position"]) if r.get("position") else i + 1
+            out[r["_key"]].append({
+                "race": g["event"], "date": g["date"].isoformat(), "klass": g["class"],
+                "place": place, "of": max(g["class_ok"], place),
+                "score": round(100.0 * c100[g["id"]] / r["time"], 2), "field": round(field, 2),
+            })
+    for key in out:
+        out[key].sort(key=lambda m: (-m["score"], m["date"]))
+        out[key] = out[key][:MERITS_PER_RUNNER]
+    return out
 
 
 # ---------- game file ----------
@@ -319,6 +353,7 @@ def write_game_file(runners, today):
             "id": r["id"], "name": r["name"], "man": r["sex"] == "M", "klass": game_class(r, today),
             "country": country_name(r), "club": r.get("club") or "",
             "speed": round(r["physic"], 2), "technique": round(r["technique"], 2), "inPacks": True,
+            "merits": r.get("merits", []),
         })
     now = {c["id"] for c in cards}
     frozen = 0
@@ -416,6 +451,7 @@ def main():
     groups = build_entries(races, ids)
     c100, adjusted, rating, iterations = solve(groups, today)
 
+    best = merits(groups, adjusted, c100, rating, today)
     anchored_keys = {r["_key"] for g in groups if g["anchor"] for r in g["runners"]}
     all_keys = {r["_key"] for g in groups for r in g["runners"]}
     runners = []
@@ -434,6 +470,7 @@ def main():
             "all_races": n_all,
             "international": key in anchored_keys,
             "visible": visible,
+            "merits": best.get(key, []) if visible else [],
         })
     runners.sort(key=lambda r: (r["sex"] or "", -(r["physic"] or 0)))
     with open(OUT_JSON, "w", encoding="utf-8") as f:

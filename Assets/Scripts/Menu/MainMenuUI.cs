@@ -27,7 +27,7 @@ public class MainMenuUI : MonoBehaviour
 
     [Header("Sound")]
     public AudioSource audioSource;
-    public AudioClip clickSound;
+    public AudioClip clickSound;   // not used any more: UISounds clicks every button
 
     PackOpening opening;
     Vector2 packHome;
@@ -54,19 +54,16 @@ public class MainMenuUI : MonoBehaviour
 
     public void ShowHome()
     {
-        Click();
         Show(homePanel);
     }
 
     public void ShowShop()
     {
-        Click();
         Show(shopPanel);
     }
 
     public void ShowRunners()
     {
-        Click();
         Show(runnersPanel);
     }
 
@@ -130,13 +127,6 @@ public class MainMenuUI : MonoBehaviour
         Refresh();
     }
 
-    void Click()
-    {
-        if (audioSource != null && clickSound != null)
-        {
-            audioSource.PlayOneShot(clickSound, 0.6f);
-        }
-    }
 
     void Refresh()
     {
@@ -153,7 +143,11 @@ public class MainMenuUI : MonoBehaviour
         if (buyLabel != null) buyLabel.text = price == 0 ? "Open free pack" : "Open pack   " + price + " kr";
         if (noteText != null)
         {
-            if (!canBuy)
+            if (PackShop.AllCollected())
+            {
+                noteText.text = "You have every runner. New ones arrive when the rankings update.";
+            }
+            else if (!canBuy)
             {
                 noteText.text = "You need " + (price - money) + " kr more. Compete to earn money.";
             }
@@ -163,7 +157,7 @@ public class MainMenuUI : MonoBehaviour
             }
             else
             {
-                noteText.text = "A runner you already have gives " + PackShop.DuplicateRefund + " kr back.";
+                noteText.text = "Every pack holds a runner you do not have yet.";
             }
         }
         if (ownedText != null) ownedText.text = "You have " + owned + " of " + total + " runners";

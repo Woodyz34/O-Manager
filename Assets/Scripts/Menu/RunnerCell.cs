@@ -10,10 +10,10 @@ public class RunnerCell : MonoBehaviour
     public GameObject copiesBadge;
     public TextMeshProUGUI copiesText;
 
-    public void Show(CardData card, int copies)
+    // Each runner can only be owned once, so the copies badge stays hidden
+    public void Show(CardData card)
     {
         view.Show(card);
-        if (copiesBadge != null) copiesBadge.SetActive(copies > 1);
-        if (copiesText != null) copiesText.text = "x" + copies;
+        if (copiesBadge != null) copiesBadge.SetActive(false);
     }
 }

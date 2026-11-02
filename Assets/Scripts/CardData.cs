@@ -22,6 +22,7 @@ public class CardData
     public string countryName;   // shown when there is no flag picture for the country
     public string clubName;
     public bool inPacks = true;  // false = frozen: kept by players who own it, no longer in packs
+    public List<RunnerMerit> merits = new List<RunnerMerit>();   // best races of the last year, best first
 
     public CardData(string Name, float Speed, float Technique, Sprite Country, Sprite Clubb, string Klass, bool Man, Sprite Profile)
     {
@@ -34,4 +35,18 @@ public class CardData
         man = Man;
         RunnerPicture = Profile;
     }
+}
+
+// One of a runner's best races of the year. The score is 100 * (time a 100-rated runner would
+// run in that race) / own time, so it already counts how strong the field was.
+[System.Serializable]
+public class RunnerMerit
+{
+    public string race;       // competition name, e.g. "EM lång"
+    public string date;       // yyyy-mm-dd
+    public string klass;
+    public int place;
+    public int of;            // finishers in the class
+    public float score;
+    public float field;       // mean rating of the 5 best runners in the class
 }

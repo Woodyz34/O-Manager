@@ -7,61 +7,61 @@ Löpare: 2172, med betyg: 2112, synliga i spelet: 634 (359 herrar, 275 damer). F
 
 | # | Namn | Klubb/land | Fysik | Teknik | Lopp |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kasper Harlem Fosser | Norway | 98.81 | 99.09 | 4 |
-| 2 | Tomas Krivda | Czechia | 96.78 | 96.03 | 4 |
-| 3 | Viktor Svensk | Sweden | 96.38 | 97.56 | 10 |
-| 4 | Anton Johansson | Sweden | 95.52 | 97.59 | 8 |
-| 5 | Olli Ojanaho | Finland | 94.88 | 98.54 | 3 |
-| 6 | Axel Elmblad | Sweden | 94.87 | 97.77 | 8 |
-| 7 | Miika Kirmula | Finland | 94.72 | 96.57 | 4 |
-| 8 | Gustav Bergman | Sweden | 94.68 | 97.09 | 11 |
-| 9 | Fabian Aebersold | Switzerland | 94.61 | 96.64 | 6 |
-| 10 | Matthieu Buehrer | Switzerland | 94.27 | 92.98 | 4 |
-| 11 | Quentin Moulet | France | 94.1 | 97.9 | 10 |
-| 12 | Emil Svensk | Sweden | 93.97 | 91.31 | 6 |
-| 13 | Mathieu Perrin | France | 93.86 | 99.27 | 4 |
-| 14 | Topi Syrjalainen | Finland | 93.48 | 98.01 | 3 |
-| 15 | Simon Hector | Sweden | 93.13 | 99.27 | 11 |
-| 16 | Akseli Ruohola | Finland | 92.97 | 94.19 | 4 |
-| 17 | Henrik Johannesson | Sweden | 92.59 | 97.82 | 7 |
-| 18 | Daniel Hubmann | Switzerland | 92.43 | 97.61 | 4 |
-| 19 | Simon Imark | Sweden | 92.19 | 99.15 | 9 |
-| 20 | Aarni Ronkainen | Finland | 91.76 | 98.52 | 4 |
-| 21 | Jürgen Joonas | Estonia | 91.58 | 88.04 | 4 |
-| 22 | Tino Polsini | Switzerland | 91.55 | 89.7 | 4 |
-| 23 | Jakub Chaloupsky | Czechia | 91.47 | 97.18 | 4 |
-| 24 | Eetu Savolainen | Finland | 91.36 | 96.92 | 2 |
-| 25 | Eirik Langedal Breivik | Norway | 91.35 | 92.29 | 7 |
+| 1 | Kasper Harlem Fosser | Norway | 98.81 | 98.18 | 4 |
+| 2 | Tomas Krivda | Czechia | 96.78 | 92.06 | 4 |
+| 3 | Viktor Svensk | Sweden | 96.38 | 95.13 | 10 |
+| 4 | Anton Johansson | Sweden | 95.52 | 95.18 | 8 |
+| 5 | Olli Ojanaho | Finland | 94.88 | 97.08 | 3 |
+| 6 | Axel Elmblad | Sweden | 94.87 | 95.55 | 8 |
+| 7 | Miika Kirmula | Finland | 94.72 | 93.13 | 4 |
+| 8 | Gustav Bergman | Sweden | 94.68 | 94.18 | 11 |
+| 9 | Fabian Aebersold | Switzerland | 94.61 | 93.27 | 6 |
+| 10 | Matthieu Buehrer | Switzerland | 94.27 | 85.96 | 4 |
+| 11 | Quentin Moulet | France | 94.1 | 95.8 | 10 |
+| 12 | Emil Svensk | Sweden | 93.97 | 82.63 | 6 |
+| 13 | Mathieu Perrin | France | 93.86 | 98.53 | 4 |
+| 14 | Topi Syrjalainen | Finland | 93.48 | 96.02 | 3 |
+| 15 | Simon Hector | Sweden | 93.13 | 98.53 | 11 |
+| 16 | Akseli Ruohola | Finland | 92.97 | 88.38 | 4 |
+| 17 | Henrik Johannesson | Sweden | 92.59 | 95.65 | 7 |
+| 18 | Daniel Hubmann | Switzerland | 92.43 | 95.22 | 4 |
+| 19 | Simon Imark | Sweden | 92.19 | 98.31 | 9 |
+| 20 | Aarni Ronkainen | Finland | 91.76 | 97.04 | 4 |
+| 21 | Jürgen Joonas | Estonia | 91.58 | 76.09 | 4 |
+| 22 | Tino Polsini | Switzerland | 91.55 | 79.4 | 4 |
+| 23 | Jakub Chaloupsky | Czechia | 91.47 | 94.37 | 4 |
+| 24 | Eetu Savolainen | Finland | 91.36 | 93.83 | 2 |
+| 25 | Eirik Langedal Breivik | Norway | 91.35 | 84.58 | 7 |
 
 ## Damer, topp 25 (synliga)
 
 | # | Namn | Klubb/land | Fysik | Teknik | Lopp |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Simona Aebersold | Switzerland | 99.75 | 94.87 | 4 |
-| 2 | Sanna Fast | Sweden | 96.96 | 82.64 | 7 |
-| 3 | Tove Alexandersson | Sweden | 96.41 | 94.11 | 4 |
-| 4 | Pia Young Vik | Norway | 95.78 | 90.68 | 4 |
-| 5 | Freja Hjerne | Sweden | 93.89 | 96.02 | 14 |
-| 6 | Malin Agervig Kristiansson | Denmark | 92.98 | 79.24 | 2 |
-| 7 | Hanna Lundberg | Sweden | 92.98 | 92.01 | 8 |
-| 8 | Venla Harju | Finland | 92.02 | 92.55 | 4 |
-| 9 | Marie Olaussen | Norway | 91.86 | 97.2 | 10 |
-| 10 | Agnes Noergaard Kracht | Denmark | 91.29 | 88.48 | 2 |
-| 11 | Ida Haapala | Finland | 91.2 | 87.97 | 4 |
-| 12 | Natalia Gemperle | Switzerland | 90.44 | 91.32 | 1 |
-| 13 | Lucie Dittrichová | Czechia | 90.32 | 90.81 | 7 |
-| 14 | Aleksandra Hornik | Poland | 89.74 | 88.65 | 3 |
-| 15 | Marika Teini | Finland | 89.29 | 96.35 | 4 |
-| 16 | Eeva-Liina Ojanaho | Finland | 88.75 | 95.74 | 5 |
-| 17 | Cecile Calandry | France | 88.67 | 75.51 | 4 |
-| 18 | Tereza Rauturier | Czechia | 88.5 | 98.74 | 4 |
-| 19 | Victoria Hæstad Bjørnstad | Norway | 88.22 | 91.14 | 8 |
-| 20 | Maija Sianoja | Finland | 87.97 | 97.49 | 4 |
-| 21 | Frida Vikström | Sweden | 87.78 | 93.96 | 6 |
+| 1 | Simona Aebersold | Switzerland | 99.75 | 89.75 | 4 |
+| 2 | Sanna Fast | Sweden | 96.96 | 65.27 | 7 |
+| 3 | Tove Alexandersson | Sweden | 96.41 | 88.22 | 4 |
+| 4 | Pia Young Vik | Norway | 95.78 | 81.37 | 4 |
+| 5 | Freja Hjerne | Sweden | 93.89 | 92.03 | 14 |
+| 6 | Hanna Lundberg | Sweden | 92.98 | 84.02 | 8 |
+| 7 | Malin Agervig Kristiansson | Denmark | 92.98 | 58.48 | 2 |
+| 8 | Venla Harju | Finland | 92.02 | 85.09 | 4 |
+| 9 | Marie Olaussen | Norway | 91.86 | 94.4 | 10 |
+| 10 | Agnes Noergaard Kracht | Denmark | 91.29 | 76.97 | 2 |
+| 11 | Ida Haapala | Finland | 91.2 | 75.95 | 4 |
+| 12 | Natalia Gemperle | Switzerland | 90.44 | 82.64 | 1 |
+| 13 | Lucie Dittrichová | Czechia | 90.32 | 81.63 | 7 |
+| 14 | Aleksandra Hornik | Poland | 89.74 | 77.3 | 3 |
+| 15 | Marika Teini | Finland | 89.29 | 92.69 | 4 |
+| 16 | Eeva-Liina Ojanaho | Finland | 88.75 | 91.49 | 5 |
+| 17 | Cecile Calandry | France | 88.67 | 56.43 | 4 |
+| 18 | Tereza Rauturier | Czechia | 88.5 | 97.48 | 4 |
+| 19 | Victoria Hæstad Bjørnstad | Norway | 88.22 | 82.27 | 8 |
+| 20 | Maija Sianoja | Finland | 87.97 | 94.98 | 4 |
+| 21 | Frida Vikström | Sweden | 87.78 | 87.92 | 6 |
 | 22 | Inka Nurminen | Finland | 87.73 | 100.0 | 1 |
-| 23 | Felicia Persson | SWE | 87.54 | 90.12 | 8 |
-| 24 | Tereza Smelikova | Slovakia | 87.39 | 89.78 | 3 |
-| 25 | Ane Dyrkorn | Norway | 87.24 | 93.31 | 8 |
+| 23 | Felicia Persson | SWE | 87.54 | 80.24 | 8 |
+| 24 | Tereza Smelikova | Slovakia | 87.39 | 79.55 | 3 |
+| 25 | Ane Dyrkorn | Norway | 87.24 | 86.62 | 8 |
 
 ## Lopp
 
