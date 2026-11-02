@@ -302,6 +302,19 @@ public class PackOpening : MonoBehaviour
         CardData runner = result.card;
         if (runner.country == null)
         {
+            // No flag picture for this country: show only the country's name
+            if (string.IsNullOrEmpty(runner.countryName))
+            {
+                yield break;
+            }
+            countryText.text = RunnerCards.CountryName(runner);
+            yield return UIAnim.Run(0.6f, t =>
+            {
+                countryText.alpha = t;
+                countryText.characterSpacing = Mathf.Lerp(70f, 22f, UIAnim.OutCubic(t));
+            });
+            yield return UIAnim.Wait(0.85f);
+            yield return UIAnim.Run(0.45f, t => countryText.alpha = 1f - t);
             yield break;
         }
         Rect rect = runner.country.rect;

@@ -17,6 +17,12 @@ public class CardData
     public bool man = true;
     public string klass;
 
+    // Set for runners that come from the Eventor points (Resources/Runners/runners.json)
+    public string id;
+    public string countryName;   // shown when there is no flag picture for the country
+    public string clubName;
+    public bool inPacks = true;  // false = frozen: kept by players who own it, no longer in packs
+
     public CardData(string Name, float Speed, float Technique, Sprite Country, Sprite Clubb, string Klass, bool Man, Sprite Profile)
     {
         RunnerName = Name;

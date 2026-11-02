@@ -138,8 +138,8 @@ public class RelayRace : MonoBehaviour, IRaceStats
 
         // Runners not picked yet, or everyone again when there are more legs than runners.
         // In "Your runners" only the player's own runners can be picked, each once.
-        List<CardData> all = pathfinding.YourRunnersMode ? RunnerCollection.OwnedCards() : RunnerCards.All();
-        if (all.Count == 0) all = RunnerCards.All();
+        List<CardData> all = pathfinding.YourRunnersMode ? RunnerCollection.OwnedCards() : RunnerCards.InPacks();
+        if (all.Count == 0) all = RunnerCards.InPacks();
         List<CardData> left = all.FindAll(c => !picks.Contains(c));
         if (left.Count == 0) left = new List<CardData>(all);
         bool showAll = pathfinding.ChooseWhomeverYouWantMode || pathfinding.YourRunnersMode;

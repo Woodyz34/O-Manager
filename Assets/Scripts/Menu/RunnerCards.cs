@@ -7,10 +7,12 @@ public enum RunnerTier { Bronze, Silver, Gold, Elite }
 // Change the limits and colours here and every screen follows.
 public static class RunnerCards
 {
-    // A runner's tier comes from their overall rating (the average of speed and technique)
-    public const int EliteFrom = 88;
-    public const int GoldFrom = 85;
-    public const int SilverFrom = 80;
+    // A runner's tier comes from their overall rating (the average of speed and technique).
+    // Set from the Eventor points 2026-11-02 (634 runners): Elite about the top 7 %,
+    // Gold the next 15 %, Silver the next 25 %, Bronze the rest.
+    public const int EliteFrom = 93;
+    public const int GoldFrom = 89;
+    public const int SilverFrom = 84;
 
     public static List<CardData> All()
     {
@@ -20,6 +22,12 @@ public static class RunnerCards
             cards.SetAllCards();
         }
         return cards.GetAllCardsList();
+    }
+
+    // The runners a pack can give. Frozen runners (no longer eligible) are left out.
+    public static List<CardData> InPacks()
+    {
+        return All().FindAll(c => c.inPacks);
     }
 
     public static CardData Find(string runnerName)
@@ -92,6 +100,10 @@ public static class RunnerCards
     // Flags are stored as pictures, so the country's name is read from the picture's file name
     public static string CountryName(CardData card)
     {
+        if (!string.IsNullOrEmpty(card.countryName))
+        {
+            return card.countryName;
+        }
         if (card.country == null)
         {
             return "";
