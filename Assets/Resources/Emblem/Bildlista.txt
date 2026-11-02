@@ -10,12 +10,11 @@ Ett klubbmärke kan också heta som klubbens förkortning när den står först 
 PNG med genomskinlig bakgrund blir finast. Kort som saknar bild visar namnet i text i stället.
 
 
-FLAGGOR (1 av 28 har bild)
+FLAGGOR (6 av 28 har bild)
 
 Saknar bild:
   Norway.png   (23 kort)
   Switzerland.png   (22 kort)
-  Finland.png   (19 kort)
   Czechia.png   (16 kort)
   France.png   (14 kort)
   Denmark.png   (12 kort)
@@ -31,18 +30,19 @@ Saknar bild:
   Slovakia.png   (3 kort)
   Spain.png   (3 kort)
   Australia.png   (2 kort)
-  Canada.png   (2 kort)
   Italy.png   (2 kort)
-  Ukraine.png   (2 kort)
   United States.png   (2 kort)
   Croatia.png   (1 kort)
   Hong Kong China.png   (1 kort)
-  Japan.png   (1 kort)
   New Zealand.png   (1 kort)
-  Portugal.png   (1 kort)
 
 Har bild:
   Sweden.png   (451 kort)
+  Finland.png   (19 kort)
+  Canada.png   (2 kort)
+  Ukraine.png   (2 kort)
+  Japan.png   (1 kort)
+  Portugal.png   (1 kort)
 
 
 KLUBBAR (1 av 128 har bild)

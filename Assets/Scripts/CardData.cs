@@ -47,6 +47,8 @@ public class RunnerMerit
     public string klass;
     public int place;
     public int of;            // finishers in the class
+    public int behind;        // seconds behind the class winner
     public float score;
     public float field;       // mean rating of the 5 best runners in the class
+    public string results;    // file in Resources/Runners/Results with the whole class and split times
 }

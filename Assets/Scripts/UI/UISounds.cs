@@ -10,6 +10,11 @@ using UnityEngine.UI;
 //   and the start sound (forest, the start clock's beeps) the first time the main menu opens.
 // The sounds are in Resources/Sounds (made by Docs/ui_sounds.py). They follow the master volume
 // in the Esc menu, since that sets AudioListener.volume.
+//
+// It runs before the EventSystem every frame, so it sees what is under the mouse before a click
+// closes a panel or loads a scene (otherwise buttons that hide themselves made no sound).
+// Anything that takes a click counts, not only Buttons: toggles, list rows, links in text.
+[DefaultExecutionOrder(-32000)]
 public class UISounds : MonoBehaviour
 {
     const float ClickVolume = 0.55f;
@@ -20,12 +25,14 @@ public class UISounds : MonoBehaviour
     static bool startPlayed;
 
     AudioSource source;
+    AudioListener backupEar;
+    float nextEarCheck;
     AudioClip click;
     AudioClip toggle;
     AudioClip tick;
     AudioClip startup;
 
-    Selectable pressed;
+    GameObject pressed;
     Vector2 pressedAt;
     readonly List<RaycastResult> hits = new List<RaycastResult>();
 
@@ -60,6 +67,10 @@ public class UISounds : MonoBehaviour
         source.playOnAwake = false;
         source.spatialBlend = 0f;
         source.ignoreListenerPause = true;
+        // Some race scenes have no AudioListener until the player's camera is made, and then nothing
+        // can be heard. This one is switched on only while no other listener is there.
+        backupEar = gameObject.AddComponent<AudioListener>();
+        backupEar.enabled = false;
         click = Resources.Load<AudioClip>("Sounds/ui_click");
         toggle = Resources.Load<AudioClip>("Sounds/ui_toggle");
         tick = Resources.Load<AudioClip>("Sounds/ui_tick");
@@ -79,6 +90,7 @@ public class UISounds : MonoBehaviour
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         pressed = null;
+        CheckEar();
         // Once per run, when the game opens on the main menu (not when coming back to it)
         if (!startPlayed && scene.name == "MainMenu")
         {
@@ -89,20 +101,50 @@ public class UISounds : MonoBehaviour
 
     void Update()
     {
+        if (Time.unscaledTime >= nextEarCheck)
+        {
+            nextEarCheck = Time.unscaledTime + 0.5f;
+            CheckEar();
+        }
+
+        // Keys that work like buttons: Esc (the Esc menu, skipping the pack show) and Enter on a selected button
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Play(click, ClickVolume);
+        }
+        else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            if (selected != null && selected.GetComponent<ISubmitHandler>() != null && selected.GetComponent<TMP_InputField>() == null
+                && selected.GetComponent<InputField>() == null && Usable(selected))
+            {
+                Play(SoundFor(selected), ClickVolume);
+            }
+        }
+
         if (Input.GetMouseButtonDown(0))
         {
-            pressed = SelectableUnderMouse();
+            pressed = null;
             pressedAt = Input.mousePosition;
-            // Sliders and scroll bars answer at once, since they are dragged
-            if (pressed is Slider || pressed is Scrollbar)
+            GameObject hit = TopUnderMouse();
+            if (hit == null) return;
+            GameObject clickable = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit);
+            if (clickable != null && Usable(clickable))
+            {
+                pressed = clickable;
+                return;
+            }
+            // Sliders, scroll bars and text fields take a press, not a click: they answer at once
+            GameObject pressable = ExecuteEvents.GetEventHandler<IPointerDownHandler>(hit);
+            if (pressable != null && Usable(pressable) && pressable.GetComponent<Selectable>() != null)
             {
                 Play(tick, ClickVolume);
-                pressed = null;
             }
         }
         else if (Input.GetMouseButtonUp(0) && pressed != null)
         {
-            Selectable released = SelectableUnderMouse();
+            GameObject hit = TopUnderMouse();
+            GameObject released = hit != null ? ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit) : null;
             bool moved = ((Vector2)Input.mousePosition - pressedAt).magnitude > DragLimit;
             if (released == pressed && !moved)
             {
@@ -112,21 +154,43 @@ public class UISounds : MonoBehaviour
         }
     }
 
-    AudioClip SoundFor(Selectable selectable)
+    void CheckEar()
     {
-        if (selectable is Toggle || selectable is TMP_Dropdown || selectable is Dropdown)
+        bool other = false;
+        foreach (AudioListener listener in FindObjectsByType<AudioListener>(FindObjectsSortMode.None))
+        {
+            if (listener != backupEar && listener.isActiveAndEnabled)
+            {
+                other = true;
+                break;
+            }
+        }
+        if (backupEar.enabled == other) backupEar.enabled = !other;
+    }
+
+    AudioClip SoundFor(GameObject target)
+    {
+        if (target.GetComponent<Toggle>() != null || target.GetComponent<TMP_Dropdown>() != null || target.GetComponent<Dropdown>() != null)
         {
             return toggle;
         }
-        if (selectable is TMP_InputField || selectable is InputField)
+        if (target.GetComponent<TMP_InputField>() != null || target.GetComponent<InputField>() != null)
         {
             return tick;
         }
         return click;
     }
 
-    // The button (or toggle, slider...) that the mouse is over and that can be used right now
-    Selectable SelectableUnderMouse()
+    // A button that is greyed out makes no sound
+    static bool Usable(GameObject target)
+    {
+        if (target.GetComponent<ClickCatcher>() != null) return false;
+        Selectable selectable = target.GetComponent<Selectable>();
+        return selectable == null || (selectable.IsActive() && selectable.IsInteractable());
+    }
+
+    // The topmost thing under the mouse that the EventSystem would send the click to
+    GameObject TopUnderMouse()
     {
         EventSystem events = EventSystem.current;
         if (events == null)
@@ -136,17 +200,7 @@ public class UISounds : MonoBehaviour
         PointerEventData pointer = new PointerEventData(events) { position = Input.mousePosition };
         hits.Clear();
         events.RaycastAll(pointer, hits);
-        if (hits.Count == 0 || hits[0].gameObject == null)
-        {
-            return null;
-        }
-        // Only the topmost thing counts, so a button under a panel makes no sound
-        Selectable selectable = hits[0].gameObject.GetComponentInParent<Selectable>();
-        if (selectable == null || !selectable.IsActive() || !selectable.IsInteractable())
-        {
-            return null;
-        }
-        return selectable;
+        return hits.Count > 0 ? hits[0].gameObject : null;
     }
 
     void Play(AudioClip clip, float volume)

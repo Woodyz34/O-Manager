@@ -35,11 +35,15 @@ Merits (best races of the last 365 days, shown on the card close-up):
     c100 already carries the strength of the field, so 20th against a strong field
     can beat a win against a weak one.
   * field = mean physic rating of the 5 best rated runners in that class.
+  * behind = seconds behind the class winner.
+  * The whole class of every merit race, with split times, is written to
+    Assets/Resources/Runners/Results/<name>.json for the game's result view.
 """
 
 import collections
 import datetime as dt
 import glob
+import hashlib
 import json
 import os
 import re
@@ -52,6 +56,7 @@ OUT_JSON = os.path.join(HERE, "data", "runners.json")
 OUT_REPORT = os.path.join(HERE, "data", "points_report.md")
 # What the game reads (Resources.Load<TextAsset>("Runners/runners"))
 GAME_JSON = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Runners", "runners.json")
+RESULTS_DIR = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Runners", "Results")
 EMBLEM_DIR = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Emblem")
 
 COUNTRIES = {
@@ -191,7 +196,8 @@ def build_entries(races, ids):
             by_course = collections.defaultdict(list)
             for r in ok:
                 by_course[tuple(s[0] for s in r["splits"])].append(r)
-            for codes, rs in by_course.items():
+            class_best = min((r["time"] for r in ok), default=0)
+            for course_no, (codes, rs) in enumerate(by_course.items()):
                 if len(rs) < MIN_GROUP or not codes:
                     continue
                 rs = [dict(r) for r in rs]
@@ -203,7 +209,10 @@ def build_entries(races, ids):
                     "id": f"{race['event_id']}|{race.get('race_id', '')}|{cls['class']}|{len(groups)}",
                     "event": race["event_name"], "class": cls["class"], "date": date,
                     "anchor": anchor, "level": race.get("level"), "controls": len(codes),
-                    "runners": rs, "class_ok": len(ok),
+                    "runners": rs, "class_ok": len(ok), "class_best": class_best,
+                    "file": f"{slug(str(race['event_id']))}_{slug(str(race.get('race_id') or 0))}_{slug(cls['class'])}_{course_no}",
+                    "codes": list(codes), "distance": race.get("distance") or "",
+                    "length": rs[0].get("course_length") or cls.get("course_length") or 0,
                 })
     return groups
 
@@ -314,12 +323,73 @@ def merits(groups, adjusted, c100, rating, today):
             out[r["_key"]].append({
                 "race": g["event"], "date": g["date"].isoformat(), "klass": g["class"],
                 "place": place, "of": max(g["class_ok"], place),
+                "behind": int(round(max(0.0, r["time"] - g["class_best"]))),
                 "score": round(100.0 * c100[g["id"]] / r["time"], 2), "field": round(field, 2),
+                "results": g["file"],
             })
     for key in out:
         out[key].sort(key=lambda m: (-m["score"], m["date"]))
         out[key] = out[key][:MERITS_PER_RUNNER]
     return out
+
+
+# ---------- full results for the merit races ----------
+
+def slug(text):
+    return re.sub(r"[^A-Za-z0-9]+", "", unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()) or "x"
+
+
+def unity_meta(path):
+    """A .meta with a GUID made from the file name, so it stays the same every week."""
+    guid = hashlib.md5(os.path.basename(path).encode("utf-8")).hexdigest()
+    with open(path + ".meta", "w", encoding="utf-8", newline="\n") as f:
+        f.write(f"fileFormatVersion: 2\nguid: {guid}\nTextScriptImporter:\n  externalObjects: {{}}\n"
+                "  userData: \n  assetBundleName: \n  assetBundleVariant: \n")
+
+
+def write_results(groups, cards):
+    """One file per race and class that a card's merit points to, with every finisher and split time.
+    The game shows it when a merit is clicked. Files nobody points to any more are removed."""
+    wanted = {m["results"] for c in cards for m in c.get("merits", []) if m.get("results")}
+    by_file = {g["file"]: g for g in groups}
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    if not os.path.exists(RESULTS_DIR + ".meta"):
+        unity_meta_folder(RESULTS_DIR)
+    written = set()
+    for name in sorted(wanted):
+        g = by_file.get(name)
+        if g is None:
+            continue
+        rows = []
+        for i, r in enumerate(sorted(g["runners"], key=lambda r: r["time"])):
+            info = r.get("club") or r.get("country") or ""
+            rows.append({
+                "id": r["_key"], "name": r["name"], "club": info,
+                "place": int(r["position"]) if r.get("position") else i + 1,
+                "time": int(round(r["time"])),
+                "splits": [int(round(s[1])) if s[1] is not None else -1 for s in r["splits"]],
+            })
+        data = {"race": g["event"], "klass": g["class"], "date": g["date"].isoformat(),
+                "distance": g["distance"], "length": int(g["length"] or 0), "finishers": g["class_ok"],
+                "controls": [str(c) for c in g["codes"]], "runners": rows}
+        path = os.path.join(RESULTS_DIR, name + ".json")
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+        if not os.path.exists(path + ".meta"):
+            unity_meta(path)
+        written.add(name + ".json")
+    for old in os.listdir(RESULTS_DIR):
+        base = old[:-5] if old.endswith(".meta") else old
+        if base not in written:
+            os.remove(os.path.join(RESULTS_DIR, old))
+    return len(written)
+
+
+def unity_meta_folder(path):
+    guid = hashlib.md5(os.path.basename(path).encode("utf-8") + b"/folder").hexdigest()
+    with open(path + ".meta", "w", encoding="utf-8", newline="\n") as f:
+        f.write(f"fileFormatVersion: 2\nguid: {guid}\nfolderAsset: yes\nDefaultImporter:\n  externalObjects: {{}}\n"
+                "  userData: \n  assetBundleName: \n  assetBundleVariant: \n")
 
 
 # ---------- game file ----------
@@ -338,7 +408,7 @@ def game_class(r, today):
     return prefix + ("18" if age <= 18 else "20" if age <= 20 else "21")
 
 
-def write_game_file(runners, today):
+def write_game_file(runners, today, groups):
     """Cards for the game. Runners in packs get today's numbers. A runner who was a card
     before but is no longer eligible keeps the last numbers and leaves the packs (frozen)."""
     previous = {}
@@ -377,6 +447,7 @@ def write_game_file(runners, today):
     with open(GAME_JSON, "w", encoding="utf-8") as f:
         json.dump({"computed": today.isoformat(), "runners": cards}, f, ensure_ascii=False, indent=0)
     write_emblem_list(cards, today)
+    write_results(groups, cards)
     return frozen
 
 
@@ -475,7 +546,7 @@ def main():
     runners.sort(key=lambda r: (r["sex"] or "", -(r["physic"] or 0)))
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump({"computed": today.isoformat(), "runners": runners}, f, ensure_ascii=False, indent=0)
-    frozen = write_game_file(runners, today)
+    frozen = write_game_file(runners, today, groups)
 
     # report
     vis = [r for r in runners if r["visible"]]

@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 // The My Runners screen: every runner pulled from packs, with search, sorting and filters.
@@ -27,6 +29,8 @@ public class RunnerCollectionUI : MonoBehaviour
 
     bool wired;
     TextMeshProUGUI meritsText;
+    CardData shownCard;
+    RaceResults openResults;
     readonly List<RunnerCell> cells = new List<RunnerCell>();
 
     void Awake()
@@ -58,6 +62,13 @@ public class RunnerCollectionUI : MonoBehaviour
         meritsText.fontSize = 25;
         meritsText.lineSpacing = 0;
         meritsText.richText = true;
+        meritsText.raycastTarget = true;
+        // Each race is a link: hovering lights it up, clicking opens the whole result list
+        MeritLinks links = meritsText.gameObject.AddComponent<MeritLinks>();
+        links.text = meritsText;
+        links.Hovered = index => { if (shownCard != null) meritsText.text = MeritsText(shownCard, index); };
+        links.Clicked = OpenResults;
+        links.Missed = () => detailPanel.SetActive(false);
         RectTransform rect = meritsText.rectTransform;
         rect.anchoredPosition = info.anchoredPosition + new Vector2(0, -345);
         rect.sizeDelta = new Vector2(info.sizeDelta.x - 40, 330);
@@ -132,6 +143,8 @@ public class RunnerCollectionUI : MonoBehaviour
         detailCard.Show(card);
         detailCard.PlayShine();
         RunnerTier tier = RunnerCards.Tier(card);
+        shownCard = card;
+        if (openResults != null) openResults.Close();
         detailTitle.text = card.RunnerName;
         detailInfo.text =
             "<color=#" + ColorUtility.ToHtmlStringRGB(RunnerCards.TierColor(tier)) + "><b>" + RunnerCards.TierName(tier) + "</b></color>\n\n" +
@@ -140,16 +153,25 @@ public class RunnerCollectionUI : MonoBehaviour
             Row("Technique", Mathf.RoundToInt(card.technique).ToString()) +
             Row("Class", card.klass) +
             Row("Country", Title(RunnerCards.CountryName(card)));
-        if (meritsText != null) meritsText.text = MeritsText(card);
+        if (meritsText != null) meritsText.text = MeritsText(card, -1);
         detailPanel.SetActive(true);
     }
 
-    // The runner's best races of the last year. The score counts how strong the field was,
-    // so 20th in a world class field can rank above a win against a weak one.
-    static string MeritsText(CardData card)
+    void OpenResults(int index)
+    {
+        if (shownCard == null || shownCard.merits == null || index < 0 || index >= shownCard.merits.Count) return;
+        if (openResults != null) openResults.Close();
+        openResults = RaceResults.Open(detailPanel.transform, shownCard.merits[index].results, shownCard.id, shownCard.RunnerName);
+        if (openResults == null) UIToast.Show("The full results for this race are not in the game yet.");
+    }
+
+    // The runner's best races of the last year: place, field size and time behind the winner.
+    // They are picked by score, which counts how strong the field was, so 20th in a world class
+    // field can rank above a win against a weak one. The hovered race is lit up.
+    static string MeritsText(CardData card, int hovered)
     {
         const string faint = "<color=#FBF4DABB>";
-        string text = "<b><cspace=6>BEST RACES THIS YEAR</cspace></b>\n";
+        string text = "<b><cspace=6>BEST RACES THIS YEAR</cspace></b>  " + faint + "<size=20>click a race for the results</size></color>\n";
         if (card.merits == null || card.merits.Count == 0)
         {
             return text + faint + "No rated races yet.</color>";
@@ -157,11 +179,15 @@ public class RunnerCollectionUI : MonoBehaviour
         for (int i = 0; i < card.merits.Count; i++)
         {
             RunnerMerit merit = card.merits[i];
-            text += (i + 1) + ".<indent=36><b>" + Short(merit.race) + "</b>  " + faint + merit.klass + "</color>\n" +
-                    Ordinal(merit.place) + " of " + merit.of +
+            bool lit = i == hovered;
+            string name = lit ? "<color=#E8742A><u>" + Short(merit.race) + "</u></color>" : Short(merit.race);
+            string behind = merit.behind > 0 ? RaceResults.Behind(merit.behind, false) : "winner";
+            text += "<link=\"" + i + "\">" + (i + 1) + ".<indent=36><b>" + name + "</b>  " + faint + merit.klass + "</color>\n" +
+                    "<b>" + RaceResults.Ordinal(merit.place) + "</b> of " + merit.of +
+                    "   <b>" + behind + "</b>" +
                     "   " + faint + "Score</color> <b>" + Mathf.RoundToInt(merit.score) + "</b>" +
-                    "   " + faint + "Field</color> <b>" + Mathf.RoundToInt(merit.field) + "</b>" +
-                    "   " + faint + merit.date + "</color></indent>\n";
+                    "   " + faint + merit.date + "</color>" +
+                    (lit ? "   <color=#E8742A><b>Results ></b></color>" : "") + "</indent></link>\n";
         }
         return text;
     }
@@ -171,20 +197,7 @@ public class RunnerCollectionUI : MonoBehaviour
     {
         const int Max = 44;
         if (string.IsNullOrEmpty(race) || race.Length <= Max) return race;
-        return race.Substring(0, Max - 1).TrimEnd(' ', ',', '+', '(') + "\u2026";
-    }
-
-    static string Ordinal(int n)
-    {
-        int lastTwo = n % 100;
-        if (lastTwo >= 11 && lastTwo <= 13) return n + "th";
-        switch (n % 10)
-        {
-            case 1: return n + "st";
-            case 2: return n + "nd";
-            case 3: return n + "rd";
-            default: return n + "th";
-        }
+        return race.Substring(0, Max - 3).TrimEnd(' ', ',', '+', '(') + "...";   // the game font has no ellipsis character
     }
 
     // One line of the close-up: caption on the left, value in a second column
