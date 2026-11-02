@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdf7c09cbde9a0e429736d1cbce57569, type: 3}
+  m_Name: Illern
+  m_EditorClassIdentifier: Assembly-CSharp::MapDefinition
+  id: illern
+  displayName: Illern
+  gridName: output_grid
+  minx: 498034.56
+  miny: 6427133
+  maxx: 501596.8
+  maxy: 6432414
+  gridSize: 10
+  rows: 529
+  cols: 357
+  defaultBackground: illern
+  backgrounds:
+  - id: illern
+    spritePath: KartBild/Illern utan bana
+    thumbnailPath: CourseThumbs/illern
+    position: {x: 1.642262, y: 0.4995, z: 0}
+    rotation: 354.435
+    scale: 0.31960002
+    courseInPicture: 0
+    pixelSize: {x: 11468, y: 16384}
+    pivotPixels: {x: 5734, y: 8192}
+    pixelsPerUnit: 89.70589
+  - id: traning1
+    spritePath: "KartBild/O-Manager tioMila tr\xE4ning"
+    thumbnailPath: CourseThumbs/traning1
+    position: {x: 1.642262, y: 0.4995, z: 0}
+    rotation: 354.435
+    scale: 0.31960002
+    courseInPicture: 1
+    pixelSize: {x: 11703, y: 16384}
+    pivotPixels: {x: 5851.5, y: 8192}
+    pixelsPerUnit: 99.0856
+  - id: traning2
+    spritePath: "KartBild/IllernKartan Tr\xE4ning2"
+    thumbnailPath: CourseThumbs/traning2
+    position: {x: 1.2932738, y: -0.031235725, z: 0}
+    rotation: 354.49982
+    scale: 0.6346725
+    courseInPicture: 1
+    pixelSize: {x: 6392, y: 9132}
+    pivotPixels: {x: 3196, y: 4566}
+    pixelsPerUnit: 100
+  - id: traning3
+    spritePath: "KartBild/IllernKartan Tr\xE4ning 3"
+    thumbnailPath: CourseThumbs/traning3
+    position: {x: 1.642262, y: 0.4995, z: 0}
+    rotation: 354.435
+    scale: 0.31960002
+    courseInPicture: 1
+    pixelSize: {x: 11468, y: 16384}
+    pivotPixels: {x: 5734, y: 8192}
+    pixelsPerUnit: 89.70589
+  - id: traning4
+    spritePath: KartBild/Illern Kartan 4
+    thumbnailPath: CourseThumbs/traning4
+    position: {x: 1.642262, y: 0.4995, z: 0}
+    rotation: 354.435
+    scale: 0.31960002
+    courseInPicture: 1
+    pixelSize: {x: 11468, y: 16384}
+    pivotPixels: {x: 5734, y: 8192}
+    pixelsPerUnit: 89.70589

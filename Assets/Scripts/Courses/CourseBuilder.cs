@@ -1,0 +1,1403 @@
+﻿using System;
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+// The course builder page: pick a map, click out the start, the controls and the finish, check that every
+// control can be reached, then save the course and publish it so other players can run it.
+//
+// Mouse: left click places a mark (or drags one that is already there), right click on a mark removes it,
+// right or middle drag moves the map, the wheel zooms.
+//
+// A course can also be a relay (the panel on the left): up to 10 legs, each with its own course (or the same course
+// as the leg before). A control can be turned into a fork: a stretch between the common control before and the common
+// control after it that can be run along different branches, each with any number of controls (or none). The forks
+// of other legs are shown faded; clicking one puts the whole fork, with its common controls, on the leg being laid.
+// A fork on several legs is "Farsta" forked: every team runs every branch once over those legs.
+public class CourseBuilder : MonoBehaviour
+{
+    public Camera mapCamera;
+
+    enum Tool { Start, Control, Finish, Branch }
+
+    MapDefinition map;
+    MapGrid grid;
+    SpriteRenderer mapRenderer;
+    CourseRenderer courseRenderer;
+
+    // ---- What is being laid, in world positions ----
+
+    class EditItem
+    {
+        public int fork = -1;          // index into forks, or -1 for a control
+        public Vector3 point;
+    }
+
+    class EditCourse
+    {
+        public Vector3? start;
+        public List<EditItem> items = new List<EditItem>();
+        public Vector3? finish;
+    }
+
+    class EditFork
+    {
+        public List<List<Vector3>> branches = new List<List<Vector3>>();
+    }
+
+    readonly List<EditCourse> courses = new List<EditCourse> { new EditCourse() };
+    readonly List<EditFork> forks = new List<EditFork>();
+    readonly List<int> legCourse = new List<int>();   // relay: the course each leg runs
+    bool relay;
+    int legs = 3;
+    bool forkEveryVariant = true;
+    int selectedLeg;
+
+    EditCourse Cur => courses[relay && selectedLeg < legCourse.Count ? legCourse[selectedLeg] : 0];
+
+    CourseData editing;            // the saved course being changed, or null for a new one
+    Tool tool = Tool.Start;
+    int branchFork = -1, branchIndex = -1;   // where the Branch tool adds controls
+    Vector3? errorPoint;
+
+    // Marks on the map: the course being laid, and the faded forks of other legs
+    enum MarkType { Start, Control, BranchControl, Finish, Shadow }
+
+    class Mark
+    {
+        public MarkType type;
+        public int item = -1;
+        public int fork = -1;
+        public int branch = -1;
+        public int index = -1;
+        public Vector3 position;
+        public string label;
+    }
+
+    readonly List<Mark> marks = new List<Mark>();
+    readonly List<Mark> shadows = new List<Mark>();
+    Mark dragging;
+    Vector3 lastPanMouse;
+    bool panning;
+    bool busy;
+
+    // UI
+    TMP_InputField nameField;
+    TMP_InputField authorField;
+    readonly Dictionary<Tool, Button> toolButtons = new Dictionary<Tool, Button>();
+    TextMeshProUGUI hintText;
+    TextMeshProUGUI statusText;
+    TextMeshProUGUI summaryText;
+    RectTransform pointList;
+    RectTransform myCourseList;
+    TextMeshProUGUI myCoursesTitle;
+    Button saveButton;
+    Button mapButton;
+    Button typeButton;
+    Image relayPanel;
+    TextMeshProUGUI legsLabel;
+    RectTransform legButtonRow;
+    Button sameCourseButton;
+    Button forkModeButton;
+    TextMeshProUGUI relayInfo;
+    GameObject forkPopup;
+    GameObject canvasObject;
+
+    const float PanelWidth = 560f;
+
+    void Start()
+    {
+        if (mapCamera == null) mapCamera = Camera.main;
+        BuildUI();
+        List<MapDefinition> maps = MapDefinition.All;
+        if (maps.Count == 0)
+        {
+            SetStatus("No maps found in Resources/MapDefs.", true);
+            return;
+        }
+        SelectMap(maps[0]);
+        RefreshMyCourses();
+        // Sign in early so publishing is quick later; failure is shown when saving
+        _ = CloudCourses.SignInAsync();
+    }
+
+    // ---- Map ----
+
+    void SelectMap(MapDefinition chosen)
+    {
+        map = chosen;
+        grid = MapGrid.Load(map.gridName);
+        if (mapRenderer == null)
+        {
+            mapRenderer = new GameObject("Map").AddComponent<SpriteRenderer>();
+            courseRenderer = new GameObject("Course").AddComponent<CourseRenderer>();
+        }
+        MapBackground background = map.GetBackground(map.defaultBackground);
+        if (background != null)
+        {
+            mapRenderer.sprite = Resources.Load<Sprite>(background.spritePath);
+            mapRenderer.transform.position = new Vector3(background.position.x, background.position.y, 0f);
+            mapRenderer.transform.rotation = Quaternion.Euler(0, 0, background.rotation);
+            mapRenderer.transform.localScale = new Vector3(background.scale, background.scale, 1f);
+        }
+        if (mapButton != null) CourseUI.SetButtonText(mapButton, "Map: " + map.displayName + (MapDefinition.All.Count > 1 ? "  (change)" : ""));
+        ClearCourse();
+        FitCamera();
+    }
+
+    void NextMap()
+    {
+        List<MapDefinition> maps = MapDefinition.All;
+        if (maps.Count < 2) return;
+        int index = maps.IndexOf(map);
+        SelectMap(maps[(index + 1) % maps.Count]);
+    }
+
+    void FitCamera()
+    {
+        if (mapRenderer == null || mapRenderer.sprite == null) return;
+        Bounds bounds = mapRenderer.bounds;
+        // Leave room for the panel on the right
+        float visibleWidthShare = 1f - PanelWidth / Mathf.Max(1f, Screen.width * (1920f / Mathf.Max(1, Screen.width)));
+        mapCamera.orthographicSize = Mathf.Max(bounds.extents.y, bounds.extents.x / (mapCamera.aspect * visibleWidthShare)) * 1.02f;
+        float worldPanel = mapCamera.orthographicSize * mapCamera.aspect * 2f * (1f - visibleWidthShare);
+        mapCamera.transform.position = new Vector3(bounds.center.x + worldPanel / 2f, bounds.center.y, -10f);
+    }
+
+    // ---- Input ----
+
+    void Update()
+    {
+        if (map == null || busy || forkPopup != null) return;
+        bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        bool typing = EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null
+                      && EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>() != null;
+        Vector3 mouseWorld = mapCamera.ScreenToWorldPoint(Input.mousePosition);
+        mouseWorld.z = -1f;
+
+        // Zoom towards the mouse
+        float wheel = Input.mouseScrollDelta.y;
+        if (!overUI && Mathf.Abs(wheel) > 0.01f)
+        {
+            float oldSize = mapCamera.orthographicSize;
+            float newSize = Mathf.Clamp(oldSize * (wheel > 0 ? 0.85f : 1.18f), 1.5f, 45f);
+            mapCamera.orthographicSize = newSize;
+            Vector3 after = mapCamera.ScreenToWorldPoint(Input.mousePosition);
+            mapCamera.transform.position += new Vector3(mouseWorld.x - after.x, mouseWorld.y - after.y, 0f);
+        }
+
+        // Pan with right or middle drag
+        if ((Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2)) && !overUI)
+        {
+            panning = false;
+            lastPanMouse = Input.mousePosition;
+        }
+        if (Input.GetMouseButton(1) || Input.GetMouseButton(2))
+        {
+            Vector3 delta = Input.mousePosition - lastPanMouse;
+            if (delta.sqrMagnitude > 9f) panning = true;
+            if (panning)
+            {
+                float unitsPerPixel = mapCamera.orthographicSize * 2f / Screen.height;
+                mapCamera.transform.position -= new Vector3(delta.x, delta.y, 0f) * unitsPerPixel;
+                lastPanMouse = Input.mousePosition;
+            }
+        }
+        if (!typing)
+        {
+            Vector3 keys = new Vector3(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"), 0f);
+            mapCamera.transform.position += keys * mapCamera.orthographicSize * Time.unscaledDeltaTime;
+        }
+
+        // Right click (without dragging) on a mark removes it
+        if (Input.GetMouseButtonUp(1) && !panning && !overUI)
+        {
+            Mark hit = Hit(marks, mouseWorld);
+            if (hit != null) RemoveMark(hit);
+        }
+
+        // Left click: drag a mark that is already there, use a faded fork, or place a new mark
+        if (Input.GetMouseButtonDown(0) && !overUI)
+        {
+            Mark hit = tool == Tool.Branch ? null : Hit(marks, mouseWorld);
+            Mark shadow = relay && hit == null ? Hit(shadows, mouseWorld, 1.6f) : null;
+            if (hit != null)
+            {
+                dragging = hit;
+            }
+            else if (shadow != null)
+            {
+                AskUseFork(shadow.fork, mouseWorld);
+            }
+            else
+            {
+                Place(mouseWorld);
+            }
+        }
+        if (dragging != null)
+        {
+            if (Input.GetMouseButton(0))
+            {
+                SetMarkPosition(dragging, mouseWorld);
+                Redraw();
+            }
+            else
+            {
+                // Dropped: it must be somewhere a runner can stand
+                string problem = CourseValidator.CheckPoint(map, grid, map.FromWorld(dragging.position));
+                errorPoint = null;
+                if (problem != null)
+                {
+                    SetStatus(MarkName(dragging) + ": " + problem, true);
+                    errorPoint = dragging.position;
+                }
+                else
+                {
+                    SetStatus("", false);
+                }
+                dragging = null;
+                Redraw();
+            }
+        }
+    }
+
+    Mark Hit(List<Mark> list, Vector3 world, float reach = 1.2f)
+    {
+        float best = Mathf.Max(courseRenderer.controlRadiusMeters * MapDefinition.WorldUnitsPerMeter * reach, mapCamera.orthographicSize * 0.02f);
+        Mark hit = null;
+        foreach (Mark mark in list)
+        {
+            float distance = Vector2.Distance(mark.position, world);
+            if (distance < best)
+            {
+                best = distance;
+                hit = mark;
+            }
+        }
+        return hit;
+    }
+
+    void Place(Vector3 world)
+    {
+        string problem = CourseValidator.CheckPoint(map, grid, map.FromWorld(world));
+        if (problem != null)
+        {
+            SetStatus(problem, true);
+            return;
+        }
+        SetStatus("", false);
+        errorPoint = null;
+        EditCourse course = Cur;
+        switch (tool)
+        {
+            case Tool.Start:
+                course.start = world;
+                SetTool(Tool.Control);
+                break;
+            case Tool.Control:
+                if (ControlCount(course) >= CourseData.MaxControls)
+                {
+                    SetStatus("A course can have at most " + CourseData.MaxControls + " controls.", true);
+                    return;
+                }
+                course.items.Add(new EditItem { point = world });
+                break;
+            case Tool.Branch:
+                if (branchFork < 0 || branchFork >= forks.Count || branchIndex >= forks[branchFork].branches.Count)
+                {
+                    SetTool(Tool.Control);
+                    return;
+                }
+                if (ControlCount(course) >= CourseData.MaxControls)
+                {
+                    SetStatus("A course can have at most " + CourseData.MaxControls + " controls.", true);
+                    return;
+                }
+                forks[branchFork].branches[branchIndex].Add(world);
+                break;
+            case Tool.Finish:
+                course.finish = world;
+                break;
+        }
+        Redraw();
+    }
+
+    int ControlCount(EditCourse course)
+    {
+        int count = 0;
+        foreach (EditItem item in course.items)
+        {
+            if (item.fork < 0) count++;
+            else foreach (List<Vector3> branch in forks[item.fork].branches) count += branch.Count;
+        }
+        return count;
+    }
+
+    // ---- Marks ----
+
+    void SetMarkPosition(Mark mark, Vector3 world)
+    {
+        mark.position = world;
+        EditCourse course = Cur;
+        switch (mark.type)
+        {
+            case MarkType.Start: course.start = world; break;
+            case MarkType.Finish: course.finish = world; break;
+            case MarkType.Control: course.items[mark.item].point = world; break;
+            case MarkType.BranchControl: forks[mark.fork].branches[mark.branch][mark.index] = world; break;
+        }
+    }
+
+    void RemoveMark(Mark mark)
+    {
+        EditCourse course = Cur;
+        switch (mark.type)
+        {
+            case MarkType.Start: course.start = null; break;
+            case MarkType.Finish: course.finish = null; break;
+            case MarkType.Control: course.items.RemoveAt(mark.item); break;
+            case MarkType.BranchControl: forks[mark.fork].branches[mark.branch].RemoveAt(mark.index); break;
+        }
+        if (tool == Tool.Branch) SetTool(Tool.Control);
+        errorPoint = null;
+        SetStatus("", false);
+        Redraw();
+    }
+
+    string MarkName(Mark mark)
+    {
+        switch (mark.type)
+        {
+            case MarkType.Start: return "Start";
+            case MarkType.Finish: return "Finish";
+            default: return "Control " + mark.label;
+        }
+    }
+
+    // Numbers the course the way it is shown: common controls 1, 2, 3...; a fork takes one number, and its branch
+    // controls are that number with the branch letter (3A, 3B, and 3A2 for the second control on branch A)
+    void BuildMarks(out List<CourseRenderer.Mark> drawn, out List<CourseRenderer.Line> lines)
+    {
+        marks.Clear();
+        shadows.Clear();
+        drawn = new List<CourseRenderer.Mark>();
+        lines = new List<CourseRenderer.Line>();
+        EditCourse course = Cur;
+        Color purple = CourseRenderer.CoursePurple;
+
+        List<(Vector3 point, CourseRenderer.MarkKind kind)> previous = new List<(Vector3, CourseRenderer.MarkKind)>();
+        if (course.start.HasValue)
+        {
+            marks.Add(new Mark { type = MarkType.Start, position = course.start.Value, label = "Start" });
+            previous.Add((course.start.Value, CourseRenderer.MarkKind.Start));
+        }
+        int number = 0;
+        for (int i = 0; i < course.items.Count; i++)
+        {
+            EditItem item = course.items[i];
+            number++;
+            if (item.fork < 0)
+            {
+                marks.Add(new Mark { type = MarkType.Control, item = i, position = item.point, label = number.ToString() });
+                foreach (var from in previous) lines.Add(new CourseRenderer.Line { from = from.point, to = item.point, fromKind = from.kind, toKind = CourseRenderer.MarkKind.Control, color = purple });
+                previous = new List<(Vector3, CourseRenderer.MarkKind)> { (item.point, CourseRenderer.MarkKind.Control) };
+                continue;
+            }
+            EditFork fork = forks[item.fork];
+            List<(Vector3, CourseRenderer.MarkKind)> ends = new List<(Vector3, CourseRenderer.MarkKind)>();
+            for (int b = 0; b < fork.branches.Count; b++)
+            {
+                List<(Vector3 point, CourseRenderer.MarkKind kind)> branchPrevious = previous;
+                for (int k = 0; k < fork.branches[b].Count; k++)
+                {
+                    Vector3 point = fork.branches[b][k];
+                    string label = number + CourseData.BranchLetter(b) + (k > 0 ? (k + 1).ToString() : "");
+                    marks.Add(new Mark { type = MarkType.BranchControl, item = i, fork = item.fork, branch = b, index = k, position = point, label = label });
+                    foreach (var from in branchPrevious) lines.Add(new CourseRenderer.Line { from = from.point, to = point, fromKind = from.kind, toKind = CourseRenderer.MarkKind.Control, color = purple });
+                    branchPrevious = new List<(Vector3, CourseRenderer.MarkKind)> { (point, CourseRenderer.MarkKind.Control) };
+                }
+                foreach (var end in branchPrevious) if (!ends.Contains(end)) ends.Add(end);
+            }
+            previous = ends;
+        }
+        if (course.finish.HasValue)
+        {
+            marks.Add(new Mark { type = MarkType.Finish, position = course.finish.Value, label = "Finish" });
+            foreach (var from in previous) lines.Add(new CourseRenderer.Line { from = from.point, to = course.finish.Value, fromKind = from.kind, toKind = CourseRenderer.MarkKind.Finish, color = purple });
+        }
+
+        Mark bad = null;
+        if (errorPoint.HasValue)
+        {
+            float best = 0.08f;
+            foreach (Mark mark in marks)
+            {
+                float d = Vector2.Distance(mark.position, errorPoint.Value);
+                if (d < best) { best = d; bad = mark; }
+            }
+        }
+        Vector3 firstAfterStart = Vector3.zero;
+        foreach (Mark mark in marks)
+        {
+            if (mark.type != MarkType.Start && firstAfterStart == Vector3.zero) firstAfterStart = mark.position;
+        }
+        foreach (Mark mark in marks)
+        {
+            Color color = mark == bad ? CourseRenderer.ErrorRed : purple;
+            CourseRenderer.MarkKind kind = mark.type == MarkType.Start ? CourseRenderer.MarkKind.Start : mark.type == MarkType.Finish ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control;
+            drawn.Add(new CourseRenderer.Mark
+            {
+                position = mark.position, kind = kind, color = color,
+                label = mark.type == MarkType.Start || mark.type == MarkType.Finish ? "" : mark.label,
+                toward = mark.type == MarkType.Start && firstAfterStart != Vector3.zero ? firstAfterStart - mark.position : Vector3.up
+            });
+        }
+
+        if (relay) AddShadowForks(drawn, lines);
+    }
+
+    // The forks of other legs that this leg doesn't have yet, faded, with the common controls around them.
+    // Clicking one of their controls offers to put the whole fork on this leg.
+    void AddShadowForks(List<CourseRenderer.Mark> drawn, List<CourseRenderer.Line> lines)
+    {
+        Color faded = CourseRenderer.ShadowPurple;
+        EditCourse course = Cur;
+        for (int f = 0; f < forks.Count; f++)
+        {
+            if (course.items.Exists(item => item.fork == f)) continue;
+            if (!FindForkSource(f, out Vector3 entry, out Vector3 exit, out bool entryIsStart, out bool exitIsFinish, out int sourceLeg)) continue;
+            EditFork fork = forks[f];
+            drawn.Add(new CourseRenderer.Mark { position = entry, kind = entryIsStart ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control, color = faded, label = "", toward = Vector3.up });
+            drawn.Add(new CourseRenderer.Mark { position = exit, kind = exitIsFinish ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control, color = faded, label = "" });
+            // The common controls before and after the fork can be clicked too (this leg's own marks win where they overlap)
+            shadows.Add(new Mark { type = MarkType.Shadow, fork = f, position = entry, label = "" });
+            shadows.Add(new Mark { type = MarkType.Shadow, fork = f, position = exit, label = "" });
+            for (int b = 0; b < fork.branches.Count; b++)
+            {
+                Vector3 from = entry;
+                CourseRenderer.MarkKind fromKind = entryIsStart ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control;
+                for (int k = 0; k < fork.branches[b].Count; k++)
+                {
+                    Vector3 point = fork.branches[b][k];
+                    string label = "F" + (f + 1) + CourseData.BranchLetter(b) + (k > 0 ? (k + 1).ToString() : "");
+                    shadows.Add(new Mark { type = MarkType.Shadow, fork = f, branch = b, index = k, position = point, label = label });
+                    drawn.Add(new CourseRenderer.Mark { position = point, kind = CourseRenderer.MarkKind.Control, color = faded, label = label });
+                    lines.Add(new CourseRenderer.Line { from = from, to = point, fromKind = fromKind, toKind = CourseRenderer.MarkKind.Control, color = faded });
+                    from = point;
+                    fromKind = CourseRenderer.MarkKind.Control;
+                }
+                lines.Add(new CourseRenderer.Line { from = from, to = exit, fromKind = fromKind, toKind = exitIsFinish ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control, color = faded });
+            }
+        }
+    }
+
+    // Where a fork sits on the first leg that has it: the common point before it and after it
+    bool FindForkSource(int f, out Vector3 entry, out Vector3 exit, out bool entryIsStart, out bool exitIsFinish, out int sourceLeg)
+    {
+        entry = exit = Vector3.zero;
+        entryIsStart = exitIsFinish = false;
+        sourceLeg = -1;
+        for (int leg = 0; leg < legs && leg < legCourse.Count; leg++)
+        {
+            EditCourse course = courses[legCourse[leg]];
+            int i = course.items.FindIndex(item => item.fork == f);
+            if (i < 0) continue;
+            Vector3? before = i == 0 ? course.start : course.items[i - 1].fork < 0 ? course.items[i - 1].point : (Vector3?)null;
+            Vector3? after = i == course.items.Count - 1 ? course.finish : course.items[i + 1].fork < 0 ? course.items[i + 1].point : (Vector3?)null;
+            if (!before.HasValue || !after.HasValue) continue;
+            entry = before.Value;
+            exit = after.Value;
+            entryIsStart = i == 0;
+            exitIsFinish = i == course.items.Count - 1;
+            sourceLeg = leg;
+            return true;
+        }
+        return false;
+    }
+
+    void Redraw()
+    {
+        BuildMarks(out List<CourseRenderer.Mark> drawn, out List<CourseRenderer.Line> lines);
+        courseRenderer.DrawMarks(drawn, lines);
+        RefreshPointList();
+        RefreshHint();
+        RefreshRelayPanel();
+    }
+
+    // ---- Forks ----
+
+    int MaxBranches => forkEveryVariant ? legs : 26;
+
+    // Turns control i into a fork: the control is branch A, and the next clicks lay branch B
+    void MakeFork(int i)
+    {
+        EditCourse course = Cur;
+        if ((i > 0 && course.items[i - 1].fork >= 0) || (i < course.items.Count - 1 && course.items[i + 1].fork >= 0))
+        {
+            SetStatus("Next to a fork there must be a common control that every team runs, so this control can't be a fork too.", true);
+            return;
+        }
+        if (MaxBranches < 2)
+        {
+            SetStatus("A fork needs at least two legs.", true);
+            return;
+        }
+        EditFork fork = new EditFork();
+        fork.branches.Add(new List<Vector3> { course.items[i].point });
+        fork.branches.Add(new List<Vector3>());
+        forks.Add(fork);
+        course.items[i] = new EditItem { fork = forks.Count - 1 };
+        StartBranch(forks.Count - 1, 1);
+        SetStatus("Control " + (i + 1) + " is now a fork. Click where branch B's first control should be.", false);
+    }
+
+    void AddBranch(int f, bool direct)
+    {
+        if (forks[f].branches.Count >= MaxBranches)
+        {
+            SetStatus("Fork " + (f + 1) + " already has " + forks[f].branches.Count + " branches, the most it can have: the relay has " + legs
+                + " legs, and every team runs every branch once. Add legs, or choose random branches.", true);
+            return;
+        }
+        forks[f].branches.Add(new List<Vector3>());
+        if (direct)
+        {
+            SetStatus("Branch " + CourseData.BranchLetter(forks[f].branches.Count - 1) + " goes straight to the common control after the fork.", false);
+            Redraw();
+            return;
+        }
+        StartBranch(f, forks[f].branches.Count - 1);
+    }
+
+    void StartBranch(int f, int b)
+    {
+        branchFork = f;
+        branchIndex = b;
+        SetTool(Tool.Branch);
+        Redraw();
+    }
+
+    void RemoveBranch(int f, int b)
+    {
+        forks[f].branches.RemoveAt(b);
+        if (tool == Tool.Branch) SetTool(Tool.Control);
+        // A fork with one branch left is just controls, if no other leg has it
+        if (forks[f].branches.Count == 1 && LegsWithFork(f).Count <= LegsWithCourse(Cur).Count)
+        {
+            EditCourse course = Cur;
+            int i = course.items.FindIndex(item => item.fork == f);
+            if (i >= 0)
+            {
+                course.items.RemoveAt(i);
+                List<Vector3> rest = forks[f].branches[0];
+                for (int k = rest.Count - 1; k >= 0; k--) course.items.Insert(i, new EditItem { point = rest[k] });
+                forks[f].branches.Clear();
+            }
+        }
+        Redraw();
+    }
+
+    void RemoveForkFromLeg(int i)
+    {
+        Cur.items.RemoveAt(i);
+        if (tool == Tool.Branch) SetTool(Tool.Control);
+        Redraw();
+    }
+
+    List<int> LegsWithFork(int f)
+    {
+        List<int> result = new List<int>();
+        for (int leg = 0; leg < legs && leg < legCourse.Count; leg++)
+        {
+            if (courses[legCourse[leg]].items.Exists(item => item.fork == f)) result.Add(leg);
+        }
+        return result;
+    }
+
+    List<int> LegsWithCourse(EditCourse course)
+    {
+        List<int> result = new List<int>();
+        for (int leg = 0; leg < legs && leg < legCourse.Count; leg++)
+        {
+            if (courses[legCourse[leg]] == course) result.Add(leg);
+        }
+        return result;
+    }
+
+    // A faded fork was clicked: put the whole fork on this leg, or just a control where it was clicked
+    void AskUseFork(int f, Vector3 clicked)
+    {
+        if (!FindForkSource(f, out Vector3 entry, out Vector3 exit, out bool entryIsStart, out bool exitIsFinish, out int sourceLeg)) return;
+        Transform canvas = canvasObject.transform;
+        Image dim = CourseUI.Panel("Fork question", canvas, new Color(0f, 0f, 0f, 0.35f), false);
+        CourseUI.Stretch(dim.rectTransform);
+        forkPopup = dim.gameObject;
+        Image card = CourseUI.CardPanel("Card", dim.transform);
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-200, 0), new Vector2(700, 330));
+        CourseUI.Column(card.gameObject, 14, new RectOffset(32, 32, 28, 28));
+        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "Fork " + (f + 1) + " from leg " + (sourceLeg + 1), 32, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Size(title, 42);
+        int branches = forks[f].branches.Count;
+        TextMeshProUGUI text = CourseUI.Text("Text", card.transform,
+            "Put the whole fork on leg " + (selectedLeg + 1) + "? It has " + branches + " branches, and comes with the common "
+            + (entryIsStart ? "start" : "control") + " before it and the common " + (exitIsFinish ? "finish" : "control") + " after it.", 22, CourseUI.InkMuted);
+        CourseUI.Size(text, 96);
+        Button use = CourseUI.Button("Use", card.transform, "Use the whole fork", CourseUI.ButtonKind.Primary, () => { CloseForkPopup(); UseFork(f); }, 24);
+        CourseUI.Size(use, 54);
+        RectTransform row = CourseUI.Rect("Row", card.transform);
+        CourseUI.Row(row.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(row, 50);
+        CourseUI.Button("New control", row, "New control here instead", CourseUI.ButtonKind.Light, () => { CloseForkPopup(); Place(clicked); }, 20);
+        CourseUI.Button("Cancel", row, "Cancel", CourseUI.ButtonKind.Light, CloseForkPopup, 20);
+    }
+
+    void CloseForkPopup()
+    {
+        if (forkPopup != null) Destroy(forkPopup);
+        forkPopup = null;
+    }
+
+    void UseFork(int f)
+    {
+        if (!FindForkSource(f, out Vector3 entry, out Vector3 exit, out bool entryIsStart, out bool exitIsFinish, out int _)) return;
+        EditCourse course = Cur;
+        if (course.items.Exists(item => item.fork == f))
+        {
+            SetStatus("This leg already has fork " + (f + 1) + ".", true);
+            return;
+        }
+        if (course.items.Count > 0 && course.items[course.items.Count - 1].fork >= 0 && !entryIsStart)
+        {
+            // The common control before the fork is added below, so two forks are kept apart
+        }
+        if (entryIsStart)
+        {
+            if (course.items.Count > 0)
+            {
+                SetStatus("Fork " + (f + 1) + " starts at the start, so it has to be the first thing on the leg. Remove this leg's controls first, or lay a new control.", true);
+                return;
+            }
+            course.start = entry;
+        }
+        else
+        {
+            Vector3? last = course.items.Count == 0 ? course.start : course.items[course.items.Count - 1].fork < 0 ? course.items[course.items.Count - 1].point : (Vector3?)null;
+            if (!last.HasValue || Vector2.Distance(last.Value, entry) > 0.02f)
+            {
+                course.items.Add(new EditItem { point = entry });
+            }
+        }
+        course.items.Add(new EditItem { fork = f });
+        if (exitIsFinish)
+        {
+            course.finish = exit;
+            SetTool(Tool.Finish);
+        }
+        else
+        {
+            course.items.Add(new EditItem { point = exit });
+            SetTool(Tool.Control);
+        }
+        errorPoint = null;
+        SetStatus("Fork " + (f + 1) + " is now on leg " + (selectedLeg + 1) + " too, with the common controls around it." + (exitIsFinish ? " It ends at the finish." : " Carry on from the control after it."), false);
+        Redraw();
+    }
+
+    // ---- Legs ----
+
+    void SelectLeg(int leg)
+    {
+        selectedLeg = Mathf.Clamp(leg, 0, legs - 1);
+        CopyStartAndFinishFromLegBefore();
+        EditCourse course = Cur;
+        errorPoint = null;
+        dragging = null;
+        SetTool(!course.start.HasValue ? Tool.Start : Tool.Control);
+        SetStatus("", false);
+        Redraw();
+    }
+
+    void ChangeLegs(int delta)
+    {
+        legs = Mathf.Clamp(legs + delta, CourseData.MinLegs, CourseData.MaxLegs);
+        // Every new leg gets its own course
+        while (legCourse.Count < legs)
+        {
+            courses.Add(new EditCourse());
+            legCourse.Add(courses.Count - 1);
+        }
+        while (legCourse.Count > legs) legCourse.RemoveAt(legCourse.Count - 1);
+        if (selectedLeg >= legs)
+        {
+            SelectLeg(legs - 1);
+            return;
+        }
+        Redraw();
+    }
+
+    // Lets the selected leg run the same course as the leg before, or gives it back a course of its own (a copy)
+    void ToggleSameCourse()
+    {
+        if (selectedLeg == 0) return;
+        if (legCourse[selectedLeg] == legCourse[selectedLeg - 1])
+        {
+            EditCourse shared = Cur;
+            EditCourse own = new EditCourse { start = shared.start, finish = shared.finish };
+            foreach (EditItem item in shared.items) own.items.Add(new EditItem { fork = item.fork, point = item.point });
+            courses.Add(own);
+            legCourse[selectedLeg] = courses.Count - 1;
+            SetStatus("Leg " + (selectedLeg + 1) + " now has its own course, a copy of leg " + selectedLeg + "'s.", false);
+        }
+        else
+        {
+            legCourse[selectedLeg] = legCourse[selectedLeg - 1];
+            SetStatus("Leg " + (selectedLeg + 1) + " runs the same course as leg " + selectedLeg + ". Its forks count once per leg.", false);
+        }
+        SelectLeg(selectedLeg);
+    }
+
+    void ToggleForkMode()
+    {
+        forkEveryVariant = !forkEveryVariant;
+        Redraw();
+    }
+
+    void SetRelay(bool on)
+    {
+        relay = on;
+        if (typeButton != null) CourseUI.SetButtonText(typeButton, relay ? "Type: Relay" : "Type: Individual");
+        if (relayPanel != null) relayPanel.gameObject.SetActive(relay);
+        if (!relay && tool == Tool.Branch) SetTool(Tool.Control);
+        if (relay)
+        {
+            // Leg 1 keeps the course laid so far; the others get courses of their own
+            if (legCourse.Count == 0) legCourse.Add(0);
+            while (legCourse.Count < legs)
+            {
+                courses.Add(new EditCourse());
+                legCourse.Add(courses.Count - 1);
+            }
+            selectedLeg = Mathf.Clamp(selectedLeg, 0, legs - 1);
+        }
+        else
+        {
+            selectedLeg = 0;
+        }
+        if (courseRenderer != null) Redraw();
+    }
+
+    void RefreshRelayPanel()
+    {
+        if (relayPanel == null || !relay) return;
+        legsLabel.text = legs + " legs";
+        foreach (Transform child in legButtonRow) Destroy(child.gameObject);
+        for (int leg = 0; leg < legs && leg < legCourse.Count; leg++)
+        {
+            int captured = leg;
+            EditCourse course = courses[legCourse[leg]];
+            bool forked = course.items.Exists(item => item.fork >= 0 && forks[item.fork].branches.Count > 1);
+            string kind = leg > 0 && legCourse[leg] == legCourse[leg - 1] ? "= leg " + leg : forked ? "forked" : course.items.Count == 0 ? "empty" : "straight";
+            Button button = CourseUI.Button("Leg " + (leg + 1), legButtonRow, "Leg " + (leg + 1) + "\n" + kind,
+                leg == selectedLeg ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light, () => SelectLeg(captured), 15);
+            button.GetComponentInChildren<TextMeshProUGUI>().enableWordWrapping = true;
+        }
+        sameCourseButton.gameObject.SetActive(selectedLeg > 0);
+        bool same = selectedLeg > 0 && legCourse[selectedLeg] == legCourse[selectedLeg - 1];
+        CourseUI.SetButtonText(sameCourseButton, same ? "Give leg " + (selectedLeg + 1) + " its own course" : "Same course as leg " + selectedLeg);
+        CourseUI.SetButtonText(forkModeButton, forkEveryVariant ? "Every team runs every branch" : "Branches are random");
+        relayInfo.text = "Each leg has its own course. Turn a control into a fork with \"Fork\" in the control list; a branch can have several controls, or none.\n"
+            + "Faded controls are forks on other legs: click one to put the whole fork on this leg. "
+            + (forkEveryVariant ? "Every team runs every branch of a fork once, so a fork needs as many legs as branches." : "Each team gets a random branch of every fork.");
+    }
+
+    // ---- Clearing, checking and saving ----
+
+    void ClearCourse()
+    {
+        courses.Clear();
+        forks.Clear();
+        legCourse.Clear();
+        courses.Add(new EditCourse());
+        legCourse.Add(0);
+        if (relay)
+        {
+            while (legCourse.Count < legs)
+            {
+                courses.Add(new EditCourse());
+                legCourse.Add(courses.Count - 1);
+            }
+        }
+        selectedLeg = 0;
+        editing = null;
+        errorPoint = null;
+        if (nameField != null) nameField.text = "";
+        SetTool(Tool.Start);
+        SetStatus("", false);
+        if (courseRenderer != null) Redraw();
+    }
+
+    CourseData BuildCourse()
+    {
+        CourseData course = new CourseData
+        {
+            id = editing != null ? editing.id : CourseData.NewId(),
+            name = nameField.text.Trim(),
+            author = authorField.text.Trim(),
+            authorId = CloudCourses.PlayerId,
+            mapId = map.id,
+            background = "",
+            builtIn = false,
+            createdAt = editing != null ? editing.createdAt : DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        };
+        if (!relay)
+        {
+            // An individual course: forks (left from a relay) are run along branch A
+            EditCourse single = Cur;
+            course.start = single.start.HasValue ? WholeMeters(single.start.Value) : default;
+            course.finish = single.finish.HasValue ? WholeMeters(single.finish.Value) : default;
+            foreach (EditItem item in single.items)
+            {
+                if (item.fork < 0) course.controls.Add(WholeMeters(item.point));
+                else if (forks[item.fork].branches.Count > 0) foreach (Vector3 point in forks[item.fork].branches[0]) course.controls.Add(WholeMeters(point));
+            }
+            return course;
+        }
+
+        course.kind = CourseData.KindRelay;
+        course.legs = legs;
+        course.forkEveryVariant = forkEveryVariant;
+        // Only the courses and forks some leg uses are saved
+        List<int> usedCourses = new List<int>();
+        for (int leg = 0; leg < legs; leg++) if (!usedCourses.Contains(legCourse[leg])) usedCourses.Add(legCourse[leg]);
+        List<int> usedForks = new List<int>();
+        foreach (int ci in usedCourses)
+        {
+            foreach (EditItem item in courses[ci].items) if (item.fork >= 0 && !usedForks.Contains(item.fork)) usedForks.Add(item.fork);
+        }
+        usedForks.Sort();
+        foreach (int f in usedForks)
+        {
+            RelayFork fork = new RelayFork();
+            foreach (List<Vector3> branch in forks[f].branches)
+            {
+                RelayBranch relayBranch = new RelayBranch();
+                foreach (Vector3 point in branch) relayBranch.controls.Add(WholeMeters(point));
+                fork.branches.Add(relayBranch);
+            }
+            course.relayForks.Add(fork);
+        }
+        foreach (int ci in usedCourses)
+        {
+            EditCourse edit = courses[ci];
+            RelayLegCourse relayCourse = new RelayLegCourse
+            {
+                start = edit.start.HasValue ? WholeMeters(edit.start.Value) : default,
+                finish = edit.finish.HasValue ? WholeMeters(edit.finish.Value) : default
+            };
+            foreach (EditItem item in edit.items)
+            {
+                relayCourse.items.Add(item.fork < 0
+                    ? new RelayItem { fork = -1, point = WholeMeters(item.point) }
+                    : new RelayItem { fork = usedForks.IndexOf(item.fork) });
+            }
+            course.relayCourses.Add(relayCourse);
+        }
+        for (int leg = 0; leg < legs; leg++) course.legCourse.Add(usedCourses.IndexOf(legCourse[leg]));
+        course.RefreshMainFields();
+        return course;
+    }
+
+    // Whole metres, so the course is exactly the same for the players who receive it in the lobby (CourseData.ToCompact)
+    CoursePoint WholeMeters(Vector3 world)
+    {
+        CoursePoint point = map.FromWorld(world);
+        return new CoursePoint(Math.Round(point.e), Math.Round(point.n));
+    }
+
+    // Returns null when the course is fine, otherwise what is wrong (and shows and marks the bad point)
+    string CheckCourse(out CourseValidator.Result result)
+    {
+        result = null;
+        errorPoint = null;
+        if (!relay)
+        {
+            EditCourse single = Cur;
+            if (!single.start.HasValue) return "Place the start first.";
+            if (single.items.Count == 0) return "Add at least one control.";
+            if (!single.finish.HasValue) return "Place the finish.";
+        }
+        else
+        {
+            for (int leg = 0; leg < legs; leg++)
+            {
+                EditCourse course = courses[legCourse[leg]];
+                bool empty = !course.start.HasValue && !course.finish.HasValue && course.items.Count == 0;
+                string missing = empty ? "has no course yet. Lay it, or let it run the same course as the leg before"
+                    : !course.start.HasValue ? "has no start" : course.items.Count == 0 ? "has no controls" : !course.finish.HasValue ? "has no finish" : null;
+                if (missing != null)
+                {
+                    ShowLeg(leg);
+                    return "Leg " + (leg + 1) + " " + missing + ".";
+                }
+            }
+        }
+
+        CourseData built = BuildCourse();
+        result = CourseValidator.Check(map, grid, built);
+        if (!result.ok)
+        {
+            if (relay && result.badLeg >= 0) ShowLeg(result.badLeg);
+            if (result.hasBadPoint) errorPoint = map.ToWorld(result.badPoint);
+            else if (!relay && result.badIndex >= 0) errorPoint = map.ToWorld(built.AllPoints()[Mathf.Clamp(result.badIndex, 0, built.AllPoints().Count - 1)]);
+            return result.message;
+        }
+        return null;
+    }
+
+    void ShowLeg(int leg)
+    {
+        if (leg == selectedLeg) return;
+        selectedLeg = leg;
+        CopyStartAndFinishFromLegBefore();
+        dragging = null;
+        SetTool(Cur.start.HasValue ? Tool.Control : Tool.Start);
+    }
+
+    // A new leg starts with the same start and finish as the leg before, since relays usually share them
+    void CopyStartAndFinishFromLegBefore()
+    {
+        EditCourse course = Cur;
+        if (selectedLeg > 0 && !course.start.HasValue && !course.finish.HasValue && course.items.Count == 0)
+        {
+            EditCourse before = courses[legCourse[selectedLeg - 1]];
+            course.start = before.start;
+            course.finish = before.finish;
+        }
+    }
+
+    void OnCheck()
+    {
+        string problem = CheckCourse(out CourseValidator.Result result);
+        Redraw();
+        if (problem != null)
+        {
+            SetStatus(problem, true);
+            return;
+        }
+        float walk = 0f;
+        foreach (float leg in result.legMeters) walk += leg;
+        SetStatus(result.message + (walk > 0f ? " Shortest way round: " + (walk / 1000f).ToString("0.0") + " km." : ""), false);
+    }
+
+    async void OnSave()
+    {
+        if (string.IsNullOrWhiteSpace(nameField.text))
+        {
+            SetStatus("Give the course a name.", true);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(authorField.text))
+        {
+            SetStatus("Write your name, so others can see who made the course.", true);
+            return;
+        }
+        string problem = CheckCourse(out _);
+        Redraw();
+        if (problem != null)
+        {
+            SetStatus(problem + " The course was not saved.", true);
+            return;
+        }
+
+        // The only limit on how many courses a player can have is Unity Cloud's 5 MB per player
+        List<CourseData> afterSave = CourseLibrary.Mine();
+        CourseData draft = BuildCourse();
+        afterSave.RemoveAll(c => c.id == draft.id);
+        afterSave.Add(draft);
+        if (!CloudCourses.FitsInCloud(afterSave))
+        {
+            SetStatus("Your courses would be over Unity Cloud's 5 MB limit. Delete a course before saving a new one.", true);
+            return;
+        }
+
+        PlayerPrefs.SetString("PlayerNickName", authorField.text.Trim());
+        PlayerPrefs.Save();
+
+        busy = true;
+        saveButton.interactable = false;
+        SetStatus("Saving...", false);
+        try
+        {
+            await CloudCourses.SignInAsync();
+        }
+        catch (Exception)
+        {
+            // Saved locally below; publishing is tried again on the next save
+        }
+        CourseData course = BuildCourse();
+        CourseLibrary.SaveMine(course);
+        editing = course;
+        try
+        {
+            await CloudCourses.PublishAsync(CourseLibrary.Mine());
+            SetStatus("Saved and published. \"" + course.name + "\" is now in the course list in the lobby.", false);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("CourseBuilder: publish failed: " + e);
+            SetStatus("Saved on this computer, but it could not be published: " + CloudCourses.Describe(e), true);
+        }
+        busy = false;
+        saveButton.interactable = true;
+        RefreshMyCourses();
+    }
+
+    void Edit(CourseData course)
+    {
+        MapDefinition courseMap = MapDefinition.Find(course.mapId);
+        if (courseMap != map) SelectMap(courseMap);
+        course.Normalize();
+        relay = course.IsRelay();
+        if (relay) legs = Mathf.Clamp(course.legs, CourseData.MinLegs, CourseData.MaxLegs);
+        ClearCourse();
+        editing = course;
+        nameField.text = course.name;
+        courses.Clear();
+        legCourse.Clear();
+        forks.Clear();
+        if (relay)
+        {
+            forkEveryVariant = course.forkEveryVariant;
+            foreach (RelayFork fork in course.relayForks)
+            {
+                EditFork edit = new EditFork();
+                foreach (RelayBranch branch in fork.branches) edit.branches.Add(branch.controls.ConvertAll(p => map.ToWorld(p)));
+                forks.Add(edit);
+            }
+            foreach (RelayLegCourse relayCourse in course.relayCourses)
+            {
+                EditCourse edit = new EditCourse { start = map.ToWorld(relayCourse.start), finish = map.ToWorld(relayCourse.finish) };
+                foreach (RelayItem item in relayCourse.items)
+                {
+                    edit.items.Add(item.fork < 0 ? new EditItem { point = map.ToWorld(item.point) } : new EditItem { fork = item.fork });
+                }
+                courses.Add(edit);
+            }
+            for (int leg = 0; leg < legs; leg++) legCourse.Add(course.LegCourseIndex(leg));
+        }
+        else
+        {
+            EditCourse edit = new EditCourse { start = map.ToWorld(course.start), finish = map.ToWorld(course.finish) };
+            foreach (CoursePoint control in course.controls) edit.items.Add(new EditItem { point = map.ToWorld(control) });
+            courses.Add(edit);
+            legCourse.Add(0);
+        }
+        selectedLeg = 0;
+        SetRelay(relay);
+        SetTool(Tool.Control);
+        SetStatus("Editing \"" + course.name + "\". Save to update it.", false);
+        Redraw();
+    }
+
+    async void Delete(CourseData course)
+    {
+        CourseLibrary.DeleteMine(course.id);
+        if (editing != null && editing.id == course.id) editing = null;
+        RefreshMyCourses();
+        try
+        {
+            await CloudCourses.PublishAsync(CourseLibrary.Mine());
+            SetStatus("\"" + course.name + "\" was deleted.", false);
+        }
+        catch (Exception e)
+        {
+            SetStatus("Deleted on this computer, but Unity Cloud could not be updated: " + CloudCourses.Describe(e), true);
+        }
+    }
+
+    // ---- UI ----
+
+    void SetTool(Tool chosen)
+    {
+        tool = chosen;
+        foreach (var pair in toolButtons)
+        {
+            CourseUI.SetButtonColor(pair.Value, pair.Key == tool ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        }
+        RefreshHint();
+    }
+
+    void RefreshHint()
+    {
+        if (hintText == null) return;
+        EditCourse course = Cur;
+        string text;
+        if (tool == Tool.Start) text = "Click on the map where the start should be.";
+        else if (tool == Tool.Control) text = "Click on the map to add control " + (course.items.Count + 1) + ". Choose Finish when you are done.";
+        else if (tool == Tool.Branch && branchFork >= 0 && branchFork < forks.Count && branchIndex < forks[branchFork].branches.Count)
+            text = "Click to add control " + (forks[branchFork].branches[branchIndex].Count + 1) + " of fork " + (branchFork + 1) + ", branch "
+                + CourseData.BranchLetter(branchIndex) + ". Choose Controls when the branch is done.";
+        else text = "Click on the map where the finish should be.";
+        hintText.text = text + "\nDrag a mark to move it, right-click it to remove it. Right-drag moves the map, the wheel zooms.";
+
+        if (summaryText != null)
+        {
+            int forkCount = course.items.FindAll(item => item.fork >= 0).Count;
+            string length = !relay && course.start.HasValue && course.finish.HasValue ? "  ·  " + BuildCourse().LengthText() + " straight line" : "";
+            summaryText.text = relay
+                ? "Leg " + (selectedLeg + 1) + "  ·  " + ControlCount(course) + " controls" + (forkCount > 0 ? ", " + forkCount + (forkCount == 1 ? " fork" : " forks") : "")
+                : course.items.Count + " controls" + length;
+        }
+    }
+
+    void SetStatus(string message, bool isError)
+    {
+        if (statusText == null) return;
+        statusText.text = message;
+        statusText.color = isError ? CourseUI.Danger : CourseUI.Forest;
+    }
+
+    void BuildUI()
+    {
+        canvasObject = new GameObject("Builder UI", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        Canvas canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.matchWidthOrHeight = 1f;
+        if (FindObjectOfType<EventSystem>() == null)
+        {
+            new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        }
+
+        Image panel = CourseUI.CardPanel("Panel", canvasObject.transform);
+        RectTransform panelRect = panel.rectTransform;
+        panelRect.anchorMin = new Vector2(1, 0);
+        panelRect.anchorMax = new Vector2(1, 1);
+        panelRect.pivot = new Vector2(1, 0.5f);
+        panelRect.sizeDelta = new Vector2(PanelWidth, -48);
+        panelRect.anchoredPosition = new Vector2(-24, 0);
+        CourseUI.Column(panel.gameObject, 12, new RectOffset(28, 28, 26, 26));
+
+        TextMeshProUGUI title = CourseUI.Text("Title", panel.transform, "Course builder", 40, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Size(title, 50);
+
+        RectTransform mapRow = CourseUI.Rect("Map row", panel.transform);
+        CourseUI.Row(mapRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(mapRow, 48);
+        mapButton = CourseUI.Button("Map", mapRow, "Map", CourseUI.ButtonKind.Light, NextMap, 22);
+        typeButton = CourseUI.Button("Type", mapRow, "Type: Individual", CourseUI.ButtonKind.Light, () => SetRelay(!relay), 22);
+
+        nameField = CourseUI.Input("Course name", panel.transform, "Course name", CourseData.MaxNameLength, null);
+        CourseUI.Size(nameField, 54);
+        authorField = CourseUI.Input("Your name", panel.transform, "Your name", CourseData.MaxAuthorLength, null);
+        CourseUI.Size(authorField, 54);
+        authorField.text = PlayerPrefs.GetString("PlayerNickName", GameManager.Instance != null ? GameManager.Instance.playerNickName : "");
+
+        RectTransform toolRow = CourseUI.Rect("Tools", panel.transform);
+        CourseUI.Row(toolRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(toolRow, 54);
+        toolButtons[Tool.Start] = CourseUI.Button("Start", toolRow, "Start", CourseUI.ButtonKind.Light, () => SetTool(Tool.Start), 24);
+        toolButtons[Tool.Control] = CourseUI.Button("Control", toolRow, "Controls", CourseUI.ButtonKind.Light, () => SetTool(Tool.Control), 24);
+        toolButtons[Tool.Finish] = CourseUI.Button("Finish", toolRow, "Finish", CourseUI.ButtonKind.Light, () => SetTool(Tool.Finish), 24);
+
+        hintText = CourseUI.Text("Hint", panel.transform, "", 19, CourseUI.InkMuted);
+        CourseUI.Size(hintText, 66);
+
+        summaryText = CourseUI.Text("Summary", panel.transform, "", 24, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Size(summaryText, 32);
+
+        pointList = CourseUI.ScrollList("Points", panel.transform, out _);
+        CourseUI.Column(pointList.gameObject, 4, new RectOffset(0, 8, 0, 0));
+        LayoutElement pointsLayout = CourseUI.Size(pointList.parent.GetComponent<Image>(), 110);
+        pointsLayout.flexibleHeight = 1;
+
+        statusText = CourseUI.Text("Status", panel.transform, "", 19, CourseUI.Forest, FontStyles.Bold);
+        CourseUI.Size(statusText, 76);
+        statusText.overflowMode = TextOverflowModes.Overflow;
+
+        RectTransform actionRow = CourseUI.Rect("Actions", panel.transform);
+        CourseUI.Row(actionRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(actionRow, 58);
+        CourseUI.Button("Check", actionRow, "Check course", CourseUI.ButtonKind.Secondary, OnCheck, 24);
+        saveButton = CourseUI.Button("Save", actionRow, "Save & publish", CourseUI.ButtonKind.Primary, OnSave, 24);
+
+        myCoursesTitle = CourseUI.Text("My courses title", panel.transform, "My courses", 26, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Size(myCoursesTitle, 34);
+        myCourseList = CourseUI.ScrollList("My courses", panel.transform, out _);
+        CourseUI.Column(myCourseList.gameObject, 4, new RectOffset(0, 8, 0, 0));
+        CourseUI.Size(myCourseList.parent.GetComponent<Image>(), 90);
+
+        RectTransform bottomRow = CourseUI.Rect("Bottom", panel.transform);
+        CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(bottomRow, 52);
+        CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Light, ClearCourse, 22);
+        CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneManager.LoadScene("MainMenu"), 22);
+
+        BuildRelayPanel(canvasObject.transform);
+    }
+
+    void BuildRelayPanel(Transform canvas)
+    {
+        relayPanel = CourseUI.CardPanel("Relay panel", canvas);
+        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 600));
+        CourseUI.Column(relayPanel.gameObject, 10, new RectOffset(22, 22, 20, 20));
+
+        TextMeshProUGUI title = CourseUI.Text("Title", relayPanel.transform, "Relay", 32, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Size(title, 40);
+
+        RectTransform legsRow = CourseUI.Rect("Legs", relayPanel.transform);
+        CourseUI.Row(legsRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(legsRow, 48);
+        Button minus = CourseUI.Button("Fewer", legsRow, "-", CourseUI.ButtonKind.Light, () => ChangeLegs(-1), 28);
+        CourseUI.Size(minus, 46, 60);
+        legsLabel = CourseUI.Text("Count", legsRow, "", 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+        CourseUI.Size(legsLabel, 46, 150);
+        Button plus = CourseUI.Button("More", legsRow, "+", CourseUI.ButtonKind.Light, () => ChangeLegs(1), 28);
+        CourseUI.Size(plus, 46, 60);
+
+        TextMeshProUGUI legHint = CourseUI.Text("Leg hint", relayPanel.transform, "Click a leg to lay its course:", 19, CourseUI.InkMuted);
+        CourseUI.Size(legHint, 26);
+
+        legButtonRow = CourseUI.Rect("Leg buttons", relayPanel.transform);
+        GridLayoutGroup legGrid = legButtonRow.gameObject.AddComponent<GridLayoutGroup>();
+        legGrid.cellSize = new Vector2(74, 52);
+        legGrid.spacing = new Vector2(5, 5);
+        legGrid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        legGrid.constraintCount = 5;
+        CourseUI.Size(legButtonRow, 110);
+
+        sameCourseButton = CourseUI.Button("Same course", relayPanel.transform, "", CourseUI.ButtonKind.Light, ToggleSameCourse, 19);
+        CourseUI.Size(sameCourseButton, 44);
+
+        forkModeButton = CourseUI.Button("Fork mode", relayPanel.transform, "", CourseUI.ButtonKind.Secondary, ToggleForkMode, 20);
+        CourseUI.Size(forkModeButton, 44);
+
+        relayInfo = CourseUI.Text("Info", relayPanel.transform, "", 17, CourseUI.InkMuted);
+        CourseUI.Size(relayInfo, 150);
+
+        relayPanel.gameObject.SetActive(relay);
+    }
+
+    void RefreshPointList()
+    {
+        if (pointList == null) return;
+        foreach (Transform child in pointList) Destroy(child.gameObject);
+        EditCourse course = Cur;
+        Vector3? previous = course.start;
+        if (course.start.HasValue)
+        {
+            AddRow("Start", 38, CourseUI.Ink, FontStyles.Normal, 6, ("Remove", CourseUI.ButtonKind.Light, () => { course.start = null; Redraw(); }));
+        }
+        int number = 0;
+        for (int i = 0; i < course.items.Count; i++)
+        {
+            int index = i;
+            EditItem item = course.items[i];
+            number++;
+            if (item.fork < 0)
+            {
+                string text = "Control " + number + Meters(previous, item.point);
+                bool bad = errorPoint.HasValue && Vector2.Distance(errorPoint.Value, item.point) < 0.08f;
+                if (relay)
+                {
+                    AddRow(text, 38, bad ? CourseUI.Danger : CourseUI.Ink, bad ? FontStyles.Bold : FontStyles.Normal, 6,
+                        ("Fork", CourseUI.ButtonKind.Secondary, () => MakeFork(index)), ("Remove", CourseUI.ButtonKind.Light, () => { course.items.RemoveAt(index); Redraw(); }));
+                }
+                else
+                {
+                    AddRow(text, 38, bad ? CourseUI.Danger : CourseUI.Ink, bad ? FontStyles.Bold : FontStyles.Normal, 6, ("Remove", CourseUI.ButtonKind.Light, () => { course.items.RemoveAt(index); Redraw(); }));
+                }
+                previous = item.point;
+                continue;
+            }
+
+            int f = item.fork;
+            EditFork fork = forks[f];
+            List<int> forkLegs = LegsWithFork(f);
+            List<string> legNames = forkLegs.ConvertAll(l => (l + 1).ToString());
+            bool full = fork.branches.Count >= MaxBranches;
+            AddRow("<b>Fork " + (f + 1) + "</b>  " + fork.branches.Count + " branches", 38, CourseUI.Ink, FontStyles.Normal, 6,
+                ("+ Branch", full ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary, () => AddBranch(f, false)),
+                ("+ Direct", full ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary, () => AddBranch(f, true)),
+                ("Remove", CourseUI.ButtonKind.Light, () => RemoveForkFromLeg(index)));
+            AddRow("<color=#5B7563>at " + number + ", on " + (forkLegs.Count == 1 ? "leg " : "legs ") + string.Join(", ", legNames)
+                + (forkEveryVariant && fork.branches.Count > forkLegs.Count ? ": needs " + (fork.branches.Count - forkLegs.Count) + " more" : "") + "</color>", 26, CourseUI.Ink, FontStyles.Normal, 34);
+            for (int b = 0; b < fork.branches.Count; b++)
+            {
+                int branch = b;
+                List<string> names = new List<string>();
+                for (int k = 0; k < fork.branches[b].Count; k++) names.Add(number + CourseData.BranchLetter(b) + (k > 0 ? (k + 1).ToString() : ""));
+                string text = CourseData.BranchLetter(b) + ":  " + (names.Count > 0 ? string.Join(", ", names) : "<i>straight to the next common control</i>");
+                bool active = tool == Tool.Branch && branchFork == f && branchIndex == b;
+                AddRow(text, 34, active ? CourseUI.Accent : CourseUI.Ink, active ? FontStyles.Bold : FontStyles.Normal, 34,
+                    ("+ Control", CourseUI.ButtonKind.Light, () => StartBranch(f, branch)),
+                    ("Remove", CourseUI.ButtonKind.Light, () => RemoveBranch(f, branch)));
+            }
+            previous = null;
+        }
+        if (course.finish.HasValue)
+        {
+            AddRow("Finish" + Meters(previous, course.finish.Value), 38, CourseUI.Ink, FontStyles.Normal, 6, ("Remove", CourseUI.ButtonKind.Light, () => { course.finish = null; Redraw(); }));
+        }
+    }
+
+    static string Meters(Vector3? from, Vector3 to)
+    {
+        if (!from.HasValue) return "";
+        float meters = Vector2.Distance(from.Value, to) / MapDefinition.WorldUnitsPerMeter;
+        return "  <color=#5B7563>" + Mathf.RoundToInt(meters) + " m</color>";
+    }
+
+    void AddRow(string text, float height, Color color, FontStyles style, int indent, params (string label, CourseUI.ButtonKind kind, UnityEngine.Events.UnityAction action)[] buttons)
+    {
+        RectTransform row = CourseUI.Rect("Row", pointList);
+        CourseUI.Row(row.gameObject, 6, new RectOffset(indent, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(row, height);
+        TextMeshProUGUI label = CourseUI.Text("Label", row, text, 19, color, style);
+        label.alignment = TextAlignmentOptions.MidlineLeft;
+        label.enableWordWrapping = false;
+        CourseUI.Size(label, height, -1, 1);
+        foreach (var button in buttons)
+        {
+            Button made = CourseUI.Button(button.label, row, button.label, button.kind, button.action, 15);
+            CourseUI.Size(made, height - 4, button.label.Length > 7 ? 104 : 90);
+        }
+    }
+
+    void RefreshMyCourses()
+    {
+        if (myCourseList == null) return;
+        foreach (Transform child in myCourseList) Destroy(child.gameObject);
+        List<CourseData> mine = CourseLibrary.Mine();
+        // How much of Unity Cloud's 5 MB the published courses use
+        float usedKb = CloudCourses.PublishedBytes(mine) / 1024f;
+        myCoursesTitle.text = "My courses  <size=75%><color=#5B7563>" + mine.Count + " saved  ·  "
+            + (usedKb < 1024f ? Mathf.CeilToInt(usedKb) + " kB" : (usedKb / 1024f).ToString("0.0") + " MB") + " of 5 MB used</color></size>";
+        if (mine.Count == 0)
+        {
+            TextMeshProUGUI empty = CourseUI.Text("Empty", myCourseList, "Nothing saved yet.", 21, CourseUI.InkMuted, FontStyles.Italic);
+            CourseUI.Size(empty, 34);
+            return;
+        }
+        foreach (CourseData course in mine)
+        {
+            CourseData captured = course;
+            RectTransform row = CourseUI.Rect("Course " + course.name, myCourseList);
+            CourseUI.Row(row.gameObject, 8, new RectOffset(6, 0, 0, 0)).childForceExpandWidth = false;
+            CourseUI.Size(row, 40);
+            string facts = course.IsRelay() ? "relay, " + course.legs + " legs" : course.controls.Count + " controls";
+            TextMeshProUGUI label = CourseUI.Text("Label", row, course.name + "  <color=#5B7563>" + facts + "</color>", 22, CourseUI.Ink);
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+            CourseUI.Size(label, 40, -1, 1);
+            Button edit = CourseUI.Button("Edit", row, "Edit", CourseUI.ButtonKind.Secondary, () => Edit(captured), 18);
+            CourseUI.Size(edit, 36, 90);
+            Button delete = CourseUI.Button("Delete", row, "Delete", CourseUI.ButtonKind.Danger, () => Delete(captured), 18);
+            CourseUI.Size(delete, 36, 100);
+        }
+    }
+}

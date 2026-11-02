@@ -1,0 +1,413 @@
+﻿using System;
+using System.Collections.Generic;
+using Fusion;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+// One runner's line in the final standings.
+public class Standing
+{
+    public PlayerRef player;
+    public string name;
+    public bool finished;
+    public int seconds;
+    public int place;      // 1 = winner. Runners who did not finish share last place.
+    public bool isLocal;
+}
+
+// Decides when a competition is over and what happens then: the results screen, the imposter vote
+// and the reveal. Each player runs this for their own NetworkPlayer; only the host (master client)
+// is allowed to move everyone on to the next step.
+public static class CompetitionFlow
+{
+    public const float GuessSeconds = 30f;
+
+    public static bool ResultsShown { get; private set; }
+    public static bool RevealStarted { get; private set; }
+    public static float GuessDeadline { get; private set; }
+
+    static float sceneLoadedAt;
+    static float resultsShownAt;
+    static float allFinishedSince;
+    static bool resultsRequested;
+    static bool revealRequested;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void Init()
+    {
+        ResetState();
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        ResetState();
+    }
+
+    static void ResetState()
+    {
+        ResultsShown = false;
+        RevealStarted = false;
+        resultsRequested = false;
+        revealRequested = false;
+        allFinishedSince = -1f;
+        rememberedImposter = PlayerRef.None;
+        sceneLoadedAt = Time.unscaledTime;
+    }
+
+    static bool InCompetition()
+    {
+        return SceneManager.GetActiveScene().name != "Lobby";
+    }
+
+    // Called every frame for the local player's own NetworkPlayer.
+    public static void Tick(NetworkPlayer local)
+    {
+        if (local == null || local.Runner == null || !InCompetition())
+        {
+            return;
+        }
+        // Give the new scene a moment so values left over from the previous competition are reset first
+        if (Time.unscaledTime - sceneLoadedAt < 3f)
+        {
+            return;
+        }
+
+        // Tell everyone when we have reached the last control, with the exact time the clock stopped at
+        if (!ResultsShown && !local.raceFinished && local.agentMovement != null && local.agentMovement.hasFinished)
+        {
+            Clock clock = local.clock;
+            if (clock != null)
+            {
+                local.secoundCount = (int)clock.sekundercount;
+                local.minuterCount = clock.minuterCount;
+                local.hourCount = clock.hourCount;
+            }
+            local.raceFinished = true;
+        }
+
+        if (!IsHostRunner(local.Runner))
+        {
+            return;
+        }
+
+        if (!ResultsShown)
+        {
+            // Everyone is in: show the results automatically. In a relay the host shows them from the statistics screen.
+            if ((RelayRace.Active != null && !RelayRace.Active.FinalResultsAllowed)
+                || (IndividualRace.Active != null && !IndividualRace.Active.FinalResultsAllowed))
+            {
+                allFinishedSince = -1f;
+            }
+            else if (AllPlayers(p => p.raceFinished))
+            {
+                if (allFinishedSince < 0f)
+                {
+                    allFinishedSince = Time.unscaledTime;
+                }
+                else if (!resultsRequested && Time.unscaledTime - allFinishedSince > 1.5f)
+                {
+                    resultsRequested = true;
+                    local.RPC_ShowResults();
+                }
+            }
+            else
+            {
+                allFinishedSince = -1f;
+            }
+        }
+        else if (!RevealStarted && !revealRequested && TryGetImposter(out PlayerRef imposter))
+        {
+            // Imposter mode: reveal when everyone has guessed, or when the time is up
+            bool everyoneGuessed = Time.unscaledTime - resultsShownAt > 3f
+                && AllPlayers(p => p.hasGuessedImposter || p.Object.StateAuthority == imposter);
+            if (everyoneGuessed || Time.unscaledTime > GuessDeadline)
+            {
+                HostRevealImposter();
+            }
+        }
+    }
+
+    // ---- Host actions ----
+
+    public static bool LocalIsHost()
+    {
+        NetworkPlayer local = NetworkPlayer.Local;
+        return local != null && IsHostRunner(local.Runner);
+    }
+
+    // The host of a shared session, or the only player in a single-player game
+    public static bool IsHostRunner(NetworkRunner runner)
+    {
+        return runner != null && (runner.IsSharedModeMasterClient || runner.GameMode == GameMode.Single);
+    }
+
+    // Ends the competition for everyone and shows the results, also for runners who are still out on the course
+    public static void HostShowResults()
+    {
+        if (ResultsShown || !LocalIsHost() || !InCompetition())
+        {
+            return;
+        }
+        resultsRequested = true;
+        NetworkPlayer.Local.RPC_ShowResults();
+    }
+
+    public static void HostRevealImposter()
+    {
+        if (!ResultsShown || RevealStarted || !LocalIsHost())
+        {
+            return;
+        }
+        revealRequested = true;
+        NetworkPlayer.Local.RPC_RevealImposter();
+    }
+
+    public static void HostReturnToLobby()
+    {
+        if (!LocalIsHost())
+        {
+            return;
+        }
+        ReturnToLobby.LoadLobby(NetworkPlayer.Local.Runner);
+    }
+
+    // ---- Received by every player ----
+
+    public static void OnShowResults()
+    {
+        if (ResultsShown || !InCompetition())
+        {
+            return;
+        }
+        ResultsShown = true;
+        resultsShownAt = Time.unscaledTime;
+        GuessDeadline = Time.unscaledTime + GuessSeconds;
+
+        StopLocalRunner();
+        if (ImposterOverlay.Instance != null)
+        {
+            ImposterOverlay.Instance.HideRoleChip();
+        }
+        EndScreenUI.Show();
+    }
+
+    public static void OnRevealImposter()
+    {
+        if (!ResultsShown || RevealStarted)
+        {
+            return;
+        }
+        RevealStarted = true;
+        if (EndScreenUI.Current != null)
+        {
+            EndScreenUI.Current.BeginReveal();
+        }
+    }
+
+    // The competition is over, so a runner who is still out on the course stops where they are
+    static void StopLocalRunner()
+    {
+        NetworkPlayer local = NetworkPlayer.Local;
+        if (local == null)
+        {
+            return;
+        }
+        AgentMovement agent = local.agentMovement;
+        if (agent != null)
+        {
+            agent.hasFinished = true;
+            if (agent.manualPathDrawer != null)
+            {
+                agent.manualPathDrawer.timeToDraw = false;
+                agent.manualPathDrawer.isDrawing = false;
+            }
+        }
+        if (local.clock != null)
+        {
+            local.clock.StopForResults();
+        }
+    }
+
+    // ---- Standings ----
+
+    public static List<Standing> ComputeStandings()
+    {
+        List<Standing> standings = new List<Standing>();
+        foreach (NetworkPlayer p in ValidPlayers())
+        {
+            string playerName = p.nickName.ToString();
+            standings.Add(new Standing
+            {
+                player = p.Object.StateAuthority,
+                name = string.IsNullOrWhiteSpace(playerName) ? "Player " + p.Object.StateAuthority.PlayerId : playerName,
+                finished = p.raceFinished,
+                seconds = p.hourCount * 3600 + p.minuterCount * 60 + p.secoundCount,
+                isLocal = p.Object.HasStateAuthority
+            });
+        }
+
+        standings.Sort((a, b) =>
+        {
+            if (a.finished != b.finished) return a.finished ? -1 : 1;
+            if (a.finished && a.seconds != b.seconds) return a.seconds.CompareTo(b.seconds);
+            return a.player.PlayerId.CompareTo(b.player.PlayerId);
+        });
+
+        for (int i = 0; i < standings.Count; i++)
+        {
+            Standing current = standings[i];
+            if (!current.finished)
+            {
+                current.place = standings.Count;
+            }
+            else if (i > 0 && standings[i - 1].finished && standings[i - 1].seconds == current.seconds)
+            {
+                current.place = standings[i - 1].place; // same time, same place
+            }
+            else
+            {
+                current.place = i + 1;
+            }
+        }
+        return standings;
+    }
+
+    public static string FormatTime(int totalSeconds)
+    {
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds % 3600) / 60;
+        int seconds = totalSeconds % 60;
+        return hours > 0 ? $"{hours}:{minutes:00}:{seconds:00}" : $"{minutes:00}:{seconds:00}";
+    }
+
+    public static string Ordinal(int number)
+    {
+        int lastTwo = number % 100;
+        if (lastTwo >= 11 && lastTwo <= 13) return number + "th";
+        switch (number % 10)
+        {
+            case 1: return number + "st";
+            case 2: return number + "nd";
+            case 3: return number + "rd";
+            default: return number + "th";
+        }
+    }
+
+    // ---- Imposter mode ----
+
+    public static bool IsImposterMode(string gameMode)
+    {
+        return !string.IsNullOrEmpty(gameMode) && gameMode.IndexOf("Imposter", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    // The host stores the imposter on its own player object, so look at every player
+    public static bool TryGetImposter(out PlayerRef imposter)
+    {
+        foreach (NetworkPlayer p in ValidPlayers())
+        {
+            if (!p.imposter.IsNone)
+            {
+                rememberedImposter = p.imposter;
+                imposter = p.imposter;
+                return true;
+            }
+        }
+        // The host may have left during the competition and taken its player object with it,
+        // so fall back on what we saw earlier in this competition
+        if (!rememberedImposter.IsNone && InCompetition())
+        {
+            imposter = rememberedImposter;
+            return true;
+        }
+        imposter = PlayerRef.None;
+        return false;
+    }
+
+    static PlayerRef rememberedImposter;
+
+    public static PlayerRef PickRandomPlayer(NetworkRunner runner)
+    {
+        List<PlayerRef> players = new List<PlayerRef>(runner.ActivePlayers);
+        if (players.Count == 0)
+        {
+            return PlayerRef.None;
+        }
+        return players[UnityEngine.Random.Range(0, players.Count)];
+    }
+
+    public static NetworkPlayer FindPlayer(PlayerRef player)
+    {
+        foreach (NetworkPlayer p in ValidPlayers())
+        {
+            if (p.Object.StateAuthority == player)
+            {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    static IEnumerable<NetworkPlayer> ValidPlayers()
+    {
+        foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        {
+            if (p.Object != null && p.Object.IsValid)
+            {
+                yield return p;
+            }
+        }
+    }
+
+    static bool AllPlayers(Func<NetworkPlayer, bool> condition)
+    {
+        int count = 0;
+        foreach (NetworkPlayer p in ValidPlayers())
+        {
+            count++;
+            if (!condition(p))
+            {
+                return false;
+            }
+        }
+        return count > 0;
+    }
+}
+
+// How much money a competition pays. More runners means more money for a good placing.
+public static class CompetitionRewards
+{
+    public const int DidNotFinish = 10;
+    public const int FinishBase = 50;
+    public const int PerRunnerBeaten = 50;
+    public const int WinnerBonus = 50;
+    public const int CorrectGuess = 150;
+    public const int ImposterEscapeBase = 100;
+    public const int ImposterEscapePerRunner = 50;
+
+    public static int ForPlace(int place, int runners, bool finished)
+    {
+        if (!finished)
+        {
+            return DidNotFinish;
+        }
+        int reward = FinishBase + PerRunnerBeaten * Mathf.Max(0, runners - place);
+        if (place == 1 && runners >= 2)
+        {
+            reward += WinnerBonus;
+        }
+        return reward;
+    }
+
+    // The imposter wants to finish last, so their placing is counted from the back
+    public static int ForImposterPlace(int place, int runners, bool finished)
+    {
+        return ForPlace(runners - place + 1, runners, finished);
+    }
+
+    public static int ForImposterEscape(int otherRunners)
+    {
+        return otherRunners <= 0 ? 0 : ImposterEscapeBase + ImposterEscapePerRunner * otherRunners;
+    }
+}
