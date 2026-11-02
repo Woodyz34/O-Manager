@@ -200,7 +200,7 @@ public class EscMenu : MonoBehaviour
         // Ending it for everyone is a big step, so the button asks once more
         if (Time.unscaledTime >= endConfirmUntil)
         {
-            endConfirmUntil = Time.unscaledTime + 3f;
+            endConfirmUntil = Time.unscaledTime + 5f;
             return;
         }
         Close();
