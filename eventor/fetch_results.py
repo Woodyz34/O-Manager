@@ -35,6 +35,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -45,6 +46,7 @@ DATA_DIR = os.path.join(HERE, "data")
 RACES_DIR = os.path.join(DATA_DIR, "races")
 CACHE_DIR = os.path.join(HERE, "cache")
 
+PARSER_VERSION = 2               # bump to rebuild stored races from cached raw XML
 FOOT_O = "1"
 INDIVIDUAL_FORMS = {"IndSingleDay", "IndMultiDay"}
 WANTED_DISTANCES = {"Long", "Middle"}
@@ -105,8 +107,16 @@ class Eventor:
         print(f"Anrop {self.calls}: {path} {params.get('eventId', '')} {params.get('eventRaceId', '')}".rstrip(), flush=True)
         url = f"{BASE_URL}/{path}?{urllib.parse.urlencode(params)}"
         req = urllib.request.Request(url, headers={"ApiKey": self.key, "User-Agent": "O-Manager-stats/0.2"})
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            return resp.read()
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as e:
+            if e.code < 500:
+                raise
+            print(f"Serverfel {e.code}, försöker igen om 60 s (samma anrop).", flush=True)
+            time.sleep(60)
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                return resp.read()
 
 
 def load_raw(name):
@@ -116,6 +126,13 @@ def load_raw(name):
         with open(path, "rb") as f:
             return f.read()
     return None
+
+
+def needs_reparse(out_path, race):
+    """Rebuild an older JSON file when its raw response is still in the cache (no API call)."""
+    with open(out_path, encoding="utf-8") as f:
+        old = json.load(f).get("parser_version", 1)
+    return old < PARSER_VERSION and load_raw(f"results_{race['event_id']}_{race['race_id']}.xml") is not None
 
 
 def save_raw(name, data):
@@ -166,6 +183,7 @@ def select_races(events_xml, mode, extra=()):
             skip("ingen lång/medel"); continue
         for r in good:
             picked.append({
+                "race_number": races.index(r) + 1,
                 "event_id": event_id,
                 "race_id": text(r, "EventRaceId"),
                 "single_race": len(races) == 1,
@@ -186,10 +204,33 @@ def person_name(person):
     return " ".join(x for x in (text(n, "Given"), text(n, "Family")) if x)
 
 
+def result_number(r):
+    rn = r.get("raceNumber") or text(r, "RaceNumber")
+    return int(rn) if rn.isdigit() else None
+
+
+def pick_result(results, race):
+    """The Result element for this race. Eventor can return the whole multi-race
+    event even when one race is asked for, so pick by raceNumber."""
+    if not results:
+        return None
+    numbered = [(result_number(r), r) for r in results]
+    if any(n is not None for n, _ in numbered):
+        for n, r in numbered:
+            if n == race["race_number"]:
+                return r
+        return None
+    if len(results) == 1:
+        return results[0]
+    i = race["race_number"] - 1
+    return results[i] if i < len(results) else None
+
+
 def parse_results(xml_bytes, race):
-    """Compact results for the game classes. Returns (classes, unknown_class_names)."""
+    """Compact results for the game classes. Returns (classes, unknown_class_names, diagnostics)."""
     root = ET.fromstring(xml_bytes)
     out, unknown = [], set()
+    diag = {"results_per_person": {}, "race_numbers": {}}
     for cr in (e for e in root.iter() if local(e.tag) == "ClassResult"):
         cls = child(cr, "Class")
         cname = text(cls, "Name") or text(cls, "ShortName")
@@ -202,9 +243,14 @@ def parse_results(xml_bytes, race):
         for pr in children(cr, "PersonResult"):
             person = child(pr, "Person")
             results = children(pr, "Result")
-            if not results:
+            k = str(len(results))
+            diag["results_per_person"][k] = diag["results_per_person"].get(k, 0) + 1
+            for r in results:
+                n = str(result_number(r))
+                diag["race_numbers"][n] = diag["race_numbers"].get(n, 0) + 1
+            res = pick_result(results, race)
+            if res is None:
                 continue
-            res = results[0]          # one result per person when fetched per race
             rc = child(res, "Course")
             if rc is None:
                 rc = course
@@ -227,13 +273,15 @@ def parse_results(xml_bytes, race):
                 "course_length": num(text(rc, "Length")),
                 "controls": num(text(rc, "NumberOfControls")),
             })
+        if not runners:
+            continue
         out.append({
             "class": cname,
             "course_length": num(text(course, "Length")),
             "controls": num(text(course, "NumberOfControls")),
             "runners": runners,
         })
-    return out, unknown
+    return out, unknown, diag
 
 
 # ---------- main ----------
@@ -287,7 +335,7 @@ def main():
     for race in sorted(races, key=lambda r: (r["date"], r["event_id"], r["race_id"])):
         out_path = os.path.join(RACES_DIR, f"{race['event_id']}_{race['race_id']}.json")
         label = f"{race['event_name']}" + (f" ({race['race_name']})" if race["race_name"] and not race["single_race"] else "")
-        if os.path.exists(out_path):
+        if os.path.exists(out_path) and not needs_reparse(out_path, race):
             cached += 1
             rows.append((race["date"], race["level"], label, "fanns redan", ""))
             continue
@@ -310,7 +358,7 @@ def main():
                     save_raw(raw_name, xml)
                 else:
                     print(f"Använder sparat svar {raw_name} (inget anrop).", flush=True)
-            classes, unknown = parse_results(xml, race)
+            classes, unknown, diag = parse_results(xml, race)
         except Exception as e:  # keep going; report at the end
             failed.append((label, f"{type(e).__name__}: {e}"))
             rows.append((race["date"], race["level"], label, "FEL", ""))
@@ -318,9 +366,11 @@ def main():
         all_unknown |= unknown
         n = sum(len(c["runners"]) for c in classes)
         with open(out_path, "w", encoding="utf-8") as f:
-            json.dump({**race, "fetched": today.isoformat(), "classes": classes}, f, ensure_ascii=False, separators=(",", ":"))
+            json.dump({**race, "parser_version": PARSER_VERSION, "fetched": today.isoformat(),
+                       "diagnostics": diag, "classes": classes}, f, ensure_ascii=False, separators=(",", ":"))
         fetched += 1
-        rows.append((race["date"], race["level"], label, "hämtad", f"{len(classes)} klasser, {n} löpare"))
+        extra = "" if race["single_race"] else f" (resultat/person {diag['results_per_person']}, raceNumber {diag['race_numbers']})"
+        rows.append((race["date"], race["level"], label, "hämtad", f"{len(classes)} klasser, {n} löpare{extra}"))
 
     if all_unknown:
         path = os.path.join(DATA_DIR, "unknown_classes.txt")

@@ -6,4 +6,3 @@ Hallandspremiären
 Göteborgspremiären
 Tibrotrippeln
 JVM-test
-O-Ringen
