@@ -1,0 +1,30 @@
+Blå 1,5
+Blå 3 km
+Blå 3,0
+Blå 3,0 km
+Grön 2,0
+Gul 2,5
+Gul 2,5 Reflex
+Gul 2,5 km
+Gul 5 km
+Gul 5,0
+Inskolning 2,0
+Inskolning 2,0 km
+Orange 3 km
+Orange 3,0
+Orange 3,0 km
+Orange 5,0
+Orange 5,0 km
+Svart 5 km
+Svart 5,0
+Svart 5,0 km
+Svart 7 km
+Svart 7,0
+U1
+U2
+U3
+U4
+Vit 2,0
+Vit 2,0 km
+Vit 4,0
+Återbud
