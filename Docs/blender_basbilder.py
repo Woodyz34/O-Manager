@@ -186,7 +186,7 @@ def skin_material(p):
     # stubble or beard
     if p["beard"]:
         jaw = ellipse_mask(nt, xyz, 0.0, -0.55, 0.52, 0.32, 0.25, y_max=-0.2)
-        layer(jaw, srgb_to_lin(tuple(v * 0.9 for v in p["hair_color"])), 0.85 if p["beard"] == "full" else 0.32)
+        layer(jaw, srgb_to_lin(tuple(v * 0.9 for v in p["hair_color"])), 0.6 if p["beard"] == "full" else 0.3)
         if p["beard"] == "full":
             mouth = ellipse_mask(nt, xyz, 0.0, -0.475, 0.14, 0.05, 0.4, y_max=-0.55)
             layer(mouth, lip, 0.9)
@@ -201,66 +201,17 @@ def skin_material(p):
 
 def hair_material(color):
     c = srgb_to_lin(color)
-    mat, bsdf = principled("Hair", c, rough=0.6, sheen=0.2)
+    mat, bsdf = principled("Hair", c, rough=0.4, sheen=0.35)
+    bsdf.inputs["Specular IOR Level"].default_value = 0.6
     nt = mat.node_tree
-    wave = node(nt, "ShaderNodeTexWave", (-500, -300), Scale=40.0, Distortion=6.0)
-    wave.wave_type = "BANDS"
-    wave.bands_direction = "Z"
-    bump = node(nt, "ShaderNodeBump", (-200, -300), Strength=0.6)
-    nt.links.new(wave.outputs[1], bump.inputs["Height"])
-    nt.links.new(bump.outputs[0], bsdf.inputs["Normal"])
-    # strands a shade lighter and darker
+    # locks a shade lighter and darker
+    var = node(nt, "ShaderNodeTexNoise", (-500, 200), Scale=9.0, Detail=3.0)
     ramp = node(nt, "ShaderNodeMix", (-300, 200))
     ramp.data_type = "RGBA"
-    nt.links.new(wave.outputs[1], ramp.inputs[0])
+    nt.links.new(var.outputs[0], ramp.inputs[0])
     ramp.inputs[6].default_value = (*[v * 0.75 for v in c], 1)
     ramp.inputs[7].default_value = (*[min(1, v * 1.35 + 0.01) for v in c], 1)
     nt.links.new(ramp.outputs[2], bsdf.inputs["Base Color"])
-    return mat
-
-
-def jersey_material(colors, angle):
-    base, pat, trim = (srgb_to_lin(c) for c in colors)
-    mat, bsdf = principled("Jersey", base, rough=0.65, sheen=0.4)
-    nt = mat.node_tree
-    tex = node(nt, "ShaderNodeTexCoord", (-1200, 0))
-    mapping = node(nt, "ShaderNodeMapping", (-1000, 0))
-    mapping.inputs["Rotation"].default_value = (0, angle, 0)
-    nt.links.new(tex.outputs["Object"], mapping.inputs[0])
-    wave = node(nt, "ShaderNodeTexWave", (-800, 0), Scale=2.2, Distortion=0.0)
-    wave.wave_profile = "SAW"
-    nt.links.new(mapping.outputs[0], wave.inputs[0])
-    stripes = node(nt, "ShaderNodeMapRange", (-600, 0), inputs={1: 0.48, 2: 0.52})
-    nt.links.new(wave.outputs[1], stripes.inputs[0])
-    mix = node(nt, "ShaderNodeMix", (-300, 0))
-    mix.data_type = "RGBA"
-    nt.links.new(stripes.outputs[0], mix.inputs[0])
-    mix.inputs[6].default_value = (*base, 1)
-    mix.inputs[7].default_value = (*pat, 1)
-    # a zig-zag band across the chest
-    sep = node(nt, "ShaderNodeSeparateXYZ", (-1000, -300))
-    nt.links.new(tex.outputs["Object"], sep.inputs[0])
-    zig = node(nt, "ShaderNodeMath", (-800, -300), inputs={1: 0.45}); zig.operation = "PINGPONG"
-    nt.links.new(sep.outputs[0], zig.inputs[0])
-    zz = node(nt, "ShaderNodeMath", (-650, -300)); zz.operation = "ADD"
-    nt.links.new(zig.outputs[0], zz.inputs[0]); nt.links.new(sep.outputs[2], zz.inputs[1])
-    band = node(nt, "ShaderNodeMapRange", (-500, -300), inputs={1: -1.62, 2: -1.6, 3: 0.0, 4: 1.0})
-    nt.links.new(zz.outputs[0], band.inputs[0])
-    band2 = node(nt, "ShaderNodeMapRange", (-500, -450), inputs={1: -1.48, 2: -1.5, 3: 0.0, 4: 1.0})
-    nt.links.new(zz.outputs[0], band2.inputs[0])
-    both = node(nt, "ShaderNodeMath", (-350, -350)); both.operation = "MULTIPLY"
-    nt.links.new(band.outputs[0], both.inputs[0]); nt.links.new(band2.outputs[0], both.inputs[1])
-    mix2 = node(nt, "ShaderNodeMix", (-150, 0))
-    mix2.data_type = "RGBA"
-    nt.links.new(both.outputs[0], mix2.inputs[0])
-    nt.links.new(mix.outputs[2], mix2.inputs[6])
-    mix2.inputs[7].default_value = (*trim, 1)
-    nt.links.new(mix2.outputs[2], bsdf.inputs["Base Color"])
-    # knit texture
-    bump = node(nt, "ShaderNodeBump", (-200, -500), Strength=0.08)
-    n = node(nt, "ShaderNodeTexNoise", (-400, -500), Scale=300.0)
-    nt.links.new(n.outputs[0], bump.inputs["Height"])
-    nt.links.new(bump.outputs[0], bsdf.inputs["Normal"])
     return mat
 
 
@@ -562,56 +513,31 @@ def blob(name, mat, loc, scale, rot=(0, 0, 0), wobble=0.0):
     return obj
 
 
-def make_hair(p, mat):
-    style = p["hair"]
-    fw = p["face_w"]
-    objs = []
-    if style == "bald":
-        return objs
-    if style == "buzz":
-        objs.append(hair_cap(p, mat, lambda x: 0.48 - 0.1 * x * x, top_extra=0.0, thick=0.012, side_low=0.0, back_low=-0.45))
-    elif style == "short":
-        objs.append(hair_cap(p, mat, lambda x: 0.46 - 0.05 * x, top_extra=0.07, thick=0.04, side_low=0.02, back_low=-0.45))
-    elif style == "side":
-        objs.append(hair_cap(p, mat, lambda x: 0.44 + 0.12 * x, top_extra=0.1, thick=0.05, side_low=0.0,
-                             back_low=-0.45, bulk=0.02))
-    elif style == "quiff":
-        objs.append(hair_cap(p, mat, lambda x: 0.47, top_extra=0.05, thick=0.04, side_low=0.05, back_low=-0.45))
-        objs.append(blob("Quiff", mat, (0.02, -0.38, 0.86), (0.5 * fw, 0.32, 0.17), (math.radians(-20), 0, 0), 0.05))
-    elif style == "curly":
-        objs.append(hair_cap(p, mat, lambda x: 0.42, top_extra=0.04, thick=0.06, side_low=0.0, back_low=-0.4))
-        rnd = random.Random(p["seed"])
-        for i in range(110):
-            th = rnd.uniform(0, math.pi * 2)
-            ph = rnd.uniform(0.0, 1.25)
-            d = Vector((math.sin(ph) * math.cos(th), math.sin(ph) * math.sin(th), math.cos(ph)))
-            pos = head_shape(d, p)
-            if pos.y < -0.3 and pos.z < 0.55:
-                continue
-            r = rnd.uniform(0.08, 0.12) * (1.25 if p["woman"] else 1.0)
-            objs.append(blob("Curl", mat, tuple(pos * 1.05), (r, r, r), wobble=0.05))
-    elif style in ("pony", "bun", "braid", "long", "short_w"):
-        part = 0.07 if style != "short_w" else 0.0
-        objs.append(hair_cap(p, mat, lambda x: 0.5 - 0.2 * (x - part) ** 2, top_extra=0.05, thick=0.045,
-                             side_low=-0.08 if style != "short_w" else -0.12, back_low=-0.55, bulk=0.015))
-        if style == "pony":
-            objs.append(blob("Tie", mat, (0, 0.82, 0.25), (0.15, 0.13, 0.15)))
-            objs.append(blob("Pony", mat, (0.0, 1.0, -0.35), (0.16, 0.16, 0.62), (math.radians(14), 0, 0), 0.1))
-        elif style == "bun":
-            objs.append(blob("Bun", mat, (0, 0.55, 0.92), (0.26, 0.24, 0.22), wobble=0.12))
-        elif style == "braid":
-            for i in range(9):
-                objs.append(blob("Braid", mat, (0.0, 0.85 + i * 0.03, 0.1 - i * 0.17),
-                                 (0.12 - i * 0.004, 0.11, 0.12), (0, 0, math.radians(30 if i % 2 else -30))))
-        elif style == "long":
-            for side in (-1, 1):
-                objs.append(blob("Long", mat, (side * 0.66 * fw, 0.25, -0.65), (0.17, 0.42, 0.95),
-                                 (0, side * math.radians(4), 0), 0.08))
-            objs.append(blob("LongBack", mat, (0, 0.5, -0.6), (0.68 * fw, 0.3, 0.95), wobble=0.06))
-    elif style == "bob":
-        objs.append(hair_cap(p, mat, lambda x: 0.36 - 0.02 * x, top_extra=0.06, thick=0.06, side_low=-0.62,
-                             back_low=-0.62, bulk=0.02))
-    return objs
+def make_beard(p, mat):
+    """A full beard and moustache made of short strands on the jaw and upper lip."""
+    if p["beard"] != "full":
+        return []
+    rnd = random.Random(p["seed"] * 17 + 3)
+    strands = []
+    for i in range(9000):
+        z = 1 - (i + 0.5) / 9000 * 2
+        r = math.sqrt(max(0.0, 1 - z * z))
+        th = math.pi * (3 - math.sqrt(5)) * i
+        d = Vector((r * math.cos(th), r * math.sin(th), z))
+        s = head_shape(d, p)
+        if s.y > 0.15:
+            continue
+        top = -0.3 + 0.22 * min(1.0, abs(s.x) / 0.55)        # higher towards the ears
+        moustache = abs(s.x) < 0.2 and -0.43 < s.z < -0.36
+        mouth = abs(s.x) < 0.19 and -0.54 < s.z < -0.41
+        if not ((s.z < top and not mouth) or moustache):
+            continue
+        n = s.normalized()
+        down = tangent(Vector((0.15 * s.x, -0.1, -1.0)), s).normalized()
+        L = rnd.uniform(0.05, 0.09)
+        pts = [s + n * 0.005, s + n * 0.025 + down * L * 0.5, s + n * 0.035 + down * L]
+        strands.append((pts, rnd.uniform(0.7, 1.2), 0.3))
+    return [strand_curve("Beard", mat, strands, 0.008)] if strands else []
 
 
 def make_extra(p):
@@ -653,6 +579,380 @@ def make_extra(p):
     return objs
 
 
+# ---------- node maths ----------
+
+class S:
+    """A shader value that can be combined with + - * / to build node graphs."""
+
+    def __init__(self, nt, out):
+        self.nt, self.out = nt, out
+
+    def _op(self, other, op, swap=False):
+        n = self.nt.nodes.new("ShaderNodeMath")
+        n.operation = op
+        a, b = (other, self) if swap else (self, other)
+        for i, v in enumerate((a, b)):
+            if isinstance(v, S):
+                self.nt.links.new(v.out, n.inputs[i])
+            else:
+                n.inputs[i].default_value = v
+        return S(self.nt, n.outputs[0])
+
+    def __add__(self, o): return self._op(o, "ADD")
+    __radd__ = __add__
+    def __sub__(self, o): return self._op(o, "SUBTRACT")
+    def __rsub__(self, o): return self._op(o, "SUBTRACT", True)
+    def __mul__(self, o): return self._op(o, "MULTIPLY")
+    __rmul__ = __mul__
+    def __truediv__(self, o): return self._op(o, "DIVIDE")
+    def __neg__(self): return self * -1.0
+    def abs(self): return self._op(0.0, "ABSOLUTE")
+    def max(self, o): return self._op(o, "MAXIMUM")
+    def min(self, o): return self._op(o, "MINIMUM")
+
+    def above(self, edge, soft=0.012):
+        """1 where the value is above edge, with a soft (anti-aliased) step."""
+        n = self.nt.nodes.new("ShaderNodeMapRange")
+        self.nt.links.new(self.out, n.inputs[0])
+        if isinstance(edge, S):
+            lo = edge - soft
+            hi = edge + soft
+            self.nt.links.new(lo.out, n.inputs[1])
+            self.nt.links.new(hi.out, n.inputs[2])
+        else:
+            n.inputs[1].default_value = edge - soft
+            n.inputs[2].default_value = edge + soft
+        return S(self.nt, n.outputs[0])
+
+    def below(self, edge, soft=0.012):
+        return 1.0 - self.above(edge, soft)
+
+
+def paint_layers(nt, base, layers):
+    """Mix colours on top of each other: layers is a list of (mask S, colour)."""
+    rgb = nt.nodes.new("ShaderNodeRGB")
+    rgb.outputs[0].default_value = (*base, 1)
+    current = rgb.outputs[0]
+    for mask, color in layers:
+        mix = nt.nodes.new("ShaderNodeMix")
+        mix.data_type = "RGBA"
+        nt.links.new(mask.out, mix.inputs[0])
+        nt.links.new(current, mix.inputs[6])
+        if isinstance(color, tuple):
+            mix.inputs[7].default_value = (*color, 1)
+        else:
+            nt.links.new(color, mix.inputs[7])
+        current = mix.outputs[2]
+    return current
+
+
+# ---------- orienteering jersey ----------
+
+def jersey_material(p):
+    """A sublimated club top: base colour, a bold graphic, raglan shoulders, trims and
+    the orienteering control flag on the chest."""
+    base, second, trim = (srgb_to_lin(c) for c in p["jersey"])
+    dark = tuple(v * 0.55 for v in base)
+    mat, bsdf = principled("Jersey", base, rough=0.62, sheen=0.5)
+    bsdf.inputs["Sheen Tint"].default_value = (1, 1, 1, 1)
+    nt = mat.node_tree
+    tex = node(nt, "ShaderNodeTexCoord")
+    sep = node(nt, "ShaderNodeSeparateXYZ")
+    nt.links.new(tex.outputs["Object"], sep.inputs[0])
+    X, Y, Z = S(nt, sep.outputs[0]), S(nt, sep.outputs[1]), S(nt, sep.outputs[2])
+    ax = X.abs()
+    flip = p["design_flip"]
+    Xd = X * flip
+    layers = []
+    design = p["design"]
+    if design == "split":
+        # the top split corner to corner in two colours, with thin speed lines along the edge
+        edge = Z - (Xd * 0.9 - 0.05)
+        layers.append((edge.below(0.0), second))
+        for k, off in enumerate((0.07, 0.13, 0.19)):
+            layers.append(((edge - off).abs().below(0.014 - 0.003 * k), trim))
+        layers.append(((-0.55 - Z).above(0.0, 0.25), dark))
+    elif design == "chevron":
+        v = Z - (ax * 0.62 - 0.32)
+        layers.append((v.abs().below(0.17), second))
+        layers.append(((v.abs() - 0.17).abs().below(0.022), trim))
+        v2 = Z - (ax * 0.62 - 0.72)
+        layers.append((v2.abs().below(0.06), second))
+    else:  # swoosh
+        line = Z - (Xd * 0.42 - 0.12)
+        layers.append((line.abs().below(0.24), second))
+        layers.append(((line.abs() - 0.24).abs().below(0.025), trim))
+        lower = Z - (Xd * 0.42 - 0.62)
+        layers.append((lower.abs().below(0.05), dark))
+    # raglan shoulder panels in the second colour, with a trim along the seam
+    seam = ax - 0.36 - (0.86 - Z) * 1.15
+    layers.append((seam.above(0.0), second if design != "split" else dark))
+    layers.append((seam.abs().below(0.018), trim))
+    # side panels
+    layers.append(((ax - 1.32).above(0.0, 0.05), dark))
+    # collar trim
+    neck = (X * X / 0.16 + (Z - 0.95) * (Z - 0.95) / 0.09)
+    layers.append((neck.below(1.0, 0.04) * Y.below(0.0, 0.05), trim))
+    # the control flag on the chest: a square split corner to corner, white and orange
+    fx, fz = X - 0.58, Z - 0.36
+    box = (fx.abs().max(fz.abs())).below(0.105, 0.006) * Y.below(-0.2, 0.05)
+    inner = (fx.abs().max(fz.abs())).below(0.09, 0.006) * Y.below(-0.2, 0.05)
+    layers.append((box, (0.02, 0.02, 0.02)))
+    layers.append((inner, (0.92, 0.92, 0.9)))
+    layers.append((inner * (fz - fx).above(0.0, 0.004), srgb_to_lin((0.95, 0.42, 0.05))))
+    color = paint_layers(nt, base, layers)
+    nt.links.new(color, bsdf.inputs["Base Color"])
+    # technical mesh fabric
+    vor2 = nt.nodes.new("ShaderNodeTexVoronoi")
+    vor2.inputs["Scale"].default_value = 260.0
+    bump = node(nt, "ShaderNodeBump", Strength=0.12)
+    nt.links.new(vor2.outputs["Distance"], bump.inputs["Height"])
+    wr = node(nt, "ShaderNodeTexWave", Scale=3.0, Distortion=2.0)
+    bump2 = node(nt, "ShaderNodeBump", Strength=0.1)
+    nt.links.new(wr.outputs[1], bump2.inputs["Height"])
+    nt.links.new(bump.outputs[0], bump2.inputs["Normal"])
+    nt.links.new(bump2.outputs[0], bsdf.inputs["Normal"])
+    return mat
+
+
+# ---------- hair made of strands ----------
+
+def to_sphere(pt, p):
+    w = p["face_w"]
+    return Vector((pt.x / (0.74 * w), pt.y / 0.86, pt.z)).normalized()
+
+
+def head_radius(pt, p):
+    """Distance from the head's centre to its skin in the direction of pt."""
+    return head_shape(to_sphere(pt, p), p).length
+
+
+def hairline(p, x, y, front, side_low, back_low):
+    side = max(0.0, min(1.0, (abs(x) - 0.42 * p["face_w"]) / (0.3 * p["face_w"])))
+    side = side * side * (3 - 2 * side)
+    back = max(0.0, min(1.0, (y + 0.2) / 0.6))
+    limit = front(x) * (1 - side) + side_low * side
+    return limit * (1 - back) + back_low * back
+
+
+def roots(p, count, front, side_low, back_low, rnd):
+    pts = []
+    golden = math.pi * (3 - math.sqrt(5))
+    for i in range(count):
+        z = 1 - (i + 0.5) / count * 2
+        r = math.sqrt(1 - z * z)
+        th = golden * i + rnd.uniform(-0.05, 0.05)
+        d = Vector((r * math.cos(th), r * math.sin(th), z))
+        s = head_shape(d, p)
+        if s.z >= hairline(p, s.x, s.y, front, side_low, back_low):
+            pts.append(s)
+    return pts
+
+
+def strand_curve(name, mat, strands, radius):
+    """strands: list of (points, root radius factor, tip factor)."""
+    cu = bpy.data.curves.new(name, "CURVE")
+    cu.dimensions = "3D"
+    cu.bevel_depth = radius
+    cu.bevel_resolution = 1
+    cu.use_fill_caps = True
+    for pts, rf, tip in strands:
+        sp = cu.splines.new("NURBS")
+        sp.points.add(len(pts) - 1)
+        for i, pt in enumerate(pts):
+            t = i / (len(pts) - 1)
+            sp.points[i].co = (pt.x, pt.y, pt.z, 1)
+            sp.points[i].radius = rf * (1 - t * (1 - tip))
+        sp.order_u = 4
+        sp.use_endpoint_u = True
+    obj = bpy.data.objects.new(name, cu)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(mat)
+    return obj
+
+
+def grow(p, root, length, h, field, rnd, steps=12, hang_below=None):
+    """Walk a strand from its root along field(pos, t), keeping it h above the skin."""
+    pts = [root + root.normalized() * h * 0.2]
+    pos = pts[0]
+    seg = length / steps
+    # neighbouring strands bend the same way, so the hair falls in locks instead of single threads
+    wob = noise.noise_vector(root * 2.2) * 0.35 + Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))) * 0.04
+    for k in range(steps):
+        t = (k + 1) / steps
+        d = (field(pos, t) + wob * (0.5 + 0.5 * t)).normalized()
+        new = pos + d * seg
+        lift = h * min(1.0, 0.3 + t * 1.2)
+        r_head = head_radius(new, p)
+        if hang_below is None or new.z > hang_below:
+            if new.length < r_head + lift:
+                new = new.normalized() * (r_head + lift)
+        else:
+            # hanging hair: beside the face and neck, never in front of them
+            min_x = 0.6 * p["face_w"] + lift
+            if abs(new.x) < min_x and new.y < 0.35:
+                new.x = math.copysign(min_x, new.x if new.x != 0 else 1)
+            new.y = max(new.y, -0.25)
+        pts.append(new)
+        pos = new
+    return pts
+
+
+def tangent(v, pos):
+    n = pos.normalized()
+    return v - n * v.dot(n)
+
+
+def make_hair(p, mat):
+    style = p["hair"]
+    fw = p["face_w"]
+    rnd = random.Random(p["seed"] * 31 + 7)
+    objs = []
+    if style == "bald":
+        return objs
+    if style == "buzz":
+        front = lambda x: 0.48 - 0.1 * x * x
+        objs.append(hair_cap(p, mat, front, top_extra=0.0, thick=0.008, side_low=0.0, back_low=-0.45))
+        short = []
+        for r in roots(p, 14000, front, 0.0, -0.45, rnd):
+            n = r.normalized()
+            d = tangent(Vector((0.2 * r.x, 0.6, -0.4)), r).normalized()
+            short.append(([r + n * 0.004, r + n * 0.016 + d * 0.02, r + n * 0.022 + d * 0.04], rnd.uniform(0.7, 1.2), 0.3))
+        objs.append(strand_curve("Buzz", mat, short, 0.006))
+        return objs
+
+    crown = Vector((0.05, 0.4, 0.95))
+    strands = []
+    if style in ("short", "side", "quiff", "short_w"):
+        part = 0.3 * fw if style == "side" else (0.18 if style == "short_w" else None)
+        front = (lambda x: 0.46 - 0.05 * x) if style != "short_w" else (lambda x: 0.44)
+        objs.append(hair_cap(p, mat, front, top_extra=0.02, thick=0.012, side_low=0.02, back_low=-0.45))
+        base_len = 0.26 if style != "short_w" else 0.4
+
+        def field(pos, t):
+            if style == "quiff" and pos.y < -0.1 and pos.z > 0.4:
+                return Vector((0, 0.35, 1.0)) * (1 - t) + Vector((0, 1, -0.3)) * t
+            if part is not None and pos.z > 0.55:
+                # swept over from the parting, lifted a little at the front
+                return tangent(Vector((math.copysign(1, pos.x - part), 0.35, 0.1)), pos)
+            if style == "short" and pos.z > 0.5:
+                # top combed up and back
+                return tangent(Vector((0.1 * pos.x, 1.0, 0.25)), pos)
+            # sides and back lie down towards the neck
+            return tangent(Vector((0.3 * math.copysign(1, pos.x), 0.5, -1.0)), pos)
+        for r in roots(p, 7000, front, 0.02, -0.45, rnd):
+            # shorter towards the hairline, so the fringe stops above the brows
+            near_front = max(0.0, min(1.0, (r.z - 0.42) / 0.35)) if r.y < -0.2 else 1.0
+            on_top = 1.0 if r.z > 0.5 else 0.55          # sides cut shorter
+            length = base_len * rnd.uniform(0.8, 1.15) * (0.45 + 0.55 * near_front) * on_top
+            strands.append((grow(p, r, length, 0.03 + 0.03 * max(0, r.z), field, rnd, 8), rnd.uniform(0.7, 1.3), 0.2))
+        objs.append(strand_curve("Hair", mat, strands, 0.012))
+    elif style == "curly":
+        objs.append(hair_cap(p, mat, lambda x: 0.42, top_extra=0.04, thick=0.05, side_low=0.0, back_low=-0.4))
+        length = 0.38 if p["woman"] else 0.24
+        for r in roots(p, 1400, lambda x: 0.42, 0.0, -0.4, rnd):
+            n = (r.normalized() + Vector((0, 0, 0.25))).normalized()
+            u = n.cross(Vector((0, 0, 1)))
+            if u.length < 0.1:
+                u = Vector((1, 0, 0))
+            u.normalize()
+            v = n.cross(u)
+            turns = rnd.uniform(2.5, 3.5)
+            cr = rnd.uniform(0.03, 0.045)
+            pts = []
+            for k in range(25):
+                t = k / 24
+                a = t * turns * math.pi * 2 + rnd.uniform(0, 6)
+                pts.append(r + n * (0.04 + t * length) + (u * math.cos(a) + v * math.sin(a)) * cr * min(1, t * 4))
+            strands.append((pts, rnd.uniform(0.8, 1.2), 0.5))
+        objs.append(strand_curve("Curls", mat, strands, 0.02))
+    else:
+        # longer hair with a parting, tied up or hanging down
+        part = rnd.choice((0.0, 0.12, -0.12)) * fw
+        front = lambda x: 0.5 - 0.2 * (x - part) ** 2
+        objs.append(hair_cap(p, mat, front, top_extra=0.0, thick=0.014,
+                             side_low=-0.12 if style != "bob" else -0.2, back_low=-0.55))
+        side_pony = style == "pony" and rnd.random() < 0.5
+        side = rnd.choice((-1, 1))
+        if style == "pony":
+            tie = Vector((side * 0.42, 0.62, -0.32)) if side_pony else Vector((0, 0.72, 0.62))
+        elif style == "braid":
+            tie = Vector((0, 0.86, 0.3))
+        else:
+            tie = Vector((0, 0.42, 0.98))
+        hang = style in ("long", "bob")
+        end_z = -1.25 if style == "long" else -0.62
+
+        def field(pos, t):
+            if not hang:
+                return tie - pos
+            side = math.copysign(1, pos.x - part)
+            if pos.z > 0.35 and pos.y < 0.45:
+                return tangent(Vector((side, 0.15, -0.35)), pos)
+            if pos.y > 0.45 and pos.z > 0:
+                return tangent(Vector((0.15 * side, 0.4, -1)), pos)
+            return Vector((0.12 * side, 0.12, -1))
+        for r in roots(p, 7000, front, -0.12, -0.55, rnd):
+            if hang:
+                length = (r.z - end_z) * rnd.uniform(0.95, 1.12) + 0.2
+                pts = grow(p, r, length, 0.035, field, rnd, 16, hang_below=-0.1)
+            else:
+                length = (tie - r).length
+                pts = grow(p, r, length, 0.03, field, rnd, 10)
+            strands.append((pts, rnd.uniform(0.7, 1.3), 0.4 if hang else 0.9))
+        objs.append(strand_curve("Hair", mat, strands, 0.0115))
+        tails = []
+        if style == "pony":
+            if side_pony:
+                # tied low at the back and brought forward over one shoulder
+                mid = Vector((side * 0.82, 0.25, -0.95))
+                end = Vector((side * 0.78, -0.32, -1.75))
+            else:
+                # a high ponytail that shows behind the head
+                mid = Vector((side * 0.55, 1.05, 0.85))
+                end = Vector((side * 0.85, 0.75, -0.45))
+            for i in range(700):
+                off = Vector((rnd.gauss(0, 0.05), rnd.gauss(0, 0.05), rnd.gauss(0, 0.045)))
+                pts = []
+                for k in range(14):
+                    t = k / 13
+                    c = tie * (1 - t) ** 2 + mid * 2 * t * (1 - t) + end * t * t
+                    pts.append(c + off * (1 + t * 1.8) + noise.noise_vector(c * 3 + off * 5) * 0.03)
+                tails.append((pts, rnd.uniform(0.8, 1.3), 0.25))
+            objs.append(blob("Tie", mat, tuple(tie), (0.09, 0.08, 0.09)))
+        elif style == "bun":
+            centre = tie + Vector((0, 0.08, 0.08))
+            objs.append(blob("BunCore", mat, tuple(centre), (0.19, 0.17, 0.16)))
+            for i in range(360):
+                axis = Vector((rnd.gauss(0, 1), rnd.gauss(0, 0.6), rnd.gauss(0, 1))).normalized()
+                u = axis.cross(Vector((0.3, 0.2, 1))).normalized()
+                v = axis.cross(u)
+                rr = rnd.uniform(0.19, 0.22)
+                a0 = rnd.uniform(0, 6.3)
+                pts = [centre + Vector(((u * math.cos(a0 + k * 0.26) + v * math.sin(a0 + k * 0.26)) * rr)[:]) * 1.0
+                       for k in range(14)]
+                pts = [centre + Vector(((q - centre).x * 1.0, (q - centre).y * 0.9, (q - centre).z * 0.85)) for q in pts]
+                tails.append((pts, rnd.uniform(0.9, 1.3), 0.6))
+        elif style == "braid":
+            for i in range(9):
+                objs.append(blob("Braid", mat, (0.0, 0.95 + i * 0.03, 0.15 - i * 0.16),
+                                 (0.11 - i * 0.004, 0.1, 0.11), (0, 0, math.radians(30 if i % 2 else -30))))
+        if style in ("pony", "bun", "braid"):
+            # a few loose strands framing the face
+            for i in range(70):
+                sd = rnd.choice((-1, 1))
+                d = Vector((sd * rnd.uniform(0.55, 0.75), -rnd.uniform(0.5, 0.7), rnd.uniform(0.3, 0.5))).normalized()
+                r = head_shape(d, p)
+                L = rnd.uniform(0.45, 0.8)
+
+                def wisp(pos, t, sd=sd):
+                    return Vector((sd * 0.25, 0.05, -1))
+                tails.append((grow(p, r, L, 0.03, wisp, rnd, 10, hang_below=0.1), rnd.uniform(0.5, 0.8), 0.3))
+        if tails:
+            objs.append(strand_curve("Tail", mat, tails, 0.017))
+    return objs
+
+
 # ---------- one portrait ----------
 
 def person(seed, woman):
@@ -666,7 +966,7 @@ def person(seed, woman):
         hair_color = HAIRS[rnd.choice(hair_names)]
     styles = WOMEN_HAIR if woman else MEN_HAIR
     style = rnd.choice(styles)
-    if dark and rnd.random() < 0.5:
+    if dark and rnd.random() < 0.3:
         style = "curly" if woman or rnd.random() < 0.5 else "buzz"
     if style == "bald" and hair_color == HAIRS["gra"]:
         pass
@@ -680,7 +980,8 @@ def person(seed, woman):
     return {
         "seed": seed, "woman": woman, "skin": skin, "hair_color": hair_color, "hair": style,
         "eye": rnd.choice(EYES if not dark else EYES[2:4]),
-        "jersey": JERSEYS[rnd.randrange(len(JERSEYS))], "stripe": rnd.choice((-1, 1)) * rnd.uniform(0.5, 0.9),
+        "jersey": JERSEYS[rnd.randrange(len(JERSEYS))],
+        "design": rnd.choice(("swoosh", "chevron", "split")), "design_flip": rnd.choice((-1, 1)),
         "face_w": rnd.uniform(0.94, 1.02) if woman else rnd.uniform(1.0, 1.08),
         "jaw_taper": rnd.uniform(0.3, 0.4) if woman else rnd.uniform(0.18, 0.28),
         "cheek": rnd.uniform(0.6, 1.2), "brow": rnd.uniform(0.02, 0.035) if woman else rnd.uniform(0.04, 0.06),
@@ -702,9 +1003,10 @@ def render_person(p, path):
 
     skin = skin_material(p)
     hair = hair_material(p["hair_color"])
-    jersey = jersey_material(p["jersey"], p["stripe"])
+    jersey = jersey_material(p)
 
-    head_parts = [make_head(p, skin)] + make_ears(p, skin) + make_eyes(p, skin) + make_hair(p, hair) + make_extra(p)
+    head_parts = ([make_head(p, skin)] + make_ears(p, skin) + make_eyes(p, skin) + make_hair(p, hair)
+                  + make_beard(p, hair) + make_extra(p))
     pivot = bpy.data.objects.new("HeadPivot", None)
     bpy.context.collection.objects.link(pivot)
     pivot.location = (0, 0.1, -0.6)

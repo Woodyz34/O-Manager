@@ -318,7 +318,7 @@ def write_game_file(runners, today):
         cards.append({
             "id": r["id"], "name": r["name"], "man": r["sex"] == "M", "klass": game_class(r, today),
             "country": country_name(r), "club": r.get("club") or "",
-            "speed": round(r["physic"]), "technique": round(r["technique"]), "inPacks": True,
+            "speed": round(r["physic"], 2), "technique": round(r["technique"], 2), "inPacks": True,
         })
     now = {c["id"] for c in cards}
     frozen = 0
@@ -428,8 +428,8 @@ def main():
         runners.append({
             "id": key, "name": inf["name"], "sex": inf["sex"], "birth_year": inf["birth_year"],
             "club": inf["club"], "country": inf["country"],
-            "physic": round(rt[0], 1) if rt else None,
-            "technique": round(rt[1], 1) if rt else None,
+            "physic": round(rt[0], 2) if rt else None,
+            "technique": round(rt[1], 2) if rt else None,
             "adjusted_races": rt[2] if rt else 0,
             "all_races": n_all,
             "international": key in anchored_keys,
