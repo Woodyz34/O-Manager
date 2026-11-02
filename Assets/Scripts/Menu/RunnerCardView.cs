@@ -65,8 +65,8 @@ public class RunnerCardView : MonoBehaviour
         SetSprite(flag, card.country);
         SetSprite(club, card.clubb);
         // No flag or club badge picture yet: write the name in its place instead
-        SetSlotText(ref countryNameText, flag, "Country name", 22f, card.country == null ? RunnerCards.CountryName(card) : "");
-        SetSlotText(ref clubNameText, club, "Club name", 20f, card.clubb == null ? Emblems.NoBreakAtDash(card.clubName) : "");
+        SetSlotText(ref countryNameText, flag, "Country name", 22f, 52f, card.country == null ? RunnerCards.CountryName(card) : "");
+        SetSlotText(ref clubNameText, club, "Club name", 26f, 92f, card.clubb == null ? Emblems.NoBreakAtDash(card.clubName) : "");
 
         if (overallText != null) overallText.text = RunnerCards.Overall(card).ToString();
         if (klassText != null) klassText.text = card.klass;
@@ -82,7 +82,7 @@ public class RunnerCardView : MonoBehaviour
         if (clubNameText != null) clubNameText.color = ink;
     }
 
-    void SetSlotText(ref TextMeshProUGUI text, Image slot, string objectName, float maxSize, string value)
+    void SetSlotText(ref TextMeshProUGUI text, Image slot, string objectName, float maxSize, float height, string value)
     {
         if (string.IsNullOrEmpty(value))
         {
@@ -92,14 +92,14 @@ public class RunnerCardView : MonoBehaviour
         if (text == null)
         {
             if (slot == null) return;
-            text = MakeSlotText(slot, objectName, maxSize);
+            text = MakeSlotText(slot, objectName, maxSize, height);
         }
         text.gameObject.SetActive(true);
         text.text = value;
     }
 
     // A small text the size of the card's left column, placed where the picture would be
-    TextMeshProUGUI MakeSlotText(Image slot, string objectName, float maxSize)
+    TextMeshProUGUI MakeSlotText(Image slot, string objectName, float maxSize, float height)
     {
         GameObject holder = new GameObject(objectName, typeof(RectTransform));
         holder.layer = slot.gameObject.layer;
@@ -111,7 +111,7 @@ public class RunnerCardView : MonoBehaviour
         rect.anchorMax = spot.anchorMax;
         rect.pivot = spot.pivot;
         rect.anchoredPosition = spot.anchoredPosition;
-        rect.sizeDelta = new Vector2(150f, Mathf.Max(spot.sizeDelta.y, 52f));
+        rect.sizeDelta = new Vector2(156f, height);
 
         TextMeshProUGUI text = holder.AddComponent<TextMeshProUGUI>();
         TextMeshProUGUI style = klassText != null ? klassText : nameText;
@@ -123,7 +123,7 @@ public class RunnerCardView : MonoBehaviour
         text.fontStyle = FontStyles.Bold;
         text.alignment = TextAlignmentOptions.Center;
         text.enableAutoSizing = true;
-        text.fontSizeMin = 14f;
+        text.fontSizeMin = 17f;
         text.fontSizeMax = maxSize;
         text.textWrappingMode = TextWrappingModes.Normal;
         text.overflowMode = TextOverflowModes.Ellipsis;
