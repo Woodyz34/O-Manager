@@ -44,6 +44,7 @@ jobs:
             echo "Inget nytt att spara."
           else
             git commit -m "Eventor-data: ${{ inputs.mode }} $(date -u +%F)"
+            git pull --rebase origin main
             git push
           fi
       - name: Spara råsvaren
