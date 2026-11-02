@@ -51,7 +51,7 @@ public class RunnerCollectionUI : MonoBehaviour
     void MakeMeritsText()
     {
         if (detailInfo == null || meritsText != null) return;
-        detailInfo.fontSize = 32;
+        detailInfo.fontSize = 30;   // small enough for eight lines, with the club
         detailInfo.lineSpacing = 0;
         RectTransform info = detailInfo.rectTransform;
         info.sizeDelta = new Vector2(info.sizeDelta.x, 330);
@@ -152,6 +152,7 @@ public class RunnerCollectionUI : MonoBehaviour
             Row("Speed", Mathf.RoundToInt(card.speed).ToString()) +
             Row("Technique", Mathf.RoundToInt(card.technique).ToString()) +
             Row("Class", card.klass) +
+            Row("Club", string.IsNullOrEmpty(card.clubName) ? "-" : card.clubName) +
             Row("Country", Title(RunnerCards.CountryName(card)));
         if (meritsText != null) meritsText.text = MeritsText(card, -1);
         detailPanel.SetActive(true);
