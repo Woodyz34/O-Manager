@@ -72,9 +72,17 @@ public class GameModeSelect : MonoBehaviour
         gameModeSelectPanel.SetActive(false);
     }
 
+    // "Runner pool" in the lobby: your own runners, or any runner in the game.
+    // A small pop-up with the two choices replaced the old panel of pictures (kept in the scene, unused).
     public void OpenPanel()
     {
-        gameModeSelectPanel.SetActive(true);
+        ChoicePopup.Option[] options = new ChoicePopup.Option[GameModes.Pools.Length];
+        for (int i = 0; i < GameModes.Pools.Length; i++)
+        {
+            string pool = GameModes.Pools[i];
+            options[i] = new ChoicePopup.Option { id = pool, title = GameModes.PoolName(pool), description = GameModes.PoolDescription(pool) };
+        }
+        ChoicePopup.Open("Runner pool", options, gameModeHandler.gameMode, SelectGameMode);
     }
 
     public void ClosePanel()

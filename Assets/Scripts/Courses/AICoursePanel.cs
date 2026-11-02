@@ -11,6 +11,43 @@ public class AICoursePanel : MonoBehaviour
 {
     static AICoursePanel instance;
 
+    // The settings of the AI course in use, so a new course of the same kind, length and number of
+    // controls can be laid when the lobby starts again after a race (see ReadyUIHandler.StartGame).
+    public static CourseGenerator.Settings LastSettings { get; private set; }
+    static MapDefinition lastMap;
+    // The AI course that was last raced. Starting again with it gets a fresh course instead.
+    public static string RacedCourseId;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics()
+    {
+        LastSettings = null;
+        lastMap = null;
+        RacedCourseId = null;
+    }
+
+    // True when this course is an AI course that has already been raced and can be remade
+    public static bool ShouldRemake(CourseData course)
+    {
+        return course != null && LastSettings != null && lastMap != null && !string.IsNullOrEmpty(course.id)
+               && course.id.StartsWith("ai-") && course.id == RacedCourseId;
+    }
+
+    // Lays a new course with the same settings and a new seed. Null and the reason when it fails.
+    public static async Task<CourseGenerator.Result> Remake()
+    {
+        MapGrid grid = MapGrid.Load(lastMap.gridName);
+        CourseGenerator.Settings settings = new CourseGenerator.Settings
+        {
+            kind = LastSettings.kind,
+            lengthKm = LastSettings.lengthKm,
+            controls = LastSettings.controls,
+            seed = Environment.TickCount
+        };
+        MapDefinition map = lastMap;
+        return await Task.Run(() => CourseGenerator.Generate(map, grid, settings));
+    }
+
     Action<CourseData> onUse;
     CourseGenerator.Kind kind = CourseGenerator.Kind.Middle;
     float lengthKm = 4f;
@@ -192,6 +229,8 @@ public class AICoursePanel : MonoBehaviour
     void Use()
     {
         if (generated == null) return;
+        LastSettings = new CourseGenerator.Settings { kind = kind, lengthKm = lengthKm, controls = controls };
+        lastMap = map;
         gameObject.SetActive(false);
         onUse?.Invoke(generated);
     }

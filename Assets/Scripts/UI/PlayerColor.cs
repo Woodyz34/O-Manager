@@ -42,24 +42,24 @@ public static class PlayerColor
     }
 }
 
-// "Change color" in the lobby: pick any colour (a few ready ones, or hue and brightness), see it on your runner at once,
-// and keep it for every game after this one
+// "Change color" in the lobby: pick any colour on a colour wheel (plus brightness, or a few ready ones),
+// see it on your runner at once, and keep it for every game after this one
 public class PlayerColorPicker : MonoBehaviour
 {
     static PlayerColorPicker open;
 
     static readonly string[] Presets =
     {
-        "E8742A", "D7263D", "F2C14E", "3F7D54", "1B998B", "2E86DE",
-        "1F3D8F", "7B3FB0", "D96BC3", "6D4C41", "222222", "F4F1E8"
+        "E8742A", "D7263D", "F2C14E", "3F7D54", "2E86DE", "7B3FB0", "222222", "F4F1E8"
     };
 
     Color color;
     Color before;
     Image preview;
-    Slider hueSlider;
+    ColorWheel wheel;
     Slider valueSlider;
-    Slider saturationSlider;
+    float hue;
+    float saturation;
     TextMeshProUGUI hexText;
     bool setting;
 
@@ -86,8 +86,8 @@ public class PlayerColorPicker : MonoBehaviour
         Image dim = CourseUI.Panel("Dim", transform, new Color(0f, 0f, 0f, 0.45f), false);
         CourseUI.Stretch(dim.rectTransform);
         Image card = CourseUI.CardPanel("Card", dim.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640, 640));
-        CourseUI.Column(card.gameObject, 14, new RectOffset(36, 36, 30, 30));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 830));
+        CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 26, 28));
 
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "Your colour", 38, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 48);
@@ -100,13 +100,22 @@ public class PlayerColorPicker : MonoBehaviour
         hexText = CourseUI.Text("Hex", previewRow, "", 26, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
         CourseUI.Size(hexText, 70, 300);
 
+        // The wheel, centred in its own row
+        RectTransform wheelRow = CourseUI.Rect("Wheel row", card.transform);
+        CourseUI.Size(wheelRow, 400);
+        wheel = ColorWheel.Create(wheelRow, 390);
+        wheel.Picked = (h, s) => { hue = h; saturation = s; FromSliders(); };
+
+        valueSlider = Labeled(card.transform, "Brightness", 0f, 1f, v => FromSliders());
+
         RectTransform swatches = CourseUI.Rect("Swatches", card.transform);
         GridLayoutGroup grid = swatches.gameObject.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(80, 54);
+        grid.cellSize = new Vector2(56, 44);
         grid.spacing = new Vector2(10, 10);
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 6;
-        CourseUI.Size(swatches, 118);
+        grid.constraintCount = 8;
+        grid.childAlignment = TextAnchor.MiddleCenter;
+        CourseUI.Size(swatches, 46);
         foreach (string hex in Presets)
         {
             ColorUtility.TryParseHtmlString("#" + hex, out Color swatch);
@@ -116,9 +125,6 @@ public class PlayerColorPicker : MonoBehaviour
             button.onClick.AddListener(() => SetColor(swatch, true));
         }
 
-        hueSlider = Labeled(card.transform, "Colour", 0f, 1f, v => FromSliders());
-        saturationSlider = Labeled(card.transform, "Strength", 0f, 1f, v => FromSliders());
-        valueSlider = Labeled(card.transform, "Brightness", 0f, 1f, v => FromSliders());
 
         RectTransform buttons = CourseUI.Rect("Buttons", card.transform);
         CourseUI.Row(buttons.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
@@ -143,7 +149,7 @@ public class PlayerColorPicker : MonoBehaviour
 
     void FromSliders()
     {
-        SetColor(Color.HSVToRGB(hueSlider.value, saturationSlider.value, valueSlider.value), false);
+        SetColor(Color.HSVToRGB(hue, saturation, valueSlider.value), false);
     }
 
     void SetColor(Color chosen, bool moveSliders)
@@ -155,12 +161,13 @@ public class PlayerColorPicker : MonoBehaviour
         if (moveSliders)
         {
             Color.RGBToHSV(color, out float h, out float s, out float v);
+            hue = h;
+            saturation = s;
             setting = true;
-            hueSlider.value = h;
-            saturationSlider.value = s;
             valueSlider.value = v;
             setting = false;
         }
+        if (wheel != null) wheel.Show(hue, saturation, valueSlider.value, color);
         ShowOnRunner(color);
     }
 

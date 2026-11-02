@@ -55,6 +55,17 @@ public static class MenuUIBuilder
         Money.Instance.AddMoney(1000);
     }
 
+    [MenuItem("Tools/O-Manager/Testing/Add 100 000 kr (in Play mode)")]
+    public static void AddLotsOfTestMoney()
+    {
+        if (Money.Instance == null)
+        {
+            Debug.Log("Start the game first (Play mode), then add the money.");
+            return;
+        }
+        Money.Instance.AddMoney(100000);
+    }
+
     [MenuItem("Tools/O-Manager/Testing/Reset runner collection")]
     public static void ResetCollection()
     {

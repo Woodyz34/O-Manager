@@ -185,7 +185,6 @@ public class RunnerCollectionUI : MonoBehaviour
             text += "<link=\"" + i + "\">" + (i + 1) + ".<indent=36><b>" + name + "</b>  " + faint + merit.klass + "</color>\n" +
                     "<b>" + RaceResults.Ordinal(merit.place) + "</b> of " + merit.of +
                     "   <b>" + behind + "</b>" +
-                    "   " + faint + "Score</color> <b>" + Mathf.RoundToInt(merit.score) + "</b>" +
                     "   " + faint + merit.date + "</color>" +
                     (lit ? "   <color=#E8742A><b>Results ></b></color>" : "") + "</indent></link>\n";
         }
