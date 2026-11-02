@@ -5,14 +5,14 @@ name: WinSplits-import
 on:
   push:
     branches: [main]
-    paths: ["eventor/winsplits/**"]
+    paths: ["eventor/winsplits/**", "eventor/import_winsplits.py"]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: eventor
+  group: winsplits
   cancel-in-progress: false
 
 jobs:

@@ -102,10 +102,20 @@ class Eventor:
         if self.calls:
             time.sleep(self.pause)
         self.calls += 1
+        print(f"Anrop {self.calls}: {path} {params.get('eventId', '')} {params.get('eventRaceId', '')}".rstrip(), flush=True)
         url = f"{BASE_URL}/{path}?{urllib.parse.urlencode(params)}"
         req = urllib.request.Request(url, headers={"ApiKey": self.key, "User-Agent": "O-Manager-stats/0.2"})
         with urllib.request.urlopen(req, timeout=300) as resp:
             return resp.read()
+
+
+def load_raw(name):
+    """A raw response saved by an earlier run (eventor/cache, restored from artifacts in Actions)."""
+    path = os.path.join(CACHE_DIR, name)
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            return f.read()
+    return None
 
 
 def save_raw(name, data):
@@ -249,9 +259,16 @@ def main():
             sys.exit("EVENTOR_API_KEY saknas. Sätt den som miljövariabel eller GitHub-hemlighet.")
         api = Eventor(key, args.pause)
 
+    cached_list = None
+    if args.mode == "once" and os.path.isdir(CACHE_DIR):
+        lists = sorted(n for n in os.listdir(CACHE_DIR) if n.startswith("events_once_"))
+        cached_list = load_raw(lists[-1]) if lists else None
     if args.events_file:
         with open(args.events_file, "rb") as f:
             events_xml = f.read()
+    elif cached_list is not None:
+        print(f"Använder sparad tävlingslista {lists[-1]} (inget anrop).", flush=True)
+        events_xml = cached_list
     else:
         events_xml = api.get("events", {
             "fromDate": from_date.strftime("%Y-%m-%d 00:00:00"),
@@ -283,11 +300,16 @@ def main():
                 with open(os.path.join(args.results_dir, base + ".xml"), "rb") as f:
                     xml = f.read()
             else:
-                params = {"eventId": race["event_id"], "includeSplitTimes": "true"}
-                if not race["single_race"]:
-                    params["eventRaceId"] = race["race_id"]
-                xml = api.get("results/event/iofxml", params)
-                save_raw(f"results_{race['event_id']}_{race['race_id']}.xml", xml)
+                raw_name = f"results_{race['event_id']}_{race['race_id']}.xml"
+                xml = load_raw(raw_name)
+                if xml is None:
+                    params = {"eventId": race["event_id"], "includeSplitTimes": "true"}
+                    if not race["single_race"]:
+                        params["eventRaceId"] = race["race_id"]
+                    xml = api.get("results/event/iofxml", params)
+                    save_raw(raw_name, xml)
+                else:
+                    print(f"Använder sparat svar {raw_name} (inget anrop).", flush=True)
             classes, unknown = parse_results(xml, race)
         except Exception as e:  # keep going; report at the end
             failed.append((label, f"{type(e).__name__}: {e}"))

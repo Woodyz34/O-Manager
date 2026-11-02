@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: eventor
@@ -30,6 +31,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Hämta sparade råsvar från tidigare körningar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p eventor/cache
+          for id in $(gh run list --workflow eventor-results.yml --limit 20 --json databaseId --jq '.[].databaseId'); do
+            for name in eventor-raw-once eventor-raw-week; do
+              tmp=$(mktemp -d)
+              if gh run download "$id" -n "$name" -D "$tmp" 2>/dev/null; then
+                cp -n "$tmp"/* eventor/cache/ 2>/dev/null || true
+              fi
+              rm -rf "$tmp"
+            done
+          done
+          echo "Sparade råsvar: $(ls eventor/cache | wc -l)"
       - name: Hämta resultat
         env:
           EVENTOR_API_KEY: ${{ secrets.EVENTOR_API_KEY }}
