@@ -37,13 +37,13 @@ public class AllCards : MonoBehaviour
             return;
         }
 
-        Sprite sweden = Resources.Load<Sprite>("Country/sverige");
         HashSet<string> names = new HashSet<string>();
         foreach (RunnerEntry r in data.runners)
         {
-            Sprite flag = r.country == "SWEDEN" ? sweden : null;
-            Sprite photo = Resources.Load<Sprite>("RunnerPicture/" + r.name);
-            CardData card = new CardData(r.name, r.speed, r.technique, flag, null, r.klass, r.man, photo);
+            // A real photo in Resources/Profilbilder wins over the drawn placeholder
+            Sprite photo = Emblems.Photo(r.name);
+            if (photo == null) photo = Emblems.Portrait(string.IsNullOrEmpty(r.id) ? r.name : r.id, r.man);
+            CardData card = new CardData(r.name, r.speed, r.technique, Emblems.Flag(r.country), Emblems.Club(r.club), r.klass, r.man, photo);
             card.id = r.id;
             card.countryName = r.country;
             card.clubName = r.club;
@@ -66,12 +66,14 @@ public class AllCards : MonoBehaviour
     List<CardData> HandMadeCards()
     {
         List<CardData> list = new List<CardData>();
-        list.Add(new CardData("Axel Elmblad", 79f, 98f, Resources.Load<Sprite>("Country/sverige"), Resources.Load<Sprite>("Clubs/IKHP"), "H21", true, Resources.Load<Sprite>("RunnerPicture/Axel Elmblad")));
-        list.Add(new CardData("August Mollén", 84f, 85f, Resources.Load<Sprite>("Country/sverige"), Resources.Load<Sprite>("Clubs/IKHP"), "H21", true, Resources.Load<Sprite>("RunnerPicture/August Mollén")));
-        list.Add(new CardData("Axel Granqvist", 82f, 94f, Resources.Load<Sprite>("Country/sverige"), Resources.Load<Sprite>("Clubs/IKHP"), "H21", true, Resources.Load<Sprite>("RunnerPicture/Axel Granqvist")));
-        list.Add(new CardData("Eetu Savolainen", 78f, 96f, Resources.Load<Sprite>("Country/sverige"), Resources.Load<Sprite>("Clubs/IKHP"), "H21", true, Resources.Load<Sprite>("RunnerPicture/Eetu Savolainen")));
-        list.Add(new CardData("Gustav Bergman", 80f, 99f, Resources.Load<Sprite>("Country/sverige"), Resources.Load<Sprite>("Clubs/IKHP"), "H21", true, Resources.Load<Sprite>("RunnerPicture/Gustav Bergman")));
-        list.Add(new CardData("Gustav Runefors", 77f, 95f, Resources.Load<Sprite>("Country/sverige"), Resources.Load<Sprite>("Clubs/IKHP"), "H21", true, Resources.Load<Sprite>("RunnerPicture/Gustav Runefors")));
+        Sprite sweden = Emblems.Flag("SWEDEN");
+        Sprite ikhp = Emblems.Club("IKHP Huskvarna Idrottsklubb");
+        list.Add(new CardData("Axel Elmblad", 79f, 98f, sweden, ikhp, "H21", true, Emblems.Photo("Axel Elmblad")));
+        list.Add(new CardData("August Mollén", 84f, 85f, sweden, ikhp, "H21", true, Emblems.Photo("August Mollén")));
+        list.Add(new CardData("Axel Granqvist", 82f, 94f, sweden, ikhp, "H21", true, Emblems.Photo("Axel Granqvist")));
+        list.Add(new CardData("Eetu Savolainen", 78f, 96f, sweden, ikhp, "H21", true, Emblems.Photo("Eetu Savolainen")));
+        list.Add(new CardData("Gustav Bergman", 80f, 99f, sweden, ikhp, "H21", true, Emblems.Photo("Gustav Bergman")));
+        list.Add(new CardData("Gustav Runefors", 77f, 95f, sweden, ikhp, "H21", true, Emblems.Photo("Gustav Runefors")));
         return list;
     }
 

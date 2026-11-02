@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public enum RunnerTier { Bronze, Silver, Gold, Elite }
@@ -108,7 +108,13 @@ public static class RunnerCards
         {
             return "";
         }
-        string key = card.country.name.ToLowerInvariant();
+        return EnglishCountry(card.country.name);
+    }
+
+    // A flag's file name, in Swedish or English, as the country's English name in capitals
+    public static string EnglishCountry(string fileName)
+    {
+        string key = fileName.Trim().ToLowerInvariant();
         switch (key)
         {
             case "sverige": return "SWEDEN";
@@ -123,7 +129,32 @@ public static class RunnerCards
             case "estland": return "ESTONIA";
             case "lettland": return "LATVIA";
             case "ukraina": return "UKRAINE";
-            default: return card.country.name.ToUpperInvariant();
+            case "ungern": return "HUNGARY";
+            case "österrike": return "AUSTRIA";
+            case "polen": return "POLAND";
+            case "spanien": return "SPAIN";
+            case "nederländerna": case "holland": return "NETHERLANDS";
+            case "slovakien": return "SLOVAKIA";
+            case "litauen": return "LITHUANIA";
+            case "kanada": return "CANADA";
+            case "italien": return "ITALY";
+            case "australien": return "AUSTRALIA";
+            case "usa": return "UNITED STATES";
+            case "nya zeeland": return "NEW ZEALAND";
+            case "kroatien": return "CROATIA";
+            case "hongkong": case "hong kong": return "HONG KONG CHINA";
+            case "belgien": return "BELGIUM";
+            case "ryssland": return "RUSSIA";
+            case "vitryssland": case "belarus": return "BELARUS";
+            case "irland": return "IRELAND";
+            case "slovenien": return "SLOVENIA";
+            case "rumänien": return "ROMANIA";
+            case "bulgarien": return "BULGARIA";
+            case "turkiet": return "TURKEY";
+            case "kina": return "CHINA";
+            case "sydafrika": return "SOUTH AFRICA";
+            case "brasilien": return "BRAZIL";
+            default: return fileName.Trim().ToUpperInvariant();
         }
     }
 
