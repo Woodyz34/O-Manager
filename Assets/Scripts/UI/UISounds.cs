@@ -107,6 +107,21 @@ public class UISounds : MonoBehaviour
             CheckEar();
         }
 
+        // Keys that work like buttons: Esc (the Esc menu, skipping the pack show) and Enter on a selected button
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Play(click, ClickVolume);
+        }
+        else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            if (selected != null && selected.GetComponent<ISubmitHandler>() != null && selected.GetComponent<TMP_InputField>() == null
+                && selected.GetComponent<InputField>() == null && Usable(selected))
+            {
+                Play(SoundFor(selected), ClickVolume);
+            }
+        }
+
         if (Input.GetMouseButtonDown(0))
         {
             pressed = null;

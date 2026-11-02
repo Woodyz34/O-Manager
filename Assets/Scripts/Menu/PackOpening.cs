@@ -727,6 +727,7 @@ public class PackOpening : MonoBehaviour
             Place(pack, new Vector2(0, PackY + Mathf.Sin(clock * 1.6f) * 10f), 1f, Mathf.Sin(clock * 0.9f) * 11f, Mathf.Sin(clock * 1.3f) * 1.5f);
             if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return))
             {
+                UISounds.Click();
                 RequestOpen();
             }
         }
