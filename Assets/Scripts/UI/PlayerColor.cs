@@ -86,7 +86,7 @@ public class PlayerColorPicker : MonoBehaviour
         Image dim = CourseUI.Panel("Dim", transform, new Color(0f, 0f, 0f, 0.45f), false);
         CourseUI.Stretch(dim.rectTransform);
         Image card = CourseUI.CardPanel("Card", dim.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 900));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 830));
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 26, 28));
 
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "Your colour", 38, CourseUI.Ink, FontStyles.Bold);

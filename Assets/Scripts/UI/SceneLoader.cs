@@ -12,12 +12,14 @@ public class SceneLoader : MonoBehaviour
     const float MinimumShown = 0.6f;    // seconds, so the page does not just flash by
 
     static GameObject cachedPage;
+    static SceneLoader runner;      // on its own object that is always active (the page is hidden between uses)
     static bool loading;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
     {
         cachedPage = null;
+        runner = null;
         loading = false;
     }
 
@@ -30,9 +32,14 @@ public class SceneLoader : MonoBehaviour
             SceneManager.LoadScene(scene);
             return;
         }
+        if (runner == null)
+        {
+            GameObject go = new GameObject("Scene loader");
+            DontDestroyOnLoad(go);
+            runner = go.AddComponent<SceneLoader>();
+        }
         loading = true;
-        SceneLoader runner = page.GetComponent<SceneLoader>();
-        if (runner == null) runner = page.AddComponent<SceneLoader>();
+        page.SetActive(true);
         runner.StartCoroutine(runner.Run(page, scene, message));
     }
 
