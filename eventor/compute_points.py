@@ -8,7 +8,7 @@ Per race and class (runners on the same course):
   * Leg reference = mean of the fastest 25 % of leg times.
   * Runner level = median of leg_time / reference over the runner's legs.
   * A leg is a mistake when the time lost against reference * level is
-    more than 30 s and more than 25 %. Mistake time = sum of those losses.
+    more than 15 s and more than 25 %. Mistake time = sum of those losses.
   * Clean time c = finish time - mistake time.
   * Technique T = 100 - mistake_minutes * 100 / controls (finish not a control).
   * Physic P = min(100, 100 * c100 / c). Double the clean time = 50.
@@ -49,7 +49,7 @@ HALF_LIFE = 180
 MIN_CALIBRATORS = 3
 MIN_RACES_TO_CALIBRATE = 1     # 3 left every H/D18 and H/D20 race unadjusted with one year of data
 MIN_RACES_VISIBLE = 5
-MISTAKE_SECONDS = 30
+MISTAKE_SECONDS = 15            # user chose 15 s (was 30) on 2026-11-02
 MISTAKE_SHARE = 0.25
 TUKEY_C = 4.685
 MAD_FLOOR = 5.0
