@@ -42,8 +42,8 @@ Löpare: 2172, med betyg: 2112, synliga i spelet: 634 (359 herrar, 275 damer). F
 | 3 | Tove Alexandersson | Sweden | 96.41 | 88.22 | 4 |
 | 4 | Pia Young Vik | Norway | 95.78 | 81.37 | 4 |
 | 5 | Freja Hjerne | Sweden | 93.89 | 92.03 | 14 |
-| 6 | Hanna Lundberg | Sweden | 92.98 | 84.02 | 8 |
-| 7 | Malin Agervig Kristiansson | Denmark | 92.98 | 58.48 | 2 |
+| 6 | Malin Agervig Kristiansson | Denmark | 92.98 | 58.48 | 2 |
+| 7 | Hanna Lundberg | Sweden | 92.98 | 84.02 | 8 |
 | 8 | Venla Harju | Finland | 92.02 | 85.09 | 4 |
 | 9 | Marie Olaussen | Norway | 91.86 | 94.4 | 10 |
 | 10 | Agnes Noergaard Kracht | Denmark | 91.29 | 76.97 | 2 |
