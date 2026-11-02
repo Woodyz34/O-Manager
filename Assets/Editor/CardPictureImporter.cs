@@ -4,6 +4,12 @@ using UnityEditor;
 // so a flag, club badge or photo is never cut into several small sprites.
 public class CardPictureImporter : AssetPostprocessor
 {
+    // Flags and club badges are only shown small, so big pictures are scaled down when imported
+    const int EmblemMaxSize = 512;
+
+    // Raised when the settings below change, so Unity imports the pictures again
+    public override uint GetVersion() { return 2; }
+
     static readonly string[] Folders =
     {
         "Assets/Resources/Emblem/",
@@ -25,5 +31,6 @@ public class CardPictureImporter : AssetPostprocessor
         importer.spriteImportMode = SpriteImportMode.Single;
         importer.alphaIsTransparency = true;
         importer.mipmapEnabled = false;
+        if (assetPath.StartsWith("Assets/Resources/Emblem/")) importer.maxTextureSize = EmblemMaxSize;
     }
 }

@@ -45,10 +45,13 @@ Har bild:
   Portugal.png   (1 kort)
 
 
-KLUBBAR (1 av 128 har bild)
+KLUBBAR (128 av 128 har bild)
 
 Saknar bild:
+
+Har bild:
   IFK Göteborg Orientering.png   (28 kort)
+  IKHP Huskvarna Idrottsklubb.png   (19 kort)
   Göteborg-Majorna OK.png   (18 kort)
   OK Orion.png   (18 kort)
   OK Linné.png   (12 kort)
@@ -175,9 +178,6 @@ Saknar bild:
   Waxholms OK.png   (1 kort)
   Ystads OK.png   (1 kort)
   Östergöt.png   (1 kort)
-
-Har bild:
-  IKHP Huskvarna Idrottsklubb.png   (19 kort)
 
 
 PROFILBILDER (4 av 634 har foto)
