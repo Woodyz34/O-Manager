@@ -60,7 +60,7 @@ public class RunnerCollectionUI : MonoBehaviour
         meritsText.richText = true;
         RectTransform rect = meritsText.rectTransform;
         rect.anchoredPosition = info.anchoredPosition + new Vector2(0, -345);
-        rect.sizeDelta = new Vector2(info.sizeDelta.x + 60, 330);
+        rect.sizeDelta = new Vector2(info.sizeDelta.x - 40, 330);
     }
 
     void OnEnable()
@@ -157,13 +157,21 @@ public class RunnerCollectionUI : MonoBehaviour
         for (int i = 0; i < card.merits.Count; i++)
         {
             RunnerMerit merit = card.merits[i];
-            text += "<b>" + (i + 1) + ".  " + merit.race + "</b>  " + faint + merit.klass + "</color>\n" +
-                    "<indent=36>" + Ordinal(merit.place) + " of " + merit.of +
+            text += (i + 1) + ".<indent=36><b>" + Short(merit.race) + "</b>  " + faint + merit.klass + "</color>\n" +
+                    Ordinal(merit.place) + " of " + merit.of +
                     "   " + faint + "Score</color> <b>" + Mathf.RoundToInt(merit.score) + "</b>" +
                     "   " + faint + "Field</color> <b>" + Mathf.RoundToInt(merit.field) + "</b>" +
                     "   " + faint + merit.date + "</color></indent>\n";
         }
         return text;
+    }
+
+    // Some Eventor names are very long ("Swedish League, #5, medel (WRE) + D/H18-20, ..."), so they are cut
+    static string Short(string race)
+    {
+        const int Max = 44;
+        if (string.IsNullOrEmpty(race) || race.Length <= Max) return race;
+        return race.Substring(0, Max - 1).TrimEnd(' ', ',', '+', '(') + "\u2026";
     }
 
     static string Ordinal(int n)
