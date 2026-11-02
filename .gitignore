@@ -46,3 +46,6 @@ crashlytics-build.properties
 .env
 *.key
 secrets/
+
+# Eventor cache (raw API responses)
+eventor/cache/

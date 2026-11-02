@@ -1,0 +1,32 @@
+name: Eventor steg 0
+
+# Startas bara för hand (Actions -> Eventor steg 0 -> Run workflow).
+# Gör exakt ETT anrop till Eventor: listan över tävlingar på nivå 1, 2 och 6
+# det senaste året. Nyckeln läses från repo-hemligheten EVENTOR_API_KEY.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  count:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Räkna tävlingar (ett anrop)
+        env:
+          EVENTOR_API_KEY: ${{ secrets.EVENTOR_API_KEY }}
+        run: python eventor/step0_count_events.py
+      - name: Spara svaret så att det inte behöver hämtas igen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventor-events
+          path: eventor/cache/
+          if-no-files-found: ignore
+          retention-days: 90
