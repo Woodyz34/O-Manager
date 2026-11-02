@@ -30,6 +30,7 @@ OUT_DIR = os.path.join(HERE, "data", "races")
 NAME_RE = re.compile(
     r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<kind>VM|EM|VC|niva2)_(?P<dist>lang|lång|medel)_(?P<sex>H|D)"
     r"(?P<kval>_kval)?(?:_.*)?\.txt$", re.I)
+IMPORTER_VERSION = 2          # bump to re-import every file after a parser change
 KIND_LEVEL = {"vm": 6, "em": 6, "vc": 6, "niva2": 2}
 KIND_NAME = {"vm": "VM", "em": "EM", "vc": "Världscup", "niva2": "Nivå 2"}
 STATUS = {"mp": "MissingPunch", "dns": "DidNotStart", "dnf": "DidNotFinish",
@@ -38,13 +39,14 @@ LEG_RE = re.compile(r"^(S|\d+)-(\d+|F)(?:\s*\((\w+)\))?$")
 
 
 def parse_time(s):
-    """'36.22' -> 2182, '1:16.30' -> 4590, '' -> None."""
+    """'36.22' -> 2182, '1:16.30' -> 4590, '31.50.80' -> 1910.8, '' -> None."""
     s = s.strip().lstrip("+")
-    m = re.fullmatch(r"(?:(\d+):)?(\d+)\.(\d{2})", s)
+    m = re.fullmatch(r"(?:(\d+):)?(\d+)\.(\d{2})(?:[.,](\d{1,3}))?", s)
     if not m:
         return None
     h, mi, se = int(m.group(1) or 0), int(m.group(2)), int(m.group(3))
-    return h * 3600 + mi * 60 + se
+    frac = float("0." + m.group(4)) if m.group(4) else 0
+    return round(h * 3600 + mi * 60 + se + frac, 2)
 
 
 def parse_file(text):
@@ -108,7 +110,8 @@ def main():
         out_path = os.path.join(OUT_DIR, f"ws_{stem}.json")
         if os.path.exists(out_path):
             with open(out_path, encoding="utf-8") as f:
-                if json.load(f).get("source_sha1") == digest:
+                old = json.load(f)
+                if old.get("source_sha1") == digest and old.get("importer_version") == IMPORTER_VERSION:
                     report.append(f"| {fname} | fanns redan | |")
                     continue
         try:
@@ -128,6 +131,7 @@ def main():
                 r["country"], r["club"] = r["club"], None
         data = {
             "source": "winsplits", "source_file": fname, "source_sha1": digest,
+            "importer_version": IMPORTER_VERSION,
             "event_id": f"ws:{stem}", "race_id": "", "single_race": True,
             "event_name": f"{KIND_NAME[kind]} {'lång' if m.group('dist').lower() != 'medel' else 'medel'}"
                           f"{' kval' if m.group('kval') else ''}",
@@ -139,6 +143,8 @@ def main():
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
         ok = sum(r["status"] == "OK" for r in runners)
+        if not ok:
+            errors.append(f"{fname}: ingen godkänd löpare hittades, kontrollera formatet")
         report.append(f"| {fname} | importerad | {len(runners)} löpare ({ok} godkända), {controls} kontroller |")
 
     out = ["# WinSplits-import", "", "| Fil | Status | Innehåll |", "| --- | --- | --- |", *report, ""]
