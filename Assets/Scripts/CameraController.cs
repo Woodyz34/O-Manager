@@ -122,14 +122,14 @@ public class CameraController : MonoBehaviour
             return;
         }
 
-        if (!following)
+        if (!following && !EscMenu.IsOpen)
         {
             PanCamera();
         }
         
         // The wheel belongs to the list under the mouse (the leaderboard, for one), not to the map behind it
         float wheel = Input.GetAxis("Mouse ScrollWheel");
-        if (wheel != 0f && !PointerOverUI())
+        if (wheel != 0f && !PointerOverUI() && !EscMenu.IsOpen)
         {
             if (wheel > 0f) { ZoomIn(); }
             else { ZoomOut(); }

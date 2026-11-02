@@ -112,7 +112,7 @@ public class ManualPathDrawer : MonoBehaviour
             Vector3 worldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             worldPos.z = -1;
             // Kolla om musen är över UI
-            bool overUI = IsPointerOverTaggedCanvas();
+            bool overUI = IsPointerOverTaggedCanvas() || EscMenu.IsOpen; // no drawing behind the Esc menu
             if (!overUI && canDraw) // Endast rita om vi inte trycker på UI
             {
                 if (Input.GetMouseButtonDown(0) && Vector3.Distance(worldPos, ThisControll.position) < manager.cellSize * 3f)
