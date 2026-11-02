@@ -2,8 +2,9 @@
 """Fetch Eventor results with split times and store the classes the game uses.
 
 Modes
-  once  Past 365 days: level 1 without DM (district championships) plus
-        events Eventor returns without a level (Swedish League / WRE).
+  once  Past 365 days: level 1 without DM (district championships), events
+        Eventor returns without a level (Swedish League / WRE), and level 2
+        events whose name contains a line of eventor/extra_events.txt.
   week  Past 7 days: levels 1 (including DM), 2, 6 and events without a level.
 
 Load on Eventor
@@ -49,6 +50,7 @@ INDIVIDUAL_FORMS = {"IndSingleDay", "IndMultiDay"}
 WANTED_DISTANCES = {"Long", "Middle"}
 CANCELLED_STATUS = "10"
 
+EXTRA_EVENTS_FILE = os.path.join(HERE, "extra_events.txt")
 DM_RE = re.compile(r"(^|[^A-Za-zÅÄÖåäö])DM([^A-Za-zÅÄÖåäö]|$)|distriktsmästerskap", re.I)
 GAME_CLASS_RE = re.compile(r"(?<!\d)(21|20|18)(?!\d)|^(men|women|herrar|damer)\b", re.I)
 NO_GAME_CLASSES_RE = re.compile(r"ungdoms-?sm|veteran-?sm|(^|\W)usm(\W|$)", re.I)
@@ -114,7 +116,14 @@ def save_raw(name, data):
 
 # ---------- choosing races ----------
 
-def select_races(events_xml, mode):
+def load_extra_events():
+    if not os.path.exists(EXTRA_EVENTS_FILE):
+        return []
+    with open(EXTRA_EVENTS_FILE, encoding="utf-8") as f:
+        return [l.strip().lower() for l in f if l.strip() and not l.lstrip().startswith("#")]
+
+
+def select_races(events_xml, mode, extra=()):
     """Return a list of dicts, one per race to fetch, plus a list of skipped events with reasons."""
     root = ET.fromstring(events_xml)
     picked, skipped = [], []
@@ -134,8 +143,8 @@ def select_races(events_xml, mode):
         if ev.get("eventForm", "IndSingleDay") not in INDIVIDUAL_FORMS:
             skip(ev.get("eventForm")); continue
         if mode == "once":
-            if level not in (0, 1):
-                continue                      # level 2 is not read back in time
+            if level not in (0, 1) and not any(x in name.lower() for x in extra):
+                continue                      # level 2 back in time only for the chosen events
             if DM_RE.search(name):
                 skip("DM"); continue
             if NO_GAME_CLASSES_RE.search(name):
@@ -251,7 +260,7 @@ def main():
         })
         save_raw(f"events_{args.mode}_{from_date}_{today}.xml", events_xml)
 
-    races, skipped = select_races(events_xml, args.mode)
+    races, skipped = select_races(events_xml, args.mode, load_extra_events())
     os.makedirs(RACES_DIR, exist_ok=True)
 
     report = [f"# Eventor {args.mode}: {from_date} till {today}", ""]

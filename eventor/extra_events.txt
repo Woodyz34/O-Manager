@@ -1,0 +1,9 @@
+# Nivå 2-tävlingar som engångsjobbet (--mode once) också hämtar.
+# En rad per tävling. Det räcker med en del av namnet, stora/små bokstäver spelar ingen roll.
+# Rader som börjar med # räknas inte.
+Sverigepremiären
+Hallandspremiären
+Göteborgspremiären
+Tibrotrippeln
+JVM-test
+O-Ringen
