@@ -356,7 +356,7 @@ public class PackOpening : MonoBehaviour
         RectTransform rect = (RectTransform)holder.transform;
         rect.SetParent(clubImage.transform.parent, false);
         rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(-230f, 0f);
+        rect.anchoredPosition = new Vector2(-250f, 0f);
         rect.sizeDelta = new Vector2(400f, 100f);
         TextMeshProUGUI text = holder.AddComponent<TextMeshProUGUI>();
         text.font = klassText.font;
@@ -383,7 +383,7 @@ public class PackOpening : MonoBehaviour
         if (clubNameText != null)
         {
             clubNameText.gameObject.SetActive(!string.IsNullOrEmpty(clubName));
-            clubNameText.text = clubName ?? "";
+            clubNameText.text = Emblems.NoBreakAtDash(clubName ?? "");
         }
         klassText.text = runner.klass;
         speedValue.text = "0";

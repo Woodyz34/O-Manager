@@ -66,7 +66,7 @@ public class RunnerCardView : MonoBehaviour
         SetSprite(club, card.clubb);
         // No flag or club badge picture yet: write the name in its place instead
         SetSlotText(ref countryNameText, flag, "Country name", 22f, card.country == null ? RunnerCards.CountryName(card) : "");
-        SetSlotText(ref clubNameText, club, "Club name", 19f, card.clubb == null ? card.clubName : "");
+        SetSlotText(ref clubNameText, club, "Club name", 20f, card.clubb == null ? Emblems.NoBreakAtDash(card.clubName) : "");
 
         if (overallText != null) overallText.text = RunnerCards.Overall(card).ToString();
         if (klassText != null) klassText.text = card.klass;
@@ -79,7 +79,7 @@ public class RunnerCardView : MonoBehaviour
         Tint(inkedLabels, ink, 0.8f);
         Tint(inkedSoft, ink, 0.4f);
         if (countryNameText != null) countryNameText.color = ink;
-        if (clubNameText != null) clubNameText.color = UIAnim.WithAlpha(ink, 0.9f);
+        if (clubNameText != null) clubNameText.color = ink;
     }
 
     void SetSlotText(ref TextMeshProUGUI text, Image slot, string objectName, float maxSize, string value)
@@ -111,7 +111,7 @@ public class RunnerCardView : MonoBehaviour
         rect.anchorMax = spot.anchorMax;
         rect.pivot = spot.pivot;
         rect.anchoredPosition = spot.anchoredPosition;
-        rect.sizeDelta = new Vector2(140f, Mathf.Max(spot.sizeDelta.y, 48f));
+        rect.sizeDelta = new Vector2(150f, Mathf.Max(spot.sizeDelta.y, 52f));
 
         TextMeshProUGUI text = holder.AddComponent<TextMeshProUGUI>();
         TextMeshProUGUI style = klassText != null ? klassText : nameText;
@@ -123,11 +123,11 @@ public class RunnerCardView : MonoBehaviour
         text.fontStyle = FontStyles.Bold;
         text.alignment = TextAlignmentOptions.Center;
         text.enableAutoSizing = true;
-        text.fontSizeMin = 11f;
+        text.fontSizeMin = 14f;
         text.fontSizeMax = maxSize;
         text.textWrappingMode = TextWrappingModes.Normal;
         text.overflowMode = TextOverflowModes.Ellipsis;
-        text.lineSpacing = -12f;
+        text.lineSpacing = -14f;
         text.raycastTarget = false;
         return text;
     }

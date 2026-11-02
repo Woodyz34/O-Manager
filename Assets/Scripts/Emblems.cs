@@ -117,15 +117,17 @@ public static class Emblems
         return key.ToString();
     }
 
-    // Pictures dropped in the folder may be imported as plain textures instead of sprites,
-    // so those are turned into sprites here
+    // Pictures dropped in the folder may be imported as plain textures, or cut into several
+    // sprites ("Norway_0", "Norway_1"...). Those get one sprite of the whole picture instead.
     static List<Sprite> LoadFolder(string folder)
     {
         List<Sprite> result = new List<Sprite>();
         HashSet<string> names = new HashSet<string>();
         foreach (Sprite sprite in Resources.LoadAll<Sprite>(folder))
         {
-            if (names.Add(sprite.texture != null ? sprite.texture.name : sprite.name))
+            Texture2D texture = sprite.texture;
+            bool whole = texture == null || sprite.name == texture.name;
+            if (whole && names.Add(sprite.name))
             {
                 result.Add(sprite);
             }
@@ -140,6 +142,18 @@ public static class Emblems
             }
         }
         return result;
+    }
+
+    // Keeps a name with a dash on one line, so "Tolered-Utby Ol-klubb" is not split at "Ol-"
+    public static string NoBreakAtDash(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+        string[] words = text.Split(' ');
+        for (int i = 0; i < words.Length; i++)
+        {
+            if (words[i].Contains("-")) words[i] = "<nobr>" + words[i] + "</nobr>";
+        }
+        return string.Join(" ", words);
     }
 
     static uint StableHash(string text)
