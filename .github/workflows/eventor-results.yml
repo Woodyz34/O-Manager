@@ -50,6 +50,8 @@ jobs:
         env:
           EVENTOR_API_KEY: ${{ secrets.EVENTOR_API_KEY }}
         run: python eventor/fetch_results.py --mode "${{ inputs.mode }}"
+      - name: Räkna poäng
+        run: python eventor/compute_points.py
       - name: Spara resultaten i repot
         if: always()
         run: |
