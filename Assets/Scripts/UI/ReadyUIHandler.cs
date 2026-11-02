@@ -37,10 +37,47 @@ public class ReadyUIHandler : NetworkBehaviour
         
     }
 
+    bool remaking;
+
+    // After a race on an AI course, Start game lays a new AI course with the same kind, length and
+    // number of controls (unless the host picked another course in the meantime), shows it to everyone
+    // in the lobby for a moment, and then starts.
+    async void RemakeAICourseThenStart()
+    {
+        remaking = true;
+        UIToast.Show("Laying a new AI course with the same length and controls...", 4f);
+        CourseGenerator.Result result = await AICoursePanel.Remake();
+        if (this == null) return;
+        if (result.course != null)
+        {
+            mapHandler.Select(result.course);
+            // Gives the lobby time to send the new course to the other players
+            float until = Time.realtimeSinceStartup + 1.2f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                await Task.Yield();
+                if (this == null) return;
+            }
+        }
+        else
+        {
+            UIToast.Show("Could not lay a new AI course (" + result.error + "). Running the same course again.");
+            AICoursePanel.RacedCourseId = null;
+        }
+        remaking = false;
+        StartGame();
+    }
+
     public void StartGame()
     {
         // Bara värden (master client i Shared Mode) får starta spelet
         if (!IsHost()) return;
+        if (remaking) return;
+        if (AICoursePanel.ShouldRemake(CourseLibrary.Current))
+        {
+            RemakeAICourseThenStart();
+            return;
+        }
 
         // "Your runners": every player needs a runner of their own for every leg of a relay
         string chosenMode = gameModeHandler != null && !string.IsNullOrWhiteSpace(gameModeHandler.gameMode) ? gameModeHandler.gameMode : GameModes.YourRunners;
@@ -90,6 +127,9 @@ public class ReadyUIHandler : NetworkBehaviour
             if (NetworkPlayer.Local != null)
                 NetworkPlayer.Local.setGameMode(selectedMode);
         }
+
+        // Remember the AI course, so the next Start game in this lobby gets a fresh one
+        if (MapSelectUI.IsAICourse(CourseLibrary.Current)) AICoursePanel.RacedCourseId = CourseLibrary.Current.id;
 
         // Every course is run in the same scene; CourseLoader sets it up for the course picked in the lobby
         Runner.LoadScene(CourseScenes.Competition);

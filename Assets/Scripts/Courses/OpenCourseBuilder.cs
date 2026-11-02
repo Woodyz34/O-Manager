@@ -6,6 +6,6 @@ public class OpenCourseBuilder : MonoBehaviour
 {
     public void Open()
     {
-        SceneManager.LoadScene(CourseScenes.Builder);
+        SceneLoader.Load(CourseScenes.Builder, "Opening the course builder");
     }
 }

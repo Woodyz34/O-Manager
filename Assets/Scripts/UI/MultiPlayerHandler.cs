@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using Fusion;
 
 public class MultiPlayerHandler : MonoBehaviour
 {
@@ -36,6 +38,35 @@ public class MultiPlayerHandler : MonoBehaviour
         {
             sessionNameinputField.text = savedSession;
         }
+        MakeBackButton();
+    }
+
+    // "Back" in the top left corner on every step of this page: leaves the lobby list and goes back to
+    // the page where you pick single player or multiplayer. Made here so the scene needs no rebuild.
+    void MakeBackButton()
+    {
+        Canvas canvas = playerDetailPanel != null ? playerDetailPanel.GetComponentInParent<Canvas>(true) : null;
+        if (canvas == null) return;
+        Transform root = canvas.rootCanvas.transform;
+        Button back = CourseUI.Button("Back", root, "Back", CourseUI.ButtonKind.Light, OnBackClicked, 28);
+        CourseUI.Place((RectTransform)back.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(48, -48), new Vector2(170, 60));
+        Shadow shadow = back.gameObject.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0.12f, 0.24f, 0.17f, 0.3f);
+        shadow.effectDistance = new Vector2(0, -4);
+        // Above the panels, below the loading page
+        back.transform.SetAsLastSibling();
+        if (loadingScreen != null && loadingScreen.transform.parent == root) loadingScreen.transform.SetAsLastSibling();
+    }
+
+    public void OnBackClicked()
+    {
+        // Leave the lobby list (or a lobby being made) before changing page
+        foreach (NetworkRunner runner in FindObjectsByType<NetworkRunner>(FindObjectsSortMode.None))
+        {
+            if (runner.IsRunning) runner.Shutdown();
+            else Destroy(runner.gameObject);
+        }
+        SceneManager.LoadScene("NewCompetition");
     }
     void HideAllPanels()
     {

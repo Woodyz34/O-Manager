@@ -2,7 +2,10 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// Shows everyone in the lobby which game mode, imposter setting and course the host has picked.
+// Shows everyone in the lobby which runner pool, game mode and course the host has picked.
+// "Runner pool" (your runners or any runner) is what used to be called game mode; "Game mode" is now
+// Normal or Imposter (it used to be an Imposter on/off switch). The names are changed here at start,
+// so the saved lobby scene needs no rebuild.
 // The host publishes its choices on its own player object; the other players read them from there.
 // If the host leaves, the player who takes over keeps the settings the old host had.
 public class LobbySettingsUI : MonoBehaviour
@@ -32,11 +35,50 @@ public class LobbySettingsUI : MonoBehaviour
     bool wasHost;
     float nextRefresh;
 
+    const string Normal = "Normal";
+    const string Imposter = "Imposter";
+
     void Start()
     {
-        imposterToggle.onClick.AddListener(ToggleImposter);
+        imposterToggle.onClick.AddListener(OpenGameModes);
         imposterToggle.gameObject.SetActive(false);
+        Rename();
         Show("...", false, "...");
+    }
+
+    void Rename()
+    {
+        SetCaption(modeText, "RUNNER POOL");
+        SetCaption(imposterText, "GAME MODE");
+        Transform poolButton = transform.Find("Player setup panel/InnerPanel/Change GameMode");
+        if (poolButton != null)
+        {
+            TextMeshProUGUI label = poolButton.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (label != null) label.text = "Runner pool";
+        }
+    }
+
+    static void SetCaption(TextMeshProUGUI value, string caption)
+    {
+        if (value == null || value.transform.parent == null) return;
+        Transform captionObject = value.transform.parent.Find("Caption");
+        TextMeshProUGUI text = captionObject != null ? captionObject.GetComponent<TextMeshProUGUI>() : null;
+        if (text != null) text.text = caption;
+    }
+
+    // The host picks the game mode. Imposter: one random player secretly has to finish last.
+    public void OpenGameModes()
+    {
+        ChoicePopup.Option[] options =
+        {
+            new ChoicePopup.Option { id = Normal, title = "Normal", description = "Everyone races to finish first." },
+            new ChoicePopup.Option { id = Imposter, title = "Imposter", description = "One random player secretly has to finish last. Can you spot who?" },
+        };
+        ChoicePopup.Open("Game mode", options, imposterEnabled ? Imposter : Normal, id =>
+        {
+            imposterEnabled = id == Imposter;
+            nextRefresh = 0f;
+        });
     }
 
     public void ToggleImposter()
@@ -111,9 +153,9 @@ public class LobbySettingsUI : MonoBehaviour
         }
         wasHost = host;
 
-        imposterToggleText.text = imposterEnabled ? "Imposter: On" : "Imposter: Off";
-        imposterToggleText.color = imposterEnabled ? Color.white : toggleOffTextColor;
-        imposterToggle.image.color = imposterEnabled ? toggleOnColor : toggleOffColor;
+        imposterToggleText.text = "Game mode";
+        imposterToggleText.color = toggleOffTextColor;
+        imposterToggle.image.color = toggleOffColor;
     }
 
     static string CourseTitle(CourseData course)
@@ -124,8 +166,8 @@ public class LobbySettingsUI : MonoBehaviour
 
     void Show(string mode, bool imposter, string map)
     {
-        modeText.text = mode;
-        imposterText.text = imposter ? "On" : "Off";
+        modeText.text = mode == "..." ? mode : GameModes.PoolName(mode);
+        imposterText.text = imposter ? "Imposter" : "Normal";
         mapText.text = map;
     }
 }

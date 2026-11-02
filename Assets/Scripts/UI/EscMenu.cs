@@ -216,8 +216,11 @@ public class EscMenu : MonoBehaviour
         {
             // Leaves the session; in a shared session another player becomes host
             runner.Shutdown();
+            SceneManager.LoadScene("MainMenu");
+            return;
         }
-        SceneManager.LoadScene("MainMenu");
+        // No network game (course builder, single-player menu): show the loading page on the way
+        SceneLoader.Load("MainMenu", "Back to the menu");
     }
 
     void OnQuit()

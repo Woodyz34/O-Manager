@@ -21,12 +21,26 @@ public class GameModeHandler : MonoBehaviour
     }
 }
 
-// The names of the game modes (the pictures in Resources/GameModes are named after them)
+// The runner pools (the lobby's "Runner pool"; the pictures in Resources/GameModes are named after them).
+// The names are sent over the network, so they stay as they are; PoolName is what the screens show.
+// "Choose a runner of three" was removed on 2026-11-02 (user's wish).
 public static class GameModes
 {
     public const string YourRunners = "Your runners";
-    public const string ChooseOfThree = "Choose a runner of three";
     public const string ChooseAny = "Choose whomever you want";
+
+    public static readonly string[] Pools = { YourRunners, ChooseAny };
+
+    public static string PoolName(string mode)
+    {
+        if (string.IsNullOrEmpty(mode)) return "...";
+        return IsYourRunners(mode) ? "Your runners" : mode == ChooseAny ? "Any runner" : mode;
+    }
+
+    public static string PoolDescription(string mode)
+    {
+        return IsYourRunners(mode) ? "Everyone races with runners from their own collection." : "Everyone may pick any runner in the game.";
+    }
 
     public static bool IsYourRunners(string mode) => !string.IsNullOrEmpty(mode) && mode.Contains(YourRunners);
 
@@ -46,7 +60,7 @@ public static class GameModes
             {
                 string who = player.Object.HasStateAuthority ? "you only have" : player.nickName.ToString() + " only has";
                 return "\"" + course.name + "\" has " + course.legs + " legs, but " + who + " " + owned + (owned == 1 ? " runner" : " runners")
-                    + ". Choose a relay with fewer legs, or another game mode.";
+                    + ". Choose a relay with fewer legs, or the runner pool \"Any runner\".";
             }
         }
         return null;

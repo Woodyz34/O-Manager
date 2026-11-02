@@ -30,6 +30,28 @@ public class RunnerFilterBar : MonoBehaviour
     int tierFilter = -1;                  // -1 = all tiers
     bool wired;
 
+    // Women and men are never shown together. The choice is shared by My Runners and Choose a runner,
+    // and remembered between games.
+    const string WomenKey = "Filters.ShowWomen";
+    static bool? showWomen;
+    Button womenChip;
+    Button menChip;
+
+    public static bool ShowWomen
+    {
+        get
+        {
+            if (!showWomen.HasValue) showWomen = PlayerPrefs.GetInt(WomenKey, 0) == 1;
+            return showWomen.Value;
+        }
+        set
+        {
+            showWomen = value;
+            PlayerPrefs.SetInt(WomenKey, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+    }
+
     void Awake()
     {
         Wire();
@@ -59,6 +81,39 @@ public class RunnerFilterBar : MonoBehaviour
         minSpeed.onValueChanged.AddListener(_ => Notify());
         minTechnique.onValueChanged.AddListener(_ => Notify());
         if (clearButton != null) clearButton.onClick.AddListener(Clear);
+        MakeGenderChips();
+    }
+
+    // Two chips, Women and Men, made from a tier chip and put between the search field and "Sort by".
+    // The search field gets narrower to make room. Made here so the saved scenes need no rebuild.
+    void MakeGenderChips()
+    {
+        if (tierButtons == null || tierButtons.Length == 0) return;
+        RectTransform searchRect = (RectTransform)search.transform;
+        float left = searchRect.anchoredPosition.x - searchRect.sizeDelta.x / 2f;
+        float y = searchRect.anchoredPosition.y;
+        searchRect.sizeDelta = new Vector2(240f, searchRect.sizeDelta.y);
+        searchRect.anchoredPosition = new Vector2(left + 120f, y);
+        TextMeshProUGUI placeholder = search.placeholder as TextMeshProUGUI;
+        if (placeholder != null) placeholder.text = "Search...";
+
+        womenChip = CopyChip("Women", left + 240f + 18f + 58f, y, 116f);
+        menChip = CopyChip("Men", left + 240f + 18f + 116f + 10f + 46f, y, 92f);
+        womenChip.onClick.AddListener(() => { ShowWomen = true; Notify(); });
+        menChip.onClick.AddListener(() => { ShowWomen = false; Notify(); });
+    }
+
+    Button CopyChip(string label, float x, float y, float width)
+    {
+        Button chip = Instantiate(tierButtons[0], tierButtons[0].transform.parent);
+        chip.name = "Gender " + label;
+        chip.onClick = new Button.ButtonClickedEvent();
+        RectTransform rect = (RectTransform)chip.transform;
+        rect.anchoredPosition = new Vector2(x, y);
+        rect.sizeDelta = new Vector2(width, rect.sizeDelta.y);
+        TextMeshProUGUI text = chip.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (text != null) text.text = label;
+        return chip;
     }
 
     // Button 0 is "All", then Elite down to Bronze
@@ -85,6 +140,7 @@ public class RunnerFilterBar : MonoBehaviour
     public bool Matches(CardData card)
     {
         string wanted = search.text == null ? "" : search.text.Trim();
+        if (card.man == ShowWomen) return false;
         if (wanted.Length > 0 && (card.RunnerName == null || card.RunnerName.IndexOf(wanted, StringComparison.OrdinalIgnoreCase) < 0)) return false;
         if (tierFilter >= 0 && (int)RunnerCards.Tier(card) != tierFilter) return false;
         if (Mathf.RoundToInt(card.speed) < minSpeed.value) return false;
@@ -121,6 +177,8 @@ public class RunnerFilterBar : MonoBehaviour
         if (clearButton != null) clearButton.gameObject.SetActive(Filtering);
         for (int i = 0; i < sortButtons.Length; i++) PaintChip(sortButtons[i], i == (int)sortBy);
         for (int i = 0; i < tierButtons.Length; i++) PaintChip(tierButtons[i], TierOfButton(i) == tierFilter);
+        if (womenChip != null) PaintChip(womenChip, ShowWomen);
+        if (menChip != null) PaintChip(menChip, !ShowWomen);
     }
 
     void PaintChip(Button chip, bool on)

@@ -16,7 +16,7 @@ public class SinglePlayerMenu : MonoBehaviour
     // The mode picked here, read by NetworkPlayer when the competition starts
     public static string ChosenGameMode { get; private set; }
 
-    static readonly string[] Modes = { GameModes.YourRunners, GameModes.ChooseOfThree, GameModes.ChooseAny };
+    static readonly string[] Modes = GameModes.Pools;
 
     CourseData chosen;
     string mode = GameModes.YourRunners;
@@ -100,12 +100,12 @@ public class SinglePlayerMenu : MonoBehaviour
         Image right = CourseUI.CardPanel("Play", back.transform);
         CourseUI.Place(right.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-60, -130), new Vector2(680, 900));
         CourseUI.Column(right.gameObject, 14, new RectOffset(28, 28, 24, 24));
-        TextMeshProUGUI modeTitle = CourseUI.Text("Title", right.transform, "Game mode", 34, CourseUI.Ink, FontStyles.Bold);
+        TextMeshProUGUI modeTitle = CourseUI.Text("Title", right.transform, "Runner pool", 34, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(modeTitle, 44);
         foreach (string m in Modes)
         {
             string captured = m;
-            Button button = CourseUI.Button(m, right.transform, m, CourseUI.ButtonKind.Light, () => { mode = captured; Refresh(); }, 24);
+            Button button = CourseUI.Button(m, right.transform, GameModes.PoolName(m), CourseUI.ButtonKind.Light, () => { mode = captured; Refresh(); }, 24);
             CourseUI.Size(button, 58);
             modeButtons[m] = button;
         }
@@ -135,7 +135,7 @@ public class SinglePlayerMenu : MonoBehaviour
         int owned = GameModes.OwnedRunnerCount();
         runnersText.text = GameModes.IsYourRunners(mode)
             ? "You run with the runners you own: you have " + owned + (owned == 1 ? " runner." : " runners.") + (owned == 0 ? " Buy a pack in the shop first; until then every runner can be picked." : "")
-            : mode == GameModes.ChooseOfThree ? "Pick one of three random runners." : "Pick any runner in the game.";
+            : "Pick any runner in the game.";
 
         foreach (Transform child in courseList) Destroy(child.gameObject);
         List<CourseData> courses = new List<CourseData>(CourseLibrary.BuiltIn);

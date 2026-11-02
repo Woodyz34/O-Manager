@@ -1236,7 +1236,7 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(bottomRow, 52);
         CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Light, ClearCourse, 22);
-        CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneManager.LoadScene("MainMenu"), 22);
+        CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
 
         BuildRelayPanel(canvasObject.transform);
     }
