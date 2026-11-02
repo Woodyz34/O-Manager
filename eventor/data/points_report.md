@@ -1,7 +1,7 @@
 # Poäng 2026-11-02
 
 Grupper (klass/bana per lopp): 333, justerade: 308, ojusterade: 25. Varv: 102.
-Löpare: 2172, med betyg: 2112, synliga i spelet: 634 (359 herrar, 275 damer).
+Löpare: 2172, med betyg: 2112, synliga i spelet: 634 (359 herrar, 275 damer). Frysta kort (inte längre med i paketen): 0.
 
 ## Herrar, topp 25 (synliga)
 
@@ -11,8 +11,8 @@ Löpare: 2172, med betyg: 2112, synliga i spelet: 634 (359 herrar, 275 damer).
 | 2 | Tomas Krivda | Czechia | 96.8 | 96.0 | 4 |
 | 3 | Viktor Svensk | Sweden | 96.4 | 97.6 | 10 |
 | 4 | Anton Johansson | Sweden | 95.5 | 97.6 | 8 |
-| 5 | Olli Ojanaho | Finland | 94.9 | 98.5 | 3 |
-| 6 | Axel Elmblad | Sweden | 94.9 | 97.8 | 8 |
+| 5 | Axel Elmblad | Sweden | 94.9 | 97.8 | 8 |
+| 6 | Olli Ojanaho | Finland | 94.9 | 98.5 | 3 |
 | 7 | Miika Kirmula | Finland | 94.7 | 96.6 | 4 |
 | 8 | Gustav Bergman | Sweden | 94.7 | 97.1 | 11 |
 | 9 | Fabian Aebersold | Switzerland | 94.6 | 96.6 | 6 |
@@ -30,8 +30,8 @@ Löpare: 2172, med betyg: 2112, synliga i spelet: 634 (359 herrar, 275 damer).
 | 21 | Jürgen Joonas | Estonia | 91.6 | 88.0 | 4 |
 | 22 | Tino Polsini | Switzerland | 91.5 | 89.7 | 4 |
 | 23 | Jakub Chaloupsky | Czechia | 91.5 | 97.2 | 4 |
-| 24 | Eirik Langedal Breivik | Norway | 91.4 | 92.3 | 7 |
-| 25 | Eetu Savolainen | Finland | 91.4 | 96.9 | 2 |
+| 24 | Eetu Savolainen | Finland | 91.4 | 96.9 | 2 |
+| 25 | Eirik Langedal Breivik | Norway | 91.4 | 92.3 | 7 |
 
 ## Damer, topp 25 (synliga)
 
@@ -61,7 +61,7 @@ Löpare: 2172, med betyg: 2112, synliga i spelet: 634 (359 herrar, 275 damer).
 | 22 | Inka Nurminen | Finland | 87.7 | 100.0 | 1 |
 | 23 | Felicia Persson | SWE | 87.5 | 90.1 | 8 |
 | 24 | Tereza Smelikova | Slovakia | 87.4 | 89.8 | 3 |
-| 25 | Izabella Ljungberg | SWE | 87.2 | 86.3 | 14 |
+| 25 | Ane Dyrkorn | Norway | 87.2 | 93.3 | 8 |
 
 ## Lopp
 

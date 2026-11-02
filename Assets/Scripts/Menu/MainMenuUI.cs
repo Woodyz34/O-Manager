@@ -140,7 +140,7 @@ public class MainMenuUI : MonoBehaviour
 
     void Refresh()
     {
-        int total = RunnerCards.All().Count;
+        int total = RunnerCards.InPacks().Count;
         int owned = RunnerCollection.OwnedCount();
         int price = PackShop.CurrentPrice();
         int money = Money.Instance != null ? Money.Instance.GetMoney() : 0;

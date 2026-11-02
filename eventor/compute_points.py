@@ -43,6 +43,20 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RACES_DIR = os.path.join(HERE, "data", "races")
 OUT_JSON = os.path.join(HERE, "data", "runners.json")
 OUT_REPORT = os.path.join(HERE, "data", "points_report.md")
+# What the game reads (Resources.Load<TextAsset>("Runners/runners"))
+GAME_JSON = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Runners", "runners.json")
+
+COUNTRIES = {
+    "SWE": "SWEDEN", "NOR": "NORWAY", "FIN": "FINLAND", "DEN": "DENMARK", "SUI": "SWITZERLAND",
+    "CZE": "CZECHIA", "FRA": "FRANCE", "GER": "GERMANY", "GBR": "GREAT BRITAIN", "AUT": "AUSTRIA",
+    "HUN": "HUNGARY", "LAT": "LATVIA", "LTU": "LITHUANIA", "EST": "ESTONIA", "POL": "POLAND",
+    "SVK": "SLOVAKIA", "NED": "NETHERLANDS", "ESP": "SPAIN", "ITA": "ITALY", "UKR": "UKRAINE",
+    "AUS": "AUSTRALIA", "NZL": "NEW ZEALAND", "USA": "UNITED STATES", "CAN": "CANADA",
+    "CRO": "CROATIA", "BEL": "BELGIUM", "POR": "PORTUGAL", "JPN": "JAPAN", "ISL": "ICELAND",
+    "IRL": "IRELAND", "SLO": "SLOVENIA", "BUL": "BULGARIA", "ROU": "ROMANIA", "RUS": "RUSSIA",
+    "BLR": "BELARUS", "ISR": "ISRAEL", "TUR": "TURKEY", "SRB": "SERBIA", "CHN": "CHINA",
+    "HKG": "HONG KONG", "KOR": "SOUTH KOREA", "RSA": "SOUTH AFRICA", "BRA": "BRAZIL",
+}
 
 WINDOW_DAYS = 365
 HALF_LIFE = 180
@@ -273,6 +287,62 @@ def solve(groups, today):
     return c100, adjusted, rating, it + 1
 
 
+# ---------- game file ----------
+
+def country_name(r):
+    c = (r.get("country") or "").strip()
+    if not c:
+        return "SWEDEN" if r.get("club") else ""
+    return COUNTRIES.get(c.upper(), c.upper())
+
+
+def game_class(r, today):
+    prefix = "H" if r.get("sex") == "M" else "D"
+    by = r.get("birth_year")
+    age = today.year - by if by else 99
+    return prefix + ("18" if age <= 18 else "20" if age <= 20 else "21")
+
+
+def write_game_file(runners, today):
+    """Cards for the game. Runners in packs get today's numbers. A runner who was a card
+    before but is no longer eligible keeps the last numbers and leaves the packs (frozen)."""
+    previous = {}
+    if os.path.exists(GAME_JSON):
+        with open(GAME_JSON, encoding="utf-8") as f:
+            previous = {c["id"]: c for c in json.load(f).get("runners", [])}
+    cards = []
+    for r in runners:
+        if not r["visible"]:
+            continue
+        cards.append({
+            "id": r["id"], "name": r["name"], "man": r["sex"] == "M", "klass": game_class(r, today),
+            "country": country_name(r), "club": r.get("club") or "",
+            "speed": round(r["physic"]), "technique": round(r["technique"]), "inPacks": True,
+        })
+    now = {c["id"] for c in cards}
+    frozen = 0
+    for cid, old in previous.items():
+        if cid not in now:
+            cards.append({**old, "inPacks": False})
+            frozen += 1
+    # Two runners with the same name get their club (or birth year) added, because the
+    # player's collection and multiplayer use the name.
+    by_name = collections.defaultdict(list)
+    for c in cards:
+        by_name[c["name"].split(" (")[0]].append(c)
+    info = {r["id"]: r for r in runners}
+    for base, same in by_name.items():
+        if len(same) > 1:
+            for c in same:
+                extra = c["club"] or str(info.get(c["id"], {}).get("birth_year") or c["id"])
+                c["name"] = f"{base} ({extra})"
+    cards.sort(key=lambda c: (-(c["speed"] + c["technique"]), c["name"]))
+    os.makedirs(os.path.dirname(GAME_JSON), exist_ok=True)
+    with open(GAME_JSON, "w", encoding="utf-8") as f:
+        json.dump({"computed": today.isoformat(), "runners": cards}, f, ensure_ascii=False, indent=0)
+    return frozen
+
+
 # ---------- main ----------
 
 def main():
@@ -304,6 +374,7 @@ def main():
     runners.sort(key=lambda r: (r["sex"] or "", -(r["physic"] or 0)))
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump({"computed": today.isoformat(), "runners": runners}, f, ensure_ascii=False, indent=0)
+    frozen = write_game_file(runners, today)
 
     # report
     vis = [r for r in runners if r["visible"]]
@@ -312,7 +383,7 @@ def main():
            f"ojusterade: {len(groups) - len(adjusted)}. Varv: {iterations}.",
            f"Löpare: {len(runners)}, med betyg: {sum(1 for r in runners if r['physic'] is not None)}, "
            f"synliga i spelet: {len(vis)} ({sum(1 for r in vis if r['sex'] == 'M')} herrar, "
-           f"{sum(1 for r in vis if r['sex'] == 'F')} damer).", ""]
+           f"{sum(1 for r in vis if r['sex'] == 'F')} damer). Frysta kort (inte längre med i paketen): {frozen}.", ""]
     for sex, title in (("M", "Herrar"), ("F", "Damer")):
         rep += [f"## {title}, topp 25 (synliga)", "", "| # | Namn | Klubb/land | Fysik | Teknik | Lopp |", "| --- | --- | --- | --- | --- | --- |"]
         top = [r for r in vis if r["sex"] == sex][:25]

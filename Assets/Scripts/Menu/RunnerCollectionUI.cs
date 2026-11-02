@@ -59,7 +59,7 @@ public class RunnerCollectionUI : MonoBehaviour
     void Rebuild()
     {
         List<CardData> owned = RunnerCollection.OwnedCards();
-        int total = RunnerCards.All().Count;
+        int total = RunnerCards.InPacks().Count;
 
         List<CardData> shown = new List<CardData>();
         foreach (CardData card in owned)

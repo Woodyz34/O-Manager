@@ -38,7 +38,7 @@ public static class PackShop
 
     public static bool CanBuy()
     {
-        return Money.Instance != null && RunnerCards.All().Count > 0 && Money.Instance.GetMoney() >= CurrentPrice();
+        return Money.Instance != null && RunnerCards.InPacks().Count > 0 && Money.Instance.GetMoney() >= CurrentPrice();
     }
 
     // The chance, from 0 to 1, that a pack holds a runner of this tier
@@ -46,7 +46,7 @@ public static class PackShop
     {
         float total = 0f;
         float ofTier = 0f;
-        foreach (CardData card in RunnerCards.All())
+        foreach (CardData card in RunnerCards.InPacks())
         {
             RunnerTier cardTier = RunnerCards.Tier(card);
             total += Weight(cardTier);
@@ -83,7 +83,7 @@ public static class PackShop
 
     static CardData Draw()
     {
-        List<CardData> cards = RunnerCards.All();
+        List<CardData> cards = RunnerCards.InPacks();
         float total = 0f;
         foreach (CardData card in cards)
         {

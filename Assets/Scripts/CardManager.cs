@@ -40,7 +40,7 @@ public class CardManager : MonoBehaviour
         {
             AllCards.getInstance().SetAllCards();
         }
-        foreach (CardData card in AllCards.getInstance().GetAllCardsList())
+        foreach (CardData card in RunnerCards.InPacks())
         {
 
             GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
@@ -76,7 +76,7 @@ public class CardManager : MonoBehaviour
             AllCards.getInstance().SetAllCards();
         }
 
-        List<CardData> allCards = AllCards.getInstance().GetAllCardsList();
+        List<CardData> allCards = RunnerCards.InPacks();
 
         // Säkerhetskontroll om amount är större än antal kort
         if (amount > allCards.Count)
