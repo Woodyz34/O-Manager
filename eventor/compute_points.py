@@ -45,6 +45,7 @@ OUT_JSON = os.path.join(HERE, "data", "runners.json")
 OUT_REPORT = os.path.join(HERE, "data", "points_report.md")
 # What the game reads (Resources.Load<TextAsset>("Runners/runners"))
 GAME_JSON = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Runners", "runners.json")
+EMBLEM_DIR = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Emblem")
 
 COUNTRIES = {
     "SWE": "SWEDEN", "NOR": "NORWAY", "FIN": "FINLAND", "DEN": "DENMARK", "SUI": "SWITZERLAND",
@@ -340,7 +341,55 @@ def write_game_file(runners, today):
     os.makedirs(os.path.dirname(GAME_JSON), exist_ok=True)
     with open(GAME_JSON, "w", encoding="utf-8") as f:
         json.dump({"computed": today.isoformat(), "runners": cards}, f, ensure_ascii=False, indent=0)
+    write_emblem_list(cards, today)
     return frozen
+
+
+def emblem_key(text):
+    """Same rule as Emblems.Key in the game: lower case letters and digits only."""
+    return "".join(ch for ch in text.lower() if ch.isalnum())
+
+
+def write_emblem_list(cards, today):
+    """List every country and club on the cards, and whether its picture is in the folder yet."""
+    def have(folder):
+        path = os.path.join(EMBLEM_DIR, folder)
+        if not os.path.isdir(path):
+            return set()
+        return {emblem_key(os.path.splitext(n)[0]) for n in os.listdir(path)
+                if os.path.splitext(n)[1].lower() in (".png", ".jpg", ".jpeg", ".gif", ".tga", ".psd")}
+
+    def section(title, folder, counts, short_ok):
+        found = have(folder)
+        rows_missing, rows_done = [], []
+        for name, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+            first = name.split(" ")[0]
+            ok = emblem_key(name) in found or (short_ok and len(first) >= 3 and first.isupper()
+                                               and emblem_key(first) in found)
+            (rows_done if ok else rows_missing).append(f"  {name}.png   ({n} kort)")
+        return [f"{title} ({len(rows_done)} av {len(counts)} har bild)", "", "Saknar bild:", *rows_missing, "",
+                "Har bild:", *(rows_done or ["  (inga än)"]), "", ""]
+
+    cards = [c for c in cards if c.get("inPacks", True)]
+    countries = collections.Counter(c["country"].title() for c in cards if c.get("country"))
+    clubs = collections.Counter(c["club"] for c in cards if c.get("club"))
+    lines = [
+        "Flaggor och klubbmärken till löparkorten",
+        f"Uppdaterad {today.isoformat()} av eventor/compute_points.py. Listan skrivs om varje gång poängen räknas.",
+        "",
+        "Lägg flaggor i mappen Flaggor och klubbmärken i mappen Klubbar, med namnen nedan.",
+        "Stora och små bokstäver, mellanslag och bindestreck spelar ingen roll.",
+        "Flaggor får också heta på svenska (Danmark.png), men då ser den här listan inte att de finns.",
+        "Ett klubbmärke kan också heta som klubbens förkortning när den står först i namnet (IKHP.png).",
+        "PNG med genomskinlig bakgrund blir finast. Kort som saknar bild visar namnet i text i stället.",
+        "",
+        "",
+        *section("FLAGGOR", "Flaggor", countries, False),
+        *section("KLUBBAR", "Klubbar", clubs, True),
+    ]
+    os.makedirs(EMBLEM_DIR, exist_ok=True)
+    with open(os.path.join(EMBLEM_DIR, "Bildlista.txt"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
 
 
 # ---------- main ----------

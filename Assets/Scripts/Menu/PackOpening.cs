@@ -44,6 +44,7 @@ public class PackOpening : MonoBehaviour
     public CanvasGroup metaRow;
     public Image clubImage;
     public TextMeshProUGUI klassText;
+    public TextMeshProUGUI clubNameText;   // shown instead of the club badge when there is no picture, made when needed
     public CanvasGroup speedBlock;
     public TextMeshProUGUI speedValue;
     public CanvasGroup techniqueBlock;
@@ -347,11 +348,43 @@ public class PackOpening : MonoBehaviour
         });
     }
 
+    // The club's name, written left of the class where the badge would be
+    TextMeshProUGUI MakeClubNameText()
+    {
+        GameObject holder = new GameObject("Club name", typeof(RectTransform));
+        holder.layer = clubImage.gameObject.layer;
+        RectTransform rect = (RectTransform)holder.transform;
+        rect.SetParent(clubImage.transform.parent, false);
+        rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(-230f, 0f);
+        rect.sizeDelta = new Vector2(400f, 100f);
+        TextMeshProUGUI text = holder.AddComponent<TextMeshProUGUI>();
+        text.font = klassText.font;
+        text.fontSharedMaterial = klassText.fontSharedMaterial;
+        text.color = klassText.color;
+        text.fontStyle = FontStyles.Bold;
+        text.alignment = TextAlignmentOptions.MidlineRight;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 22f;
+        text.fontSizeMax = 44f;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.raycastTarget = false;
+        return text;
+    }
+
     IEnumerator RevealStats()
     {
         CardData runner = result.card;
         clubImage.sprite = runner.clubb;
         clubImage.enabled = runner.clubb != null;
+        string clubName = runner.clubb == null ? runner.clubName : null;
+        if (!string.IsNullOrEmpty(clubName) && clubNameText == null) clubNameText = MakeClubNameText();
+        if (clubNameText != null)
+        {
+            clubNameText.gameObject.SetActive(!string.IsNullOrEmpty(clubName));
+            clubNameText.text = clubName ?? "";
+        }
         klassText.text = runner.klass;
         speedValue.text = "0";
         techniqueValue.text = "0";

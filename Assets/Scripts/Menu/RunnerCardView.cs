@@ -23,6 +23,10 @@ public class RunnerCardView : MonoBehaviour
     public TextMeshProUGUI techniqueText;
     public TextMeshProUGUI tierText;
 
+    [Header("Shown in the flag and club spots when there is no picture (made when needed)")]
+    public TextMeshProUGUI countryNameText;
+    public TextMeshProUGUI clubNameText;
+
     [Header("Tinted with the tier's text colour")]
     public Graphic[] inked;
     public Graphic[] inkedLabels;       // small captions, a little lighter
@@ -60,6 +64,9 @@ public class RunnerCardView : MonoBehaviour
         }
         SetSprite(flag, card.country);
         SetSprite(club, card.clubb);
+        // No flag or club badge picture yet: write the name in its place instead
+        SetSlotText(ref countryNameText, flag, "Country name", 22f, card.country == null ? RunnerCards.CountryName(card) : "");
+        SetSlotText(ref clubNameText, club, "Club name", 19f, card.clubb == null ? card.clubName : "");
 
         if (overallText != null) overallText.text = RunnerCards.Overall(card).ToString();
         if (klassText != null) klassText.text = card.klass;
@@ -71,6 +78,58 @@ public class RunnerCardView : MonoBehaviour
         Tint(inked, ink, 1f);
         Tint(inkedLabels, ink, 0.8f);
         Tint(inkedSoft, ink, 0.4f);
+        if (countryNameText != null) countryNameText.color = ink;
+        if (clubNameText != null) clubNameText.color = UIAnim.WithAlpha(ink, 0.9f);
+    }
+
+    void SetSlotText(ref TextMeshProUGUI text, Image slot, string objectName, float maxSize, string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            if (text != null) text.gameObject.SetActive(false);
+            return;
+        }
+        if (text == null)
+        {
+            if (slot == null) return;
+            text = MakeSlotText(slot, objectName, maxSize);
+        }
+        text.gameObject.SetActive(true);
+        text.text = value;
+    }
+
+    // A small text the size of the card's left column, placed where the picture would be
+    TextMeshProUGUI MakeSlotText(Image slot, string objectName, float maxSize)
+    {
+        GameObject holder = new GameObject(objectName, typeof(RectTransform));
+        holder.layer = slot.gameObject.layer;
+        RectTransform rect = (RectTransform)holder.transform;
+        rect.SetParent(slot.transform.parent, false);
+        rect.SetSiblingIndex(slot.transform.GetSiblingIndex() + 1);
+        RectTransform spot = slot.rectTransform;
+        rect.anchorMin = spot.anchorMin;
+        rect.anchorMax = spot.anchorMax;
+        rect.pivot = spot.pivot;
+        rect.anchoredPosition = spot.anchoredPosition;
+        rect.sizeDelta = new Vector2(140f, Mathf.Max(spot.sizeDelta.y, 48f));
+
+        TextMeshProUGUI text = holder.AddComponent<TextMeshProUGUI>();
+        TextMeshProUGUI style = klassText != null ? klassText : nameText;
+        if (style != null)
+        {
+            text.font = style.font;
+            text.fontSharedMaterial = style.fontSharedMaterial;
+        }
+        text.fontStyle = FontStyles.Bold;
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 11f;
+        text.fontSizeMax = maxSize;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.lineSpacing = -12f;
+        text.raycastTarget = false;
+        return text;
     }
 
     static void Tint(Graphic[] graphics, Color ink, float alpha)
