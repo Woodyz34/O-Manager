@@ -52,6 +52,7 @@ public class RaceResults : MonoBehaviour
     ScrollRect rightScroll;
     RectTransform rightHeaderContent;
     bool syncing;
+    readonly List<GameObject> hiddenMoney = new List<GameObject>();
 
     // Opens the results over everything in the parent. Returns null when the file is missing.
     public static RaceResults Open(Transform parent, string file, string runnerId, string runnerName)
@@ -77,6 +78,27 @@ public class RaceResults : MonoBehaviour
         Destroy(gameObject);
     }
 
+    // The money pill sits in the top right corner, over the Close button, so it hides while the list is open
+    void HideMoney()
+    {
+        foreach (MoneyLabel label in FindObjectsByType<MoneyLabel>(FindObjectsSortMode.None))
+        {
+            if (label.gameObject.activeSelf)
+            {
+                label.gameObject.SetActive(false);
+                hiddenMoney.Add(label.gameObject);
+            }
+        }
+    }
+
+    void OnDestroy()
+    {
+        foreach (GameObject money in hiddenMoney)
+        {
+            if (money != null) money.SetActive(true);
+        }
+    }
+
     void Build(ResultFile data, string runnerId, string runnerName)
     {
         // A dark backdrop that closes the list when clicked outside the card. The card is not inside it,
@@ -93,6 +115,7 @@ public class RaceResults : MonoBehaviour
         // The close-up behind closes on any click, so clicks and drags on the card stop here
         card.gameObject.AddComponent<ClickCatcher>();
         Transform c = card.transform;
+        HideMoney();
 
         int mine = FindRunner(data, runnerId, runnerName);
         int legs = data.controls.Count + 1;
