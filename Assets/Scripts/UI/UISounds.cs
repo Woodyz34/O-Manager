@@ -169,6 +169,7 @@ public class UISounds : MonoBehaviour
     // A button that is greyed out makes no sound
     static bool Usable(GameObject target)
     {
+        if (target.GetComponent<ClickCatcher>() != null) return false;
         Selectable selectable = target.GetComponent<Selectable>();
         return selectable == null || (selectable.IsActive() && selectable.IsInteractable());
     }

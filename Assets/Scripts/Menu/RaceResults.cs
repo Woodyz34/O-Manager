@@ -90,6 +90,8 @@ public class RaceResults : MonoBehaviour
         Image card = CourseUI.CardPanel("Card", transform);
         card.color = CourseUI.CardSolid;
         CourseUI.Stretch(card.rectTransform, 70, 70, 46, 46);
+        // The close-up behind closes on any click, so clicks and drags on the card stop here
+        card.gameObject.AddComponent<ClickCatcher>();
         Transform c = card.transform;
 
         int mine = FindRunner(data, runnerId, runnerName);
