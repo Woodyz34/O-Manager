@@ -286,7 +286,7 @@ public static class MenuUIBuilder
         view.Show(new CardData("Gustav Bergman", 80f, 99f,
             AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/Emblem/Flaggor/Sweden.gif"),
             AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/Emblem/Klubbar/IKHP Huskvarna Idrottsklubb.png"), "H21", true,
-            AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/RunnerPicture/Gustav Bergman.jpg")));
+            AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/Profilbilder/Gustav Bergman.jpg")));
 
         cardPrefab = PrefabUtility.SaveAsPrefabAsset(root, CardPrefabPath);
         UnityEngine.Object.DestroyImmediate(root);

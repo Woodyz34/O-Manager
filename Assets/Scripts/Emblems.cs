@@ -8,17 +8,20 @@ using UnityEngine;
 //   Resources/Emblem/Klubbar   one picture per club, named exactly like the club in Eventor,
 //                              e.g. "OK Denseln.png" (the club's short form also works when it
 //                              is the first word in capitals, e.g. "IKHP.png")
+//   Resources/Profilbilder     real photos, named exactly like the runner, e.g. "Tove Alexandersson.jpg"
 //   Resources/Basbilder        placeholder portraits, "Herr_..." and "Dam_...", used until a
-//                              runner has a real photo in Resources/RunnerPicture/<name>
+//                              runner has a real photo
 // Capitals, spaces and dashes in the file names do not matter. Pictures are looked up once and kept.
 public static class Emblems
 {
     const string FlagFolder = "Emblem/Flaggor";
     const string ClubFolder = "Emblem/Klubbar";
     const string PortraitFolder = "Basbilder";
+    const string PhotoFolder = "Profilbilder";
 
     static Dictionary<string, Sprite> flags;
     static Dictionary<string, Sprite> clubs;
+    static Dictionary<string, Sprite> photos;
     static List<Sprite> men;
     static List<Sprite> women;
 
@@ -59,6 +62,25 @@ public static class Emblems
         {
             return found;
         }
+        return null;
+    }
+
+    // A real photo of the runner, or null. "Anna Svensson (OK Denseln)" also finds "Anna Svensson.jpg".
+    public static Sprite Photo(string runnerName)
+    {
+        if (string.IsNullOrEmpty(runnerName)) return null;
+        if (photos == null)
+        {
+            photos = new Dictionary<string, Sprite>();
+            foreach (Sprite sprite in LoadFolder(PhotoFolder))
+            {
+                photos[Key(sprite.name)] = sprite;
+            }
+        }
+        Sprite found;
+        if (photos.TryGetValue(Key(runnerName), out found)) return found;
+        int bracket = runnerName.IndexOf(" (");
+        if (bracket > 0 && photos.TryGetValue(Key(runnerName.Substring(0, bracket)), out found)) return found;
         return null;
     }
 

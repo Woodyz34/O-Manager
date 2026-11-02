@@ -350,10 +350,22 @@ def emblem_key(text):
     return "".join(ch for ch in text.lower() if ch.isalnum())
 
 
+def photo_section(cards, found):
+    """Runners in card order (best first), with or without a real photo."""
+    missing, done = [], []
+    for c in cards:
+        base = c["name"].split(" (")[0]
+        ok = emblem_key(c["name"]) in found or emblem_key(base) in found
+        (done if ok else missing).append(f"  {c['name']}.jpg   ({c['klass']}, {c['speed']}/{c['technique']})")
+    return [f"PROFILBILDER ({len(done)} av {len(cards)} har foto)", "", "Har foto:", *(done or ["  (inga än)"]), "",
+            "Saknar foto, bästa löparna först:", *missing, ""]
+
+
 def write_emblem_list(cards, today):
     """List every country and club on the cards, and whether its picture is in the folder yet."""
     def have(folder):
-        path = os.path.join(EMBLEM_DIR, folder)
+        path = os.path.join(EMBLEM_DIR, folder) if folder != "Profilbilder" else os.path.join(
+            os.path.dirname(EMBLEM_DIR), "Profilbilder")
         if not os.path.isdir(path):
             return set()
         return {emblem_key(os.path.splitext(n)[0]) for n in os.listdir(path)
@@ -374,10 +386,12 @@ def write_emblem_list(cards, today):
     countries = collections.Counter(c["country"].title() for c in cards if c.get("country"))
     clubs = collections.Counter(c["club"] for c in cards if c.get("club"))
     lines = [
-        "Flaggor och klubbmärken till löparkorten",
+        "Bilder till löparkorten: flaggor, klubbmärken och profilbilder",
         f"Uppdaterad {today.isoformat()} av eventor/compute_points.py. Listan skrivs om varje gång poängen räknas.",
         "",
-        "Lägg flaggor i mappen Flaggor och klubbmärken i mappen Klubbar, med namnen nedan.",
+        "Lägg flaggor i Emblem/Flaggor och klubbmärken i Emblem/Klubbar, med namnen nedan.",
+        "Riktiga profilbilder läggs i Resources/Profilbilder och heter som löparen, t.ex. Tove Alexandersson.jpg.",
+        "Använd bara foton som du har lov att använda. Löpare utan foto får en ritad basbild.",
         "Stora och små bokstäver, mellanslag och bindestreck spelar ingen roll.",
         "Flaggor får också heta på svenska (Danmark.png), men då ser den här listan inte att de finns.",
         "Ett klubbmärke kan också heta som klubbens förkortning när den står först i namnet (IKHP.png).",
@@ -386,6 +400,7 @@ def write_emblem_list(cards, today):
         "",
         *section("FLAGGOR", "Flaggor", countries, False),
         *section("KLUBBAR", "Klubbar", clubs, True),
+        *photo_section(cards, have("Profilbilder")),
     ]
     os.makedirs(EMBLEM_DIR, exist_ok=True)
     with open(os.path.join(EMBLEM_DIR, "Bildlista.txt"), "w", encoding="utf-8") as f:
