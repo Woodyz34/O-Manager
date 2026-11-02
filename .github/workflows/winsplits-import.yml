@@ -26,6 +26,8 @@ jobs:
           python-version: "3.12"
       - name: Importera
         run: python eventor/import_winsplits.py
+      - name: Räkna poäng
+        run: python eventor/compute_points.py
       - name: Spara resultaten i repot
         if: always()
         run: |

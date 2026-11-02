@@ -49,3 +49,4 @@ secrets/
 
 # Eventor cache (raw API responses)
 eventor/cache/
+__pycache__/

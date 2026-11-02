@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+"""Compute physic and technique points for every runner from eventor/data/races.
+
+Makes no API calls. Reads every race file (Eventor and WinSplits) and writes
+eventor/data/runners.json plus eventor/data/points_report.md.
+
+Per race and class (runners on the same course):
+  * Leg reference = mean of the fastest 25 % of leg times.
+  * Runner level = median of leg_time / reference over the runner's legs.
+  * A leg is a mistake when the time lost against reference * level is
+    more than 30 s and more than 25 %. Mistake time = sum of those losses.
+  * Clean time c = finish time - mistake time.
+  * Technique T = 100 - mistake_minutes * 100 / controls (finish not a control).
+  * Physic P = min(100, 100 * c100 / c). Double the clean time = 50.
+
+Calibration of c100 (separate scales for women and men, since classes never mix):
+  * VM/EM/VC races (WinSplits, level 6) are the anchor: best clean time = 100.
+  * Other races: c100 = median of c * R / 100 over runners who already have a
+    rating R (MIN_RACES_TO_CALIBRATE adjusted races, default 1, so juniors can
+    chain in through juniors who also ran senior/international races).
+    At least 3 such runners are needed.
+  * Otherwise the race is "ojusterad": the best clean time gets 100 for display,
+    but the race does not count. Everything is solved again until it stops
+    changing, so a race can become adjusted through runners met later (or earlier).
+
+Rating per runner, over the last 365 days:
+  * weight = 0.5 ** (age_days / 180)
+  * physic: Tukey biweight (c = 4.685, scale = max(1.4826 * MAD, 5)) times weight
+  * technique: weighted mean
+  * visible in the game with >= 5 adjusted races, or any VM/EM/VC race.
+"""
+
+import collections
+import datetime as dt
+import glob
+import json
+import os
+import re
+import statistics
+import unicodedata
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+RACES_DIR = os.path.join(HERE, "data", "races")
+OUT_JSON = os.path.join(HERE, "data", "runners.json")
+OUT_REPORT = os.path.join(HERE, "data", "points_report.md")
+
+WINDOW_DAYS = 365
+HALF_LIFE = 180
+MIN_CALIBRATORS = 3
+MIN_RACES_TO_CALIBRATE = 1     # 3 left every H/D18 and H/D20 race unadjusted with one year of data
+MIN_RACES_VISIBLE = 5
+MISTAKE_SECONDS = 30
+MISTAKE_SHARE = 0.25
+TUKEY_C = 4.685
+MAD_FLOOR = 5.0
+MIN_GROUP = 3
+MAX_ITER = 400
+
+
+# ---------- identity ----------
+
+def norm_name(name):
+    s = unicodedata.normalize("NFKD", name or "")
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    s = s.replace("ø", "o").replace("Ø", "O").replace("æ", "ae").replace("ß", "ss").replace("đ", "d")
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", s.lower())).strip()
+
+
+class Identities:
+    """Eventor person id is the key. WinSplits runners are matched by name and sex."""
+
+    def __init__(self):
+        self.by_name = collections.defaultdict(set)      # (norm name, sex) -> eventor keys
+        self.info = {}                                   # key -> dict
+        self.ambiguous = []
+
+    def add_eventor(self, r):
+        key = f"e{r['pid']}" if r.get("pid") else f"n:{norm_name(r['name'])}:{r.get('sex')}"
+        self.by_name[(norm_name(r["name"]), r.get("sex"))].add(key)
+        inf = self.info.setdefault(key, {"name": r["name"], "sex": r.get("sex"), "birth_year": r.get("birth_year"),
+                                         "club": None, "country": None})
+        if r.get("club"):
+            inf["club"] = r["club"]
+        if r.get("country"):
+            inf["country"] = r["country"]
+        return key
+
+    def match_winsplits(self, r, source):
+        cands = self.by_name.get((norm_name(r["name"]), r.get("sex")), set())
+        if len(cands) == 1:
+            key = next(iter(cands))
+        else:
+            if len(cands) > 1:
+                self.ambiguous.append((r["name"], r.get("country") or r.get("club"), source, sorted(cands)))
+            key = f"w:{norm_name(r['name'])}:{r.get('sex')}"
+        inf = self.info.setdefault(key, {"name": r["name"], "sex": r.get("sex"), "birth_year": None,
+                                         "club": None, "country": None})
+        if r.get("country"):
+            inf["country"] = r["country"]
+        if r.get("club") and not inf["club"]:
+            inf["club"] = r["club"]
+        return key
+
+
+# ---------- one class in one race ----------
+
+def leg_times(r):
+    """Leg times from cumulative splits; None where a split is missing."""
+    cum = [s[1] for s in r["splits"]] + [r["time"]]
+    out, prev = [], 0.0
+    for t in cum:
+        if t is None or prev is None:
+            out.append(None)
+        else:
+            out.append(t - prev)
+        prev = t
+    return out
+
+
+def analyse_group(runners):
+    """runners: OK runners on the same course. Adds mistake time and clean time in place."""
+    legs = [leg_times(r) for r in runners]
+    n_legs = len(legs[0])
+    refs = []
+    for i in range(n_legs):
+        vals = sorted(l[i] for l in legs if l[i] is not None and l[i] > 0)
+        if not vals:
+            refs.append(None)
+            continue
+        k = max(1, round(len(vals) * 0.25))
+        refs.append(sum(vals[:k]) / k)
+    for r, l in zip(runners, legs):
+        ratios = [l[i] / refs[i] for i in range(n_legs) if l[i] and refs[i]]
+        level = statistics.median(ratios) if ratios else 1.0
+        mistake = 0.0
+        for i in range(n_legs):
+            if not l[i] or not refs[i]:
+                continue
+            expected = refs[i] * level
+            lost = l[i] - expected
+            if lost > MISTAKE_SECONDS and lost > MISTAKE_SHARE * expected:
+                mistake += lost
+        r["_mistake"] = mistake
+        r["_clean"] = r["time"] - mistake
+
+
+def load_races():
+    races = []
+    for p in sorted(glob.glob(os.path.join(RACES_DIR, "*.json"))):
+        with open(p, encoding="utf-8") as f:
+            races.append(json.load(f))
+    return races
+
+
+def build_entries(races, ids):
+    """One entry per (race, class/course group) with OK runners and clean times."""
+    eventor = [r for r in races if r.get("source") != "winsplits"]
+    winsplits = [r for r in races if r.get("source") == "winsplits"]
+    groups = []
+    for race in eventor + winsplits:     # Eventor first so WinSplits can match to Eventor ids
+        date = dt.date.fromisoformat(race["date"])
+        is_ws = race.get("source") == "winsplits"
+        anchor = is_ws and race.get("level") == 6
+        for cls in race["classes"]:
+            ok = [r for r in cls["runners"] if r["status"] == "OK" and r.get("time")]
+            by_course = collections.defaultdict(list)
+            for r in ok:
+                by_course[tuple(s[0] for s in r["splits"])].append(r)
+            for codes, rs in by_course.items():
+                if len(rs) < MIN_GROUP or not codes:
+                    continue
+                rs = [dict(r) for r in rs]
+                for r in rs:
+                    r["sex"] = r.get("sex") or ("F" if cls["class"][:1] in "DW" else "M")
+                    r["_key"] = ids.match_winsplits(r, race["event_name"]) if is_ws else ids.add_eventor(r)
+                analyse_group(rs)
+                groups.append({
+                    "id": f"{race['event_id']}|{race.get('race_id', '')}|{cls['class']}|{len(groups)}",
+                    "event": race["event_name"], "class": cls["class"], "date": date,
+                    "anchor": anchor, "level": race.get("level"), "controls": len(codes),
+                    "runners": rs,
+                })
+    return groups
+
+
+# ---------- rating ----------
+
+def weighted_median(pairs):
+    pairs = sorted(pairs)
+    total = sum(w for _, w in pairs)
+    acc = 0.0
+    for x, w in pairs:
+        acc += w
+        if acc >= total / 2:
+            return x
+    return pairs[-1][0]
+
+
+def biweight_mean(values, weights):
+    if not values:
+        return None
+    m = weighted_median(list(zip(values, weights)))
+    for _ in range(10):
+        mad = statistics.median(abs(v - m) for v in values)
+        s = max(1.4826 * mad, MAD_FLOOR)
+        num = den = 0.0
+        for v, w in zip(values, weights):
+            u = (v - m) / (TUKEY_C * s)
+            bw = (1 - u * u) ** 2 if abs(u) < 1 else 0.0
+            num += v * w * bw
+            den += w * bw
+        if den == 0:
+            break
+        new = num / den
+        if abs(new - m) < 1e-6:
+            m = new
+            break
+        m = new
+    return m
+
+
+def ratings(per_runner, today):
+    """per_runner: key -> list of (date, physic, technique). Returns key -> (physic, technique, n)."""
+    out = {}
+    for key, rows in per_runner.items():
+        rows = [r for r in rows if (today - r[0]).days <= WINDOW_DAYS]
+        if not rows:
+            continue
+        w = [0.5 ** (max(0, (today - d).days) / HALF_LIFE) for d, _, _ in rows]
+        phys = biweight_mean([p for _, p, _ in rows], w)
+        tech = sum(t * wi for (_, _, t), wi in zip(rows, w)) / sum(w)
+        out[key] = (phys, tech, len(rows))
+    return out
+
+
+def solve(groups, today):
+    c100 = {}
+    for g in groups:
+        if g["anchor"]:
+            c100[g["id"]] = min(r["_clean"] for r in g["runners"])
+    adjusted = {g["id"] for g in groups if g["anchor"]}
+    rating = {}
+    for it in range(MAX_ITER):
+        per_runner = collections.defaultdict(list)
+        for g in groups:
+            if g["id"] not in adjusted:
+                continue
+            for r in g["runners"]:
+                p = min(100.0, 100.0 * c100[g["id"]] / r["_clean"])
+                t = max(0.0, min(100.0, 100.0 - (r["_mistake"] / 60.0) * 100.0 / g["controls"]))
+                per_runner[r["_key"]].append((g["date"], p, t))
+        rating = ratings(per_runner, today)
+        changed = False
+        new_adjusted = {g["id"] for g in groups if g["anchor"]}
+        for g in groups:
+            if g["anchor"]:
+                continue
+            est = [r["_clean"] * rating[r["_key"]][0] / 100.0 for r in g["runners"]
+                   if r["_key"] in rating and rating[r["_key"]][2] >= MIN_RACES_TO_CALIBRATE]
+            if len(est) >= MIN_CALIBRATORS:
+                val = statistics.median(est)
+                new_adjusted.add(g["id"])
+            else:
+                val = min(r["_clean"] for r in g["runners"])
+            if abs(c100.get(g["id"], 0) - val) > 0.5:
+                changed = True
+            c100[g["id"]] = val
+        if new_adjusted != adjusted:
+            changed = True
+        adjusted = new_adjusted
+        if not changed:
+            break
+    return c100, adjusted, rating, it + 1
+
+
+# ---------- main ----------
+
+def main():
+    today = dt.date.today()
+    ids = Identities()
+    races = load_races()
+    groups = build_entries(races, ids)
+    c100, adjusted, rating, iterations = solve(groups, today)
+
+    anchored_keys = {r["_key"] for g in groups if g["anchor"] for r in g["runners"]}
+    all_keys = {r["_key"] for g in groups for r in g["runners"]}
+    runners = []
+    for key in all_keys:
+        inf = ids.info[key]
+        rt = rating.get(key)
+        n_all = sum(1 for g in groups for r in g["runners"] if r["_key"] == key
+                    and (today - g["date"]).days <= WINDOW_DAYS)
+        visible = bool(rt) and (rt[2] >= MIN_RACES_VISIBLE or key in anchored_keys)
+        runners.append({
+            "id": key, "name": inf["name"], "sex": inf["sex"], "birth_year": inf["birth_year"],
+            "club": inf["club"], "country": inf["country"],
+            "physic": round(rt[0], 1) if rt else None,
+            "technique": round(rt[1], 1) if rt else None,
+            "adjusted_races": rt[2] if rt else 0,
+            "all_races": n_all,
+            "international": key in anchored_keys,
+            "visible": visible,
+        })
+    runners.sort(key=lambda r: (r["sex"] or "", -(r["physic"] or 0)))
+    with open(OUT_JSON, "w", encoding="utf-8") as f:
+        json.dump({"computed": today.isoformat(), "runners": runners}, f, ensure_ascii=False, indent=0)
+
+    # report
+    vis = [r for r in runners if r["visible"]]
+    rep = [f"# Poäng {today}", "",
+           f"Grupper (klass/bana per lopp): {len(groups)}, justerade: {len(adjusted)}, "
+           f"ojusterade: {len(groups) - len(adjusted)}. Varv: {iterations}.",
+           f"Löpare: {len(runners)}, med betyg: {sum(1 for r in runners if r['physic'] is not None)}, "
+           f"synliga i spelet: {len(vis)} ({sum(1 for r in vis if r['sex'] == 'M')} herrar, "
+           f"{sum(1 for r in vis if r['sex'] == 'F')} damer).", ""]
+    for sex, title in (("M", "Herrar"), ("F", "Damer")):
+        rep += [f"## {title}, topp 25 (synliga)", "", "| # | Namn | Klubb/land | Fysik | Teknik | Lopp |", "| --- | --- | --- | --- | --- | --- |"]
+        top = [r for r in vis if r["sex"] == sex][:25]
+        for i, r in enumerate(top, 1):
+            rep.append(f"| {i} | {r['name']} | {r['country'] or r['club'] or ''} | {r['physic']} | {r['technique']} | {r['adjusted_races']} |")
+        rep.append("")
+    rep += ["## Lopp", "", "| Datum | Tävling | Klass | Löpare | Justerad | c100 |", "| --- | --- | --- | --- | --- | --- |"]
+    for g in sorted(groups, key=lambda g: (g["date"], g["event"], g["class"])):
+        m, s = divmod(int(round(c100[g["id"]])), 60)
+        rep.append(f"| {g['date']} | {g['event']} | {g['class']} | {len(g['runners'])} | "
+                   f"{'ankare' if g['anchor'] else ('ja' if g['id'] in adjusted else 'ojusterad')} | {m}:{s:02d} |")
+    rep.append("")
+    if ids.ambiguous:
+        rep += ["## Tvetydiga namn i WinSplits-filer (granska)", ""]
+        rep += [f"- {n} ({o}), {src}: {', '.join(c)}" for n, o, src, c in ids.ambiguous]
+        rep.append("")
+    unmatched = sorted({(ids.info[r['_key']]['name'], ids.info[r['_key']]['country'] or '') for g in groups if g["anchor"]
+                        for r in g["runners"] if r["_key"].startswith("w:")})
+    rep += [f"WinSplits-löpare utan Eventor-träff (oftast utländska): {len(unmatched)}.", ""]
+    text = "\n".join(rep)
+    with open(OUT_REPORT, "w", encoding="utf-8") as f:
+        f.write(text + "\n")
+    print(text)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as f:
+            f.write(text + "\n")
+
+
+if __name__ == "__main__":
+    main()
