@@ -8,11 +8,11 @@ public enum RunnerTier { Bronze, Silver, Gold, Elite }
 public static class RunnerCards
 {
     // A runner's tier comes from their overall rating (the average of speed and technique).
-    // Set from the Eventor points 2026-11-02 (634 runners): Elite about the top 7 %,
-    // Gold the next 15 %, Silver the next 25 %, Bronze the rest.
-    public const int EliteFrom = 93;
-    public const int GoldFrom = 89;
-    public const int SilverFrom = 84;
+    // Set from the Eventor points 2026-11-02 (634 runners, technique 2 points per mistake minute
+    // per 100 controls): Elite about the top 8 %, Gold the next 15 %, Silver the next 26 %, Bronze the rest.
+    public const int EliteFrom = 92;
+    public const int GoldFrom = 87;
+    public const int SilverFrom = 79;
 
     public static List<CardData> All()
     {

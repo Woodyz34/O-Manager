@@ -611,10 +611,9 @@ public class PackOpening : MonoBehaviour
         }
         else
         {
-            titleText.text = "DUPLICATE";
-            subtitleText.text = result.refund > 0
-                ? "<color=#FBF4DA>You already have this runner.</color>   +" + result.refund + " kr"
-                : "<color=#FBF4DA>You already have this runner.</color>";
+            // Packs only hold runners the player is missing, so this is only seen with an old save
+            titleText.text = "RUNNER";
+            subtitleText.text = RunnerCards.TierName(tier) + "   <color=#FBF4DA>OVERALL " + RunnerCards.Overall(result.card) + "</color>";
         }
         subtitleText.color = tierColor;
         yield return UIAnim.Run(0.4f, t =>
@@ -623,11 +622,6 @@ public class PackOpening : MonoBehaviour
             subtitleText.alpha = t;
             titleText.characterSpacing = Mathf.Lerp(40f, 12f, UIAnim.OutCubic(t));
         });
-        if (result.refund > 0)
-        {
-            Sound(coin, 0.8f);
-        }
-
         int price = PackShop.CurrentPrice();
         anotherButton.gameObject.SetActive(PackShop.CanBuy());
         anotherLabel.text = price == 0 ? "Open free pack" : "Open another (" + price + " kr)";

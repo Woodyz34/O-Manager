@@ -7,14 +7,13 @@ public class PackResult
     public CardData card;
     public bool isNew;
     public int paid;
-    public int refund;   // money back for a runner the player already had
 }
 
-// Prices and odds for runner packs. One pack always holds exactly one runner.
+// Prices and odds for runner packs. One pack always holds exactly one runner,
+// and only runners the player does not have yet, so there are never duplicates.
 public static class PackShop
 {
     public const int PackPrice = 200;
-    public const int DuplicateRefund = 50;
 
     // The very first pack costs nothing, so a new player gets a runner to start with
     public static readonly bool FirstPackFree = true;
@@ -38,7 +37,27 @@ public static class PackShop
 
     public static bool CanBuy()
     {
-        return Money.Instance != null && RunnerCards.InPacks().Count > 0 && Money.Instance.GetMoney() >= CurrentPrice();
+        return Money.Instance != null && !AllCollected() && Money.Instance.GetMoney() >= CurrentPrice();
+    }
+
+    // The runners a pack can hold: in the packs and not owned yet
+    public static List<CardData> Available()
+    {
+        List<CardData> left = new List<CardData>();
+        foreach (CardData card in RunnerCards.InPacks())
+        {
+            if (!RunnerCollection.Owns(card.RunnerName))
+            {
+                left.Add(card);
+            }
+        }
+        return left;
+    }
+
+    // True when the player has every runner that packs can hold
+    public static bool AllCollected()
+    {
+        return Available().Count == 0;
     }
 
     // The chance, from 0 to 1, that a pack holds a runner of this tier
@@ -46,7 +65,7 @@ public static class PackShop
     {
         float total = 0f;
         float ofTier = 0f;
-        foreach (CardData card in RunnerCards.InPacks())
+        foreach (CardData card in Available())
         {
             RunnerTier cardTier = RunnerCards.Tier(card);
             total += Weight(cardTier);
@@ -73,17 +92,12 @@ public static class PackShop
         }
         PackResult result = new PackResult { card = card, paid = price };
         result.isNew = RunnerCollection.AddFromPack(card.RunnerName);
-        if (!result.isNew && DuplicateRefund > 0)
-        {
-            result.refund = DuplicateRefund;
-            Money.Instance.AddMoney(result.refund);
-        }
         return result;
     }
 
     static CardData Draw()
     {
-        List<CardData> cards = RunnerCards.InPacks();
+        List<CardData> cards = Available();
         float total = 0f;
         foreach (CardData card in cards)
         {

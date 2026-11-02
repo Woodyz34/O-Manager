@@ -45,6 +45,7 @@ public class AllCards : MonoBehaviour
             card.countryName = r.country;
             card.clubName = r.club;
             card.inPacks = r.inPacks;
+            if (r.merits != null) card.merits = r.merits;
             AllCardsList.Add(card);
         }
     }
@@ -68,5 +69,6 @@ public class AllCards : MonoBehaviour
         public float speed;
         public float technique;
         public bool inPacks;
+        public List<RunnerMerit> merits;
     }
 }
