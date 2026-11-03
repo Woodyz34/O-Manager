@@ -247,6 +247,12 @@ public class ManualPathDrawer : MonoBehaviour
             {
                 corridorPath = FindOptimizedPathInCorridor(gridPath, 10);
             }
+            // Route analysis: a line over ground nobody can run on (a lake) has no route round it, so the drawn
+            // line itself is kept; that ground then counts as very slow
+            if ((corridorPath == null || corridorPath.Count == 0) && RouteAnalysis.On)
+            {
+                corridorPath = new List<Vector2Int>(gridPath);
+            }
             agent.relaySegments.Add(corridorPath);
             KeepLine();
             // The next stretch starts from scratch

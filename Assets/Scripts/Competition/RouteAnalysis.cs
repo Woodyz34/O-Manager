@@ -35,6 +35,9 @@ public static class RouteAnalysis
             GameModeRuntime.Host.gameObject.AddComponent<RouteAnalysisWatcher>();
         }
         local.SetHasChoosenRunner();
+        // Nobody runs, so the race leaderboard has nothing to show (it also showed through the comparison panel)
+        GameObject board = GameObject.Find("LeaderboardPanel");
+        if (board != null) board.SetActive(false);
         UIToast.Show("Route analysis: draw the whole course, stretch by stretch, the way you would run it yourself. "
             + "Nobody runs. When everyone is done, you compare everyone's route choices.", 10f);
     }
