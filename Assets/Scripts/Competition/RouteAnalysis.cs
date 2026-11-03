@@ -324,7 +324,7 @@ public class RouteAnalysisWatcher : MonoBehaviour
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 40), new Vector2(900, 150));
         waitText = CourseUI.Text("Text", card.transform, "", 26, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.TopLeft);
         CourseUI.Place(waitText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28, -18), new Vector2(560, 120));
-        Button now = CourseUI.Button("Compare now", card.transform, "Compare the routes now", CourseUI.ButtonKind.Primary, OpenComparison, 22);
+        Button now = CourseUI.Button("Compare now", card.transform, "Compare now", CourseUI.ButtonKind.Primary, OpenComparison, 22);
         CourseUI.Place((RectTransform)now.transform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24, 0), new Vector2(290, 60));
     }
 
