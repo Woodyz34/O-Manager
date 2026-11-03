@@ -16,7 +16,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 1,
@@ -27,7 +27,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 2,
@@ -38,7 +38,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 1,
@@ -76,7 +76,7 @@
 "results": "54929_56785_D21AFinal"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 3,
@@ -125,7 +125,7 @@
 "results": "56195_58064_D21A"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 1,
@@ -163,7 +163,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 2,
@@ -174,7 +174,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 4,
@@ -185,7 +185,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 4,
@@ -261,7 +261,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 15,
@@ -272,7 +272,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 12,
@@ -299,7 +299,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 1,
@@ -348,7 +348,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 3,
@@ -359,7 +359,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 7,
@@ -370,7 +370,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 6,
@@ -397,7 +397,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 2,
@@ -408,7 +408,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 4,
@@ -446,7 +446,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 8,
@@ -457,7 +457,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 9,
@@ -468,7 +468,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 12,
@@ -495,7 +495,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 11,
@@ -517,7 +517,7 @@
 "results": "53086_54889_W21E"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 11,
@@ -544,7 +544,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 22,
@@ -571,7 +571,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 3,
@@ -631,7 +631,7 @@
 "results": "53555_55362_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 28,
@@ -642,7 +642,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 26,
@@ -669,7 +669,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 4,
@@ -680,7 +680,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 8,
@@ -691,7 +691,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 12,
@@ -733,7 +733,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 6,
@@ -755,7 +755,7 @@
 "results": "55918_57782_W21E1"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 20,
@@ -782,7 +782,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 2,
@@ -793,7 +793,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 14,
@@ -804,7 +804,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 30,
@@ -831,7 +831,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 3,
@@ -842,7 +842,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 13,
@@ -853,7 +853,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 19,
@@ -891,7 +891,7 @@
 "results": "53888_55713_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 9,
@@ -929,7 +929,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 10,
@@ -940,7 +940,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 9,
@@ -951,7 +951,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 13,
@@ -978,7 +978,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 10,
@@ -1069,7 +1069,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 7,
@@ -1080,7 +1080,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 24,
@@ -1091,7 +1091,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 28,
@@ -1118,7 +1118,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 6,
@@ -1167,7 +1167,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 14,
@@ -1194,7 +1194,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 5,
@@ -1205,7 +1205,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 7,
@@ -1243,7 +1243,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 11,
@@ -1254,7 +1254,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 21,
@@ -1265,7 +1265,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 38,
@@ -1292,7 +1292,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 18,
@@ -1303,7 +1303,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 29,
@@ -1330,7 +1330,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 17,
@@ -1485,7 +1485,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 18,
@@ -1512,7 +1512,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 33,
@@ -1523,7 +1523,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 45,
@@ -1534,7 +1534,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 52,
@@ -1561,7 +1561,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 27,
@@ -1572,7 +1572,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 51,
@@ -1583,7 +1583,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 48,
@@ -1723,7 +1723,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 16,
@@ -1745,7 +1745,7 @@
 "results": "53086_54889_W21E"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 20,
@@ -1783,7 +1783,7 @@
 "results": "53837_55662_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 12,
@@ -1794,7 +1794,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 14,
@@ -1821,7 +1821,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 17,
@@ -1832,7 +1832,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 22,
@@ -1843,7 +1843,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 29,
@@ -1905,44 +1905,6 @@
 ]
 },
 {
-"id": "w:amy nymalm:F",
-"name": "Amy Nymalm",
-"sex": "F",
-"birth_year": null,
-"club": null,
-"country": "Finland",
-"physic": 85.3,
-"technique": 97.76,
-"adjusted_races": 2,
-"all_races": 2,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "EM medel",
-"date": "2026-09-26",
-"klass": "D21",
-"place": 18,
-"of": 70,
-"behind": 265,
-"score": 86.46,
-"field": 96.43,
-"results": "ws20260926EMmedelD_0_D21"
-},
-{
-"race": "EM lång",
-"date": "2026-09-24",
-"klass": "D21",
-"place": 21,
-"of": 54,
-"behind": 1048,
-"score": 83.7,
-"field": 96.43,
-"results": "ws20260924EMlangD_0_D21"
-}
-]
-},
-{
 "id": "e74055",
 "name": "Eleonora Alinder",
 "sex": "F",
@@ -1992,6 +1954,44 @@
 ]
 },
 {
+"id": "w:amy nymalm:F",
+"name": "Amy Nymalm",
+"sex": "F",
+"birth_year": null,
+"club": null,
+"country": "Finland",
+"physic": 85.3,
+"technique": 97.76,
+"adjusted_races": 2,
+"all_races": 2,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "D21",
+"place": 18,
+"of": 70,
+"behind": 265,
+"score": 86.46,
+"field": 96.43,
+"results": "ws20260926EMmedelD_0_D21"
+},
+{
+"race": "European Championships Long",
+"date": "2026-09-24",
+"klass": "D21",
+"place": 21,
+"of": 54,
+"behind": 1048,
+"score": 83.7,
+"field": 96.43,
+"results": "ws20260924EMlangD_0_D21"
+}
+]
+},
+{
 "id": "e139748",
 "name": "Helene Scheele",
 "sex": "F",
@@ -2021,7 +2021,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 13,
@@ -2032,13 +2032,51 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 25,
 "of": 70,
 "behind": 418,
 "score": 81.82,
+"field": 95.56,
+"results": "ws20260808VCmedelD_0_D21"
+}
+]
+},
+{
+"id": "w:paula gross:F",
+"name": "Paula Gross",
+"sex": "F",
+"birth_year": null,
+"club": null,
+"country": "Switzerland",
+"physic": 84.69,
+"technique": 100.0,
+"adjusted_races": 2,
+"all_races": 2,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "World Cup Long",
+"date": "2026-08-06",
+"klass": "D21",
+"place": 19,
+"of": 59,
+"behind": 927,
+"score": 85.23,
+"field": 95.56,
+"results": "ws20260806VClangD_0_D21"
+},
+{
+"race": "World Cup Middle",
+"date": "2026-08-08",
+"klass": "D21",
+"place": 18,
+"of": 70,
+"behind": 355,
+"score": 84.14,
 "field": 95.56,
 "results": "ws20260808VCmedelD_0_D21"
 }
@@ -2070,7 +2108,7 @@
 "results": "57153_59041_D20"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 19,
@@ -2081,7 +2119,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 39,
@@ -2090,44 +2128,6 @@
 "score": 79.05,
 "field": 95.56,
 "results": "ws20260806VClangD_0_D21"
-}
-]
-},
-{
-"id": "w:paula gross:F",
-"name": "Paula Gross",
-"sex": "F",
-"birth_year": null,
-"club": null,
-"country": "Switzerland",
-"physic": 84.69,
-"technique": 100.0,
-"adjusted_races": 2,
-"all_races": 2,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "Världscup lång",
-"date": "2026-08-06",
-"klass": "D21",
-"place": 19,
-"of": 59,
-"behind": 927,
-"score": 85.23,
-"field": 95.56,
-"results": "ws20260806VClangD_0_D21"
-},
-{
-"race": "Världscup medel",
-"date": "2026-08-08",
-"klass": "D21",
-"place": 18,
-"of": 70,
-"behind": 355,
-"score": 84.14,
-"field": 95.56,
-"results": "ws20260808VCmedelD_0_D21"
 }
 ]
 },
@@ -2217,7 +2217,7 @@
 "results": "56195_58064_D21A"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 56,
@@ -2293,7 +2293,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 8,
@@ -2304,7 +2304,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 46,
@@ -2331,7 +2331,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 15,
@@ -2342,7 +2342,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 24,
@@ -2353,7 +2353,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 29,
@@ -2362,55 +2362,6 @@
 "score": 82.36,
 "field": 95.56,
 "results": "ws20260806VClangD_0_D21"
-}
-]
-},
-{
-"id": "w:janne tjorhom aasheim:F",
-"name": "Janne Tjorhom Aasheim",
-"sex": "F",
-"birth_year": null,
-"club": null,
-"country": "Norway",
-"physic": 84.26,
-"technique": 86.68,
-"adjusted_races": 4,
-"all_races": 4,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "EM medel",
-"date": "2026-09-26",
-"klass": "D21",
-"place": 10,
-"of": 70,
-"behind": 229,
-"score": 87.86,
-"field": 96.43,
-"results": "ws20260926EMmedelD_0_D21"
-},
-{
-"race": "Världscup lång",
-"date": "2026-08-06",
-"klass": "D21",
-"place": 21,
-"of": 59,
-"behind": 974,
-"score": 84.64,
-"field": 95.56,
-"results": "ws20260806VClangD_0_D21"
-},
-{
-"race": "Världscup medel",
-"date": "2026-08-08",
-"klass": "D21",
-"place": 17,
-"of": 70,
-"behind": 345,
-"score": 84.52,
-"field": 95.56,
-"results": "ws20260808VCmedelD_0_D21"
 }
 ]
 },
@@ -2428,6 +2379,55 @@
 "international": false,
 "visible": false,
 "merits": []
+},
+{
+"id": "w:janne tjorhom aasheim:F",
+"name": "Janne Tjorhom Aasheim",
+"sex": "F",
+"birth_year": null,
+"club": null,
+"country": "Norway",
+"physic": 84.26,
+"technique": 86.68,
+"adjusted_races": 4,
+"all_races": 4,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "D21",
+"place": 10,
+"of": 70,
+"behind": 229,
+"score": 87.86,
+"field": 96.43,
+"results": "ws20260926EMmedelD_0_D21"
+},
+{
+"race": "World Cup Long",
+"date": "2026-08-06",
+"klass": "D21",
+"place": 21,
+"of": 59,
+"behind": 974,
+"score": 84.64,
+"field": 95.56,
+"results": "ws20260806VClangD_0_D21"
+},
+{
+"race": "World Cup Middle",
+"date": "2026-08-08",
+"klass": "D21",
+"place": 17,
+"of": 70,
+"behind": 345,
+"score": 84.52,
+"field": 95.56,
+"results": "ws20260808VCmedelD_0_D21"
+}
+]
 },
 {
 "id": "e6152",
@@ -2459,7 +2459,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 11,
@@ -2508,7 +2508,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 26,
@@ -2519,7 +2519,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 36,
@@ -2530,7 +2530,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 33,
@@ -2568,7 +2568,7 @@
 "results": "54929_56785_D21AFinal"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 32,
@@ -2579,7 +2579,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 41,
@@ -2606,7 +2606,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 24,
@@ -2617,7 +2617,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 35,
@@ -2674,7 +2674,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 27,
@@ -2685,7 +2685,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 43,
@@ -2696,7 +2696,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 40,
@@ -2723,7 +2723,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 26,
@@ -2734,7 +2734,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 50,
@@ -2761,7 +2761,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 21,
@@ -2788,7 +2788,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 20,
@@ -2799,7 +2799,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 25,
@@ -2810,7 +2810,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 25,
@@ -3044,7 +3044,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 28,
@@ -3055,7 +3055,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 46,
@@ -3195,7 +3195,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 36,
@@ -3206,7 +3206,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 58,
@@ -3233,7 +3233,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 24,
@@ -3244,7 +3244,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 34,
@@ -3255,7 +3255,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 30,
@@ -3376,7 +3376,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 28,
@@ -3387,7 +3387,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 33,
@@ -3398,7 +3398,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 33,
@@ -3425,7 +3425,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 9,
@@ -3436,7 +3436,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 47,
@@ -3625,7 +3625,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 51,
@@ -3863,7 +3863,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 38,
@@ -3874,7 +3874,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 46,
@@ -3901,7 +3901,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 29,
@@ -3912,7 +3912,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 38,
@@ -4033,7 +4033,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 53,
@@ -4044,7 +4044,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 50,
@@ -4071,7 +4071,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 42,
@@ -4082,7 +4082,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 45,
@@ -4109,7 +4109,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 34,
@@ -4120,7 +4120,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 36,
@@ -4196,7 +4196,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 44,
@@ -4207,7 +4207,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 67,
@@ -4218,7 +4218,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 64,
@@ -4407,7 +4407,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 30,
@@ -4418,7 +4418,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 62,
@@ -4445,7 +4445,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 27,
@@ -4456,7 +4456,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 37,
@@ -4467,7 +4467,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 52,
@@ -4599,7 +4599,7 @@
 "results": "55918_57782_W21E1"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 36,
@@ -4610,7 +4610,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 43,
@@ -4712,7 +4712,7 @@
 "results": "53801_55624_W21E"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 46,
@@ -4723,7 +4723,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 45,
@@ -4750,7 +4750,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 34,
@@ -4761,7 +4761,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 41,
@@ -4772,7 +4772,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 46,
@@ -4781,6 +4781,55 @@
 "score": 77.99,
 "field": 96.43,
 "results": "ws20260926EMmedelD_0_D21"
+}
+]
+},
+{
+"id": "e211242",
+"name": "Signe Sirmā",
+"sex": "F",
+"birth_year": 2000,
+"club": "Vehkalahden Veikot",
+"country": "Latvia",
+"physic": 80.13,
+"technique": 74.0,
+"adjusted_races": 3,
+"all_races": 3,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "25mannamedeln (WRE)",
+"date": "2026-10-11",
+"klass": "W21E1",
+"place": 18,
+"of": 85,
+"behind": 258,
+"score": 80.24,
+"field": 89.04,
+"results": "55918_57782_W21E1"
+},
+{
+"race": "World Cup Middle",
+"date": "2026-08-08",
+"klass": "D21",
+"place": 54,
+"of": 70,
+"behind": 666,
+"score": 73.85,
+"field": 95.56,
+"results": "ws20260808VCmedelD_0_D21"
+},
+{
+"race": "World Cup Long",
+"date": "2026-08-06",
+"klass": "D21",
+"place": 55,
+"of": 59,
+"behind": 2176,
+"score": 71.88,
+"field": 95.56,
+"results": "ws20260806VClangD_0_D21"
 }
 ]
 },
@@ -4834,55 +4883,6 @@
 ]
 },
 {
-"id": "e211242",
-"name": "Signe Sirmā",
-"sex": "F",
-"birth_year": 2000,
-"club": "Vehkalahden Veikot",
-"country": "Latvia",
-"physic": 80.13,
-"technique": 74.0,
-"adjusted_races": 3,
-"all_races": 3,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "25mannamedeln (WRE)",
-"date": "2026-10-11",
-"klass": "W21E1",
-"place": 18,
-"of": 85,
-"behind": 258,
-"score": 80.24,
-"field": 89.04,
-"results": "55918_57782_W21E1"
-},
-{
-"race": "Världscup medel",
-"date": "2026-08-08",
-"klass": "D21",
-"place": 54,
-"of": 70,
-"behind": 666,
-"score": 73.85,
-"field": 95.56,
-"results": "ws20260808VCmedelD_0_D21"
-},
-{
-"race": "Världscup lång",
-"date": "2026-08-06",
-"klass": "D21",
-"place": 55,
-"of": 59,
-"behind": 2176,
-"score": 71.88,
-"field": 95.56,
-"results": "ws20260806VClangD_0_D21"
-}
-]
-},
-{
 "id": "w:sara delic:F",
 "name": "Sara Delic",
 "sex": "F",
@@ -4897,7 +4897,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 63,
@@ -4908,7 +4908,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 63,
@@ -4976,7 +4976,7 @@
 "results": "53086_54889_W21E"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 41,
@@ -4987,7 +4987,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 60,
@@ -5172,7 +5172,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 66,
@@ -5199,7 +5199,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 37,
@@ -5237,7 +5237,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 59,
@@ -5248,7 +5248,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 58,
@@ -5290,7 +5290,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 40,
@@ -5301,7 +5301,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 40,
@@ -5312,7 +5312,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 54,
@@ -5384,7 +5384,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 45,
@@ -5395,7 +5395,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 48,
@@ -5406,7 +5406,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 44,
@@ -5645,21 +5645,6 @@
 ]
 },
 {
-"id": "e267038",
-"name": "Lovise Harriette Koppel",
-"sex": "F",
-"birth_year": 2006,
-"club": "Halden SK",
-"country": "NOR",
-"physic": 78.74,
-"technique": 89.28,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e275054",
 "name": "Mónica De Miguel Armisén",
 "sex": "F",
@@ -5670,6 +5655,21 @@
 "technique": 78.22,
 "adjusted_races": 1,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e267038",
+"name": "Lovise Harriette Koppel",
+"sex": "F",
+"birth_year": 2006,
+"club": "Halden SK",
+"country": "NOR",
+"physic": 78.74,
+"technique": 89.28,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -5689,7 +5689,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 37,
@@ -5700,7 +5700,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 58,
@@ -5727,7 +5727,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 38,
@@ -5738,7 +5738,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 44,
@@ -5878,7 +5878,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 39,
@@ -5887,55 +5887,6 @@
 "score": 78.42,
 "field": 95.56,
 "results": "ws20260808VCmedelD_0_D21"
-}
-]
-},
-{
-"id": "e128963",
-"name": "Maja Maxén",
-"sex": "F",
-"birth_year": 2008,
-"club": "Stora Tuna OK",
-"country": "SWE",
-"physic": 78.3,
-"technique": 86.35,
-"adjusted_races": 7,
-"all_races": 7,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "JVM-test, lång (D/H20) + Testtävling, medel (D/H21)",
-"date": "2026-05-14",
-"klass": "D20",
-"place": 8,
-"of": 57,
-"behind": 697,
-"score": 81.06,
-"field": 86.98,
-"results": "57153_59041_D20"
-},
-{
-"race": "Vilselöpet, lång + JVM-test, lång",
-"date": "2026-04-19",
-"klass": "D20E SVE",
-"place": 13,
-"of": 47,
-"behind": 368,
-"score": 80.12,
-"field": 84.8,
-"results": "55291_57153_D20ESVE"
-},
-{
-"race": "Kolmårdsmedeln (Swedish League, #2, WRE)",
-"date": "2026-04-05",
-"klass": "D18 Elit",
-"place": 6,
-"of": 83,
-"behind": 214,
-"score": 78.3,
-"field": 69.59,
-"results": "53086_54889_D18Elit"
 }
 ]
 },
@@ -5985,6 +5936,55 @@
 "score": 77.72,
 "field": 78.08,
 "results": "56195_58063_D182"
+}
+]
+},
+{
+"id": "e128963",
+"name": "Maja Maxén",
+"sex": "F",
+"birth_year": 2008,
+"club": "Stora Tuna OK",
+"country": "SWE",
+"physic": 78.3,
+"technique": 86.35,
+"adjusted_races": 7,
+"all_races": 7,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "JVM-test, lång (D/H20) + Testtävling, medel (D/H21)",
+"date": "2026-05-14",
+"klass": "D20",
+"place": 8,
+"of": 57,
+"behind": 697,
+"score": 81.06,
+"field": 86.98,
+"results": "57153_59041_D20"
+},
+{
+"race": "Vilselöpet, lång + JVM-test, lång",
+"date": "2026-04-19",
+"klass": "D20E SVE",
+"place": 13,
+"of": 47,
+"behind": 368,
+"score": 80.12,
+"field": 84.8,
+"results": "55291_57153_D20ESVE"
+},
+{
+"race": "Kolmårdsmedeln (Swedish League, #2, WRE)",
+"date": "2026-04-05",
+"klass": "D18 Elit",
+"place": 6,
+"of": 83,
+"behind": 214,
+"score": 78.3,
+"field": 69.59,
+"results": "53086_54889_D18Elit"
 }
 ]
 },
@@ -6226,55 +6226,6 @@
 ]
 },
 {
-"id": "w:barbora smolkova:F",
-"name": "Barbora Smolkova",
-"sex": "F",
-"birth_year": null,
-"club": null,
-"country": "Czechia",
-"physic": 77.82,
-"technique": 59.54,
-"adjusted_races": 3,
-"all_races": 3,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "Världscup lång",
-"date": "2026-08-06",
-"klass": "D21",
-"place": 42,
-"of": 59,
-"behind": 1506,
-"score": 78.48,
-"field": 95.56,
-"results": "ws20260806VClangD_0_D21"
-},
-{
-"race": "Världscup medel",
-"date": "2026-08-08",
-"klass": "D21",
-"place": 61,
-"of": 70,
-"behind": 774,
-"score": 70.86,
-"field": 95.56,
-"results": "ws20260808VCmedelD_0_D21"
-},
-{
-"race": "EM medel",
-"date": "2026-09-26",
-"klass": "D21",
-"place": 61,
-"of": 70,
-"behind": 984,
-"score": 65.63,
-"field": 96.43,
-"results": "ws20260926EMmedelD_0_D21"
-}
-]
-},
-{
 "id": "e100615",
 "name": "Cajsa Alenius",
 "sex": "F",
@@ -6320,6 +6271,55 @@
 "score": 77.64,
 "field": 84.8,
 "results": "55291_57153_D20ESVE"
+}
+]
+},
+{
+"id": "w:barbora smolkova:F",
+"name": "Barbora Smolkova",
+"sex": "F",
+"birth_year": null,
+"club": null,
+"country": "Czechia",
+"physic": 77.82,
+"technique": 59.54,
+"adjusted_races": 3,
+"all_races": 3,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "World Cup Long",
+"date": "2026-08-06",
+"klass": "D21",
+"place": 42,
+"of": 59,
+"behind": 1506,
+"score": 78.48,
+"field": 95.56,
+"results": "ws20260806VClangD_0_D21"
+},
+{
+"race": "World Cup Middle",
+"date": "2026-08-08",
+"klass": "D21",
+"place": 61,
+"of": 70,
+"behind": 774,
+"score": 70.86,
+"field": 95.56,
+"results": "ws20260808VCmedelD_0_D21"
+},
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "D21",
+"place": 61,
+"of": 70,
+"behind": 984,
+"score": 65.63,
+"field": 96.43,
+"results": "ws20260926EMmedelD_0_D21"
 }
 ]
 },
@@ -6436,7 +6436,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 57,
@@ -6449,21 +6449,6 @@
 ]
 },
 {
-"id": "e109428",
-"name": "Tyra Larsson",
-"sex": "F",
-"birth_year": 2006,
-"club": "IFK Umeå",
-"country": "SWE",
-"physic": 77.39,
-"technique": 76.65,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e46471",
 "name": "Sandra Ling",
 "sex": "F",
@@ -6474,6 +6459,21 @@
 "technique": 66.36,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e109428",
+"name": "Tyra Larsson",
+"sex": "F",
+"birth_year": 2006,
+"club": "IFK Umeå",
+"country": "SWE",
+"physic": 77.39,
+"technique": 76.65,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -6572,7 +6572,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 65,
@@ -6599,7 +6599,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 49,
@@ -6610,7 +6610,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 47,
@@ -6637,7 +6637,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 41,
@@ -6672,21 +6672,6 @@
 ]
 },
 {
-"id": "e70588",
-"name": "Ronja Hugg",
-"sex": "F",
-"birth_year": 2000,
-"club": "Stora Tuna OK",
-"country": "SWE",
-"physic": 77.09,
-"technique": 82.79,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e101432",
 "name": "Julia Näslund",
 "sex": "F",
@@ -6697,6 +6682,21 @@
 "technique": 62.34,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e70588",
+"name": "Ronja Hugg",
+"sex": "F",
+"birth_year": 2000,
+"club": "Stora Tuna OK",
+"country": "SWE",
+"physic": 77.09,
+"technique": 82.79,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -6772,7 +6772,7 @@
 "results": "53801_55624_W21E"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 67,
@@ -7115,7 +7115,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 53,
@@ -7126,7 +7126,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 65,
@@ -7292,7 +7292,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 59,
@@ -7398,7 +7398,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 51,
@@ -7409,7 +7409,7 @@
 "results": "ws20260806VClangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 49,
@@ -7549,7 +7549,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 37,
@@ -7560,7 +7560,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 56,
@@ -7682,21 +7682,6 @@
 "merits": []
 },
 {
-"id": "e76947",
-"name": "Svetlana Mironova",
-"sex": "F",
-"birth_year": 1986,
-"club": "Halden SK",
-"country": "NOR",
-"physic": 75.18,
-"technique": 70.76,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e47997",
 "name": "Wilma Jonsson",
 "sex": "F",
@@ -7744,6 +7729,21 @@
 "results": "55291_57153_D20ESVE"
 }
 ]
+},
+{
+"id": "e76947",
+"name": "Svetlana Mironova",
+"sex": "F",
+"birth_year": 1986,
+"club": "Halden SK",
+"country": "NOR",
+"physic": 75.18,
+"technique": 70.76,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e46470",
@@ -7869,7 +7869,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 54,
@@ -7880,7 +7880,7 @@
 "results": "ws20260926EMmedelD_0_D21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 49,
@@ -7942,21 +7942,6 @@
 ]
 },
 {
-"id": "e208772",
-"name": "Alberte Kaae - Nielsen",
-"sex": "F",
-"birth_year": 2001,
-"club": "Farum Tisvilde OK",
-"country": "DEN",
-"physic": 74.92,
-"technique": 69.85,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e20159",
 "name": "Ella Sjöberg",
 "sex": "F",
@@ -7967,6 +7952,21 @@
 "technique": 97.25,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e208772",
+"name": "Alberte Kaae - Nielsen",
+"sex": "F",
+"birth_year": 2001,
+"club": "Farum Tisvilde OK",
+"country": "DEN",
+"physic": 74.92,
+"technique": 69.85,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -8193,7 +8193,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 50,
@@ -8204,7 +8204,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 52,
@@ -8253,7 +8253,7 @@
 "results": "56195_58063_D211"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 64,
@@ -8393,7 +8393,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 68,
@@ -8469,7 +8469,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 53,
@@ -8527,21 +8527,6 @@
 "merits": []
 },
 {
-"id": "e250667",
-"name": "Jana Pekarova",
-"sex": "F",
-"birth_year": 2002,
-"club": "OK Pan-Kristianstad",
-"country": "SWE",
-"physic": 73.84,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e40563",
 "name": "Agnes Djurstedt",
 "sex": "F",
@@ -8589,6 +8574,21 @@
 "results": "53397_55204_D21"
 }
 ]
+},
+{
+"id": "e250667",
+"name": "Jana Pekarova",
+"sex": "F",
+"birth_year": 2002,
+"club": "OK Pan-Kristianstad",
+"country": "SWE",
+"physic": 73.84,
+"technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e31899",
@@ -8986,21 +8986,6 @@
 ]
 },
 {
-"id": "e153349",
-"name": "Marthe Gløersen",
-"sex": "F",
-"birth_year": 1994,
-"club": "Bækkelagets SK",
-"country": "NOR",
-"physic": 73.06,
-"technique": 74.75,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e260856",
 "name": "Aline Schmuki",
 "sex": "F",
@@ -9011,6 +8996,21 @@
 "technique": 66.79,
 "adjusted_races": 4,
 "all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e153349",
+"name": "Marthe Gløersen",
+"sex": "F",
+"birth_year": 1994,
+"club": "Bækkelagets SK",
+"country": "NOR",
+"physic": 73.06,
+"technique": 74.75,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -9124,7 +9124,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 56,
@@ -9135,7 +9135,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 57,
@@ -9241,7 +9241,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 57,
@@ -9743,6 +9743,21 @@
 "merits": []
 },
 {
+"id": "e116834",
+"name": "Ella Kruse",
+"sex": "F",
+"birth_year": 2007,
+"club": "KFUM Örebro OK",
+"country": "SWE",
+"physic": 71.46,
+"technique": 50.1,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e149649",
 "name": "Gerda Medin",
 "sex": "F",
@@ -9790,21 +9805,6 @@
 "results": "56195_58064_D18A"
 }
 ]
-},
-{
-"id": "e116834",
-"name": "Ella Kruse",
-"sex": "F",
-"birth_year": 2007,
-"club": "KFUM Örebro OK",
-"country": "SWE",
-"physic": 71.46,
-"technique": 50.1,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e71089",
@@ -10345,21 +10345,6 @@
 "merits": []
 },
 {
-"id": "e60341",
-"name": "Ebba Skullman",
-"sex": "F",
-"birth_year": 2007,
-"club": "OK Kolmården",
-"country": "SWE",
-"physic": 70.49,
-"technique": 100.0,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e63494",
 "name": "Hedda Rosengren Svensson",
 "sex": "F",
@@ -10370,6 +10355,21 @@
 "technique": 56.98,
 "adjusted_races": 4,
 "all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e60341",
+"name": "Ebba Skullman",
+"sex": "F",
+"birth_year": 2007,
+"club": "OK Kolmården",
+"country": "SWE",
+"physic": 70.49,
+"technique": 100.0,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -10626,7 +10626,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 66,
@@ -10637,7 +10637,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "D21",
 "place": 59,
@@ -11788,7 +11788,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 68,
@@ -11880,21 +11880,6 @@
 "merits": []
 },
 {
-"id": "e83875",
-"name": "Emma Caspari",
-"sex": "F",
-"birth_year": 2004,
-"club": "OL Team Lippe",
-"country": "GER",
-"physic": 67.66,
-"technique": 24.7,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e204064",
 "name": "Sanna Grendelmeier",
 "sex": "F",
@@ -11942,6 +11927,21 @@
 "results": "56195_58063_D182"
 }
 ]
+},
+{
+"id": "e83875",
+"name": "Emma Caspari",
+"sex": "F",
+"birth_year": 2004,
+"club": "OL Team Lippe",
+"country": "GER",
+"physic": 67.66,
+"technique": 24.7,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e11573",
@@ -12053,21 +12053,6 @@
 "merits": []
 },
 {
-"id": "e99582",
-"name": "Malva Arvidsson",
-"sex": "F",
-"birth_year": 2006,
-"club": "Brattås CK",
-"country": "SWE",
-"physic": 67.52,
-"technique": 37.25,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e208957",
 "name": "Sigrid Aamand",
 "sex": "F",
@@ -12078,6 +12063,21 @@
 "technique": 64.49,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e99582",
+"name": "Malva Arvidsson",
+"sex": "F",
+"birth_year": 2006,
+"club": "Brattås CK",
+"country": "SWE",
+"physic": 67.52,
+"technique": 37.25,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -12096,55 +12096,6 @@
 "international": false,
 "visible": false,
 "merits": []
-},
-{
-"id": "e12504",
-"name": "Anna Hallmén",
-"sex": "F",
-"birth_year": 1999,
-"club": "OK Tisaren",
-"country": "SWE",
-"physic": 67.35,
-"technique": 78.26,
-"adjusted_races": 7,
-"all_races": 7,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-13",
-"klass": "D21B",
-"place": 2,
-"of": 9,
-"behind": 507,
-"score": 66.9,
-"field": 67.34,
-"results": "56195_58064_D21B"
-},
-{
-"race": "SM, medel (Swedish League, #6)",
-"date": "2026-08-21",
-"klass": "D21-1",
-"place": 18,
-"of": 28,
-"behind": 594,
-"score": 66.8,
-"field": 81.61,
-"results": "54929_56784_D211"
-},
-{
-"race": "Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE)",
-"date": "2026-06-06",
-"klass": "W21E",
-"place": 43,
-"of": 58,
-"behind": 818,
-"score": 66.59,
-"field": 90.37,
-"results": "53801_55624_W21E"
-}
-]
 },
 {
 "id": "e141690",
@@ -12192,6 +12143,55 @@
 "score": 65.05,
 "field": 86.16,
 "results": "55918_57782_D20E"
+}
+]
+},
+{
+"id": "e12504",
+"name": "Anna Hallmén",
+"sex": "F",
+"birth_year": 1999,
+"club": "OK Tisaren",
+"country": "SWE",
+"physic": 67.35,
+"technique": 78.26,
+"adjusted_races": 7,
+"all_races": 7,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-13",
+"klass": "D21B",
+"place": 2,
+"of": 9,
+"behind": 507,
+"score": 66.9,
+"field": 67.34,
+"results": "56195_58064_D21B"
+},
+{
+"race": "SM, medel (Swedish League, #6)",
+"date": "2026-08-21",
+"klass": "D21-1",
+"place": 18,
+"of": 28,
+"behind": 594,
+"score": 66.8,
+"field": 81.61,
+"results": "54929_56784_D211"
+},
+{
+"race": "Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE)",
+"date": "2026-06-06",
+"klass": "W21E",
+"place": 43,
+"of": 58,
+"behind": 818,
+"score": 66.59,
+"field": 90.37,
+"results": "53801_55624_W21E"
 }
 ]
 },
@@ -12557,21 +12557,6 @@
 "merits": []
 },
 {
-"id": "e24939",
-"name": "Vilma Engström",
-"sex": "F",
-"birth_year": 2004,
-"club": "OK Orion",
-"country": "SWE",
-"physic": 66.73,
-"technique": 78.03,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e52276",
 "name": "Lovisa Gustafsson",
 "sex": "F",
@@ -12582,6 +12567,21 @@
 "technique": 48.25,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e24939",
+"name": "Vilma Engström",
+"sex": "F",
+"birth_year": 2004,
+"club": "OK Orion",
+"country": "SWE",
+"physic": 66.73,
+"technique": 78.03,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -12933,21 +12933,6 @@
 "merits": []
 },
 {
-"id": "e106619",
-"name": "Maja Nordenfelt",
-"sex": "F",
-"birth_year": 2005,
-"club": "Tolered-Utby Ol-klubb",
-"country": "SWE",
-"physic": 65.95,
-"technique": 95.38,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e35892",
 "name": "Elvira Larsson",
 "sex": "F",
@@ -12958,6 +12943,21 @@
 "technique": 42.92,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e106619",
+"name": "Maja Nordenfelt",
+"sex": "F",
+"birth_year": 2005,
+"club": "Tolered-Utby Ol-klubb",
+"country": "SWE",
+"physic": 65.95,
+"technique": 95.38,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -14054,21 +14054,6 @@
 "merits": []
 },
 {
-"id": "e62258",
-"name": "Tonje Vassend",
-"sex": "F",
-"birth_year": 1996,
-"club": "Oppsal Orientering",
-"country": "NOR",
-"physic": 63.76,
-"technique": 53.48,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e117272",
 "name": "Linn Lindblom",
 "sex": "F",
@@ -14084,14 +14069,14 @@
 "merits": []
 },
 {
-"id": "e42162",
-"name": "Jennie Höye",
+"id": "e62258",
+"name": "Tonje Vassend",
 "sex": "F",
-"birth_year": 1987,
-"club": "OK Vivill",
-"country": "SWE",
-"physic": 63.71,
-"technique": 4.81,
+"birth_year": 1996,
+"club": "Oppsal Orientering",
+"country": "NOR",
+"physic": 63.76,
+"technique": 53.48,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -14109,6 +14094,21 @@
 "technique": 42.65,
 "adjusted_races": 4,
 "all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e42162",
+"name": "Jennie Höye",
+"sex": "F",
+"birth_year": 1987,
+"club": "OK Vivill",
+"country": "SWE",
+"physic": 63.71,
+"technique": 4.81,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -14670,21 +14670,6 @@
 "merits": []
 },
 {
-"id": "e35709",
-"name": "Maja Ahlström",
-"sex": "F",
-"birth_year": 2004,
-"club": "Västerås SOK",
-"country": "SWE",
-"physic": 62.55,
-"technique": 79.92,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e94374",
 "name": "Miranda Strand",
 "sex": "F",
@@ -14695,6 +14680,21 @@
 "technique": 100.0,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e35709",
+"name": "Maja Ahlström",
+"sex": "F",
+"birth_year": 2004,
+"club": "Västerås SOK",
+"country": "SWE",
+"physic": 62.55,
+"technique": 79.92,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -15159,21 +15159,6 @@
 ]
 },
 {
-"id": "e124332",
-"name": "Hedvig Grahn",
-"sex": "F",
-"birth_year": 2009,
-"club": "IFK Göteborg Orientering",
-"country": "SWE",
-"physic": 61.78,
-"technique": 26.67,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e133743",
 "name": "Inga Skaarer Wiklund",
 "sex": "F",
@@ -15184,6 +15169,21 @@
 "technique": 80.84,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e124332",
+"name": "Hedvig Grahn",
+"sex": "F",
+"birth_year": 2009,
+"club": "IFK Göteborg Orientering",
+"country": "SWE",
+"physic": 61.78,
+"technique": 26.67,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -16447,7 +16447,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "D21",
 "place": 54,
@@ -16458,7 +16458,7 @@
 "results": "ws20260924EMlangD_0_D21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 69,
@@ -16469,7 +16469,7 @@
 "results": "ws20260808VCmedelD_0_D21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "D21",
 "place": 69,
@@ -16873,21 +16873,6 @@
 "merits": []
 },
 {
-"id": "e4412",
-"name": "Lovisa Tjernström",
-"sex": "F",
-"birth_year": 1990,
-"club": "Sävedalens AIK",
-"country": "SWE",
-"physic": 58.12,
-"technique": 66.99,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e110625",
 "name": "Wilma Wikström",
 "sex": "F",
@@ -16935,6 +16920,21 @@
 "results": "52726_54529_D20"
 }
 ]
+},
+{
+"id": "e4412",
+"name": "Lovisa Tjernström",
+"sex": "F",
+"birth_year": 1990,
+"club": "Sävedalens AIK",
+"country": "SWE",
+"physic": 58.12,
+"technique": 66.99,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e92982",
@@ -17011,7 +17011,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "D21",
 "place": 70,
@@ -17483,21 +17483,6 @@
 ]
 },
 {
-"id": "e50528",
-"name": "Josefin Erlandsson",
-"sex": "F",
-"birth_year": 1997,
-"club": "OK Milan",
-"country": "SWE",
-"physic": 57.2,
-"technique": 55.4,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e143054",
 "name": "Selma Sundberg",
 "sex": "F",
@@ -17508,6 +17493,21 @@
 "technique": 93.77,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e50528",
+"name": "Josefin Erlandsson",
+"sex": "F",
+"birth_year": 1997,
+"club": "OK Milan",
+"country": "SWE",
+"physic": 57.2,
+"technique": 55.4,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -17746,21 +17746,6 @@
 ]
 },
 {
-"id": "e134641",
-"name": "Amanda Gustavsson",
-"sex": "F",
-"birth_year": 2007,
-"club": "Växjö OK",
-"country": "SWE",
-"physic": 56.7,
-"technique": 55.15,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e28698",
 "name": "Nora Petersson",
 "sex": "F",
@@ -17769,6 +17754,21 @@
 "country": "SWE",
 "physic": 56.7,
 "technique": 22.58,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e134641",
+"name": "Amanda Gustavsson",
+"sex": "F",
+"birth_year": 2007,
+"club": "Växjö OK",
+"country": "SWE",
+"physic": 56.7,
+"technique": 55.15,
 "adjusted_races": 4,
 "all_races": 4,
 "international": false,
@@ -18719,21 +18719,6 @@
 "merits": []
 },
 {
-"id": "e217867",
-"name": "Inka Boldingh Debernard",
-"sex": "F",
-"birth_year": 2007,
-"club": "Nydalens SK",
-"country": "NOR",
-"physic": 53.22,
-"technique": 74.27,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e91118",
 "name": "Klara Bäckstäde",
 "sex": "F",
@@ -18744,6 +18729,21 @@
 "technique": 2.39,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e217867",
+"name": "Inka Boldingh Debernard",
+"sex": "F",
+"birth_year": 2007,
+"club": "Nydalens SK",
+"country": "NOR",
+"physic": 53.22,
+"technique": 74.27,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -18869,21 +18869,6 @@
 "merits": []
 },
 {
-"id": "e77048",
-"name": "Vera Folkestad",
-"sex": "F",
-"birth_year": 2008,
-"club": "Anderstorps OK",
-"country": "SWE",
-"physic": 52.59,
-"technique": 61.33,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e155711",
 "name": "Märta Creutzer Lans",
 "sex": "F",
@@ -18894,6 +18879,21 @@
 "technique": 33.27,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e77048",
+"name": "Vera Folkestad",
+"sex": "F",
+"birth_year": 2008,
+"club": "Anderstorps OK",
+"country": "SWE",
+"physic": 52.59,
+"technique": 61.33,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -19402,21 +19402,6 @@
 ]
 },
 {
-"id": "e181746",
-"name": "Mathilde Sønsterudbråten",
-"sex": "F",
-"birth_year": 1999,
-"club": "Lillomarka OL",
-"country": "NOR",
-"physic": 50.62,
-"technique": 38.3,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e101610",
 "name": "Kajsa Wallin",
 "sex": "F",
@@ -19425,6 +19410,21 @@
 "country": "SWE",
 "physic": 50.62,
 "technique": 74.21,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e181746",
+"name": "Mathilde Sønsterudbråten",
+"sex": "F",
+"birth_year": 1999,
+"club": "Lillomarka OL",
+"country": "NOR",
+"physic": 50.62,
+"technique": 38.3,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -19586,21 +19586,6 @@
 "merits": []
 },
 {
-"id": "e128401",
-"name": "Evelina Petersson",
-"sex": "F",
-"birth_year": 2007,
-"club": "Nyköpings OK",
-"country": "SWE",
-"physic": 49.79,
-"technique": 64.14,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e56216",
 "name": "Emma Hallendal",
 "sex": "F",
@@ -19611,6 +19596,21 @@
 "technique": 0.0,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e128401",
+"name": "Evelina Petersson",
+"sex": "F",
+"birth_year": 2007,
+"club": "Nyköpings OK",
+"country": "SWE",
+"physic": 49.79,
+"technique": 64.14,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -20213,21 +20213,6 @@
 "merits": []
 },
 {
-"id": "e4092",
-"name": "Sara Ivarsson",
-"sex": "F",
-"birth_year": 1993,
-"club": "OK Kullingshof",
-"country": "SWE",
-"physic": 45.68,
-"technique": 72.84,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e180095",
 "name": "Ebba Nilsson",
 "sex": "F",
@@ -20236,6 +20221,21 @@
 "country": "SWE",
 "physic": 45.68,
 "technique": 74.45,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e4092",
+"name": "Sara Ivarsson",
+"sex": "F",
+"birth_year": 1993,
+"club": "OK Kullingshof",
+"country": "SWE",
+"physic": 45.68,
+"technique": 72.84,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -20858,11 +20858,11 @@
 "merits": []
 },
 {
-"id": "e101825",
-"name": "Ida Österberg",
+"id": "e168814",
+"name": "Klara Loberg",
 "sex": "F",
-"birth_year": 2004,
-"club": "OK Ravinen",
+"birth_year": 2007,
+"club": "Järfälla OK",
 "country": "SWE",
 "physic": null,
 "technique": null,
@@ -20873,57 +20873,12 @@
 "merits": []
 },
 {
-"id": "e162893",
-"name": "Elisa Mänty",
+"id": "e232296",
+"name": "Guinedell Sanjaume Faja",
 "sex": "F",
-"birth_year": 2005,
-"club": "Rastikarhut",
-"country": "FIN",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:anni jantunen:F",
-"name": "Anni Jantunen",
-"sex": "F",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e74234",
-"name": "Hilma Ekström",
-"sex": "F",
-"birth_year": 2007,
-"club": "Stenungsunds OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e244167",
-"name": "Freya Tryner",
-"sex": "F",
-"birth_year": 2007,
-"club": "EUOC",
-"country": "GBR",
+"birth_year": 2006,
+"club": "Team Spain",
+"country": "ESP",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
@@ -20948,57 +20903,27 @@
 "merits": []
 },
 {
-"id": "e146371",
-"name": "Tuva Andersson",
+"id": "e149533",
+"name": "Elli Kyläkoski",
 "sex": "F",
-"birth_year": 2008,
-"club": "NAIS Orienteringsklubb",
-"country": "SWE",
+"birth_year": 2006,
+"club": "Team Fin",
+"country": null,
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
-"all_races": 1,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
 },
 {
-"id": "e75921",
-"name": "Petrina Costermans",
-"sex": "F",
-"birth_year": 2001,
-"club": "Järla Orientering",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e168814",
-"name": "Klara Loberg",
+"id": "e244167",
+"name": "Freya Tryner",
 "sex": "F",
 "birth_year": 2007,
-"club": "Järfälla OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:arlet sales turro:F",
-"name": "Arlet Sales Turró",
-"sex": "F",
-"birth_year": null,
-"club": "Team Spain",
-"country": "ESP",
+"club": "EUOC",
+"country": "GBR",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
@@ -21008,38 +20933,8 @@
 "merits": []
 },
 {
-"id": "n:joana monge conti:F",
-"name": "Joana Monge Conti",
-"sex": "F",
-"birth_year": null,
-"club": "Team Spain",
-"country": "ESP",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e90657",
-"name": "Venla Tikkanen",
-"sex": "F",
-"birth_year": 1999,
-"club": "Espoon Suunta",
-"country": "FIN",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:lotta laakso:F",
-"name": "Lotta Laakso",
+"id": "n:anni jantunen:F",
+"name": "Anni Jantunen",
 "sex": "F",
 "birth_year": null,
 "club": "Team Fin",
@@ -21053,11 +20948,11 @@
 "merits": []
 },
 {
-"id": "e11990",
-"name": "Anna Kindlundh",
+"id": "e101825",
+"name": "Ida Österberg",
 "sex": "F",
-"birth_year": 1996,
-"club": "Södertälje-Nykvarn OF",
+"birth_year": 2004,
+"club": "OK Ravinen",
 "country": "SWE",
 "physic": null,
 "technique": null,
@@ -21083,6 +20978,36 @@
 "merits": []
 },
 {
+"id": "e133090",
+"name": "Julia Gellerbrant",
+"sex": "F",
+"birth_year": 2006,
+"club": "Malungs OK Skogsmårdarna",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e116935",
+"name": "Lova Jonsson",
+"sex": "F",
+"birth_year": 2009,
+"club": "Skarpnäcks OL",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e195160",
 "name": "Leonore Winkler",
 "sex": "F",
@@ -21098,8 +21023,203 @@
 "merits": []
 },
 {
+"id": "e90657",
+"name": "Venla Tikkanen",
+"sex": "F",
+"birth_year": 1999,
+"club": "Espoon Suunta",
+"country": "FIN",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e215068",
+"name": "Maria Terehova",
+"sex": "F",
+"birth_year": 2007,
+"club": "OK Denseln",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e75921",
+"name": "Petrina Costermans",
+"sex": "F",
+"birth_year": 2001,
+"club": "Järla Orientering",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "n:kiia kuusikko:F",
 "name": "Kiia Kuusikko",
+"sex": "F",
+"birth_year": null,
+"club": "Team Fin",
+"country": null,
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e21508",
+"name": "Emma Bengtsson",
+"sex": "F",
+"birth_year": 1997,
+"club": "Linköpings OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e162893",
+"name": "Elisa Mänty",
+"sex": "F",
+"birth_year": 2005,
+"club": "Rastikarhut",
+"country": "FIN",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e74234",
+"name": "Hilma Ekström",
+"sex": "F",
+"birth_year": 2007,
+"club": "Stenungsunds OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:maria guma martinez:F",
+"name": "María Gumà Martínez",
+"sex": "F",
+"birth_year": null,
+"club": "Team Spain",
+"country": "ESP",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:arlet sales turro:F",
+"name": "Arlet Sales Turró",
+"sex": "F",
+"birth_year": null,
+"club": "Team Spain",
+"country": "ESP",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e218009",
+"name": "Anni Mäki-Hokkonen",
+"sex": "F",
+"birth_year": null,
+"club": "Team Fin",
+"country": null,
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:joana monge conti:F",
+"name": "Joana Monge Conti",
+"sex": "F",
+"birth_year": null,
+"club": "Team Spain",
+"country": "ESP",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e11990",
+"name": "Anna Kindlundh",
+"sex": "F",
+"birth_year": 1996,
+"club": "Södertälje-Nykvarn OF",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:roosa muukkonen:F",
+"name": "Roosa Muukkonen",
+"sex": "F",
+"birth_year": null,
+"club": "Team Fin",
+"country": null,
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:lotta laakso:F",
+"name": "Lotta Laakso",
 "sex": "F",
 "birth_year": null,
 "club": "Team Fin",
@@ -21128,46 +21248,16 @@
 "merits": []
 },
 {
-"id": "e21508",
-"name": "Emma Bengtsson",
+"id": "e146371",
+"name": "Tuva Andersson",
 "sex": "F",
-"birth_year": 1997,
-"club": "Linköpings OK",
+"birth_year": 2008,
+"club": "NAIS Orienteringsklubb",
 "country": "SWE",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:maria guma martinez:F",
-"name": "María Gumà Martínez",
-"sex": "F",
-"birth_year": null,
-"club": "Team Spain",
-"country": "ESP",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e149533",
-"name": "Elli Kyläkoski",
-"sex": "F",
-"birth_year": 2006,
-"club": "Team Fin",
-"country": null,
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -21188,91 +21278,16 @@
 "merits": []
 },
 {
-"id": "e232296",
-"name": "Guinedell Sanjaume Faja",
+"id": "e9179",
+"name": "Sanna Skoog",
 "sex": "F",
-"birth_year": 2006,
-"club": "Team Spain",
-"country": "ESP",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e218009",
-"name": "Anni Mäki-Hokkonen",
-"sex": "F",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e116935",
-"name": "Lova Jonsson",
-"sex": "F",
-"birth_year": 2009,
-"club": "Skarpnäcks OL",
+"birth_year": 1995,
+"club": "Kils OK",
 "country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
+"physic": -1.94,
+"technique": 0.0,
+"adjusted_races": 1,
 "all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e133090",
-"name": "Julia Gellerbrant",
-"sex": "F",
-"birth_year": 2006,
-"club": "Malungs OK Skogsmårdarna",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:roosa muukkonen:F",
-"name": "Roosa Muukkonen",
-"sex": "F",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e215068",
-"name": "Maria Terehova",
-"sex": "F",
-"birth_year": 2007,
-"club": "OK Denseln",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -21284,21 +21299,6 @@
 "birth_year": 1992,
 "club": "Helsingin Suunnistajat",
 "country": "FIN",
-"physic": -1.94,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e9179",
-"name": "Sanna Skoog",
-"sex": "F",
-"birth_year": 1995,
-"club": "Kils OK",
-"country": "SWE",
 "physic": -1.94,
 "technique": 0.0,
 "adjusted_races": 1,
@@ -21382,7 +21382,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 1,
@@ -21393,7 +21393,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 1,
@@ -21404,7 +21404,7 @@
 "results": "ws20260926EMmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 2,
@@ -21431,7 +21431,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 1,
@@ -21442,7 +21442,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 6,
@@ -21453,7 +21453,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 6,
@@ -21491,7 +21491,7 @@
 "results": "56195_58064_H21A"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 1,
@@ -21502,7 +21502,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 2,
@@ -21555,7 +21555,7 @@
 "results": "53801_55624_M21E"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 4,
@@ -21566,7 +21566,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 5,
@@ -21593,7 +21593,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 7,
@@ -21604,7 +21604,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 4,
@@ -21615,7 +21615,7 @@
 "results": "ws20260926EMmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 9,
@@ -21691,7 +21691,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 10,
@@ -21702,7 +21702,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 8,
@@ -21713,7 +21713,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 13,
@@ -21789,7 +21789,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 2,
@@ -21800,7 +21800,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 3,
@@ -21811,7 +21811,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 3,
@@ -21853,7 +21853,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 4,
@@ -21913,7 +21913,7 @@
 "results": "56195_58064_H21A"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 6,
@@ -21951,7 +21951,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 4,
@@ -21962,7 +21962,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 11,
@@ -22000,7 +22000,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 5,
@@ -22011,7 +22011,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 8,
@@ -22022,7 +22022,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 17,
@@ -22098,7 +22098,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 10,
@@ -22109,7 +22109,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 19,
@@ -22120,7 +22120,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 12,
@@ -22211,7 +22211,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 5,
@@ -22222,7 +22222,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 20,
@@ -22233,7 +22233,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 22,
@@ -22297,7 +22297,7 @@
 "results": "53086_54889_M21E"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 14,
@@ -22324,7 +22324,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 14,
@@ -22335,7 +22335,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 15,
@@ -22346,7 +22346,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 9,
@@ -22373,7 +22373,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 9,
@@ -22384,7 +22384,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 13,
@@ -22395,7 +22395,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 16,
@@ -22422,7 +22422,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 10,
@@ -22444,7 +22444,7 @@
 "results": "55918_57782_M21E1"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 46,
@@ -22471,7 +22471,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 16,
@@ -22482,7 +22482,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 13,
@@ -22493,7 +22493,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 30,
@@ -22520,7 +22520,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 11,
@@ -22531,7 +22531,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 15,
@@ -22542,7 +22542,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 23,
@@ -22569,7 +22569,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 15,
@@ -22580,7 +22580,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 32,
@@ -22607,7 +22607,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 8,
@@ -22629,7 +22629,7 @@
 "results": "53889_55714_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 27,
@@ -22720,7 +22720,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 12,
@@ -22731,7 +22731,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 20,
@@ -22742,7 +22742,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 26,
@@ -22829,7 +22829,7 @@
 "results": "55918_57782_M21E1"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 34,
@@ -22840,7 +22840,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 50,
@@ -22889,7 +22889,7 @@
 "results": "56195_58063_H212"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 16,
@@ -23029,7 +23029,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 14,
@@ -23040,7 +23040,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 7,
@@ -23051,7 +23051,7 @@
 "results": "ws20260926EMmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 21,
@@ -23157,7 +23157,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 18,
@@ -23179,7 +23179,7 @@
 "results": "53086_54889_M21E"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 20,
@@ -23255,7 +23255,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 12,
@@ -23266,7 +23266,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 15,
@@ -23277,7 +23277,7 @@
 "results": "ws20260926EMmedelH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 25,
@@ -23466,7 +23466,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 17,
@@ -23477,7 +23477,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 63,
@@ -23553,7 +23553,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 30,
@@ -23564,7 +23564,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 37,
@@ -23768,7 +23768,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 19,
@@ -23803,6 +23803,44 @@
 ]
 },
 {
+"id": "w:timo sild:M",
+"name": "Timo Sild",
+"sex": "M",
+"birth_year": null,
+"club": null,
+"country": "Estonia",
+"physic": 88.53,
+"technique": 97.3,
+"adjusted_races": 2,
+"all_races": 2,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "European Championships Long",
+"date": "2026-09-24",
+"klass": "H21",
+"place": 31,
+"of": 56,
+"behind": 763,
+"score": 88.09,
+"field": 96.48,
+"results": "ws20260924EMlangH_0_H21"
+},
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "H21",
+"place": 22,
+"of": 73,
+"behind": 282,
+"score": 87.51,
+"field": 96.48,
+"results": "ws20260926EMmedelH_0_H21"
+}
+]
+},
+{
 "id": "e153615",
 "name": "Jacob Steinthal",
 "sex": "M",
@@ -23828,7 +23866,7 @@
 "results": "53398_55205_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 25,
@@ -23839,7 +23877,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 31,
@@ -23848,44 +23886,6 @@
 "score": 87.57,
 "field": 96.48,
 "results": "ws20260808VCmedelH_0_H21"
-}
-]
-},
-{
-"id": "w:timo sild:M",
-"name": "Timo Sild",
-"sex": "M",
-"birth_year": null,
-"club": null,
-"country": "Estonia",
-"physic": 88.53,
-"technique": 97.3,
-"adjusted_races": 2,
-"all_races": 2,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "EM lång",
-"date": "2026-09-24",
-"klass": "H21",
-"place": 31,
-"of": 56,
-"behind": 763,
-"score": 88.09,
-"field": 96.48,
-"results": "ws20260924EMlangH_0_H21"
-},
-{
-"race": "EM medel",
-"date": "2026-09-26",
-"klass": "H21",
-"place": 22,
-"of": 73,
-"behind": 282,
-"score": 87.51,
-"field": 96.48,
-"results": "ws20260926EMmedelH_0_H21"
 }
 ]
 },
@@ -23905,21 +23905,6 @@
 "merits": []
 },
 {
-"id": "e86144",
-"name": "Edvin Nilsson",
-"sex": "M",
-"birth_year": 2004,
-"club": "Långhundra IF",
-"country": "SWE",
-"physic": 88.43,
-"technique": 96.76,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "w:daniel bolehovsky:M",
 "name": "Daniel Bolehovsky",
 "sex": "M",
@@ -23934,7 +23919,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 18,
@@ -23945,7 +23930,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 29,
@@ -23956,7 +23941,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 37,
@@ -23967,6 +23952,21 @@
 "results": "ws20260926EMmedelH_0_H21"
 }
 ]
+},
+{
+"id": "e86144",
+"name": "Edvin Nilsson",
+"sex": "M",
+"birth_year": 2004,
+"club": "Långhundra IF",
+"country": "SWE",
+"physic": 88.43,
+"technique": 96.76,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "w:ueli werren:M",
@@ -23983,7 +23983,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 21,
@@ -23994,7 +23994,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 38,
@@ -24021,7 +24021,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 19,
@@ -24032,7 +24032,7 @@
 "results": "ws20260926EMmedelH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 28,
@@ -24123,7 +24123,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 23,
@@ -24134,7 +24134,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 35,
@@ -24162,55 +24162,6 @@
 "merits": []
 },
 {
-"id": "w:uldis upitis:M",
-"name": "Uldis Upitis",
-"sex": "M",
-"birth_year": null,
-"club": null,
-"country": "Latvia",
-"physic": 87.88,
-"technique": 91.85,
-"adjusted_races": 4,
-"all_races": 4,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "EM lång",
-"date": "2026-09-24",
-"klass": "H21",
-"place": 25,
-"of": 56,
-"behind": 680,
-"score": 89.25,
-"field": 96.48,
-"results": "ws20260924EMlangH_0_H21"
-},
-{
-"race": "Världscup lång",
-"date": "2026-08-06",
-"klass": "H21",
-"place": 26,
-"of": 55,
-"behind": 773,
-"score": 87.74,
-"field": 96.47,
-"results": "ws20260806VClangH_0_H21"
-},
-{
-"race": "EM medel",
-"date": "2026-09-26",
-"klass": "H21",
-"place": 31,
-"of": 73,
-"behind": 338,
-"score": 85.39,
-"field": 96.48,
-"results": "ws20260926EMmedelH_0_H21"
-}
-]
-},
-{
 "id": "w:tuomas heikkila:M",
 "name": "Tuomas Heikkila",
 "sex": "M",
@@ -24225,7 +24176,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 30,
@@ -24236,13 +24187,62 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 42,
 "of": 73,
 "behind": 437,
 "score": 81.89,
+"field": 96.48,
+"results": "ws20260926EMmedelH_0_H21"
+}
+]
+},
+{
+"id": "w:uldis upitis:M",
+"name": "Uldis Upitis",
+"sex": "M",
+"birth_year": null,
+"club": null,
+"country": "Latvia",
+"physic": 87.88,
+"technique": 91.85,
+"adjusted_races": 4,
+"all_races": 4,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "European Championships Long",
+"date": "2026-09-24",
+"klass": "H21",
+"place": 25,
+"of": 56,
+"behind": 680,
+"score": 89.25,
+"field": 96.48,
+"results": "ws20260924EMlangH_0_H21"
+},
+{
+"race": "World Cup Long",
+"date": "2026-08-06",
+"klass": "H21",
+"place": 26,
+"of": 55,
+"behind": 773,
+"score": 87.74,
+"field": 96.47,
+"results": "ws20260806VClangH_0_H21"
+},
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "H21",
+"place": 31,
+"of": 73,
+"behind": 338,
+"score": 85.39,
 "field": 96.48,
 "results": "ws20260926EMmedelH_0_H21"
 }
@@ -24263,7 +24263,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 22,
@@ -24274,7 +24274,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 56,
@@ -24316,7 +24316,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 28,
@@ -24327,7 +24327,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 29,
@@ -24365,7 +24365,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 21,
@@ -24387,7 +24387,7 @@
 "results": "54929_56785_H21AFinal"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 36,
@@ -24527,7 +24527,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 41,
@@ -24538,7 +24538,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 44,
@@ -24576,7 +24576,7 @@
 "results": "53889_55714_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 34,
@@ -24787,7 +24787,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 18,
@@ -24798,7 +24798,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 48,
@@ -24938,7 +24938,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 31,
@@ -24949,7 +24949,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 39,
@@ -25100,7 +25100,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 24,
@@ -25111,7 +25111,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 46,
@@ -25232,7 +25232,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 25,
@@ -25254,7 +25254,7 @@
 "results": "55918_57782_M21E1"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 49,
@@ -25281,7 +25281,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 26,
@@ -25292,7 +25292,7 @@
 "results": "ws20260926EMmedelH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 38,
@@ -25303,7 +25303,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 46,
@@ -25330,7 +25330,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 23,
@@ -25352,7 +25352,7 @@
 "results": "53086_54889_M21E"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 58,
@@ -25394,7 +25394,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 33,
@@ -25405,7 +25405,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 33,
@@ -25416,7 +25416,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 47,
@@ -25443,7 +25443,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 43,
@@ -25454,7 +25454,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 70,
@@ -25590,7 +25590,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 32,
@@ -25601,7 +25601,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 50,
@@ -25612,7 +25612,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 44,
@@ -25640,21 +25640,6 @@
 "merits": []
 },
 {
-"id": "e14815",
-"name": "Olle Boström",
-"sex": "M",
-"birth_year": 1990,
-"club": "Järla Orientering",
-"country": "SWE",
-"physic": 85.69,
-"technique": 100.0,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e104878",
 "name": "Niklas Ekström",
 "sex": "M",
@@ -25665,6 +25650,21 @@
 "technique": 89.67,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e14815",
+"name": "Olle Boström",
+"sex": "M",
+"birth_year": 1990,
+"club": "Järla Orientering",
+"country": "SWE",
+"physic": 85.69,
+"technique": 100.0,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -25763,7 +25763,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 41,
@@ -25774,7 +25774,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 35,
@@ -25801,7 +25801,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 35,
@@ -25812,7 +25812,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 55,
@@ -25865,7 +25865,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 29,
@@ -25876,7 +25876,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 49,
@@ -25903,7 +25903,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 36,
@@ -25914,7 +25914,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 38,
@@ -25925,7 +25925,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 59,
@@ -25997,7 +25997,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 30,
@@ -26008,7 +26008,7 @@
 "results": "ws20260926EMmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 40,
@@ -26019,7 +26019,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 62,
@@ -26110,7 +26110,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 32,
@@ -26174,7 +26174,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 39,
@@ -26201,7 +26201,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 47,
@@ -26212,7 +26212,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 47,
@@ -26288,7 +26288,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 33,
@@ -26299,7 +26299,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 41,
@@ -26382,7 +26382,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 57,
@@ -26661,7 +26661,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 54,
@@ -26699,7 +26699,7 @@
 "results": "55918_57782_M21E1"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 63,
@@ -26771,7 +26771,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 43,
@@ -26782,7 +26782,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 60,
@@ -26793,7 +26793,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 50,
@@ -27096,6 +27096,21 @@
 "merits": []
 },
 {
+"id": "e230991",
+"name": "Mads Christian Maarup",
+"sex": "M",
+"birth_year": 2006,
+"club": "Eksjö SOK",
+"country": "SWE",
+"physic": 83.82,
+"technique": 55.58,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e29176",
 "name": "Emil Björnlinger",
 "sex": "M",
@@ -27145,16 +27160,16 @@
 ]
 },
 {
-"id": "e230991",
-"name": "Mads Christian Maarup",
+"id": "e159180",
+"name": "Florian Attinger",
 "sex": "M",
-"birth_year": 2006,
-"club": "Eksjö SOK",
+"birth_year": 1997,
+"club": "IFK Mora OK",
 "country": "SWE",
-"physic": 83.82,
-"technique": 55.58,
-"adjusted_races": 4,
-"all_races": 4,
+"physic": 83.77,
+"technique": 100.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -27170,21 +27185,6 @@
 "technique": 93.47,
 "adjusted_races": 4,
 "all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e159180",
-"name": "Florian Attinger",
-"sex": "M",
-"birth_year": 1997,
-"club": "IFK Mora OK",
-"country": "SWE",
-"physic": 83.77,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -27213,21 +27213,6 @@
 "country": "SWE",
 "physic": 83.6,
 "technique": 88.81,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:florian fritzen:M",
-"name": "Florian Fritzen",
-"sex": "M",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
-"physic": 83.59,
-"technique": 67.23,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -27284,6 +27269,21 @@
 ]
 },
 {
+"id": "n:florian fritzen:M",
+"name": "Florian Fritzen",
+"sex": "M",
+"birth_year": null,
+"club": "Team Fin",
+"country": null,
+"physic": 83.59,
+"technique": 67.23,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e12560",
 "name": "Viktor Larsson",
 "sex": "M",
@@ -27297,44 +27297,6 @@
 "international": false,
 "visible": false,
 "merits": []
-},
-{
-"id": "w:daniel pompura:M",
-"name": "Daniel Pompura",
-"sex": "M",
-"birth_year": null,
-"club": null,
-"country": "Slovakia",
-"physic": 83.55,
-"technique": 88.04,
-"adjusted_races": 2,
-"all_races": 2,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "Världscup medel",
-"date": "2026-08-08",
-"klass": "H21",
-"place": 41,
-"of": 71,
-"behind": 367,
-"score": 83.87,
-"field": 96.48,
-"results": "ws20260808VCmedelH_0_H21"
-},
-{
-"race": "EM medel",
-"date": "2026-09-26",
-"klass": "H21",
-"place": 52,
-"of": 73,
-"behind": 550,
-"score": 78.23,
-"field": 96.48,
-"results": "ws20260926EMmedelH_0_H21"
-}
-]
 },
 {
 "id": "e9010",
@@ -27365,6 +27327,44 @@
 "international": false,
 "visible": false,
 "merits": []
+},
+{
+"id": "w:daniel pompura:M",
+"name": "Daniel Pompura",
+"sex": "M",
+"birth_year": null,
+"club": null,
+"country": "Slovakia",
+"physic": 83.55,
+"technique": 88.04,
+"adjusted_races": 2,
+"all_races": 2,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "World Cup Middle",
+"date": "2026-08-08",
+"klass": "H21",
+"place": 41,
+"of": 71,
+"behind": 367,
+"score": 83.87,
+"field": 96.48,
+"results": "ws20260808VCmedelH_0_H21"
+},
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "H21",
+"place": 52,
+"of": 73,
+"behind": 550,
+"score": 78.23,
+"field": 96.48,
+"results": "ws20260926EMmedelH_0_H21"
+}
+]
 },
 {
 "id": "e59017",
@@ -27430,7 +27430,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 33,
@@ -27441,7 +27441,7 @@
 "results": "ws20260926EMmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 45,
@@ -27509,7 +27509,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 27,
@@ -27589,6 +27589,44 @@
 "merits": []
 },
 {
+"id": "w:jan strycek:M",
+"name": "Jan Strycek",
+"sex": "M",
+"birth_year": null,
+"club": null,
+"country": "Czechia",
+"physic": 83.2,
+"technique": 96.28,
+"adjusted_races": 2,
+"all_races": 2,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "World Cup Middle",
+"date": "2026-08-08",
+"klass": "H21",
+"place": 43,
+"of": 71,
+"behind": 376,
+"score": 83.55,
+"field": 96.48,
+"results": "ws20260808VCmedelH_0_H21"
+},
+{
+"race": "World Cup Long",
+"date": "2026-08-06",
+"klass": "H21",
+"place": 46,
+"of": 55,
+"behind": 1223,
+"score": 82.05,
+"field": 96.47,
+"results": "ws20260806VClangH_0_H21"
+}
+]
+},
+{
 "id": "e55096",
 "name": "Hugo Larsson",
 "sex": "M",
@@ -27634,44 +27672,6 @@
 "score": 84.76,
 "field": 88.83,
 "results": "53838_55663_H21"
-}
-]
-},
-{
-"id": "w:jan strycek:M",
-"name": "Jan Strycek",
-"sex": "M",
-"birth_year": null,
-"club": null,
-"country": "Czechia",
-"physic": 83.2,
-"technique": 96.28,
-"adjusted_races": 2,
-"all_races": 2,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "Världscup medel",
-"date": "2026-08-08",
-"klass": "H21",
-"place": 43,
-"of": 71,
-"behind": 376,
-"score": 83.55,
-"field": 96.48,
-"results": "ws20260808VCmedelH_0_H21"
-},
-{
-"race": "Världscup lång",
-"date": "2026-08-06",
-"klass": "H21",
-"place": 46,
-"of": 55,
-"behind": 1223,
-"score": 82.05,
-"field": 96.47,
-"results": "ws20260806VClangH_0_H21"
 }
 ]
 },
@@ -27852,7 +27852,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 39,
@@ -27901,6 +27901,21 @@
 "technique": 61.94,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e24560",
+"name": "Kent Ohlsson",
+"sex": "M",
+"birth_year": 1989,
+"club": "Södertälje-Nykvarn OF",
+"country": "SWE",
+"physic": 83.05,
+"technique": 94.47,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -27955,21 +27970,6 @@
 ]
 },
 {
-"id": "e24560",
-"name": "Kent Ohlsson",
-"sex": "M",
-"birth_year": 1989,
-"club": "Södertälje-Nykvarn OF",
-"country": "SWE",
-"physic": 83.05,
-"technique": 94.47,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e17586",
 "name": "Ola Martner",
 "sex": "M",
@@ -27978,6 +27978,21 @@
 "country": "SWE",
 "physic": 82.99,
 "technique": 100.0,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:joona hirvilahti:M",
+"name": "Joona Hirvilahti",
+"sex": "M",
+"birth_year": null,
+"club": "Team Fin",
+"country": null,
+"physic": 82.97,
+"technique": 79.95,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -27994,21 +28009,6 @@
 "physic": 82.97,
 "technique": 92.56,
 "adjusted_races": 1,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:joona hirvilahti:M",
-"name": "Joona Hirvilahti",
-"sex": "M",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
-"physic": 82.97,
-"technique": 79.95,
-"adjusted_races": 2,
 "all_races": 2,
 "international": false,
 "visible": false,
@@ -28059,7 +28059,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 40,
@@ -28081,13 +28081,40 @@
 "results": "53086_54889_M21E2"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 59,
 "of": 73,
 "behind": 595,
 "score": 76.86,
+"field": 96.48,
+"results": "ws20260926EMmedelH_0_H21"
+}
+]
+},
+{
+"id": "w:tomasz rzenca:M",
+"name": "Tomasz Rzenca",
+"sex": "M",
+"birth_year": null,
+"club": null,
+"country": "Poland",
+"physic": 82.88,
+"technique": 75.67,
+"adjusted_races": 1,
+"all_races": 1,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "H21",
+"place": 56,
+"of": 73,
+"behind": 576,
+"score": 77.43,
 "field": 96.48,
 "results": "ws20260926EMmedelH_0_H21"
 }
@@ -28108,7 +28135,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 35,
@@ -28119,7 +28146,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 42,
@@ -28130,7 +28157,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 52,
@@ -28139,33 +28166,6 @@
 "score": 81.03,
 "field": 96.48,
 "results": "ws20260924EMlangH_0_H21"
-}
-]
-},
-{
-"id": "w:tomasz rzenca:M",
-"name": "Tomasz Rzenca",
-"sex": "M",
-"birth_year": null,
-"club": null,
-"country": "Poland",
-"physic": 82.88,
-"technique": 75.67,
-"adjusted_races": 1,
-"all_races": 1,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "EM medel",
-"date": "2026-09-26",
-"klass": "H21",
-"place": 56,
-"of": 73,
-"behind": 576,
-"score": 77.43,
-"field": 96.48,
-"results": "ws20260926EMmedelH_0_H21"
 }
 ]
 },
@@ -28327,7 +28327,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 42,
@@ -28662,7 +28662,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 53,
@@ -28684,7 +28684,7 @@
 "results": "53837_55662_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 67,
@@ -28722,7 +28722,7 @@
 "results": "52726_54529_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 48,
@@ -28733,7 +28733,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 67,
@@ -28809,7 +28809,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 61,
@@ -28997,7 +28997,7 @@
 "results": "55918_57782_M21E1"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 54,
@@ -29265,7 +29265,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 44,
@@ -29276,7 +29276,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 52,
@@ -29287,7 +29287,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 58,
@@ -29462,6 +29462,21 @@
 "merits": []
 },
 {
+"id": "e268230",
+"name": "Álvaro Pérez Otero",
+"sex": "M",
+"birth_year": 2006,
+"club": "Team Spain",
+"country": "ESP",
+"physic": 81.64,
+"technique": 16.91,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e176871",
 "name": "Emil Husebye Aamodt",
 "sex": "M",
@@ -29492,21 +29507,6 @@
 "merits": []
 },
 {
-"id": "e268230",
-"name": "Álvaro Pérez Otero",
-"sex": "M",
-"birth_year": 2006,
-"club": "Team Spain",
-"country": "ESP",
-"physic": 81.64,
-"technique": 16.91,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e211977",
 "name": "Zoltán Bujdosó",
 "sex": "M",
@@ -29521,7 +29521,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 54,
@@ -29543,7 +29543,7 @@
 "results": "53086_54889_M21E"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 50,
@@ -29592,7 +29592,7 @@
 "results": "53086_54889_H20Elit"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 68,
@@ -29683,7 +29683,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 45,
@@ -29694,7 +29694,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 53,
@@ -30173,21 +30173,6 @@
 "merits": []
 },
 {
-"id": "e105254",
-"name": "Victor Hörnquist",
-"sex": "M",
-"birth_year": 2005,
-"club": "Bredaryds SOK",
-"country": "SWE",
-"physic": 80.63,
-"technique": 91.57,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e72575",
 "name": "Sindre Østgulen Deisz",
 "sex": "M",
@@ -30217,7 +30202,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 37,
@@ -30228,7 +30213,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 51,
@@ -30239,7 +30224,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 61,
@@ -30250,6 +30235,21 @@
 "results": "ws20260926EMmedelH_0_H21"
 }
 ]
+},
+{
+"id": "e105254",
+"name": "Victor Hörnquist",
+"sex": "M",
+"birth_year": 2005,
+"club": "Bredaryds SOK",
+"country": "SWE",
+"physic": 80.63,
+"technique": 91.57,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e197164",
@@ -30316,6 +30316,21 @@
 ]
 },
 {
+"id": "e24051",
+"name": "Alvin Craig",
+"sex": "M",
+"birth_year": 2004,
+"club": "OK Ravinen",
+"country": "SWE",
+"physic": 80.45,
+"technique": 95.3,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e117820",
 "name": "Hugo Claesson",
 "sex": "M",
@@ -30363,21 +30378,6 @@
 "results": "55918_57782_H18E1"
 }
 ]
-},
-{
-"id": "e24051",
-"name": "Alvin Craig",
-"sex": "M",
-"birth_year": 2004,
-"club": "OK Ravinen",
-"country": "SWE",
-"physic": 80.45,
-"technique": 95.3,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e80133",
@@ -30459,6 +30459,21 @@
 ]
 },
 {
+"id": "e234950",
+"name": "Hans Grönborg Nielsen",
+"sex": "M",
+"birth_year": 2003,
+"club": "Farum Tisvilde OK",
+"country": "DEN",
+"physic": 80.38,
+"technique": 100.0,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e16681",
 "name": "Mattias Kallhauge",
 "sex": "M",
@@ -30508,21 +30523,6 @@
 ]
 },
 {
-"id": "e234950",
-"name": "Hans Grönborg Nielsen",
-"sex": "M",
-"birth_year": 2003,
-"club": "Farum Tisvilde OK",
-"country": "DEN",
-"physic": 80.38,
-"technique": 100.0,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "w:kylian wymer:M",
 "name": "Kylian Wymer",
 "sex": "M",
@@ -30537,7 +30537,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 49,
@@ -30548,7 +30548,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 53,
@@ -30559,7 +30559,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 54,
@@ -30617,21 +30617,6 @@
 "merits": []
 },
 {
-"id": "e21036",
-"name": "Jan Troeng",
-"sex": "M",
-"birth_year": 1981,
-"club": "OK Linné",
-"country": "SWE",
-"physic": 80.21,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e31220",
 "name": "Johan Olson",
 "sex": "M",
@@ -30642,6 +30627,21 @@
 "technique": 98.18,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e21036",
+"name": "Jan Troeng",
+"sex": "M",
+"birth_year": 1981,
+"club": "OK Linné",
+"country": "SWE",
+"physic": 80.21,
+"technique": 100.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -30692,21 +30692,6 @@
 "merits": []
 },
 {
-"id": "e147995",
-"name": "Ludvig Eggöy Markhester",
-"sex": "M",
-"birth_year": 2007,
-"club": "IFK Mora OK",
-"country": "SWE",
-"physic": 80.12,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e80521",
 "name": "Magnus Dewett",
 "sex": "M",
@@ -30730,6 +30715,21 @@
 "country": "SWE",
 "physic": 80.12,
 "technique": 87.93,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e147995",
+"name": "Ludvig Eggöy Markhester",
+"sex": "M",
+"birth_year": 2007,
+"club": "IFK Mora OK",
+"country": "SWE",
+"physic": 80.12,
+"technique": 100.0,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -30797,21 +30797,6 @@
 "merits": []
 },
 {
-"id": "e71710",
-"name": "Axel Örnhagen Jørgensen",
-"sex": "M",
-"birth_year": 2007,
-"club": "Farum Tisvilde OK",
-"country": "DEN",
-"physic": 79.99,
-"technique": 95.13,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e14210",
 "name": "Elias Bäcklund Ekvall",
 "sex": "M",
@@ -30822,6 +30807,21 @@
 "technique": 72.8,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e71710",
+"name": "Axel Örnhagen Jørgensen",
+"sex": "M",
+"birth_year": 2007,
+"club": "Farum Tisvilde OK",
+"country": "DEN",
+"physic": 79.99,
+"technique": 95.13,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -30925,21 +30925,6 @@
 ]
 },
 {
-"id": "e28469",
-"name": "Jonas Andersson",
-"sex": "M",
-"birth_year": 1999,
-"club": "Kils OK",
-"country": "SWE",
-"physic": 79.97,
-"technique": 90.37,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e11181",
 "name": "Viktor Runnby",
 "sex": "M",
@@ -30989,6 +30974,21 @@
 ]
 },
 {
+"id": "e28469",
+"name": "Jonas Andersson",
+"sex": "M",
+"birth_year": 1999,
+"club": "Kils OK",
+"country": "SWE",
+"physic": 79.97,
+"technique": 90.37,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e42544",
 "name": "Leonas Mockunas",
 "sex": "M",
@@ -31019,21 +31019,6 @@
 "merits": []
 },
 {
-"id": "e271166",
-"name": "Euan Best",
-"sex": "M",
-"birth_year": 2007,
-"club": "OK Linné",
-"country": "SWE",
-"physic": 79.87,
-"technique": 69.35,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e29367",
 "name": "William Sturesson",
 "sex": "M",
@@ -31044,6 +31029,21 @@
 "technique": 73.19,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e271166",
+"name": "Euan Best",
+"sex": "M",
+"birth_year": 2007,
+"club": "OK Linné",
+"country": "SWE",
+"physic": 79.87,
+"technique": 69.35,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -31158,21 +31158,6 @@
 "merits": []
 },
 {
-"id": "e71852",
-"name": "Vegard Blomseth Johnsen",
-"sex": "M",
-"birth_year": 1991,
-"club": "Nydalens SK",
-"country": "NOR",
-"physic": 79.69,
-"technique": 81.79,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e29891",
 "name": "Viktor Sone",
 "sex": "M",
@@ -31183,6 +31168,21 @@
 "technique": 92.15,
 "adjusted_races": 4,
 "all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e71852",
+"name": "Vegard Blomseth Johnsen",
+"sex": "M",
+"birth_year": 1991,
+"club": "Nydalens SK",
+"country": "NOR",
+"physic": 79.69,
+"technique": 81.79,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -31747,7 +31747,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 49,
@@ -31758,7 +31758,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 64,
@@ -31830,7 +31830,7 @@
 "visible": true,
 "merits": [
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 55,
@@ -31841,7 +31841,7 @@
 "results": "ws20260924EMlangH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 71,
@@ -32008,21 +32008,6 @@
 ]
 },
 {
-"id": "e5593",
-"name": "Sebastian Tegnebratt",
-"sex": "M",
-"birth_year": 1988,
-"club": "OK Södertörn",
-"country": "SWE",
-"physic": 78.55,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e125809",
 "name": "Emil Øbro",
 "sex": "M",
@@ -32033,6 +32018,21 @@
 "technique": 94.53,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e5593",
+"name": "Sebastian Tegnebratt",
+"sex": "M",
+"birth_year": 1988,
+"club": "OK Södertörn",
+"country": "SWE",
+"physic": 78.55,
+"technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -32354,21 +32354,6 @@
 "merits": []
 },
 {
-"id": "e255140",
-"name": "Serafim Kovalchuk",
-"sex": "M",
-"birth_year": 2005,
-"club": "Ronneby OK",
-"country": "SWE",
-"physic": 78.14,
-"technique": 67.99,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e211889",
 "name": "Vilho Hietala",
 "sex": "M",
@@ -32379,6 +32364,21 @@
 "technique": 78.99,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e255140",
+"name": "Serafim Kovalchuk",
+"sex": "M",
+"birth_year": 2005,
+"club": "Ronneby OK",
+"country": "SWE",
+"physic": 78.14,
+"technique": 67.99,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -32665,7 +32665,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 65,
@@ -32676,7 +32676,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 55,
@@ -32911,21 +32911,6 @@
 "merits": []
 },
 {
-"id": "e84284",
-"name": "Albin Persson",
-"sex": "M",
-"birth_year": 2002,
-"club": "Halmstad OK",
-"country": "SWE",
-"physic": 77.52,
-"technique": 91.58,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e181283",
 "name": "Sigurd Størmer-Antonsen",
 "sex": "M",
@@ -32936,6 +32921,21 @@
 "technique": 54.67,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e84284",
+"name": "Albin Persson",
+"sex": "M",
+"birth_year": 2002,
+"club": "Halmstad OK",
+"country": "SWE",
+"physic": 77.52,
+"technique": 91.58,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -33068,7 +33068,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 48,
@@ -33079,7 +33079,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 66,
@@ -33090,7 +33090,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM medel",
+"race": "European Championships Middle",
 "date": "2026-09-26",
 "klass": "H21",
 "place": 60,
@@ -33126,21 +33126,6 @@
 "country": "SWE",
 "physic": 77.29,
 "technique": 90.0,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e212036",
-"name": "Alfred Teig",
-"sex": "M",
-"birth_year": 2009,
-"club": "Nydalens SK",
-"country": "NOR",
-"physic": 77.23,
-"technique": 14.12,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -33195,6 +33180,21 @@
 "results": "54929_56785_H21CFinal"
 }
 ]
+},
+{
+"id": "e212036",
+"name": "Alfred Teig",
+"sex": "M",
+"birth_year": 2009,
+"club": "Nydalens SK",
+"country": "NOR",
+"physic": 77.23,
+"technique": 14.12,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e131086",
@@ -33438,21 +33438,6 @@
 "merits": []
 },
 {
-"id": "e212791",
-"name": "Finn Selmer Duguid",
-"sex": "M",
-"birth_year": 2008,
-"club": "Eksjö SOK",
-"country": "SWE",
-"physic": 77.08,
-"technique": 82.14,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e98402",
 "name": "Hugo Hässler",
 "sex": "M",
@@ -33500,6 +33485,21 @@
 "results": "56195_58064_H20A"
 }
 ]
+},
+{
+"id": "e212791",
+"name": "Finn Selmer Duguid",
+"sex": "M",
+"birth_year": 2008,
+"club": "Eksjö SOK",
+"country": "SWE",
+"physic": 77.08,
+"technique": 82.14,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e41566",
@@ -34370,7 +34370,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup lång",
+"race": "World Cup Long",
 "date": "2026-08-06",
 "klass": "H21",
 "place": 52,
@@ -34381,7 +34381,7 @@
 "results": "ws20260806VClangH_0_H21"
 },
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 69,
@@ -34392,7 +34392,7 @@
 "results": "ws20260808VCmedelH_0_H21"
 },
 {
-"race": "EM lång",
+"race": "European Championships Long",
 "date": "2026-09-24",
 "klass": "H21",
 "place": 56,
@@ -34548,21 +34548,6 @@
 "merits": []
 },
 {
-"id": "e16082",
-"name": "Emil Åberg",
-"sex": "M",
-"birth_year": 1996,
-"club": "OK Kåre",
-"country": "SWE",
-"physic": 75.71,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e95934",
 "name": "Hugo Braam",
 "sex": "M",
@@ -34573,6 +34558,21 @@
 "technique": 81.74,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e16082",
+"name": "Emil Åberg",
+"sex": "M",
+"birth_year": 1996,
+"club": "OK Kåre",
+"country": "SWE",
+"physic": 75.71,
+"technique": 100.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -35138,33 +35138,6 @@
 ]
 },
 {
-"id": "w:fryderyk pryjma:M",
-"name": "Fryderyk Pryjma",
-"sex": "M",
-"birth_year": null,
-"club": null,
-"country": "Poland",
-"physic": 74.99,
-"technique": 95.82,
-"adjusted_races": 1,
-"all_races": 1,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "EM medel",
-"date": "2026-09-26",
-"klass": "H21",
-"place": 62,
-"of": 73,
-"behind": 688,
-"score": 74.17,
-"field": 96.48,
-"results": "ws20260926EMmedelH_0_H21"
-}
-]
-},
-{
 "id": "e26292",
 "name": "Mikael Håkansson",
 "sex": "M",
@@ -35180,19 +35153,31 @@
 "merits": []
 },
 {
-"id": "e261336",
-"name": "Ruari Cottier",
+"id": "w:fryderyk pryjma:M",
+"name": "Fryderyk Pryjma",
 "sex": "M",
-"birth_year": 2008,
-"club": "OK Ravinen",
-"country": "SWE",
-"physic": 74.97,
-"technique": 16.49,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
+"birth_year": null,
+"club": null,
+"country": "Poland",
+"physic": 74.99,
+"technique": 95.82,
+"adjusted_races": 1,
+"all_races": 1,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "H21",
+"place": 62,
+"of": 73,
+"behind": 688,
+"score": 74.17,
+"field": 96.48,
+"results": "ws20260926EMmedelH_0_H21"
+}
+]
 },
 {
 "id": "e113368",
@@ -35244,53 +35229,19 @@
 ]
 },
 {
-"id": "e97130",
-"name": "Oskar Eklöv",
+"id": "e261336",
+"name": "Ruari Cottier",
 "sex": "M",
 "birth_year": 2008,
-"club": "Tumba-Mälarhöjden OK",
+"club": "OK Ravinen",
 "country": "SWE",
-"physic": 74.93,
-"technique": 81.54,
-"adjusted_races": 6,
-"all_races": 6,
+"physic": 74.97,
+"technique": 16.49,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
-"visible": true,
-"merits": [
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-13",
-"klass": "H18A",
-"place": 15,
-"of": 41,
-"behind": 336,
-"score": 74.75,
-"field": 80.81,
-"results": "56195_58064_H18A"
-},
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-12",
-"klass": "H18-1",
-"place": 4,
-"of": 31,
-"behind": 425,
-"score": 74.36,
-"field": 78.0,
-"results": "56195_58063_H181"
-},
-{
-"race": "SM, medel (Swedish League, #6)",
-"date": "2026-08-21",
-"klass": "H18-3",
-"place": 1,
-"of": 30,
-"behind": 0,
-"score": 73.52,
-"field": 72.0,
-"results": "54929_56784_H183"
-}
-]
+"visible": false,
+"merits": []
 },
 {
 "id": "e74220",
@@ -35338,6 +35289,55 @@
 "score": 73.47,
 "field": 88.43,
 "results": "54929_56784_H213"
+}
+]
+},
+{
+"id": "e97130",
+"name": "Oskar Eklöv",
+"sex": "M",
+"birth_year": 2008,
+"club": "Tumba-Mälarhöjden OK",
+"country": "SWE",
+"physic": 74.93,
+"technique": 81.54,
+"adjusted_races": 6,
+"all_races": 6,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-13",
+"klass": "H18A",
+"place": 15,
+"of": 41,
+"behind": 336,
+"score": 74.75,
+"field": 80.81,
+"results": "56195_58064_H18A"
+},
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-12",
+"klass": "H18-1",
+"place": 4,
+"of": 31,
+"behind": 425,
+"score": 74.36,
+"field": 78.0,
+"results": "56195_58063_H181"
+},
+{
+"race": "SM, medel (Swedish League, #6)",
+"date": "2026-08-21",
+"klass": "H18-3",
+"place": 1,
+"of": 30,
+"behind": 0,
+"score": 73.52,
+"field": 72.0,
+"results": "54929_56784_H183"
 }
 ]
 },
@@ -35402,21 +35402,6 @@
 "merits": []
 },
 {
-"id": "e186839",
-"name": "Fredrik Signebøen",
-"sex": "M",
-"birth_year": 2008,
-"club": "Halden SK",
-"country": "NOR",
-"physic": 74.83,
-"technique": 84.25,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e172047",
 "name": "Halvor Eid",
 "sex": "M",
@@ -35425,6 +35410,21 @@
 "country": "NOR",
 "physic": 74.83,
 "technique": 86.33,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e186839",
+"name": "Fredrik Signebøen",
+"sex": "M",
+"birth_year": 2008,
+"club": "Halden SK",
+"country": "NOR",
+"physic": 74.83,
+"technique": 84.25,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -35447,21 +35447,6 @@
 "merits": []
 },
 {
-"id": "e249687",
-"name": "Anton Kupriyanov Hviid",
-"sex": "M",
-"birth_year": 2009,
-"club": "Farum Tisvilde OK",
-"country": "DEN",
-"physic": 74.72,
-"technique": 74.17,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e256255",
 "name": "Charlie Rennie",
 "sex": "M",
@@ -35477,16 +35462,16 @@
 "merits": []
 },
 {
-"id": "e34087",
-"name": "Emil Axelsson",
+"id": "e249687",
+"name": "Anton Kupriyanov Hviid",
 "sex": "M",
-"birth_year": 2002,
-"club": "Sävedalens AIK",
-"country": "SWE",
-"physic": 74.67,
-"technique": 42.99,
-"adjusted_races": 2,
-"all_races": 2,
+"birth_year": 2009,
+"club": "Farum Tisvilde OK",
+"country": "DEN",
+"physic": 74.72,
+"technique": 74.17,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -35502,6 +35487,21 @@
 "technique": 56.72,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e34087",
+"name": "Emil Axelsson",
+"sex": "M",
+"birth_year": 2002,
+"club": "Sävedalens AIK",
+"country": "SWE",
+"physic": 74.67,
+"technique": 42.99,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -35676,6 +35676,21 @@
 "merits": []
 },
 {
+"id": "e34622",
+"name": "Hugo Ericsson",
+"sex": "M",
+"birth_year": 2003,
+"club": "Växjö OK",
+"country": "SWE",
+"physic": 74.34,
+"technique": 96.91,
+"adjusted_races": 3,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e216404",
 "name": "Isaac Hernandez Pindado",
 "sex": "M",
@@ -35725,31 +35740,16 @@
 ]
 },
 {
-"id": "e34622",
-"name": "Hugo Ericsson",
+"id": "e6415",
+"name": "Per-Åke Bligård",
 "sex": "M",
-"birth_year": 2003,
-"club": "Växjö OK",
-"country": "SWE",
-"physic": 74.34,
-"technique": 96.91,
-"adjusted_races": 3,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e94589",
-"name": "Elis Peterson",
-"sex": "M",
-"birth_year": 2005,
-"club": "OK Denseln",
+"birth_year": 1981,
+"club": "Göteborg-Majorna OK",
 "country": "SWE",
 "physic": 74.29,
-"technique": 97.89,
-"adjusted_races": 4,
-"all_races": 4,
+"technique": 89.39,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -35770,16 +35770,16 @@
 "merits": []
 },
 {
-"id": "e6415",
-"name": "Per-Åke Bligård",
+"id": "e94589",
+"name": "Elis Peterson",
 "sex": "M",
-"birth_year": 1981,
-"club": "Göteborg-Majorna OK",
+"birth_year": 2005,
+"club": "OK Denseln",
 "country": "SWE",
 "physic": 74.29,
-"technique": 89.39,
-"adjusted_races": 2,
-"all_races": 2,
+"technique": 97.89,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -35793,21 +35793,6 @@
 "country": "SWE",
 "physic": 74.28,
 "technique": 89.14,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e267417",
-"name": "Jan Vaníček",
-"sex": "M",
-"birth_year": 2007,
-"club": "Turun Suunnistajat",
-"country": "FIN",
-"physic": 74.28,
-"technique": 96.79,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -35862,6 +35847,21 @@
 "results": "53086_54889_H18Elit"
 }
 ]
+},
+{
+"id": "e267417",
+"name": "Jan Vaníček",
+"sex": "M",
+"birth_year": 2007,
+"club": "Turun Suunnistajat",
+"country": "FIN",
+"physic": 74.28,
+"technique": 96.79,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e110592",
@@ -35942,7 +35942,7 @@
 "visible": true,
 "merits": [
 {
-"race": "Världscup medel",
+"race": "World Cup Middle",
 "date": "2026-08-08",
 "klass": "H21",
 "place": 71,
@@ -36177,21 +36177,6 @@
 "merits": []
 },
 {
-"id": "e219273",
-"name": "Vegard Kittilsen",
-"sex": "M",
-"birth_year": 2001,
-"club": "IFK Göteborg Orientering",
-"country": "SWE",
-"physic": 74.01,
-"technique": 92.6,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e75654",
 "name": "Matjaz Stanfel",
 "sex": "M",
@@ -36254,6 +36239,21 @@
 "results": "53753_55572_H20ESVE"
 }
 ]
+},
+{
+"id": "e219273",
+"name": "Vegard Kittilsen",
+"sex": "M",
+"birth_year": 2001,
+"club": "IFK Göteborg Orientering",
+"country": "SWE",
+"physic": 74.01,
+"technique": 92.6,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e237146",
@@ -36391,6 +36391,21 @@
 "merits": []
 },
 {
+"id": "e16149",
+"name": "Oscar Stomberg",
+"sex": "M",
+"birth_year": 1999,
+"club": "Ulricehamns OK",
+"country": "SWE",
+"physic": 73.71,
+"technique": 44.97,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e28389",
 "name": "Melker Larsson",
 "sex": "M",
@@ -36438,21 +36453,6 @@
 "results": "53555_55362_H21"
 }
 ]
-},
-{
-"id": "e16149",
-"name": "Oscar Stomberg",
-"sex": "M",
-"birth_year": 1999,
-"club": "Ulricehamns OK",
-"country": "SWE",
-"physic": 73.71,
-"technique": 44.97,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e54967",
@@ -36696,21 +36696,6 @@
 "merits": []
 },
 {
-"id": "e207258",
-"name": "Brais Piñeiro",
-"sex": "M",
-"birth_year": 1996,
-"club": "Snättringe SK",
-"country": "SWE",
-"physic": 73.5,
-"technique": 71.72,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e136583",
 "name": "Arvid Andersson",
 "sex": "M",
@@ -36736,6 +36721,21 @@
 "technique": 100.0,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e207258",
+"name": "Brais Piñeiro",
+"sex": "M",
+"birth_year": 1996,
+"club": "Snättringe SK",
+"country": "SWE",
+"physic": 73.5,
+"technique": 71.72,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -37023,21 +37023,6 @@
 "merits": []
 },
 {
-"id": "e116012",
-"name": "George Mavchun",
-"sex": "M",
-"birth_year": 1988,
-"club": "Farum Tisvilde OK",
-"country": "DEN",
-"physic": 73.02,
-"technique": 87.43,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e133864",
 "name": "Martin Størmer-Antonsen",
 "sex": "M",
@@ -37048,6 +37033,21 @@
 "technique": 58.5,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e116012",
+"name": "George Mavchun",
+"sex": "M",
+"birth_year": 1988,
+"club": "Farum Tisvilde OK",
+"country": "DEN",
+"physic": 73.02,
+"technique": 87.43,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -37365,21 +37365,6 @@
 "merits": []
 },
 {
-"id": "e206486",
-"name": "Tobias Tronbøl Lium",
-"sex": "M",
-"birth_year": 2005,
-"club": "Bækkelagets SK",
-"country": "NOR",
-"physic": 72.49,
-"technique": 80.81,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e39944",
 "name": "Jakob Persson Ingström",
 "sex": "M",
@@ -37427,6 +37412,21 @@
 "results": "54929_56784_H216"
 }
 ]
+},
+{
+"id": "e206486",
+"name": "Tobias Tronbøl Lium",
+"sex": "M",
+"birth_year": 2005,
+"club": "Bækkelagets SK",
+"country": "NOR",
+"physic": 72.49,
+"technique": 80.81,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e256150",
@@ -38016,6 +38016,21 @@
 "merits": []
 },
 {
+"id": "e184078",
+"name": "Carl-Meijer Axelsson",
+"sex": "M",
+"birth_year": 2008,
+"club": "OK Ravinen",
+"country": "SWE",
+"physic": 71.64,
+"technique": 78.62,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e14022",
 "name": "Albin Andersson",
 "sex": "M",
@@ -38063,21 +38078,6 @@
 "results": "56195_58064_H21B"
 }
 ]
-},
-{
-"id": "e184078",
-"name": "Carl-Meijer Axelsson",
-"sex": "M",
-"birth_year": 2008,
-"club": "OK Ravinen",
-"country": "SWE",
-"physic": 71.64,
-"technique": 78.62,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e207396",
@@ -38215,21 +38215,6 @@
 "merits": []
 },
 {
-"id": "e75235",
-"name": "Olivier Blanc-Tranchant",
-"sex": "M",
-"birth_year": 1992,
-"club": "Snättringe SK",
-"country": "SWE",
-"physic": 71.38,
-"technique": 80.48,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e168641",
 "name": "Viktor Nygren",
 "sex": "M",
@@ -38277,6 +38262,21 @@
 "results": "53753_55572_H20ESVE"
 }
 ]
+},
+{
+"id": "e75235",
+"name": "Olivier Blanc-Tranchant",
+"sex": "M",
+"birth_year": 1992,
+"club": "Snättringe SK",
+"country": "SWE",
+"physic": 71.38,
+"technique": 80.48,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e122808",
@@ -38358,6 +38358,21 @@
 "merits": []
 },
 {
+"id": "e84951",
+"name": "Joar Oldernes",
+"sex": "M",
+"birth_year": 1999,
+"club": "Lillomarka OL",
+"country": "NOR",
+"physic": 71.08,
+"technique": 60.69,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e19305",
 "name": "Eddie Karlsson",
 "sex": "M",
@@ -38407,36 +38422,6 @@
 ]
 },
 {
-"id": "e84951",
-"name": "Joar Oldernes",
-"sex": "M",
-"birth_year": 1999,
-"club": "Lillomarka OL",
-"country": "NOR",
-"physic": 71.08,
-"technique": 60.69,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e27520",
-"name": "Adam Segerslätt",
-"sex": "M",
-"birth_year": 1998,
-"club": "IFK Umeå",
-"country": "SWE",
-"physic": 71.06,
-"technique": 74.57,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e125462",
 "name": "Ludvig Juhlin",
 "sex": "M",
@@ -38484,6 +38469,21 @@
 "results": "53086_54889_H18Elit"
 }
 ]
+},
+{
+"id": "e27520",
+"name": "Adam Segerslätt",
+"sex": "M",
+"birth_year": 1998,
+"club": "IFK Umeå",
+"country": "SWE",
+"physic": 71.06,
+"technique": 74.57,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e267971",
@@ -38580,21 +38580,6 @@
 ]
 },
 {
-"id": "e238616",
-"name": "Kasper Bakken Ulseth",
-"sex": "M",
-"birth_year": 2003,
-"club": "Nydalens SK",
-"country": "NOR",
-"physic": 70.95,
-"technique": 21.95,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e82934",
 "name": "Ludvig Hedström",
 "sex": "M",
@@ -38644,6 +38629,21 @@
 ]
 },
 {
+"id": "e238616",
+"name": "Kasper Bakken Ulseth",
+"sex": "M",
+"birth_year": 2003,
+"club": "Nydalens SK",
+"country": "NOR",
+"physic": 70.95,
+"technique": 21.95,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e64351",
 "name": "Torkil Eide Solstad",
 "sex": "M",
@@ -38689,16 +38689,16 @@
 "merits": []
 },
 {
-"id": "e3500",
-"name": "Marcus Karlsson Sennevik",
+"id": "e137537",
+"name": "Maxime Bonneau",
 "sex": "M",
-"birth_year": 1976,
-"club": "OK Gränsen",
+"birth_year": 1991,
+"club": "OK Tisaren",
 "country": "SWE",
 "physic": 70.81,
-"technique": 69.43,
-"adjusted_races": 2,
-"all_races": 2,
+"technique": 40.07,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -38719,16 +38719,16 @@
 "merits": []
 },
 {
-"id": "e137537",
-"name": "Maxime Bonneau",
+"id": "e3500",
+"name": "Marcus Karlsson Sennevik",
 "sex": "M",
-"birth_year": 1991,
-"club": "OK Tisaren",
+"birth_year": 1976,
+"club": "OK Gränsen",
 "country": "SWE",
 "physic": 70.81,
-"technique": 40.07,
-"adjusted_races": 1,
-"all_races": 1,
+"technique": 69.43,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -38877,21 +38877,6 @@
 ]
 },
 {
-"id": "e256048",
-"name": "Anthony Riley",
-"sex": "M",
-"birth_year": 2002,
-"club": "IFK Göteborg Orientering",
-"country": "SWE",
-"physic": 70.51,
-"technique": 83.18,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e149502",
 "name": "Juuso Ekola",
 "sex": "M",
@@ -38917,6 +38902,21 @@
 "technique": 84.88,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e256048",
+"name": "Anthony Riley",
+"sex": "M",
+"birth_year": 2002,
+"club": "IFK Göteborg Orientering",
+"country": "SWE",
+"physic": 70.51,
+"technique": 83.18,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -39012,21 +39012,6 @@
 "merits": []
 },
 {
-"id": "e15620",
-"name": "Isak Langerak",
-"sex": "M",
-"birth_year": 1996,
-"club": "Järfälla OK",
-"country": "SWE",
-"physic": 70.4,
-"technique": 34.24,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e138467",
 "name": "Elias Trossing",
 "sex": "M",
@@ -39074,6 +39059,21 @@
 "results": "56195_58064_H18B"
 }
 ]
+},
+{
+"id": "e15620",
+"name": "Isak Langerak",
+"sex": "M",
+"birth_year": 1996,
+"club": "Järfälla OK",
+"country": "SWE",
+"physic": 70.4,
+"technique": 34.24,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e97615",
@@ -39125,21 +39125,6 @@
 ]
 },
 {
-"id": "e141743",
-"name": "Adrian Rönnback",
-"sex": "M",
-"birth_year": 2008,
-"club": "OK Linné",
-"country": "SWE",
-"physic": 70.35,
-"technique": 68.16,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e13982",
 "name": "Karl Enges",
 "sex": "M",
@@ -39150,6 +39135,21 @@
 "technique": 96.36,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e141743",
+"name": "Adrian Rönnback",
+"sex": "M",
+"birth_year": 2008,
+"club": "OK Linné",
+"country": "SWE",
+"physic": 70.35,
+"technique": 68.16,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -39313,21 +39313,6 @@
 "merits": []
 },
 {
-"id": "e274211",
-"name": "Reimo Liiv",
-"sex": "M",
-"birth_year": 1994,
-"club": "SK Saue Tammed",
-"country": "EST",
-"physic": 70.05,
-"technique": 87.6,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e148563",
 "name": "Kristoffer Tengroth",
 "sex": "M",
@@ -39336,6 +39321,21 @@
 "country": "SWE",
 "physic": 70.05,
 "technique": 61.31,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e274211",
+"name": "Reimo Liiv",
+"sex": "M",
+"birth_year": 1994,
+"club": "SK Saue Tammed",
+"country": "EST",
+"physic": 70.05,
+"technique": 87.6,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -39757,21 +39757,6 @@
 "merits": []
 },
 {
-"id": "e46074",
-"name": "Botvid Simonsson",
-"sex": "M",
-"birth_year": 2007,
-"club": "Sundbybergs IK",
-"country": "SWE",
-"physic": 69.59,
-"technique": 65.8,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e42538",
 "name": "Paulius Kudriavcevas",
 "sex": "M",
@@ -39782,6 +39767,21 @@
 "technique": 80.83,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e46074",
+"name": "Botvid Simonsson",
+"sex": "M",
+"birth_year": 2007,
+"club": "Sundbybergs IK",
+"country": "SWE",
+"physic": 69.59,
+"technique": 65.8,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -39851,6 +39851,21 @@
 ]
 },
 {
+"id": "e27049",
+"name": "Gabriel Öhgren",
+"sex": "M",
+"birth_year": 2002,
+"club": "Sävedalens AIK",
+"country": "SWE",
+"physic": 69.52,
+"technique": 75.05,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e59701",
 "name": "Liam Hogedal",
 "sex": "M",
@@ -39898,21 +39913,6 @@
 "results": "56195_58063_H202"
 }
 ]
-},
-{
-"id": "e27049",
-"name": "Gabriel Öhgren",
-"sex": "M",
-"birth_year": 2002,
-"club": "Sävedalens AIK",
-"country": "SWE",
-"physic": 69.52,
-"technique": 75.05,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e100753",
@@ -40235,21 +40235,6 @@
 ]
 },
 {
-"id": "e36062",
-"name": "Victor Flingmark",
-"sex": "M",
-"birth_year": 1994,
-"club": "Uddevalla OK",
-"country": "SWE",
-"physic": 69.25,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e13569",
 "name": "Glen Bales",
 "sex": "M",
@@ -40258,6 +40243,21 @@
 "country": "SWE",
 "physic": 69.25,
 "technique": 62.18,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e36062",
+"name": "Victor Flingmark",
+"sex": "M",
+"birth_year": 1994,
+"club": "Uddevalla OK",
+"country": "SWE",
+"physic": 69.25,
+"technique": 100.0,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -40513,6 +40513,21 @@
 "merits": []
 },
 {
+"id": "e261562",
+"name": "Maksym Barchuk",
+"sex": "M",
+"birth_year": 2007,
+"club": "Ronneby OK",
+"country": "SWE",
+"physic": 68.95,
+"technique": 52.12,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e128062",
 "name": "Albin Schröder",
 "sex": "M",
@@ -40562,16 +40577,16 @@
 ]
 },
 {
-"id": "e261562",
-"name": "Maksym Barchuk",
+"id": "e162185",
+"name": "Johannes Marager",
 "sex": "M",
-"birth_year": 2007,
-"club": "Ronneby OK",
-"country": "SWE",
-"physic": 68.95,
-"technique": 52.12,
-"adjusted_races": 2,
-"all_races": 2,
+"birth_year": 2006,
+"club": "Farum Tisvilde OK",
+"country": "DEN",
+"physic": 68.94,
+"technique": 85.26,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -40587,21 +40602,6 @@
 "technique": 73.66,
 "adjusted_races": 2,
 "all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e162185",
-"name": "Johannes Marager",
-"sex": "M",
-"birth_year": 2006,
-"club": "Farum Tisvilde OK",
-"country": "DEN",
-"physic": 68.94,
-"technique": 85.26,
-"adjusted_races": 4,
-"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -40825,21 +40825,6 @@
 "merits": []
 },
 {
-"id": "e127076",
-"name": "Eirik Vie Strisland",
-"sex": "M",
-"birth_year": 2004,
-"club": "NTNUI",
-"country": "NOR",
-"physic": 68.74,
-"technique": 58.15,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e80038",
 "name": "Arvid Myrberger",
 "sex": "M",
@@ -40848,6 +40833,21 @@
 "country": "SWE",
 "physic": 68.74,
 "technique": 2.02,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e127076",
+"name": "Eirik Vie Strisland",
+"sex": "M",
+"birth_year": 2004,
+"club": "NTNUI",
+"country": "NOR",
+"physic": 68.74,
+"technique": 58.15,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -41517,55 +41517,6 @@
 "merits": []
 },
 {
-"id": "e57430",
-"name": "Alexander Dufva",
-"sex": "M",
-"birth_year": 2009,
-"club": "Sundsvalls OK",
-"country": "SWE",
-"physic": 67.88,
-"technique": 73.68,
-"adjusted_races": 11,
-"all_races": 11,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "Norrlandsmästerskapen, lång",
-"date": "2026-08-08",
-"klass": "H18",
-"place": 2,
-"of": 5,
-"behind": 124,
-"score": 74.5,
-"field": 64.6,
-"results": "53691_55508_H18"
-},
-{
-"race": "25mannamedeln (WRE)",
-"date": "2026-10-11",
-"klass": "H18E-1",
-"place": 18,
-"of": 79,
-"behind": 184,
-"score": 70.0,
-"field": 80.07,
-"results": "55918_57782_H18E1"
-},
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-12",
-"klass": "H18-4",
-"place": 9,
-"of": 29,
-"behind": 654,
-"score": 66.11,
-"field": 77.11,
-"results": "56195_58063_H184"
-}
-]
-},
-{
 "id": "e102049",
 "name": "Noel Hellberg",
 "sex": "M",
@@ -41611,6 +41562,55 @@
 "score": 69.24,
 "field": 83.05,
 "results": "53086_54889_H20Elit"
+}
+]
+},
+{
+"id": "e57430",
+"name": "Alexander Dufva",
+"sex": "M",
+"birth_year": 2009,
+"club": "Sundsvalls OK",
+"country": "SWE",
+"physic": 67.88,
+"technique": 73.68,
+"adjusted_races": 11,
+"all_races": 11,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "Norrlandsmästerskapen, lång",
+"date": "2026-08-08",
+"klass": "H18",
+"place": 2,
+"of": 5,
+"behind": 124,
+"score": 74.5,
+"field": 64.6,
+"results": "53691_55508_H18"
+},
+{
+"race": "25mannamedeln (WRE)",
+"date": "2026-10-11",
+"klass": "H18E-1",
+"place": 18,
+"of": 79,
+"behind": 184,
+"score": 70.0,
+"field": 80.07,
+"results": "55918_57782_H18E1"
+},
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-12",
+"klass": "H18-4",
+"place": 9,
+"of": 29,
+"behind": 654,
+"score": 66.11,
+"field": 77.11,
+"results": "56195_58063_H184"
 }
 ]
 },
@@ -41833,70 +41833,6 @@
 "merits": []
 },
 {
-"id": "e117798",
-"name": "Teodor Jonsson",
-"sex": "M",
-"birth_year": 2007,
-"club": "Skarpnäcks OL",
-"country": "SWE",
-"physic": 67.35,
-"technique": 35.05,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e138104",
-"name": "Ulrik Olsson",
-"sex": "M",
-"birth_year": 2009,
-"club": "Tolered-Utby Ol-klubb",
-"country": "SWE",
-"physic": 67.35,
-"technique": 46.15,
-"adjusted_races": 7,
-"all_races": 8,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-12",
-"klass": "H18-1",
-"place": 7,
-"of": 31,
-"behind": 468,
-"score": 73.4,
-"field": 78.0,
-"results": "56195_58063_H181"
-},
-{
-"race": "Sverigepremiären, medel",
-"date": "2026-02-28",
-"klass": "H18",
-"place": 14,
-"of": 48,
-"behind": 262,
-"score": 64.91,
-"field": 75.99,
-"results": "53555_55362_H18"
-},
-{
-"race": "Sverigepremiären, lång",
-"date": "2026-03-01",
-"klass": "H18",
-"place": 15,
-"of": 44,
-"behind": 504,
-"score": 63.58,
-"field": 74.52,
-"results": "53556_55363_H18"
-}
-]
-},
-{
 "id": "e270984",
 "name": "Joseph Hudd",
 "sex": "M",
@@ -41907,6 +41843,21 @@
 "technique": 88.35,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e117798",
+"name": "Teodor Jonsson",
+"sex": "M",
+"birth_year": 2007,
+"club": "Skarpnäcks OL",
+"country": "SWE",
+"physic": 67.35,
+"technique": 35.05,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -41957,6 +41908,55 @@
 "score": 66.07,
 "field": 88.34,
 "results": "53397_55204_H21"
+}
+]
+},
+{
+"id": "e138104",
+"name": "Ulrik Olsson",
+"sex": "M",
+"birth_year": 2009,
+"club": "Tolered-Utby Ol-klubb",
+"country": "SWE",
+"physic": 67.35,
+"technique": 46.15,
+"adjusted_races": 7,
+"all_races": 8,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-12",
+"klass": "H18-1",
+"place": 7,
+"of": 31,
+"behind": 468,
+"score": 73.4,
+"field": 78.0,
+"results": "56195_58063_H181"
+},
+{
+"race": "Sverigepremiären, medel",
+"date": "2026-02-28",
+"klass": "H18",
+"place": 14,
+"of": 48,
+"behind": 262,
+"score": 64.91,
+"field": 75.99,
+"results": "53555_55362_H18"
+},
+{
+"race": "Sverigepremiären, lång",
+"date": "2026-03-01",
+"klass": "H18",
+"place": 15,
+"of": 44,
+"behind": 504,
+"score": 63.58,
+"field": 74.52,
+"results": "53556_55363_H18"
 }
 ]
 },
@@ -42277,6 +42277,21 @@
 "merits": []
 },
 {
+"id": "e209045",
+"name": "Rėjus Mockaitis",
+"sex": "M",
+"birth_year": 1998,
+"club": "OK Versmė",
+"country": "LTU",
+"physic": 66.85,
+"technique": 10.47,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e113324",
 "name": "Melker Carlsson",
 "sex": "M",
@@ -42326,21 +42341,6 @@
 ]
 },
 {
-"id": "e209045",
-"name": "Rėjus Mockaitis",
-"sex": "M",
-"birth_year": 1998,
-"club": "OK Versmė",
-"country": "LTU",
-"physic": 66.85,
-"technique": 10.47,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e39928",
 "name": "Mårten Lundqvist",
 "sex": "M",
@@ -42356,21 +42356,6 @@
 "merits": []
 },
 {
-"id": "e211522",
-"name": "Odin Øysteinson Østby",
-"sex": "M",
-"birth_year": 2008,
-"club": "Hamar OK",
-"country": "NOR",
-"physic": 66.83,
-"technique": 90.08,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e117271",
 "name": "Adam Lindblom",
 "sex": "M",
@@ -42379,6 +42364,21 @@
 "country": "SWE",
 "physic": 66.83,
 "technique": 87.32,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e211522",
+"name": "Odin Øysteinson Østby",
+"sex": "M",
+"birth_year": 2008,
+"club": "Hamar OK",
+"country": "NOR",
+"physic": 66.83,
+"technique": 90.08,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -42446,21 +42446,6 @@
 "merits": []
 },
 {
-"id": "e102814",
-"name": "Axel Ekdala",
-"sex": "M",
-"birth_year": 2007,
-"club": "Kungälvs OK",
-"country": "SWE",
-"physic": 66.73,
-"technique": 76.61,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e154732",
 "name": "Selmer Løken",
 "sex": "M",
@@ -42471,6 +42456,21 @@
 "technique": 76.7,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e102814",
+"name": "Axel Ekdala",
+"sex": "M",
+"birth_year": 2007,
+"club": "Kungälvs OK",
+"country": "SWE",
+"physic": 66.73,
+"technique": 76.61,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -42931,21 +42931,6 @@
 "merits": []
 },
 {
-"id": "e238269",
-"name": "Joakim Østergaard",
-"sex": "M",
-"birth_year": 2001,
-"club": "Søllerød OK",
-"country": "DEN",
-"physic": 66.08,
-"technique": 39.02,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e134272",
 "name": "Samuel Böke",
 "sex": "M",
@@ -42956,6 +42941,21 @@
 "technique": 76.04,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e238269",
+"name": "Joakim Østergaard",
+"sex": "M",
+"birth_year": 2001,
+"club": "Søllerød OK",
+"country": "DEN",
+"physic": 66.08,
+"technique": 39.02,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -42991,21 +42991,6 @@
 "merits": []
 },
 {
-"id": "e110368",
-"name": "Elvis Åberg",
-"sex": "M",
-"birth_year": 2007,
-"club": "Tolered-Utby Ol-klubb",
-"country": "SWE",
-"physic": 66.0,
-"technique": 81.09,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e105821",
 "name": "Albin Granqvist",
 "sex": "M",
@@ -43031,6 +43016,21 @@
 "technique": 67.76,
 "adjusted_races": 4,
 "all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e110368",
+"name": "Elvis Åberg",
+"sex": "M",
+"birth_year": 2007,
+"club": "Tolered-Utby Ol-klubb",
+"country": "SWE",
+"physic": 66.0,
+"technique": 81.09,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -43130,21 +43130,6 @@
 "merits": []
 },
 {
-"id": "e18187",
-"name": "Jonas Hammarskiöld",
-"sex": "M",
-"birth_year": 1997,
-"club": "Sundsvalls OK",
-"country": "SWE",
-"physic": 65.86,
-"technique": 50.63,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e52637",
 "name": "Axel Hejdenberg",
 "sex": "M",
@@ -43153,6 +43138,21 @@
 "country": "SWE",
 "physic": 65.86,
 "technique": 47.6,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e18187",
+"name": "Jonas Hammarskiöld",
+"sex": "M",
+"birth_year": 1997,
+"club": "Sundsvalls OK",
+"country": "SWE",
+"physic": 65.86,
+"technique": 50.63,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -43510,21 +43510,6 @@
 "merits": []
 },
 {
-"id": "e12609",
-"name": "Daniel Olsson",
-"sex": "M",
-"birth_year": 1986,
-"club": "Uddevalla OK",
-"country": "SWE",
-"physic": 65.49,
-"technique": 97.48,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e145651",
 "name": "Axel Persson",
 "sex": "M",
@@ -43572,6 +43557,21 @@
 "results": "53556_55363_H18"
 }
 ]
+},
+{
+"id": "e12609",
+"name": "Daniel Olsson",
+"sex": "M",
+"birth_year": 1986,
+"club": "Uddevalla OK",
+"country": "SWE",
+"physic": 65.49,
+"technique": 97.48,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e209748",
@@ -44116,6 +44116,21 @@
 "merits": []
 },
 {
+"id": "e3764",
+"name": "Rasmus Palmqvist",
+"sex": "M",
+"birth_year": 1993,
+"club": "IFK Lidingö SOK",
+"country": "SWE",
+"physic": 64.85,
+"technique": 84.34,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e162632",
 "name": "Axel Nyman",
 "sex": "M",
@@ -44165,21 +44180,6 @@
 ]
 },
 {
-"id": "e3764",
-"name": "Rasmus Palmqvist",
-"sex": "M",
-"birth_year": 1993,
-"club": "IFK Lidingö SOK",
-"country": "SWE",
-"physic": 64.85,
-"technique": 84.34,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e109040",
 "name": "Erik Slätt",
 "sex": "M",
@@ -44188,21 +44188,6 @@
 "country": "SWE",
 "physic": 64.8,
 "technique": 95.72,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e105822",
-"name": "Gustav Granqvist",
-"sex": "M",
-"birth_year": 2007,
-"club": "FK Göingarna",
-"country": "SWE",
-"physic": 64.78,
-"technique": 83.46,
 "adjusted_races": 3,
 "all_races": 3,
 "international": false,
@@ -44257,6 +44242,21 @@
 "results": "54929_56785_H18BFinal"
 }
 ]
+},
+{
+"id": "e105822",
+"name": "Gustav Granqvist",
+"sex": "M",
+"birth_year": 2007,
+"club": "FK Göingarna",
+"country": "SWE",
+"physic": 64.78,
+"technique": 83.46,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e240555",
@@ -44319,21 +44319,6 @@
 "merits": []
 },
 {
-"id": "e121705",
-"name": "Joel Gustafsson",
-"sex": "M",
-"birth_year": 2011,
-"club": "Eds SK",
-"country": "SWE",
-"physic": 64.72,
-"technique": 44.21,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e179468",
 "name": "Ole Jørgen Bogen Arenth",
 "sex": "M",
@@ -44342,6 +44327,21 @@
 "country": "SWE",
 "physic": 64.72,
 "technique": 87.43,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e121705",
+"name": "Joel Gustafsson",
+"sex": "M",
+"birth_year": 2011,
+"club": "Eds SK",
+"country": "SWE",
+"physic": 64.72,
+"technique": 44.21,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -44364,21 +44364,6 @@
 "merits": []
 },
 {
-"id": "e55461",
-"name": "Noa Helgars",
-"sex": "M",
-"birth_year": 2005,
-"club": "Täby OK",
-"country": "SWE",
-"physic": 64.56,
-"technique": 81.07,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e108308",
 "name": "Filip Gummesson",
 "sex": "M",
@@ -44389,6 +44374,21 @@
 "technique": 51.15,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e55461",
+"name": "Noa Helgars",
+"sex": "M",
+"birth_year": 2005,
+"club": "Täby OK",
+"country": "SWE",
+"physic": 64.56,
+"technique": 81.07,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -45164,21 +45164,6 @@
 "merits": []
 },
 {
-"id": "e20117",
-"name": "Fredrik Norell",
-"sex": "M",
-"birth_year": 1989,
-"club": "Göteborg-Majorna OK",
-"country": "SWE",
-"physic": 63.12,
-"technique": 88.45,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e156533",
 "name": "Linus Claesson",
 "sex": "M",
@@ -45226,6 +45211,21 @@
 "results": "53556_55363_H18"
 }
 ]
+},
+{
+"id": "e20117",
+"name": "Fredrik Norell",
+"sex": "M",
+"birth_year": 1989,
+"club": "Göteborg-Majorna OK",
+"country": "SWE",
+"physic": 63.12,
+"technique": 88.45,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e206910",
@@ -46198,21 +46198,6 @@
 "merits": []
 },
 {
-"id": "e143995",
-"name": "Felix Nideborn",
-"sex": "M",
-"birth_year": 2009,
-"club": "OK Roxen",
-"country": "SWE",
-"physic": 61.3,
-"technique": 69.69,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e115666",
 "name": "Carl Eklund Wännman",
 "sex": "M",
@@ -46223,6 +46208,21 @@
 "technique": 54.29,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e143995",
+"name": "Felix Nideborn",
+"sex": "M",
+"birth_year": 2009,
+"club": "OK Roxen",
+"country": "SWE",
+"physic": 61.3,
+"technique": 69.69,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -46273,21 +46273,6 @@
 "merits": []
 },
 {
-"id": "e185606",
-"name": "Roberts Arnicāns",
-"sex": "M",
-"birth_year": 2006,
-"club": "OK Kāpa",
-"country": "LAT",
-"physic": 61.05,
-"technique": 86.97,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e49538",
 "name": "Nils Forsberg Rundström",
 "sex": "M",
@@ -46298,6 +46283,21 @@
 "technique": 63.1,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e185606",
+"name": "Roberts Arnicāns",
+"sex": "M",
+"birth_year": 2006,
+"club": "OK Kāpa",
+"country": "LAT",
+"physic": 61.05,
+"technique": 86.97,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -46765,21 +46765,6 @@
 "merits": []
 },
 {
-"id": "e171026",
-"name": "Rasmus Mjøsund",
-"sex": "M",
-"birth_year": 2009,
-"club": "Nydalens SK",
-"country": "NOR",
-"physic": 60.14,
-"technique": 4.98,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e75996",
 "name": "Emil Jägstedt",
 "sex": "M",
@@ -46790,6 +46775,21 @@
 "technique": 65.1,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e171026",
+"name": "Rasmus Mjøsund",
+"sex": "M",
+"birth_year": 2009,
+"club": "Nydalens SK",
+"country": "NOR",
+"physic": 60.14,
+"technique": 4.98,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -46820,6 +46820,21 @@
 "technique": 67.21,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e81530",
+"name": "Aron Laurell Håkansson",
+"sex": "M",
+"birth_year": 1995,
+"club": "Kungälvs OK",
+"country": "SWE",
+"physic": 60.08,
+"technique": 94.22,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -46872,21 +46887,6 @@
 "results": "53837_55662_H20"
 }
 ]
-},
-{
-"id": "e81530",
-"name": "Aron Laurell Håkansson",
-"sex": "M",
-"birth_year": 1995,
-"club": "Kungälvs OK",
-"country": "SWE",
-"physic": 60.08,
-"technique": 94.22,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e167384",
@@ -47246,21 +47246,6 @@
 "merits": []
 },
 {
-"id": "e21687",
-"name": "Marcus Hane",
-"sex": "M",
-"birth_year": 1990,
-"club": "OK Nolaskogsarna",
-"country": "SWE",
-"physic": 59.38,
-"technique": 90.78,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e52970",
 "name": "Martin Sandqvist",
 "sex": "M",
@@ -47269,6 +47254,21 @@
 "country": "SWE",
 "physic": 59.38,
 "technique": 56.84,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e21687",
+"name": "Marcus Hane",
+"sex": "M",
+"birth_year": 1990,
+"club": "OK Nolaskogsarna",
+"country": "SWE",
+"physic": 59.38,
+"technique": 90.78,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -48001,21 +48001,6 @@
 "merits": []
 },
 {
-"id": "e23492",
-"name": "Samuel Lindén",
-"sex": "M",
-"birth_year": 2002,
-"club": "Attunda OK",
-"country": "SWE",
-"physic": 57.7,
-"technique": 87.98,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e4119",
 "name": "Joakim Tosteberg",
 "sex": "M",
@@ -48026,6 +48011,21 @@
 "technique": 63.25,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e23492",
+"name": "Samuel Lindén",
+"sex": "M",
+"birth_year": 2002,
+"club": "Attunda OK",
+"country": "SWE",
+"physic": 57.7,
+"technique": 87.98,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -48223,21 +48223,6 @@
 ]
 },
 {
-"id": "e54501",
-"name": "Olle Erlandsson",
-"sex": "M",
-"birth_year": 2003,
-"club": "SOK Viljan",
-"country": "SWE",
-"physic": 57.23,
-"technique": 97.58,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e274431",
 "name": "Lars Depuydt",
 "sex": "M",
@@ -48248,6 +48233,21 @@
 "technique": 49.93,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e54501",
+"name": "Olle Erlandsson",
+"sex": "M",
+"birth_year": 2003,
+"club": "SOK Viljan",
+"country": "SWE",
+"physic": 57.23,
+"technique": 97.58,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -49057,21 +49057,6 @@
 "merits": []
 },
 {
-"id": "e9781",
-"name": "Johan Nordin",
-"sex": "M",
-"birth_year": 1996,
-"club": "Sundsvalls OK",
-"country": "SWE",
-"physic": 54.83,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e3248",
 "name": "Tobias Edström",
 "sex": "M",
@@ -49080,6 +49065,21 @@
 "country": "SWE",
 "physic": 54.83,
 "technique": 48.27,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e9781",
+"name": "Johan Nordin",
+"sex": "M",
+"birth_year": 1996,
+"club": "Sundsvalls OK",
+"country": "SWE",
+"physic": 54.83,
+"technique": 0.0,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -49485,21 +49485,6 @@
 "merits": []
 },
 {
-"id": "e144757",
-"name": "Isak Kämpe",
-"sex": "M",
-"birth_year": 2009,
-"club": "Örkelljunga FK",
-"country": "SWE",
-"physic": 53.43,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e26803",
 "name": "Oscar Ehrnborn",
 "sex": "M",
@@ -49510,6 +49495,21 @@
 "technique": 69.56,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e144757",
+"name": "Isak Kämpe",
+"sex": "M",
+"birth_year": 2009,
+"club": "Örkelljunga FK",
+"country": "SWE",
+"physic": 53.43,
+"technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -49665,21 +49665,6 @@
 "merits": []
 },
 {
-"id": "e142972",
-"name": "Olle Lundberg",
-"sex": "M",
-"birth_year": 2007,
-"club": "IFK Umeå",
-"country": "SWE",
-"physic": 53.21,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e275379",
 "name": "Ricards Tabaks",
 "sex": "M",
@@ -49688,6 +49673,21 @@
 "country": "LAT",
 "physic": 53.21,
 "technique": 84.59,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e142972",
+"name": "Olle Lundberg",
+"sex": "M",
+"birth_year": 2007,
+"club": "IFK Umeå",
+"country": "SWE",
+"physic": 53.21,
+"technique": 0.0,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -50123,6 +50123,21 @@
 "merits": []
 },
 {
+"id": "e110694",
+"name": "Arvid Karlsson",
+"sex": "M",
+"birth_year": 2008,
+"club": "Tjällmo-Godegårds OK",
+"country": "SWE",
+"physic": 52.02,
+"technique": 77.57,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e140211",
 "name": "Emil Lindgren",
 "sex": "M",
@@ -50170,21 +50185,6 @@
 "results": "53086_54889_H18Elit2"
 }
 ]
-},
-{
-"id": "e110694",
-"name": "Arvid Karlsson",
-"sex": "M",
-"birth_year": 2008,
-"club": "Tjällmo-Godegårds OK",
-"country": "SWE",
-"physic": 52.02,
-"technique": 77.57,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e85049",
@@ -51534,21 +51534,6 @@
 "merits": []
 },
 {
-"id": "e275428",
-"name": "Jakob Sivert Hunstad",
-"sex": "M",
-"birth_year": 2006,
-"club": "Ås-NMBU Orientering",
-"country": "NOR",
-"physic": 44.6,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e208119",
 "name": "Noah Bühlmann",
 "sex": "M",
@@ -51557,6 +51542,21 @@
 "country": "SWE",
 "physic": 44.6,
 "technique": 4.51,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e275428",
+"name": "Jakob Sivert Hunstad",
+"sex": "M",
+"birth_year": 2006,
+"club": "Ås-NMBU Orientering",
+"country": "NOR",
+"physic": 44.6,
+"technique": 0.0,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -51778,21 +51778,6 @@
 "merits": []
 },
 {
-"id": "e154401",
-"name": "Alexander Hanson",
-"sex": "M",
-"birth_year": 2009,
-"club": "Tullinge SK",
-"country": "SWE",
-"physic": 42.93,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e8943",
 "name": "Daniel Karlsson",
 "sex": "M",
@@ -51803,6 +51788,21 @@
 "technique": 10.25,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e154401",
+"name": "Alexander Hanson",
+"sex": "M",
+"birth_year": 2009,
+"club": "Tullinge SK",
+"country": "SWE",
+"physic": 42.93,
+"technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -52213,126 +52213,6 @@
 "merits": []
 },
 {
-"id": "e117224",
-"name": "Noah Korall",
-"sex": "M",
-"birth_year": 2006,
-"club": "Motala AIF OL",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e35110",
-"name": "Olle Kalered",
-"sex": "M",
-"birth_year": 1990,
-"club": "Stora Tuna OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e112658",
-"name": "Einar Söderberg Beckman",
-"sex": "M",
-"birth_year": 2007,
-"club": "Sjövalla FK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e114320",
-"name": "Eric Olofsson",
-"sex": "M",
-"birth_year": 2007,
-"club": "Sjövalla FK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e97441",
-"name": "Rickard Jemth",
-"sex": "M",
-"birth_year": 2008,
-"club": "IF Thor",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e108347",
-"name": "Jonatan Anderson",
-"sex": "M",
-"birth_year": 2005,
-"club": "Järfälla OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e103833",
-"name": "Viktor Danielsson",
-"sex": "M",
-"birth_year": 2007,
-"club": "Vimmerby OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e99847",
-"name": "Carl-Johan Olvegård",
-"sex": "M",
-"birth_year": 2007,
-"club": "Skånes",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e31316",
 "name": "Niklas Aldén",
 "sex": "M",
@@ -52348,251 +52228,11 @@
 "merits": []
 },
 {
-"id": "e190659",
-"name": "Linus Uddenberg",
-"sex": "M",
-"birth_year": 2007,
-"club": "SOL Tranås",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e88142",
-"name": "Joel Golsäter",
-"sex": "M",
-"birth_year": 2004,
-"club": "OK Kåre",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e138443",
-"name": "Erik Johansson",
-"sex": "M",
-"birth_year": 2007,
-"club": "IK Uven",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e185053",
-"name": "Roberts Graudins",
-"sex": "M",
-"birth_year": 2007,
-"club": "OK Kāpa",
-"country": "LAT",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e149937",
-"name": "Hugo Alm",
-"sex": "M",
-"birth_year": 2007,
-"club": "Sjövalla FK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e121228",
-"name": "Filip Sjölander",
-"sex": "M",
-"birth_year": 2008,
-"club": "Täby OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e17592",
-"name": "Erik Eriksson",
-"sex": "M",
-"birth_year": 2000,
-"club": "OK Älgen",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e178831",
-"name": "Lukas Bergmann Verhelst",
-"sex": "M",
-"birth_year": 2008,
-"club": "Horsens OK",
-"country": "DEN",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e70969",
-"name": "Malte Albinsson",
-"sex": "M",
-"birth_year": 2005,
-"club": "Täby OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e21184",
-"name": "Jacob Eriksson",
-"sex": "M",
-"birth_year": 1997,
-"club": "KFUM Örebro OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e225925",
-"name": "Mihály Ormay",
-"sex": "M",
-"birth_year": 1999,
-"club": "Turun Suunnistajat",
-"country": "FIN",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e24516",
-"name": "Pontus Lindblom",
-"sex": "M",
-"birth_year": 1998,
-"club": "Almby IK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e265071",
 "name": "Luke Fisher",
 "sex": "M",
 "birth_year": 1997,
 "club": "IFK Lidingö SOK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e83736",
-"name": "Olli-Markus Taivainen",
-"sex": "M",
-"birth_year": 1989,
-"club": "Ikaalisten Nouseva-Voima",
-"country": "FIN",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e87150",
-"name": "Alfons Peterson",
-"sex": "M",
-"birth_year": 2003,
-"club": "OK Denseln",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e71132",
-"name": "Gabriel Ekström",
-"sex": "M",
-"birth_year": 2006,
-"club": "Hallands",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e254981",
-"name": "Prokop Tomášek",
-"sex": "M",
-"birth_year": 2007,
-"club": "OK Kåre",
 "country": "SWE",
 "physic": null,
 "technique": null,
@@ -52633,6 +52273,231 @@
 "merits": []
 },
 {
+"id": "e112658",
+"name": "Einar Söderberg Beckman",
+"sex": "M",
+"birth_year": 2007,
+"club": "Sjövalla FK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e88142",
+"name": "Joel Golsäter",
+"sex": "M",
+"birth_year": 2004,
+"club": "OK Kåre",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e24516",
+"name": "Pontus Lindblom",
+"sex": "M",
+"birth_year": 1998,
+"club": "Almby IK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e87150",
+"name": "Alfons Peterson",
+"sex": "M",
+"birth_year": 2003,
+"club": "OK Denseln",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e103833",
+"name": "Viktor Danielsson",
+"sex": "M",
+"birth_year": 2007,
+"club": "Vimmerby OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e121228",
+"name": "Filip Sjölander",
+"sex": "M",
+"birth_year": 2008,
+"club": "Täby OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e70969",
+"name": "Malte Albinsson",
+"sex": "M",
+"birth_year": 2005,
+"club": "Täby OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e83736",
+"name": "Olli-Markus Taivainen",
+"sex": "M",
+"birth_year": 1989,
+"club": "Ikaalisten Nouseva-Voima",
+"country": "FIN",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e225925",
+"name": "Mihály Ormay",
+"sex": "M",
+"birth_year": 1999,
+"club": "Turun Suunnistajat",
+"country": "FIN",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e138443",
+"name": "Erik Johansson",
+"sex": "M",
+"birth_year": 2007,
+"club": "IK Uven",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e185053",
+"name": "Roberts Graudins",
+"sex": "M",
+"birth_year": 2007,
+"club": "OK Kāpa",
+"country": "LAT",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e190659",
+"name": "Linus Uddenberg",
+"sex": "M",
+"birth_year": 2007,
+"club": "SOL Tranås",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e71132",
+"name": "Gabriel Ekström",
+"sex": "M",
+"birth_year": 2006,
+"club": "Hallands",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e114320",
+"name": "Eric Olofsson",
+"sex": "M",
+"birth_year": 2007,
+"club": "Sjövalla FK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e117224",
+"name": "Noah Korall",
+"sex": "M",
+"birth_year": 2006,
+"club": "Motala AIF OL",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e237840",
 "name": "Elias Jensen",
 "sex": "M",
@@ -52654,6 +52519,141 @@
 "birth_year": 1998,
 "club": "MS Parma",
 "country": "FIN",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e108347",
+"name": "Jonatan Anderson",
+"sex": "M",
+"birth_year": 2005,
+"club": "Järfälla OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e254981",
+"name": "Prokop Tomášek",
+"sex": "M",
+"birth_year": 2007,
+"club": "OK Kåre",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e149937",
+"name": "Hugo Alm",
+"sex": "M",
+"birth_year": 2007,
+"club": "Sjövalla FK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e17592",
+"name": "Erik Eriksson",
+"sex": "M",
+"birth_year": 2000,
+"club": "OK Älgen",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e97441",
+"name": "Rickard Jemth",
+"sex": "M",
+"birth_year": 2008,
+"club": "IF Thor",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e99847",
+"name": "Carl-Johan Olvegård",
+"sex": "M",
+"birth_year": 2007,
+"club": "Skånes",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e178831",
+"name": "Lukas Bergmann Verhelst",
+"sex": "M",
+"birth_year": 2008,
+"club": "Horsens OK",
+"country": "DEN",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e35110",
+"name": "Olle Kalered",
+"sex": "M",
+"birth_year": 1990,
+"club": "Stora Tuna OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e21184",
+"name": "Jacob Eriksson",
+"sex": "M",
+"birth_year": 1997,
+"club": "KFUM Örebro OK",
+"country": "SWE",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,

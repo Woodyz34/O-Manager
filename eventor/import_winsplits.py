@@ -3,9 +3,16 @@
 
 Put the files in eventor/winsplits/ named
 
-    YYYY-MM-DD_<VM|EM|VC|niva2>_<lang|medel>_<H|D>[_kval][_free text].txt
+    YYYY-MM-DD_<VM|EM|VC|niva2>_<lang|medel>_<class>[_kval][_race name].txt
 
-for example 2026-07-14_VM_medel_H.txt or 2026-05-30_VC_lang_D_kval.txt.
+The class is H or D (meaning H21/D21), or the whole class name, e.g. D20, H18 or H21Kort.
+Two classes of the same race need different file names, and the class tells them apart:
+2026-07-19_niva2_medel_D20_O-Ringen_E1.txt and 2026-07-19_niva2_medel_D_O-Ringen_E1.txt.
+
+for example 2026-07-14_VM_medel_H.txt, 2026-05-30_VC_lang_D_kval.txt or
+2026-07-19_niva2_medel_H_O-Ringen_E1.txt. The race name in the game is in English
+("World Championships Middle"); the free text at the end, with _ as spaces, is added to it,
+and for niva2 it is the race's own name ("O-Ringen E1, Middle").
 Each file holds one class. The importer writes one JSON file per txt file to
 eventor/data/races/ws_<file name>.json, in the same shape as the Eventor
 data, so the points step can treat both sources alike. Files that are
@@ -28,11 +35,11 @@ IN_DIR = os.path.join(HERE, "winsplits")
 OUT_DIR = os.path.join(HERE, "data", "races")
 
 NAME_RE = re.compile(
-    r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<kind>VM|EM|VC|niva2)_(?P<dist>lang|lång|medel)_(?P<sex>H|D)"
-    r"(?P<kval>_kval)?(?:_.*)?\.txt$", re.I)
-IMPORTER_VERSION = 2          # bump to re-import every file after a parser change
+    r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<kind>VM|EM|VC|niva2)_(?P<dist>lang|lång|medel)_(?P<sex>[HD])(?P<age>\d{2}[A-Za-zÅÄÖåäö]*)?"
+    r"(?P<kval>_kval)?(?:_(?P<free>.*))?\.txt$", re.I)
+IMPORTER_VERSION = 3          # bump to re-import every file after a parser change
 KIND_LEVEL = {"vm": 6, "em": 6, "vc": 6, "niva2": 2}
-KIND_NAME = {"vm": "VM", "em": "EM", "vc": "Världscup", "niva2": "Nivå 2"}
+KIND_NAME = {"vm": "World Championships", "em": "European Championships", "vc": "World Cup", "niva2": "National race"}
 STATUS = {"mp": "MissingPunch", "dns": "DidNotStart", "dnf": "DidNotFinish",
           "dsq": "Disqualified", "-": "NotFinished", "": "NotFinished"}
 LEG_RE = re.compile(r"^(S|\d+)-(\d+|F)(?:\s*\((\w+)\))?$")
@@ -90,6 +97,18 @@ def parse_file(text):
     return controls, runners
 
 
+def race_name(kind, dist, kval, free):
+    """The name shown in the game, in English: "World Cup Long", "European Championships Middle
+    Qualification (final A)", or for a national race its own name, "O-Ringen E1, Middle"."""
+    distance = "Middle" if dist.lower() == "medel" else "Long"
+    extra = " ".join((free or "").replace("_", " ").split())
+    if kind == "niva2" and extra:
+        name = f"{extra}, {distance}"
+        return name + (" Qualification" if kval else "")
+    name = f"{KIND_NAME[kind]} {distance}" + (" Qualification" if kval else "")
+    return name + (f" ({extra})" if extra else "")
+
+
 def main():
     if not os.path.isdir(IN_DIR):
         print("Mappen eventor/winsplits finns inte, inget att importera.")
@@ -101,7 +120,7 @@ def main():
             continue
         m = NAME_RE.match(fname)
         if not m:
-            errors.append(f"{fname}: namnet följer inte mönstret ÅÅÅÅ-MM-DD_VM|EM|VC|niva2_lang|medel_H|D[_kval].txt")
+            errors.append(f"{fname}: namnet följer inte mönstret ÅÅÅÅ-MM-DD_VM|EM|VC|niva2_lang|medel_H|D|klass[_kval][_namn].txt")
             continue
         with open(os.path.join(IN_DIR, fname), "rb") as f:
             raw = f.read()
@@ -124,6 +143,7 @@ def main():
             errors.append(f"{fname}: {e}")
             continue
         kind, sex = m.group("kind").lower(), m.group("sex").upper()
+        klass = sex + (m.group("age") or "21")
         international = kind != "niva2"
         for r in runners:
             r["sex"] = "M" if sex == "H" else "F"
@@ -133,12 +153,11 @@ def main():
             "source": "winsplits", "source_file": fname, "source_sha1": digest,
             "importer_version": IMPORTER_VERSION,
             "event_id": f"ws:{stem}", "race_id": "", "single_race": True,
-            "event_name": f"{KIND_NAME[kind]} {'lång' if m.group('dist').lower() != 'medel' else 'medel'}"
-                          f"{' kval' if m.group('kval') else ''}",
+            "event_name": race_name(kind, m.group("dist"), bool(m.group("kval")), m.group("free")),
             "race_name": "", "date": m.group("date"), "level": KIND_LEVEL[kind],
             "distance": "Middle" if m.group("dist").lower() == "medel" else "Long",
             "light": "Day", "qualification": bool(m.group("kval")),
-            "classes": [{"class": f"{sex}21", "course_length": None, "controls": controls, "runners": runners}],
+            "classes": [{"class": klass, "course_length": None, "controls": controls, "runners": runners}],
         }
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
