@@ -124,8 +124,18 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int moveControl { get; set; }
     [Networked] public Vector2 moveTarget { get; set; }
 
+    // Route analysis: this player's drawn routes, simplified (grid cells packed as row * columns + column), where each
+    // leg ends in that list, and the time the standard runner would need on each leg (RouteAnalysis)
+    [Networked, Capacity(800)] public NetworkArray<int> analysisPoints => default;
+    [Networked, Capacity(52)] public NetworkArray<int> analysisLegEnds => default;
+    [Networked, Capacity(52)] public NetworkArray<int> analysisLegTimes => default;
+    [Networked] public int analysisLegCount { get; set; }
+    [Networked] public NetworkBool analysisDone { get; set; }
+
     void ClearModeChoices()
     {
+        analysisDone = false;
+        analysisLegCount = 0;
         bearPlaced = false;
         bearPosition = Vector2.zero;
         moveUsed = false;
@@ -949,6 +959,11 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         if (RelayRace.Active != null)
         {
             RelayRace.Active.StartFirstLeg(agent);
+        }
+        else if (RouteAnalysis.On)
+        {
+            // Route analysis: the whole course is drawn first, and nobody runs
+            RouteAnalysis.StartDrawing(agent);
         }
         else
         {

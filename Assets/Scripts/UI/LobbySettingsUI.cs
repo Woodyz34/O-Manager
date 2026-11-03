@@ -181,7 +181,7 @@ public class LobbySettingsUI : MonoBehaviour
     void Show(string mode, ExtraMode extra, string map)
     {
         // Route analysis gives everyone the same runner, so the pool does not matter then
-        modeText.text = mode == "..." ? mode : (extra & ExtraMode.RouteAnalysis) != 0 ? "Same runner for all" : GameModes.PoolName(mode);
+        modeText.text = mode == "..." ? mode : (extra & ExtraMode.RouteAnalysis) != 0 ? "No runners" : GameModes.PoolName(mode);
         imposterText.text = mode == "..." ? "..." : ExtraModes.Describe(extra);
         mapText.text = map;
     }

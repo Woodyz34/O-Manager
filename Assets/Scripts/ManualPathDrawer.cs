@@ -268,6 +268,14 @@ public class ManualPathDrawer : MonoBehaviour
                     agent.WorldToGridPositionCentered(targetControl.position));
                 return;
             }
+            // Route analysis: the whole course is drawn; nobody runs, the routes are compared instead
+            if (RouteAnalysis.On && RelayRace.Active == null)
+            {
+                ClearKeptLines();
+                relayMode = false;
+                RouteAnalysis.OnCourseDrawn(agent);
+                return;
+            }
             // The whole leg is drawn: the runner starts on the first stretch when every team is ready.
             // The drawn lines are taken off the map again.
             ClearKeptLines();
