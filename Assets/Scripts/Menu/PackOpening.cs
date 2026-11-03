@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // The pack opening show. The pack flies in, shakes and bursts, and then the runner is revealed
-// piece by piece: country, stats, photo, name and finally the card itself.
+// piece by piece: country, club, stats, photo, name and finally the card itself.
 // The timings and sizes are all in this file; the objects it moves are in Resources/UI/PackOpening.prefab,
 // which is built by Tools > O-Manager > Apply Menu UI.
 public class PackOpening : MonoBehaviour
@@ -44,7 +44,6 @@ public class PackOpening : MonoBehaviour
     public CanvasGroup metaRow;
     public Image clubImage;
     public TextMeshProUGUI klassText;
-    public TextMeshProUGUI clubNameText;   // shown instead of the club badge when there is no picture, made when needed
     public CanvasGroup speedBlock;
     public TextMeshProUGUI speedValue;
     public CanvasGroup techniqueBlock;
@@ -100,6 +99,8 @@ public class PackOpening : MonoBehaviour
     const float DroneVolume = 0.45f;
     static readonly Vector2 ChipLeft = new Vector2(-700f, 405f);
     static readonly Vector2 ChipRight = new Vector2(650f, 405f);
+    static readonly Vector2 ChipClub = new Vector2(-545f, 405f);   // next to the flag in the corner
+    const float ClubSize = 300f;
     static readonly Color Neutral = new Color(1f, 0.93f, 0.78f, 1f);
 
     PackResult result;
@@ -120,6 +121,13 @@ public class PackOpening : MonoBehaviour
     float beamAlpha, beamTarget;
     float cardRaysAlpha, cardRaysTarget;
     Vector2 tilt;
+
+    // The club's own moment comes right after the country. Made from the country's pieces the first
+    // time it is needed, so the prefab needs no rebuild.
+    RectTransform clubGroup;
+    CanvasGroup clubCanvas;
+    Image clubBadge;
+    TextMeshProUGUI clubTitle;
 
     void Awake()
     {
@@ -175,6 +183,8 @@ public class PackOpening : MonoBehaviour
     {
         flagGroup.gameObject.SetActive(false);
         countryText.alpha = 0f;
+        if (clubGroup != null) clubGroup.gameObject.SetActive(false);
+        if (clubTitle != null) clubTitle.alpha = 0f;
         statsGroup.gameObject.SetActive(false);
         metaRow.alpha = 0f;
         speedBlock.alpha = 0f;
@@ -215,6 +225,7 @@ public class PackOpening : MonoBehaviour
         yield return Charge();
         yield return Burst();
         yield return RevealCountry();
+        yield return RevealClub();
         yield return RevealStats();
         yield return RevealPortrait();
         yield return RevealName();
@@ -348,43 +359,82 @@ public class PackOpening : MonoBehaviour
         });
     }
 
-    // The club's name, written left of the class where the badge would be
-    TextMeshProUGUI MakeClubNameText()
+    void MakeClubPieces()
     {
-        GameObject holder = new GameObject("Club name", typeof(RectTransform));
-        holder.layer = clubImage.gameObject.layer;
-        RectTransform rect = (RectTransform)holder.transform;
-        rect.SetParent(clubImage.transform.parent, false);
-        rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(-250f, 0f);
-        rect.sizeDelta = new Vector2(400f, 100f);
-        TextMeshProUGUI text = holder.AddComponent<TextMeshProUGUI>();
-        text.font = klassText.font;
-        text.fontSharedMaterial = klassText.fontSharedMaterial;
-        text.color = klassText.color;
-        text.fontStyle = FontStyles.Bold;
-        text.alignment = TextAlignmentOptions.MidlineRight;
-        text.enableAutoSizing = true;
-        text.fontSizeMin = 22f;
-        text.fontSizeMax = 44f;
-        text.textWrappingMode = TextWrappingModes.Normal;
-        text.overflowMode = TextOverflowModes.Ellipsis;
-        text.raycastTarget = false;
-        return text;
+        if (clubGroup != null) return;
+        clubGroup = Instantiate(flagGroup.gameObject, flagGroup.parent).GetComponent<RectTransform>();
+        clubGroup.name = "Club";
+        clubGroup.SetSiblingIndex(flagGroup.GetSiblingIndex() + 1);
+        clubCanvas = clubGroup.GetComponent<CanvasGroup>();
+        clubBadge = clubGroup.Find("Picture").GetComponent<Image>();
+        clubBadge.preserveAspect = true;
+        clubBadge.rectTransform.offsetMin = Vector2.zero;
+        clubBadge.rectTransform.offsetMax = Vector2.zero;
+        // Badges have their own shape, so no cream frame behind them like the flag has
+        Transform border = clubGroup.Find("Border");
+        if (border != null) border.gameObject.SetActive(false);
+        clubGroup.sizeDelta = new Vector2(ClubSize, ClubSize);
+
+        clubTitle = Instantiate(countryText, countryText.transform.parent);
+        clubTitle.name = "Club name";
+        clubTitle.transform.SetSiblingIndex(countryText.transform.GetSiblingIndex() + 1);
+        clubTitle.enableAutoSizing = true;
+        clubTitle.fontSizeMax = countryText.fontSize;
+        clubTitle.fontSizeMin = 40f;
+        clubTitle.textWrappingMode = TextWrappingModes.NoWrap;
+        clubTitle.alpha = 0f;
+        clubGroup.gameObject.SetActive(false);
+    }
+
+    // The club comes in the same way as the country: the badge lands, the name is written under it,
+    // and then the badge moves to the corner next to the flag
+    IEnumerator RevealClub()
+    {
+        CardData runner = result.card;
+        if (string.IsNullOrEmpty(runner.clubName) && runner.clubb == null)
+        {
+            yield break;
+        }
+        MakeClubPieces();
+        clubTitle.text = Emblems.NoBreakAtDash(runner.clubName ?? "");
+        clubTitle.characterSpacing = 70f;
+        bool badge = runner.clubb != null;
+        if (badge)
+        {
+            clubBadge.sprite = runner.clubb;
+            clubCanvas.alpha = 0f;
+            Place(clubGroup, new Vector2(0, FlagY), 2.6f, 75f);
+            clubGroup.gameObject.SetActive(true);
+            Hit(0.95f, 12f);
+            Flare(new Vector2(0, FlagY));
+            yield return UIAnim.Run(0.5f, t =>
+            {
+                float e = UIAnim.OutCubic(t);
+                clubCanvas.alpha = Mathf.Clamp01(t * 2.5f);
+                Place(clubGroup, new Vector2(0, FlagY), Mathf.Lerp(2.6f, 1f, e), Mathf.Lerp(75f, 0f, e));
+            });
+        }
+        yield return UIAnim.Run(0.6f, t =>
+        {
+            clubTitle.alpha = t;
+            clubTitle.characterSpacing = Mathf.Lerp(70f, 22f, UIAnim.OutCubic(t));
+        });
+        yield return UIAnim.Wait(0.85f);
+        yield return UIAnim.Run(0.45f, t =>
+        {
+            float e = UIAnim.InOutCubic(t);
+            if (badge) Place(clubGroup, Vector2.Lerp(new Vector2(0, FlagY), ChipClub, e), Mathf.Lerp(1f, 0.3f, e));
+            clubTitle.alpha = 1f - t;
+        });
     }
 
     IEnumerator RevealStats()
     {
         CardData runner = result.card;
-        clubImage.sprite = runner.clubb;
-        clubImage.enabled = runner.clubb != null;
-        string clubName = runner.clubb == null ? runner.clubName : null;
-        if (!string.IsNullOrEmpty(clubName) && clubNameText == null) clubNameText = MakeClubNameText();
-        if (clubNameText != null)
-        {
-            clubNameText.gameObject.SetActive(!string.IsNullOrEmpty(clubName));
-            clubNameText.text = Emblems.NoBreakAtDash(clubName ?? "");
-        }
+        // The club has had its own moment already, so this row shows only the class, in the middle
+        clubImage.enabled = false;
+        klassText.rectTransform.anchoredPosition = Vector2.zero;
+        klassText.alignment = TextAlignmentOptions.Center;
         klassText.text = runner.klass;
         speedValue.text = "0";
         techniqueValue.text = "0";
@@ -544,10 +594,12 @@ public class PackOpening : MonoBehaviour
         if (!skipped)
         {
             Vector2 flagFrom = flagGroup.anchoredPosition, statsFrom = statsGroup.anchoredPosition, portraitFrom = portraitGroup.anchoredPosition;
+            Vector2 clubFrom = clubGroup != null ? clubGroup.anchoredPosition : Vector2.zero;
             yield return UIAnim.Run(0.22f, t =>
             {
                 float e = UIAnim.InCubic(t);
                 Place(flagGroup, Vector2.Lerp(flagFrom, Vector2.zero, e), 0.3f * (1f - e));
+                if (clubGroup != null) Place(clubGroup, Vector2.Lerp(clubFrom, Vector2.zero, e), 0.3f * (1f - e));
                 Place(statsGroup, Vector2.Lerp(statsFrom, Vector2.zero, e), 0.34f * (1f - e));
                 Place(portraitGroup, Vector2.Lerp(portraitFrom, Vector2.zero, e), 1f - e);
                 nameText.alpha = 1f - t;
