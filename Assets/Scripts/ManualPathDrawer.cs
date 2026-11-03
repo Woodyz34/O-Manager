@@ -247,6 +247,12 @@ public class ManualPathDrawer : MonoBehaviour
             {
                 corridorPath = FindOptimizedPathInCorridor(gridPath, 10);
             }
+            // Route analysis: a line over ground nobody can run on (a lake) has no route round it, so the drawn
+            // line itself is kept; that ground then counts as very slow
+            if ((corridorPath == null || corridorPath.Count == 0) && RouteAnalysis.On)
+            {
+                corridorPath = new List<Vector2Int>(gridPath);
+            }
             agent.relaySegments.Add(corridorPath);
             KeepLine();
             // The next stretch starts from scratch
@@ -266,6 +272,14 @@ public class ManualPathDrawer : MonoBehaviour
                 agent.CamController.FocusOnSegment(
                     agent.WorldToGridPositionCentered(ThisControll.position),
                     agent.WorldToGridPositionCentered(targetControl.position));
+                return;
+            }
+            // Route analysis: the whole course is drawn; nobody runs, the routes are compared instead
+            if (RouteAnalysis.On && RelayRace.Active == null)
+            {
+                ClearKeptLines();
+                relayMode = false;
+                RouteAnalysis.OnCourseDrawn(agent);
                 return;
             }
             // The whole leg is drawn: the runner starts on the first stretch when every team is ready.
@@ -310,9 +324,27 @@ public class ManualPathDrawer : MonoBehaviour
         {
             corridorPath = FindOptimizedPathInCorridor(gridPath, 10);
             Debug.Log("Ingen optimerad path hittades, använder ritad path.");
+            if (corridorPath == null || corridorPath.Count == 0)
+            {
+                // The line goes over ground nobody can run on (straight over a lake), so there is no route near it.
+                // Without a route the runner stood still for good; it takes the way round instead.
+                corridorPath = WayRound(gridPath[0], gridPath[gridPath.Count - 1]);
+            }
             agent.Initialize(corridorPath);
         }
 
+    }
+
+    // The fastest route over the whole map from where the line starts to where it ends (the control when that fails)
+    List<Vector2Int> WayRound(Vector2Int from, Vector2Int to)
+    {
+        AStarPathfinder pathfinder = new AStarPathfinder(manager.speedGrid2D, manager.slopeFactors);
+        List<List<Vector2Int>> paths = pathfinder.GetAllPaths(from, to, 1);
+        if (paths.Count == 0 || paths[0] == null || paths[0].Count == 0)
+        {
+            paths = pathfinder.GetAllPaths(WorldToGrid(ThisControll.position), WorldToGrid(targetControl.position), 1);
+        }
+        return paths.Count > 0 && paths[0] != null && paths[0].Count > 0 ? paths[0] : new List<Vector2Int>(gridPath);
     }
 
     Vector2Int WorldToGrid(Vector3 worldPos)

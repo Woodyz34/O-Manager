@@ -48,7 +48,7 @@ public static class ExtraModes
             case ExtraMode.Imposter: return "One random player secretly has to finish last. Can you spot who?";
             case ExtraMode.Bears: return "Everyone hides one bear while drawing. Runners who find it get scared and run round it.";
             case ExtraMode.MoveControl: return "Everyone may move one control up to 100 m while drawing. Good routes can turn bad.";
-            case ExtraMode.RouteAnalysis: return "No runner cards: draw how you would run yourself, then compare everyone's route choices. Played on its own.";
+            case ExtraMode.RouteAnalysis: return "Nobody runs: everyone draws the whole course the way they would run it, then you compare the route choices. Played on its own.";
             default: return "";
         }
     }

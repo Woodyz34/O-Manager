@@ -7,9 +7,9 @@ using UnityEngine;
 
 // Bears game mode. While drawing, every player may hide one bear somewhere on the map (GameModeTools). The bear is
 // only seen by its owner until a runner comes close to it: then everyone sees a bear jump up and roar (ModeBanner),
-// and from then on the bear stands on the map for all. A runner who comes close to someone else's bear gets scared:
+// and from then on the bear stands on the map for all. A runner who comes close to any bear, their own too, gets scared:
 // stands still for a moment and then runs a detour round the bear back to their own line. That costs a little time,
-// which is all a bear does. Your own runner is not afraid of your own bear.
+// which is all a bear does. Your own bear scares your own runner too.
 //
 // Each player's runner checks the bears itself (BearWatcher); the bears' places are shared on the owners' NetworkPlayers.
 public static class BearMode
@@ -70,6 +70,8 @@ public static class BearMode
         bool scaredIsMe = scared != null && scared.Object != null && scared.Object.HasStateAuthority;
         string ownerName = ownerIsMe ? "your" : (ownerPlayer != null ? Name(ownerPlayer) : "someone") + "'s";
         string runnerName = scaredIsMe ? "you" : scared != null ? Name(scared) : "a runner";
+        bool ownBear = scared != null && scared == ownerPlayer;
+        if (ownBear) ownerName = scaredIsMe ? "your own" : "their own";
 
         if (BearWatcher.Instance != null)
         {
@@ -77,7 +79,7 @@ public static class BearMode
         }
         if (first)
         {
-            ModeBanner.Show(ModeBanner.BearSprite, "RAAAWR!", Capital(ownerName) + " bear scared " + runnerName + "!",
+            ModeBanner.Show(ModeBanner.BearSprite, "RAAAWR!", (ownBear ? Capital(runnerName) + " got scared by " + ownerName + " bear!" : Capital(ownerName) + " bear scared " + runnerName + "!"),
                 new Color(0.55f, 0.29f, 0.12f), 3.4f, true, ModeBanner.LoadSound("bear_roar"));
         }
         else
@@ -342,7 +344,7 @@ public class BearWatcher : MonoBehaviour
         Vector3 me = agent.transform.position;
         foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player == local || player.Object == null || !player.Object.IsValid || !player.bearPlaced) continue;
+            if (player.Object == null || !player.Object.IsValid || !player.bearPlaced) continue;
             PlayerRef owner = player.Object.StateAuthority;
             if (scaredBy.Contains(owner)) continue;
             Vector2 bear = player.bearPosition;
