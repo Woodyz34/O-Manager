@@ -51,8 +51,43 @@ public static class RunnerCollection
             data = string.IsNullOrEmpty(json) ? null : JsonUtility.FromJson<SaveData>(json);
             if (data == null) data = new SaveData();
             if (data.runners == null) data.runners = new List<Entry>();
+            if (MoveRenamed(data))
+            {
+                PlayerPrefs.SetString(Key(), JsonUtility.ToJson(data));
+                PlayerPrefs.Save();
+            }
         }
         return data;
+    }
+
+    // A runner who was two cards under two spellings is now one card. A saved card under the old
+    // name moves to the new one (once, if the player had both).
+    static bool MoveRenamed(SaveData save)
+    {
+        Dictionary<string, string> renamed = AllCardsRenamed();
+        bool changed = false;
+        for (int i = save.runners.Count - 1; i >= 0; i--)
+        {
+            Entry entry = save.runners[i];
+            string to;
+            if (!renamed.TryGetValue(entry.name, out to)) continue;
+            changed = true;
+            if (save.runners.Exists(e => e.name == to))
+            {
+                save.runners.RemoveAt(i);
+            }
+            else
+            {
+                entry.name = to;
+            }
+        }
+        return changed;
+    }
+
+    static Dictionary<string, string> AllCardsRenamed()
+    {
+        RunnerCards.All();   // loads runners.json, where the renames are
+        return AllCards.getInstance().Renamed;
     }
 
     static void Save()

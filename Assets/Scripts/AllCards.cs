@@ -6,6 +6,10 @@ using UnityEngine;
 public class AllCards : MonoBehaviour
 {
     public List<CardData> AllCardsList = new List<CardData>();
+
+    // Old card name -> new name, for runners that were two cards under two spellings and are now one
+    // (e.g. "Miri Thrane Oedum" -> "Miri Thrane Ødum"). The collection moves saved cards to the new name.
+    public readonly Dictionary<string, string> Renamed = new Dictionary<string, string>();
     private static readonly Lazy<AllCards> instance = new Lazy<AllCards>(() => new AllCards());
 
     private AllCards()
@@ -27,12 +31,21 @@ public class AllCards : MonoBehaviour
     public void SetAllCards()
     {
         AllCardsList.Clear();
+        Renamed.Clear();
         TextAsset file = Resources.Load<TextAsset>("Runners/runners");
         RunnerFile data = file != null ? JsonUtility.FromJson<RunnerFile>(file.text) : null;
         if (data == null || data.runners == null || data.runners.Count == 0)
         {
             Debug.LogError("No runners found in Resources/Runners/runners.json");
             return;
+        }
+
+        if (data.renamed != null)
+        {
+            foreach (RenamedEntry rename in data.renamed)
+            {
+                if (!string.IsNullOrEmpty(rename.from) && !string.IsNullOrEmpty(rename.to)) Renamed[rename.from] = rename.to;
+            }
         }
 
         foreach (RunnerEntry r in data.runners)
@@ -54,7 +67,15 @@ public class AllCards : MonoBehaviour
     class RunnerFile
     {
         public string computed;
+        public List<RenamedEntry> renamed;
         public List<RunnerEntry> runners;
+    }
+
+    [Serializable]
+    class RenamedEntry
+    {
+        public string from;
+        public string to;
     }
 
     [Serializable]
