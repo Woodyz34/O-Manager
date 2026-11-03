@@ -225,7 +225,6 @@ public class SinglePlayerMenu : MonoBehaviour
     public static void EndGame(NetworkRunner runner)
     {
         ChosenGameMode = null;
-        if (runner != null) runner.Shutdown();
-        SceneManager.LoadScene("SingelPlayer");
+        SceneLoader.LeaveSession(runner, "SingelPlayer");
     }
 }

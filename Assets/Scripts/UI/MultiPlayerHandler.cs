@@ -61,12 +61,13 @@ public class MultiPlayerHandler : MonoBehaviour
     public void OnBackClicked()
     {
         // Leave the lobby list (or a lobby being made) before changing page
+        NetworkRunner running = null;
         foreach (NetworkRunner runner in FindObjectsByType<NetworkRunner>(FindObjectsSortMode.None))
         {
-            if (runner.IsRunning) runner.Shutdown();
+            if (runner.IsRunning) running = runner;
             else Destroy(runner.gameObject);
         }
-        SceneManager.LoadScene("NewCompetition");
+        SceneLoader.LeaveSession(running, "NewCompetition");
     }
     void HideAllPanels()
     {

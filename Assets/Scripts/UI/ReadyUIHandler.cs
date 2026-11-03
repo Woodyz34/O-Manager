@@ -191,11 +191,8 @@ public class ReadyUIHandler : NetworkBehaviour
             return; // Stoppa hosten från att lämna
         }
 
-        // Stäng ner nätverks-sessionen
-        Runner.Shutdown();
-
-        // Ladda MainMenu scenen
-        SceneManager.LoadScene("MainMenu");
+        // Stäng ner nätverks-sessionen och ladda MainMenu när den är stängd
+        SceneLoader.LeaveSession(Runner, "MainMenu");
     }
 
     // "Change color": a colour picker; the colour is saved and used in every game from now on
