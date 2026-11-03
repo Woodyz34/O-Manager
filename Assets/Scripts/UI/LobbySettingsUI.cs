@@ -25,8 +25,20 @@ public class LobbySettingsUI : MonoBehaviour
     public Color toggleOnColor = new Color(0.91f, 0.45f, 0.16f);
     public Color toggleOffTextColor = new Color(0.12f, 0.24f, 0.17f);
 
-    // The host's choice of extra game modes
-    public ExtraMode modes;
+    // The host's choice of extra game modes. Remembered for the next race in the same session (the lobby scene is
+    // loaded again after every race).
+    public ExtraMode modes
+    {
+        get => remembered;
+        set => remembered = value;
+    }
+    static ExtraMode remembered;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRemembered()
+    {
+        remembered = ExtraMode.None;
+    }
 
     // Imposter: one random player becomes the imposter when the game starts
     public bool imposterEnabled => (modes & ExtraMode.Imposter) != 0;

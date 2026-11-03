@@ -248,6 +248,7 @@ public class GameModeTools : MonoBehaviour
         }
         bearGhost.SetActive(true);
         bearGhost.transform.position = at;
+        if (Camera.main != null) bearGhost.transform.rotation = Camera.main.transform.rotation;
         bearGhostSprite.color = ok ? new Color(1f, 1f, 1f, 0.75f) : new Color(1f, 0.45f, 0.45f, 0.6f);
     }
 

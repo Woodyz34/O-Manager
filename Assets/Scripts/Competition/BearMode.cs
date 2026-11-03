@@ -205,9 +205,13 @@ public class BearWatcher : MonoBehaviour
             SyncViews();
         }
         CheckLocalRunner();
+        // The race camera turns with each leg, so the bears turn with it and stay upright (like the runners' names)
+        Camera cam = Camera.main;
+        Quaternion upright = cam != null ? cam.transform.rotation : Quaternion.identity;
         // The bears that are seen breathe a little
         foreach (View view in views.Values)
         {
+            if (view.root != null) view.root.transform.rotation = upright;
             if (view.root != null && view.root.activeSelf && view.popped)
             {
                 float breath = 1f + 0.03f * Mathf.Sin(Time.time * 2.4f);
@@ -233,7 +237,7 @@ public class BearWatcher : MonoBehaviour
             Color color = Color.white;
             color.a = found ? 1f : 0.55f;
             if (!view.popped) view.sprite.color = color;
-            view.label.text = mine ? (found ? "Your bear" : "Your bear (hidden)") : BearMode.Name(player) + "'s bear";
+            view.label.text = mine ? "Your bear" : BearMode.Name(player) + "'s bear";
         }
     }
 
@@ -254,7 +258,7 @@ public class BearWatcher : MonoBehaviour
         view.label.transform.SetParent(view.root.transform, false);
         view.label.transform.localPosition = new Vector3(0f, -0.62f, 0f);
         view.label.rectTransform.sizeDelta = new Vector2(4f, 0.4f);
-        view.label.fontSize = 3.6f;
+        view.label.fontSize = 1.6f;
         view.label.fontStyle = FontStyles.Bold;
         view.label.alignment = TextAlignmentOptions.Center;
         view.label.enableWordWrapping = false;
@@ -285,7 +289,7 @@ public class BearWatcher : MonoBehaviour
         roar.transform.localPosition = new Vector3(0.35f, 0.75f, 0f);
         roar.rectTransform.sizeDelta = new Vector2(4f, 1f);
         roar.text = first ? "RAAAWR!" : "RAWR!";
-        roar.fontSize = 6f;
+        roar.fontSize = 3f;
         roar.fontStyle = FontStyles.Bold;
         roar.alignment = TextAlignmentOptions.Center;
         roar.enableWordWrapping = false;
@@ -390,7 +394,7 @@ public class BearWatcher : MonoBehaviour
             {
                 // Jumps up and down above the runner, upright whichever way the runner faces
                 shout.transform.position = agent.transform.position + new Vector3(0f, 0.28f + 0.06f * Mathf.Abs(Mathf.Sin(t * 14f)), -0.1f);
-                shout.transform.rotation = Quaternion.identity;
+                shout.transform.rotation = Camera.main != null ? Camera.main.transform.rotation : Quaternion.identity;
             }
             yield return null;
         }

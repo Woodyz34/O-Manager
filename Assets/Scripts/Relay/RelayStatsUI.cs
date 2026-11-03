@@ -355,7 +355,7 @@ public class RelayStatsUI : MonoBehaviour
         int points = race.Course.Route(leg, null).CommonCount;
         List<RelayTeamResult> players = new List<RelayTeamResult>(teams);
         players.Sort((a, b) => b.isLocal.CompareTo(a.isLocal));
-        List<CellData> header = new List<CellData> { Cell("Leg", 230), Cell("", 150) };
+        List<CellData> header = new List<CellData> { Cell("Leg", 230), Cell("", 190) };
         foreach (RelayTeamResult t in players) header.Add(Cell(t.team + (t.isLocal ? " (you)" : ""), 190));
         Row(48, true, header.ToArray());
         for (int c = 1; c < points; c++)
@@ -363,7 +363,7 @@ public class RelayStatsUI : MonoBehaviour
             string name = (c - 1 == 0 ? "Start" : (c - 1).ToString()) + " - " + (c == points - 1 ? "Finish" : c.ToString());
             List<CellData> cells = new List<CellData> { Cell("<b>" + c + ".</b>  " + name, 230) };
             int captured = c;
-            CellData open = Cell("<color=" + Green + "><b>Show routes ></b></color>", 150);
+            CellData open = Cell("<color=" + Green + "><b>Show routes ></b></color>", 190);
             open.click = () => OpenRoutes(captured);
             cells.Add(open);
             foreach (RelayTeamResult t in players)

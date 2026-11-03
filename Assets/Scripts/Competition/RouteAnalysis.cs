@@ -258,13 +258,13 @@ public class RouteCompareView : MonoBehaviour
         if (best != null)
         {
             int estimate = EstimateSeconds(best);
-            string text = estimate > 0 ? "about " + RelayStats.Time(estimate) : "";
+            string text = estimate > 0 ? "~" + RelayStats.Time(estimate) : "";
             if (estimate > 0 && fastest > 0 && fastest < int.MaxValue)
             {
                 int gain = fastest - estimate;
                 if (gain > 0) text += "  <color=#3F7D54>-" + RelayStats.Time(gain) + "</color>";
             }
-            AddRow(new Color(0.1f, 0.1f, 0.1f), "<b>Computer's fastest route</b>", text, false);
+            AddRow(new Color(0.1f, 0.1f, 0.1f), "<b>Computer's route</b>", text, false);
         }
         else
         {
@@ -283,13 +283,17 @@ public class RouteCompareView : MonoBehaviour
         CourseUI.Size(row, 54);
         Image swatch = CourseUI.Panel("Colour", row.transform, color);
         CourseUI.Place(swatch.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(12, 0), new Vector2(34, 10));
-        TextMeshProUGUI label = CourseUI.Text("Name", row.transform, name, 22, CourseUI.Ink);
-        CourseUI.Stretch(label.rectTransform, 58, 170, 4, 4);
+        TextMeshProUGUI label = CourseUI.Text("Name", row.transform, name, 21, CourseUI.Ink);
+        CourseUI.Stretch(label.rectTransform, 58, 200, 4, 4);
         label.alignment = TextAlignmentOptions.MidlineLeft;
         label.enableWordWrapping = false;
-        TextMeshProUGUI value = CourseUI.Text("Time", row.transform, time, 22, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
-        CourseUI.Place(value.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-12, 0), new Vector2(200, 50));
+        TextMeshProUGUI value = CourseUI.Text("Time", row.transform, time, 21, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+        CourseUI.Place(value.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-10, 0), new Vector2(190, 50));
         value.enableWordWrapping = false;
+        value.overflowMode = TextOverflowModes.Overflow;
+        value.enableAutoSizing = true;
+        value.fontSizeMin = 14;
+        value.fontSizeMax = 21;
     }
 
     RelayTeamResult Result(RelayTrack track)
