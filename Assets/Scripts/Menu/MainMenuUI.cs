@@ -161,7 +161,15 @@ public class MainMenuUI : MonoBehaviour
             }
         }
         if (ownedText != null) ownedText.text = "You have " + owned + " of " + total + " runners";
-        if (oddsText != null) oddsText.text = OddsText();
+        if (oddsText != null)
+        {
+            // Four tiers do not fit on one line at full size, so the line shrinks to the box
+            oddsText.enableAutoSizing = true;
+            oddsText.fontSizeMin = 18;
+            oddsText.fontSizeMax = 30;
+            oddsText.textWrappingMode = TextWrappingModes.NoWrap;
+            oddsText.text = OddsText();
+        }
     }
 
     static string OddsText()
@@ -175,7 +183,7 @@ public class MainMenuUI : MonoBehaviour
             {
                 continue;
             }
-            if (text.Length > 0) text.Append("     ");
+            if (text.Length > 0) text.Append("   ");
             string name = RunnerCards.TierName(tier);
             text.Append("<b>").Append(name[0]).Append(name.Substring(1).ToLowerInvariant()).Append("</b> ");
             text.Append(Mathf.RoundToInt(chance * 100f)).Append("%");
