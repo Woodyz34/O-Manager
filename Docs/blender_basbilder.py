@@ -29,8 +29,9 @@ RES = (300, 450) if QUICK else (600, 900)
 SAMPLES = 24 if QUICK else 64
 CHILD_SCALE = 0.5 if QUICK else 1.0
 
-SKINS = [(0.93, 0.74, 0.62), (0.87, 0.64, 0.50), (0.78, 0.55, 0.40), (0.62, 0.41, 0.28),
-         (0.45, 0.29, 0.19), (0.96, 0.80, 0.70), (0.70, 0.48, 0.33), (0.33, 0.21, 0.14)]
+# skin tones and how often each is picked (mostly light and medium, a few darker)
+SKINS = [((0.89, 0.68, 0.54), 4), ((0.86, 0.64, 0.49), 4), ((0.88, 0.66, 0.50), 3), ((0.82, 0.59, 0.44), 3),
+         ((0.77, 0.53, 0.38), 2), ((0.68, 0.46, 0.31), 1.5), ((0.52, 0.34, 0.23), 0.8), ((0.38, 0.24, 0.16), 0.5)]
 # hair colours as (melanin, redness, shown colour for brows/caps)
 HAIRS = {"blond": (0.22, 0.45, (0.62, 0.45, 0.22)), "ljus": (0.10, 0.35, (0.80, 0.66, 0.42)),
          "brun": (0.55, 0.40, (0.30, 0.17, 0.09)), "mork": (0.78, 0.30, (0.12, 0.07, 0.04)),
@@ -48,10 +49,11 @@ JERSEYS = [((0.05, 0.30, 0.13), (0.95, 0.45, 0.08), (0.96, 0.92, 0.82)),
            ((0.80, 0.80, 0.80), (0.05, 0.30, 0.13), (0.05, 0.30, 0.13)),
            ((0.55, 0.05, 0.25), (0.98, 0.80, 0.20), (1, 1, 1))]
 # how many of each style among 30 portraits (shuffled once, so every style shows up)
-MEN_HAIR = {"side": 4, "middle": 4, "mullet": 4, "quiff": 2, "crop": 2, "slick": 2, "messy": 3, "undercut": 2,
-            "long_m": 2, "manbun": 1, "curly": 2, "buzz": 1, "bald": 1}
-WOMEN_HAIR = {"long": 3, "long_side": 3, "wavy": 3, "bob": 2, "lob": 2, "pixie": 2, "pony": 3, "low_pony": 2,
-              "braids": 3, "bun": 2, "messy_bun": 2, "curly": 2, "half_up": 1}
+MEN_HAIR = {"side": 3, "middle": 3, "mullet": 3, "quiff": 2, "crop": 1, "fade_crop": 3, "fluffy": 3, "flow": 2,
+            "slick": 1, "messy": 2, "undercut": 2, "long_m": 1, "manbun": 1, "curly": 1, "buzz": 1, "bald": 1}
+WOMEN_HAIR = {"long": 2, "long_side": 2, "curtain": 4, "wavy": 2, "shag": 2, "bob": 2, "lob": 1, "pixie": 1,
+              "pony": 2, "side_pony": 3, "low_pony": 1, "bubble": 2, "braids": 2, "bun": 1, "messy_bun": 1,
+              "space_buns": 1, "curly": 1}
 
 
 def style_order(table, seed):
@@ -348,6 +350,10 @@ def head_shape(v, p):
     w = p["face_w"]
     x *= 0.68 * w
     y *= 0.88
+    if z > 0:
+        x *= 1 + (p["skull_w"] - 1) * smooth(0.0, 0.6, z)
+        y *= 1 + (p["skull_d"] - 1) * smooth(0.0, 0.6, z) * (1 if y > 0 else 0.3)
+        z *= 1 + (p["skull_h"] - 1) * smooth(0.1, 0.7, z)
     if z < 0:
         t = -z
         z *= p["len"]
@@ -803,8 +809,16 @@ def jersey_material(p):
     layers.append((seam.above(0.0), second if design != "split" else dark))
     layers.append((seam.abs().below(0.018), trim))
     layers.append(((ax - 1.32).above(0.0, 0.05), dark))
-    neck = (X * X / 0.16 + (Z - 0.95) * (Z - 0.95) / 0.09)
-    layers.append((neck.below(1.0, 0.04) * Y.below(0.0, 0.05), trim))
+    # neckline: an open V or U neck, trimmed, with skin showing inside
+    front = Y.below(0.05, 0.08)
+    if p["neckline"] == "v":
+        cut = ax * 0.75 + (0.8 - Z)
+        depth, band = 0.55, 0.05
+    else:
+        cut = (X * X / 0.3 + (Z - 0.75) * (Z - 0.75) / 0.2) * 0.55
+        depth, band = 0.55, 0.06
+    inside = cut.below(depth, 0.008) * front
+    layers.append(((cut - depth - band * 0.5).abs().below(band * 0.5, 0.006) * front, trim))
     fx, fz = X - 0.58, Z - 0.36
     box = (fx.abs().max(fz.abs())).below(0.105, 0.006) * Y.below(-0.2, 0.05)
     inner = (fx.abs().max(fz.abs())).below(0.09, 0.006) * Y.below(-0.2, 0.05)
@@ -813,6 +827,19 @@ def jersey_material(p):
     layers.append((inner * (fz - fx).above(0.0, 0.004), srgb_to_lin((0.95, 0.42, 0.05))))
     color = paint_layers(nt, base, layers)
     nt.links.new(color, bsdf.inputs["Base Color"])
+    # chest skin inside the neckline
+    sk = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    sk.inputs["Base Color"].default_value = (*srgb_to_lin(tuple(v * 0.97 for v in p["skin"])), 1)
+    sk.inputs["Roughness"].default_value = 0.5
+    sk.inputs["Subsurface Weight"].default_value = 0.3
+    sk.inputs["Subsurface Radius"].default_value = (1.0, 0.35, 0.2)
+    sk.inputs["Subsurface Scale"].default_value = 0.06
+    out = nt.nodes["Material Output"]
+    mixsh = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(inside.out, mixsh.inputs[0])
+    nt.links.new(bsdf.outputs[0], mixsh.inputs[1])
+    nt.links.new(sk.outputs[0], mixsh.inputs[2])
+    nt.links.new(mixsh.outputs[0], out.inputs[0])
     vor2 = nt.nodes.new("ShaderNodeTexVoronoi")
     vor2.inputs["Scale"].default_value = 260.0
     bump = node(nt, "ShaderNodeBump", Strength=0.12)
@@ -980,6 +1007,20 @@ def scalp_shell(p, st, mat, thick=0.03, shell_extra=None):
     return cap
 
 
+def fade_sides(p, front, rnd, seed, hair, zmax):
+    """Very short hair on the sides and back, shortest at the bottom (a fade)."""
+    st = Style(front, side_low=0.03, back_low=-0.45, sideburn=-0.02)
+    roots = [r for r in scalp_roots(p, st, 9000, rnd) if r.z < zmax or r.y > 0.55]
+    guides = []
+    for r in roots:
+        n = r.normalized()
+        L = 0.006 + 0.03 * smooth(-0.3, zmax, r.z)
+        d = tangent(Vector((0.2 * r.x, 0.4, -0.6)), r).normalized()
+        guides.append(resample([r - n * 0.004, r + n * L * 0.6 + d * L * 0.5, r + n * L + d * L], 4))
+    return hair_object("Fade", children(guides, [r.normalized() for r in roots], 3, 0.015, 0.0, seed + 11),
+                       hair, 0.0033, 0.5)
+
+
 def style_for(p):
     """Build guide strands for the person's style. Returns (objects, volume)."""
     style = p["hair"]
@@ -1047,7 +1088,7 @@ def style_for(p):
 
     if style in ("side", "undercut", "long_side"):
         part_x = sw * rnd.uniform(0.22, 0.32) * fw
-    elif style in ("middle", "long", "wavy", "lob", "bob", "half_up", "long_m"):
+    elif style in ("middle", "long", "wavy", "lob", "bob", "half_up", "long_m", "curtain", "shag"):
         part_x = rnd.uniform(-0.04, 0.04)
 
     if not p["woman"]:
@@ -1177,15 +1218,59 @@ def style_for(p):
         frizz = 0.012
         clump = 0.75
 
-    elif style in ("long", "long_side", "wavy", "lob", "bob", "long_m", "half_up"):
+    elif style in ("fade_crop", "fluffy"):
+        # skin fade on the sides, the length on top
+        st.side_low = 0.4
+        st.back_low = 0.28
+        objs.append(scalp_shell(p, Style(front, 0.03, -0.45, -0.02), scalp, 0.006))
+        objs.append(fade_sides(p, front, rnd, seed, hair, 0.45))
+        if style == "fade_crop":
+            H = rnd.uniform(0.05, 0.08)
+            face_guard = 0.42
+
+            def field(pos, t):
+                return tangent(Vector((0.25 * pos.x, -1.0, 0.1)), pos)
+            length = lambda r: 0.26 + 0.06 * smooth(0.5, 0.8, r.z)
+            frizz, clump = 0.012, 0.7
+        else:
+            H = rnd.uniform(0.1, 0.14)
+            face_guard = 0.36
+            curl = 1.0
+
+            def field(pos, t):
+                return tangent(Vector((0.3 * pos.x, -0.7, 0.4)), pos)
+            length = lambda r: 0.3
+            frizz, clump = 0.006, 0.65
+        lift = lambda r: H
+
+    elif style == "flow":
+        # medium length, swept back, curling out at the collar
+        H = rnd.uniform(0.07, 0.1)
+        hang_below = -0.15
+        st.back_low = -0.55
+
+        def field(pos, t):
+            if pos.z > 0.2:
+                return tangent(Vector((0.35 * pos.x, 1.0, -0.2)), pos)
+            return Vector((0.3 * math.copysign(1, pos.x), 0.35, -1.0))
+        length = lambda r: 0.45 + 0.25 * smooth(0.3, 0.8, r.z)
+        lift = lambda r: H * (0.5 + 0.5 * smooth(0.0, 0.6, r.z))
+        frizz, clump = 0.006, 0.6
+
+    elif style in ("long", "long_side", "wavy", "lob", "bob", "long_m", "half_up", "curtain", "shag"):
         end_z = {"long": -1.45, "long_side": -1.4, "wavy": -1.35, "lob": -0.98, "bob": -0.6,
-                 "long_m": -0.9, "half_up": -1.35}[style] + rnd.uniform(-0.1, 0.1)
+                 "long_m": -0.9, "half_up": -1.35, "curtain": -1.35, "shag": -1.0}[style] + rnd.uniform(-0.1, 0.1)
         hang_below = -0.05
         H = rnd.uniform(0.045, 0.07)
         st.back_low = -0.55
-        if style == "wavy":
+        if style == "wavy" or style == "shag":
             curl = 1.0
-        if style in ("bob", "lob") and rnd.random() < 0.6:
+        if style == "shag":
+            frizz = 0.012
+        curtain = style == "curtain"
+        if curtain:
+            face_guard = 0.2
+        if style == "shag" or style in ("bob", "lob") and rnd.random() < 0.6:
             face_guard = 0.33   # with a fringe
             fringe = True
         else:
@@ -1197,6 +1282,9 @@ def style_for(p):
             s = math.copysign(1, pos.x - part_x)
             if fringe and pos.y < -0.25 and pos.z > 0.35:
                 return tangent(Vector((0.15 * pos.x, -0.8, -1.0)), pos)
+            if curtain and pos.y < -0.25 and pos.z > 0.1 and abs(pos.x) < 0.5:
+                # curtain bangs: from the middle parting out over the temples
+                return tangent(Vector((s * 1.0, -0.3, -0.75)), pos)
             if pos.z > 0.3 and pos.y < 0.45:
                 return tangent(Vector((s, 0.1, -0.45)), pos)
             if pos.y > 0.45 and pos.z > 0:
@@ -1205,13 +1293,19 @@ def style_for(p):
 
         def length(r):
             if fringe and r.y < -0.25 and r.z > 0.35:
-                return 0.38
-            return (r.z - end_z) * rnd.uniform(0.95, 1.08) + 0.2
+                return 0.38 if style != "shag" else 0.34 * rnd.uniform(0.8, 1.15)
+            if curtain and r.y < -0.3 and r.z > 0.38:
+                return rnd.uniform(0.5, 0.65)
+            full = (r.z - end_z) * rnd.uniform(0.95, 1.08) + 0.2
+            if style == "shag":
+                full *= rnd.uniform(0.55, 1.0)     # choppy layers
+            return full
         lift = lambda r: H * (0.7 + 0.3 * smooth(0.0, 0.8, r.z))
         clump = 0.6
         count = 3000
 
-    elif style in ("pony", "low_pony", "bun", "messy_bun", "manbun", "braids", "pixie"):
+    elif style in ("pony", "low_pony", "bun", "messy_bun", "manbun", "braids", "pixie", "side_pony", "bubble",
+                   "space_buns"):
         if style == "pixie":
             H = rnd.uniform(0.06, 0.09)
             face_guard = 0.3
@@ -1225,8 +1319,13 @@ def style_for(p):
             frizz = 0.008
         else:
             H = 0.035 if style != "messy_bun" else 0.055
+            pony_side = rnd.choice((-1, 1))
             if style == "pony":
                 tie = Vector((0, 0.8, 0.55))
+            elif style in ("side_pony", "bubble"):
+                tie = Vector((pony_side * 0.3, 0.7, -0.38))
+            elif style == "space_buns":
+                tie = None
             elif style == "low_pony":
                 tie = Vector((0, 0.78, -0.35))
             elif style == "braids":
@@ -1236,18 +1335,21 @@ def style_for(p):
             else:
                 tie = Vector((0, 0.45, 0.98))
 
-            def field(pos, t):
+            buns = [Vector((-0.42, 0.3, 0.8)), Vector((0.42, 0.3, 0.8))]
+
+            def target_for(pos):
                 if style == "braids":
-                    s = math.copysign(1, pos.x + 1e-4)
-                    target = Vector((s * 0.52, 0.55, -0.45))
-                    return tangent(target - pos, pos) + (target - pos) * 0.3
-                return tangent(tie - pos, pos) + (tie - pos) * 0.3
+                    return Vector((math.copysign(1, pos.x + 1e-4) * 0.52, 0.55, -0.45))
+                if style == "space_buns":
+                    return buns[0] if pos.x < 0 else buns[1]
+                return tie
+
+            def field(pos, t):
+                target = target_for(pos)
+                return tangent(target - pos, pos) + (target - pos) * 0.3
 
             def length(r):
-                if style == "braids":
-                    s = math.copysign(1, r.x + 1e-4)
-                    return (Vector((s * 0.52, 0.55, -0.45)) - r).length * 1.25
-                return (tie - r).length * 1.2
+                return (target_for(r) - r).length * (1.25 if style == "braids" else 1.2)
             lift = lambda r: H
             clump = 0.45
             frizz = 0.006
@@ -1275,9 +1377,10 @@ def style_for(p):
         h = lift(r) * rnd.uniform(0.45, 1.0)
         steps = 14 if L < 0.6 else 22
         pts = grow(p, r, L, h, field, rnd, steps, hang_below=hang_below, face_guard=face_guard)
-        if tie is not None and style in ("pony", "low_pony", "bun", "messy_bun", "manbun"):
+        if style in ("pony", "low_pony", "bun", "messy_bun", "manbun", "side_pony", "bubble", "space_buns"):
             # stop at the tie
-            cut = next((i for i, q in enumerate(pts) if (q - tie).length < 0.06), len(pts) - 1)
+            goal = target_for(r) if style == "space_buns" else tie
+            cut = next((i for i, q in enumerate(pts) if (q - goal).length < 0.06), len(pts) - 1)
             pts = pts[:max(cut + 1, 3)]
         if style == "half_up" and r.z > 0.35 and abs(r.x) < 0.45:
             # the top section pulled back to a small clip
@@ -1286,16 +1389,23 @@ def style_for(p):
             pts = pts[:max(cut + 1, 3)]
         guides.append(resample(pts, 16))
         normals.append(r.normalized())
+    curl_r, curl_turns = {"wavy": (0.035, 2.0), "shag": (0.03, 2.0), "fluffy": (0.016, 3.0),
+                          "mullet": (0.018, 2.5)}.get(style, (0.03, 3.5))
     strands = children(guides, normals, per, spread, clump, seed, frizz=frizz, curl=curl,
-                       curl_r=0.035 if style == "wavy" else 0.03, curl_turns=2.0 if style == "wavy" else 3.5)
+                       curl_r=curl_r, curl_turns=curl_turns)
     objs.append(hair_object("Hair", strands, hair, 0.0042, 0.35))
 
     # ---- tails, buns and braids ----
     trng = random.Random(seed + 3)
     extra = []
-    if style in ("pony", "low_pony", "half_up"):
+    if style in ("pony", "low_pony", "half_up", "side_pony", "bubble"):
         side = trng.choice((-1, 1))
-        if style == "pony":
+        bubbles = style == "bubble"
+        if style in ("side_pony", "bubble"):
+            # tied low beside the neck and brought forward over the shoulder
+            side = 1 if tie.x > 0 else -1
+            mid, end = Vector((side * 0.74, 0.18, -0.98)), Vector((side * 0.66, -0.52, -1.8))
+        elif style == "pony":
             mid, end = Vector((side * 0.15, 1.12, 0.35)), Vector((side * 0.35, 0.95, -0.85))
         elif style == "low_pony":
             if trng.random() < 0.5:
@@ -1311,17 +1421,24 @@ def style_for(p):
                 t = k / 15
                 c = tie * (1 - t) ** 2 + mid * 2 * t * (1 - t) + end * t * t
                 spread_t = 1 + t * 2.2 - t * t * 1.4
+                if bubbles:
+                    spread_t = (0.45 + 1.3 * abs(math.sin(t * math.pi * 3.5))) * (1.2 - 0.3 * t)
                 pts.append(c + off * spread_t + noise.noise_vector(c * 3 + off * 5) * 0.025)
-            extra.append(resample(pts, 16))
+            extra.append(resample(pts, 32 if bubbles else 16))
         objs.append(blob("Tie", p["tie_mat"], tuple(tie), (0.07, 0.06, 0.07)))
+        if bubbles:
+            for k in range(1, 4):
+                t = k / 3.5
+                c = tie * (1 - t) ** 2 + mid * 2 * t * (1 - t) + end * t * t
+                objs.append(blob("Tie", p["tie_mat"], tuple(c), (0.04, 0.04, 0.035)))
         tails = children(extra, [Vector((0, 1, 0))] * len(extra), 10, 0.02, 0.5, seed + 5,
                          curl=1.0 if p["hair_wavy"] else 0.0, curl_r=0.03, curl_turns=2.5, frizz=0.005)
         objs.append(hair_object("Tail", tails, hair, 0.0042, 0.35))
-    elif style in ("bun", "messy_bun", "manbun"):
-        rb = 0.2 if style != "manbun" else 0.14
-        centre = tie + tie.normalized() * rb * 0.6
+    elif style in ("bun", "messy_bun", "manbun", "space_buns"):
+        rb = {"manbun": 0.14, "space_buns": 0.17}.get(style, 0.2)
         messy = style == "messy_bun"
-        for i in range(700):
+        for centre, i in [(c + c.normalized() * rb * 0.6, i)
+                          for c in ([tie] if style != "space_buns" else buns) for i in range(700)]:
             axis = Vector((trng.gauss(0, 1), trng.gauss(0, 1), trng.gauss(0, 1))).normalized()
             u = axis.cross(Vector((0.3, 0.2, 1))).normalized()
             v = axis.cross(u)
@@ -1332,7 +1449,9 @@ def style_for(p):
                    for k in range(16)]
             extra.append(resample(pts, 16))
         tails = children(extra, [Vector((0, 0, 1))] * len(extra), 6, 0.015, 0.2, seed + 6, frizz=0.012 if messy else 0.003)
-        objs.append(blob("BunCore", p["scalp_mat"], tuple(centre), (rb * 0.85,) * 3))
+        for c in ([tie] if style != "space_buns" else buns):
+            objs.append(blob("BunCore", p["scalp_mat"], tuple(c + c.normalized() * rb * 0.6), (rb * 0.85,) * 3))
+        centre = tie + tie.normalized() * rb * 0.6 if tie is not None else None
         objs.append(hair_object("Bun", tails, hair, 0.0042, 0.5))
         if messy:
             # loose ends sticking out
@@ -1381,7 +1500,7 @@ def style_for(p):
             objs.append(hair_object("Braid", children(braid, [Vector((0, 0, 1))] * len(braid), 2, 0.006, 0.5, seed + s),
                                     hair, 0.0042, 0.5))
             objs.append(blob("Tie", p["tie_mat"], tuple(axis[-4]), (0.035, 0.035, 0.03)))
-    if style in ("pony", "low_pony", "bun", "messy_bun", "braids") and trng.random() < 0.7:
+    if style in ("pony", "low_pony", "bun", "messy_bun", "braids", "side_pony", "bubble", "space_buns") and trng.random() < 0.7:
         # a few loose strands framing the face
         st2 = Style(lambda x: 0.5, -0.05, -0.5)
         wisps = []
@@ -1400,7 +1519,7 @@ def style_for(p):
 def make_beard(p, mat):
     """Full beard or moustache made of strands on the jaw and upper lip."""
     kind = p["beard"]
-    if kind not in ("full", "short", "moustache"):
+    if kind not in ("full", "short", "moustache", "goatee"):
         return []
     rnd = random.Random(p["seed"] * 17 + 3)
     guides, normals = [], []
@@ -1412,11 +1531,13 @@ def make_beard(p, mat):
         s = head_shape(Vector((r * math.cos(th), r * math.sin(th), z)), p)
         if s.y > 0.18:
             continue
-        top = -0.28 + 0.24 * smooth(0.0, 0.6, abs(s.x))        # higher towards the ears
-        moustache = abs(s.x) < 0.22 and -0.43 < s.z < -0.34
+        top = -0.37 + 0.22 * smooth(0.0, 0.6, abs(s.x))        # cheek line, rising towards the ears
+        moustache = abs(s.x) < 0.2 * p["mouth_w"] and -0.425 < s.z < -0.355 + 0.02 * max(0.0, 1 - abs(s.x) / 0.1)
         mouth = abs(s.x) < 0.2 and -0.56 < s.z < -0.41
         if kind == "moustache":
             ok = moustache
+        elif kind == "goatee":
+            ok = moustache or (abs(s.x) < 0.17 and -0.95 * p["len"] < s.z < -0.555)
         else:
             ok = (s.z < top and not mouth and s.z > -1.05) or moustache
         if not ok:
@@ -1426,9 +1547,9 @@ def make_beard(p, mat):
             down = tangent(Vector((math.copysign(0.6, s.x), -0.2, -1.0)), s).normalized()
         else:
             down = tangent(Vector((0.1 * s.x, -0.15, -1.0)), s).normalized()
-        L = (0.09 if kind == "full" else 0.05) * rnd.uniform(0.7, 1.2)
+        L = (0.08 if kind == "full" else 0.045) * rnd.uniform(0.7, 1.2)
         if moustache:
-            L = 0.06
+            L = 0.045 * rnd.uniform(0.8, 1.1)
         pts = [s - n * 0.005, s + n * 0.02 + down * L * 0.5, s + n * 0.03 + down * L]
         guides.append(resample([Vector(q) for q in pts], 5))
         normals.append(n)
@@ -1441,7 +1562,7 @@ def make_beard(p, mat):
 
 def person(seed, woman):
     rnd = random.Random(seed * 7919 + (1 if woman else 0))
-    skin = SKINS[rnd.randrange(len(SKINS))]
+    skin = rnd.choices([c for c, w in SKINS], [w for c, w in SKINS])[0]
     dark = skin[0] < 0.65
     if dark:
         hair_name = rnd.choice(["mork", "svart", "svart", "brun"])
@@ -1455,17 +1576,18 @@ def person(seed, woman):
     beard = None
     if not woman:
         r = rnd.random()
-        beard = "full" if r < 0.12 else ("short" if r < 0.22 else ("moustache" if r < 0.27 else ("stubble" if r < 0.5 else None)))
+        beard = ("full" if r < 0.08 else "short" if r < 0.18 else "moustache" if r < 0.32 else
+                 "goatee" if r < 0.38 else "stubble" if r < 0.58 else None)
     extra = rnd.choice([None] * 7 + ["band"])
     if style in ("bun", "quiff", "curly", "manbun", "messy_bun", "pony", "half_up") and extra == "cap":
         extra = None
-    if style in ("bun", "messy_bun", "manbun", "pony", "half_up") and extra == "band":
+    if style in ("bun", "messy_bun", "manbun", "pony", "half_up", "space_buns", "fluffy") and extra == "band":
         extra = None
     return {
         "seed": seed, "woman": woman, "skin": skin, "hair_name": hair_name, "hair_col": HAIRS[hair_name],
         "hair_rgb": HAIRS[hair_name][2], "hair": style, "hair_wavy": rnd.random() < 0.3,
         "eye": rnd.choice(EYES if not dark else EYES[2:4]),
-        "jersey": JERSEYS[rnd.randrange(len(JERSEYS))],
+        "jersey": JERSEYS[rnd.randrange(len(JERSEYS))], "neckline": rnd.choice(("v", "u")),
         "design": rnd.choice(("swoosh", "chevron", "split")), "design_flip": rnd.choice((-1, 1)),
         **face_shape(rnd, woman),
         "cheek": rnd.uniform(0.7, 1.2), "lean": rnd.uniform(0.3, 1.0),
@@ -1491,7 +1613,8 @@ def person(seed, woman):
 FACES_MEN = {   # face_w, len, jaw_taper, taper_pow, jaw (corner), chin, chin_w, cheek_full
     "square": ((1.04, 1.08), (0.99, 1.04), (0.27, 0.32), 2.8, (0.07, 0.1), (0.05, 0.07), 1.6, (0.0, 0.01)),
     "oval": ((1.0, 1.04), (1.02, 1.07), (0.33, 0.39), 2.3, (0.03, 0.05), (0.04, 0.06), 1.4, (0.0, 0.02)),
-    "long": ((0.95, 0.99), (1.08, 1.14), (0.3, 0.35), 2.4, (0.04, 0.06), (0.05, 0.07), 1.3, (0.0, 0.01)),
+    "long": ((0.94, 0.98), (1.1, 1.17), (0.3, 0.35), 2.4, (0.04, 0.06), (0.05, 0.07), 1.3, (0.0, 0.01)),
+    "narrow": ((0.92, 0.96), (1.05, 1.1), (0.34, 0.4), 2.2, (0.02, 0.04), (0.05, 0.07), 1.2, (0.0, 0.01)),
     "round": ((1.05, 1.1), (0.94, 0.99), (0.3, 0.36), 2.0, (0.0, 0.03), (0.03, 0.05), 1.5, (0.05, 0.08)),
     "diamond": ((0.99, 1.03), (1.02, 1.07), (0.4, 0.45), 2.0, (0.0, 0.02), (0.05, 0.07), 1.1, (0.03, 0.05)),
 }
@@ -1499,7 +1622,8 @@ FACES_WOMEN = {
     "oval": ((0.94, 0.98), (0.96, 1.01), (0.44, 0.5), 2.0, (0.0, 0.0), (0.02, 0.035), 1.0, (0.01, 0.03)),
     "heart": ((0.97, 1.0), (0.95, 1.0), (0.52, 0.58), 1.8, (0.0, 0.0), (0.02, 0.03), 0.85, (0.02, 0.04)),
     "round": ((0.99, 1.03), (0.92, 0.96), (0.38, 0.44), 1.9, (0.0, 0.0), (0.02, 0.03), 1.1, (0.05, 0.08)),
-    "long": ((0.92, 0.95), (1.01, 1.06), (0.44, 0.5), 2.2, (0.0, 0.01), (0.025, 0.04), 1.0, (0.0, 0.02)),
+    "long": ((0.91, 0.94), (1.04, 1.1), (0.44, 0.5), 2.2, (0.0, 0.01), (0.025, 0.04), 1.0, (0.0, 0.02)),
+    "narrow": ((0.9, 0.93), (1.0, 1.05), (0.46, 0.52), 2.0, (0.0, 0.0), (0.025, 0.035), 0.95, (0.0, 0.01)),
     "square": ((0.97, 1.0), (0.96, 1.0), (0.38, 0.42), 2.6, (0.02, 0.035), (0.025, 0.04), 1.2, (0.01, 0.03)),
 }
 
@@ -1507,11 +1631,18 @@ FACES_WOMEN = {
 def face_shape(rnd, woman):
     """Pick a face shape (oval, round, square, heart ...) and the numbers that make it."""
     table = FACES_WOMEN if woman else FACES_MEN
-    name = rnd.choice(list(table))
+    weights = FACE_WEIGHTS_W if woman else FACE_WEIGHTS_M
+    name = rnd.choices(list(weights), list(weights.values()))[0]
     fw, ln, taper, pw, jaw, chin, chin_w, full = table[name]
     u = lambda r: rnd.uniform(*r)
     return {"face": name, "face_w": u(fw), "len": u(ln), "jaw_taper": u(taper), "taper_pow": pw,
-            "jaw": u(jaw), "chin": u(chin), "chin_w": chin_w, "cheek_full": u(full)}
+            "jaw": u(jaw), "chin": u(chin), "chin_w": chin_w, "cheek_full": u(full),
+            "skull_w": rnd.uniform(0.95, 1.04), "skull_h": rnd.uniform(0.95, 1.07), "skull_d": rnd.uniform(0.96, 1.08)}
+
+
+# long and narrow faces look most natural, round ones are rare
+FACE_WEIGHTS_M = {"long": 3, "narrow": 3, "oval": 3, "square": 1.5, "diamond": 1, "round": 0.4}
+FACE_WEIGHTS_W = {"long": 3, "narrow": 3, "oval": 3, "heart": 1.5, "square": 0.7, "round": 0.4}
 
 
 def render_person(p, path):
