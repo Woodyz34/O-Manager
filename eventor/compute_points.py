@@ -148,6 +148,17 @@ class Identities:
             inf["country"] = r["country"]
         return key
 
+    def peek(self, r, is_ws):
+        """The key a runner would get, without adding anything. For runners who are only shown in a
+        results list (their course had too few runners to be rated)."""
+        if not is_ws:
+            if r.get("pid"):
+                return f"e{r['pid']}"
+            found = self.person_ids.get((match_name(r["name"]), r.get("sex")), ())
+            return next(iter(found)) if len(found) == 1 else f"n:{norm_name(r['name'])}:{r.get('sex')}"
+        cands = self.by_name.get((match_name(r["name"]), r.get("sex")), set())
+        return next(iter(cands)) if len(cands) == 1 else f"w:{norm_name(r['name'])}:{r.get('sex')}"
+
     def match_winsplits(self, r, source):
         cands = self.by_name.get((match_name(r["name"]), r.get("sex")), set())
         if len(cands) == 1:
@@ -231,23 +242,48 @@ def build_entries(races, ids):
             for r in ok:
                 by_course[tuple(s[0] for s in r["splits"])].append(r)
             class_best = min((r["time"] for r in ok), default=0)
+            sex = "F" if cls["class"][:1] in "DW" else "M"
+            # The whole class for the results list, also when it ran forked courses (each course
+            # is rated on its own below, but the list shows everyone)
+            class_file = f"{slug(str(race['event_id']))}_{slug(str(race.get('race_id') or 0))}_{slug(cls['class'])}"
+            class_rows = {}
             for course_no, (codes, rs) in enumerate(by_course.items()):
                 if len(rs) < MIN_GROUP or not codes:
                     continue
-                rs = [dict(r) for r in rs]
-                for r in rs:
-                    r["sex"] = r.get("sex") or ("F" if cls["class"][:1] in "DW" else "M")
+                copies = []
+                for original in rs:
+                    r = dict(original)
+                    r["sex"] = r.get("sex") or sex
                     r["_key"] = ids.match_winsplits(r, race["event_name"]) if is_ws else ids.add_eventor(r)
+                    class_rows[id(original)] = r
+                    copies.append(r)
+                rs = copies
                 analyse_group(rs)
                 groups.append({
                     "id": f"{race['event_id']}|{race.get('race_id', '')}|{cls['class']}|{len(groups)}",
                     "event": race["event_name"], "class": cls["class"], "date": date,
                     "anchor": anchor, "level": race.get("level"), "controls": len(codes),
                     "runners": rs, "class_ok": len(ok), "class_best": class_best,
-                    "file": f"{slug(str(race['event_id']))}_{slug(str(race.get('race_id') or 0))}_{slug(cls['class'])}_{course_no}",
+                    "file": class_file, "class_rows": None,
                     "codes": list(codes), "distance": race.get("distance") or "",
                     "length": rs[0].get("course_length") or cls.get("course_length") or 0,
                 })
+            if not class_rows:
+                continue
+            everyone = []
+            for original in ok:
+                r = class_rows.get(id(original))
+                if r is None:
+                    r = dict(original)
+                    r["sex"] = r.get("sex") or sex
+                    r["_key"] = ids.peek(r, is_ws)
+                everyone.append(r)
+            everyone.sort(key=lambda r: r["time"])
+            for i, r in enumerate(everyone):
+                r["_place"] = int(r["position"]) if r.get("position") else i + 1
+            for g in groups:
+                if g["file"] == class_file and g["class_rows"] is None:
+                    g["class_rows"] = everyone
     return groups
 
 
@@ -351,9 +387,8 @@ def merits(groups, adjusted, c100, rating, today):
             continue
         rated = sorted((rating[r["_key"]][0] for r in g["runners"] if r["_key"] in rating), reverse=True)
         field = sum(rated[:FIELD_TOP]) / len(rated[:FIELD_TOP]) if rated else 0.0
-        by_time = sorted(g["runners"], key=lambda r: r["time"])
-        for i, r in enumerate(by_time):
-            place = int(r["position"]) if r.get("position") else i + 1
+        for r in g["runners"]:
+            place = r["_place"]
             out[r["_key"]].append({
                 "race": g["event"], "date": g["date"].isoformat(), "klass": g["class"],
                 "place": place, "of": max(g["class_ok"], place),
@@ -394,18 +429,28 @@ def write_results(groups, cards):
         g = by_file.get(name)
         if g is None:
             continue
+        everyone = g["class_rows"]
+        # The controls most runners had are the columns. Runners on another fork (same number of
+        # controls) keep their own order; runners with a missing or extra punch are lined up by
+        # control code. Each row then carries its controls, so the game ranks a leg only among
+        # those who ran the same two controls.
+        courses = collections.Counter(tuple(str(s[0]) for s in r["splits"]) for r in everyone)
+        controls = list(courses.most_common(1)[0][0])
+        forked = len(courses) > 1
         rows = []
-        for i, r in enumerate(sorted(g["runners"], key=lambda r: r["time"])):
+        for r in everyone:
             info = r.get("club") or r.get("country") or ""
-            rows.append({
-                "id": r["_key"], "name": r["name"], "club": info,
-                "place": int(r["position"]) if r.get("position") else i + 1,
-                "time": int(round(r["time"])),
-                "splits": [int(round(s[1])) if s[1] is not None else -1 for s in r["splits"]],
-            })
+            codes, times = line_up(r["splits"], controls)
+            row = {
+                "id": r["_key"], "name": r["name"], "club": info, "place": r["_place"],
+                "time": int(round(r["time"])), "splits": times,
+            }
+            if forked:
+                row["codes"] = codes
+            rows.append(row)
         data = {"race": g["event"], "klass": g["class"], "date": g["date"].isoformat(),
                 "distance": g["distance"], "length": int(g["length"] or 0), "finishers": g["class_ok"],
-                "controls": [str(c) for c in g["codes"]], "runners": rows}
+                "forked": forked, "controls": controls, "runners": rows}
         path = os.path.join(RESULTS_DIR, name + ".json")
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
@@ -417,6 +462,27 @@ def write_results(groups, cards):
         if base not in written:
             os.remove(os.path.join(RESULTS_DIR, old))
     return len(written)
+
+
+def line_up(splits, controls):
+    """A runner's splits as one per column. The same number of controls: taken in the runner's own
+    order (a forked course). Otherwise each column takes the runner's split at that control, if any."""
+    own = [str(s[0]) for s in splits]
+    times = [int(round(s[1])) if s[1] is not None else -1 for s in splits]
+    if len(own) == len(controls):
+        return own, times
+    codes, out, at = [], [], 0
+    for code in controls:
+        try:
+            found = own.index(code, at)
+        except ValueError:
+            codes.append("")
+            out.append(-1)
+            continue
+        codes.append(code)
+        out.append(times[found])
+        at = found + 1
+    return codes, out
 
 
 def unity_meta_folder(path):
