@@ -152,8 +152,8 @@ public class RunnerCollectionUI : MonoBehaviour
             Row("Speed", Mathf.RoundToInt(card.speed).ToString()) +
             Row("Technique", Mathf.RoundToInt(card.technique).ToString()) +
             Row("Class", card.klass) +
-            Row("Club", string.IsNullOrEmpty(card.clubName) ? "-" : card.clubName) +
-            Row("Country", Title(RunnerCards.CountryName(card)));
+            Row("Country", Title(RunnerCards.CountryName(card))) +
+            Row("Club", string.IsNullOrEmpty(card.clubName) ? "-" : card.clubName);
         if (meritsText != null) meritsText.text = MeritsText(card, -1);
         detailPanel.SetActive(true);
     }

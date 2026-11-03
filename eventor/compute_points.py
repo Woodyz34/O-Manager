@@ -58,6 +58,7 @@ OUT_REPORT = os.path.join(HERE, "data", "points_report.md")
 GAME_JSON = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Runners", "runners.json")
 RESULTS_DIR = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Runners", "Results")
 EMBLEM_DIR = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Emblem")
+CLUBS_TXT = os.path.join(HERE, "klubbar.txt")
 
 COUNTRIES = {
     "SWE": "SWEDEN", "NOR": "NORWAY", "FIN": "FINLAND", "DEN": "DENMARK", "SUI": "SWITZERLAND",
@@ -96,17 +97,49 @@ def norm_name(name):
     return re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", s.lower())).strip()
 
 
+def match_name(name):
+    """Looser than norm_name, only for finding the same person under two spellings:
+    WinSplits writes Ødum as Oedum, Nørgård as Noergaard and Örnhagen as Ornhagen.
+    Both spellings end up the same here (odum, norgard, ornhagen)."""
+    s = (name or "").lower()
+    for a, b in (("ø", "oe"), ("æ", "ae"), ("å", "aa"), ("ä", "ae"), ("ö", "oe"), ("ü", "ue")):
+        s = s.replace(a, b)
+    s = norm_name(s)
+    for a, b in (("oe", "o"), ("ae", "a"), ("aa", "a"), ("ue", "u")):
+        s = s.replace(a, b)
+    return s
+
+
 class Identities:
-    """Eventor person id is the key. WinSplits runners are matched by name and sex."""
+    """Eventor person id is the key. WinSplits runners, and Eventor results without a person id,
+    are matched to it by name and sex. Ids made from names use norm_name, so they stay the same
+    as before; the matching uses the looser match_name."""
 
     def __init__(self):
-        self.by_name = collections.defaultdict(set)      # (norm name, sex) -> eventor keys
+        self.by_name = collections.defaultdict(set)      # (match name, sex) -> eventor keys
+        self.person_ids = collections.defaultdict(set)   # (match name, sex) -> e-keys, from all Eventor races
         self.info = {}                                   # key -> dict
         self.ambiguous = []
 
+    def prescan(self, races):
+        """Notes every Eventor person id first, so a result without an id can join the person
+        even when it comes earlier in the list."""
+        for race in races:
+            for cls in race["classes"]:
+                for r in cls["runners"]:
+                    if r.get("pid"):
+                        sex = r.get("sex") or ("F" if cls["class"][:1] in "DW" else "M")
+                        self.person_ids[(match_name(r["name"]), sex)].add(f"e{r['pid']}")
+
     def add_eventor(self, r):
-        key = f"e{r['pid']}" if r.get("pid") else f"n:{norm_name(r['name'])}:{r.get('sex')}"
-        self.by_name[(norm_name(r["name"]), r.get("sex"))].add(key)
+        name_key = (match_name(r["name"]), r.get("sex"))
+        if r.get("pid"):
+            key = f"e{r['pid']}"
+        elif len(self.person_ids.get(name_key, ())) == 1:
+            key = next(iter(self.person_ids[name_key]))
+        else:
+            key = f"n:{norm_name(r['name'])}:{r.get('sex')}"
+        self.by_name[name_key].add(key)
         inf = self.info.setdefault(key, {"name": r["name"], "sex": r.get("sex"), "birth_year": r.get("birth_year"),
                                          "club": None, "country": None})
         if r.get("club"):
@@ -116,7 +149,7 @@ class Identities:
         return key
 
     def match_winsplits(self, r, source):
-        cands = self.by_name.get((norm_name(r["name"]), r.get("sex")), set())
+        cands = self.by_name.get((match_name(r["name"]), r.get("sex")), set())
         if len(cands) == 1:
             key = next(iter(cands))
         else:
@@ -187,6 +220,7 @@ def build_entries(races, ids):
     eventor = [r for r in races if r.get("source") != "winsplits"]
     winsplits = [r for r in races if r.get("source") == "winsplits"]
     groups = []
+    ids.prescan(eventor)
     for race in eventor + winsplits:     # Eventor first so WinSplits can match to Eventor ids
         date = dt.date.fromisoformat(race["date"])
         is_ws = race.get("source") == "winsplits"
@@ -412,9 +446,12 @@ def write_game_file(runners, today, groups):
     """Cards for the game. Runners in packs get today's numbers. A runner who was a card
     before but is no longer eligible keeps the last numbers and leaves the packs (frozen)."""
     previous = {}
+    renamed = []
     if os.path.exists(GAME_JSON):
         with open(GAME_JSON, encoding="utf-8") as f:
-            previous = {c["id"]: c for c in json.load(f).get("runners", [])}
+            old_file = json.load(f)
+        previous = {c["id"]: c for c in old_file.get("runners", [])}
+        renamed = old_file.get("renamed", [])
     cards = []
     for r in runners:
         if not r["visible"]:
@@ -425,10 +462,19 @@ def write_game_file(runners, today, groups):
             "speed": round(r["physic"], 2), "technique": round(r["technique"], 2), "inPacks": True,
             "merits": r.get("merits", []),
         })
+    clubs_by_hand(cards)
     now = {c["id"] for c in cards}
+    by_match = {(match_name(c["name"]), c["man"]): c for c in cards}
+    merged = []
     frozen = 0
     for cid, old in previous.items():
         if cid not in now:
+            # The same person found under another spelling is now one card: the old card goes,
+            # and the game moves it in players' collections to the new name ("renamed" below)
+            same = by_match.get((match_name(old["name"].split(" (")[0]), old["man"]))
+            if same is not None and not cid.startswith("e"):
+                merged.append((old["name"], same))
+                continue
             cards.append({**old, "inPacks": False})
             frozen += 1
     # Two runners with the same name get their club (or birth year) added, because the
@@ -442,13 +488,52 @@ def write_game_file(runners, today, groups):
             for c in same:
                 extra = c["club"] or str(info.get(c["id"], {}).get("birth_year") or c["id"])
                 c["name"] = f"{base} ({extra})"
+    for old_name, card in merged:
+        renamed = [r for r in renamed if r["from"] != old_name]
+        if old_name != card["name"]:
+            renamed.append({"from": old_name, "to": card["name"]})
+    # A name that was renamed earlier and is a card again is no longer moved
+    names = {c["name"] for c in cards}
+    renamed = [r for r in renamed if r["from"] not in names]
     cards.sort(key=lambda c: (-(c["speed"] + c["technique"]), c["name"]))
     os.makedirs(os.path.dirname(GAME_JSON), exist_ok=True)
     with open(GAME_JSON, "w", encoding="utf-8") as f:
-        json.dump({"computed": today.isoformat(), "runners": cards}, f, ensure_ascii=False, indent=0)
+        json.dump({"computed": today.isoformat(), "renamed": renamed, "runners": cards}, f, ensure_ascii=False, indent=0)
     write_emblem_list(cards, today)
     write_results(groups, cards)
     return frozen
+
+
+def clubs_by_hand(cards):
+    """WinSplits results (VM, EM, World Cup) only give the country, so those runners have no club.
+    eventor/klubbar.txt lets you write it by hand, one runner per line: "Namn = Klubb".
+    The file is written again each time, with every card that still has no club and an empty right side."""
+    given = {}
+    if os.path.exists(CLUBS_TXT):
+        with open(CLUBS_TXT, encoding="utf-8") as f:
+            for line in f:
+                if "=" in line and not line.lstrip().startswith("#"):
+                    name, club = (s.strip() for s in line.split("=", 1))
+                    if name and club:
+                        given[match_name(name)] = (name, club)
+    for c in cards:
+        hand = given.get(match_name(c["name"].split(" (")[0]))
+        if hand and not c["club"]:
+            c["club"] = hand[1]
+    filled = sorted(given.values(), key=lambda nc: nc[0])
+    filled_keys = set(given)
+    missing = sorted(c["name"] for c in cards if not c["club"] and match_name(c["name"]) not in filled_keys)
+    lines = ["# Klubbar för löpare som saknar klubb (oftast utländska från VM, EM och världscupen).",
+             "# Skriv klubben efter likhetstecknet, t.ex.  Förnamn Efternamn = Klubbens namn",
+             "# Klubbmärket läggs i Assets/Resources/Emblem/Klubbar med samma namn som klubben.",
+             "# Rader utan klubb gör ingenting. Filen skrivs om när poängen räknas: ifyllda rader står kvar överst.",
+             ""]
+    lines += [f"{n} = {c}" for n, c in filled]
+    if filled:
+        lines.append("")
+    lines += [f"{n} = " for n in missing]
+    with open(CLUBS_TXT, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def emblem_key(text):
@@ -467,6 +552,20 @@ def photo_section(cards, found):
             "Saknar foto, bästa löparna först:", *missing, ""]
 
 
+# Swedish flag file names, the same list as RunnerCards.EnglishCountry in the game
+SWEDISH_COUNTRY = {
+    "sverige": "SWEDEN", "norge": "NORWAY", "suomi": "FINLAND", "danmark": "DENMARK", "schweiz": "SWITZERLAND",
+    "frankrike": "FRANCE", "tyskland": "GERMANY", "storbritannien": "GREAT BRITAIN", "tjeckien": "CZECHIA",
+    "estland": "ESTONIA", "lettland": "LATVIA", "ukraina": "UKRAINE", "ungern": "HUNGARY", "österrike": "AUSTRIA",
+    "polen": "POLAND", "spanien": "SPAIN", "nederländerna": "NETHERLANDS", "holland": "NETHERLANDS",
+    "slovakien": "SLOVAKIA", "litauen": "LITHUANIA", "kanada": "CANADA", "italien": "ITALY",
+    "australien": "AUSTRALIA", "usa": "UNITED STATES", "nya zeeland": "NEW ZEALAND", "kroatien": "CROATIA",
+    "hongkong": "HONG KONG CHINA", "hong kong": "HONG KONG CHINA", "belgien": "BELGIUM", "ryssland": "RUSSIA",
+    "vitryssland": "BELARUS", "irland": "IRELAND", "slovenien": "SLOVENIA", "rumänien": "ROMANIA",
+    "bulgarien": "BULGARIA", "turkiet": "TURKEY", "kina": "CHINA", "sydafrika": "SOUTH AFRICA", "brasilien": "BRAZIL",
+}
+
+
 def write_emblem_list(cards, today):
     """List every country and club on the cards, and whether its picture is in the folder yet."""
     def have(folder):
@@ -474,8 +573,9 @@ def write_emblem_list(cards, today):
             os.path.dirname(EMBLEM_DIR), "Profilbilder")
         if not os.path.isdir(path):
             return set()
-        return {emblem_key(os.path.splitext(n)[0]) for n in os.listdir(path)
-                if os.path.splitext(n)[1].lower() in (".png", ".jpg", ".jpeg", ".gif", ".tga", ".psd")}
+        names = [os.path.splitext(n)[0] for n in os.listdir(path)
+                 if os.path.splitext(n)[1].lower() in (".png", ".jpg", ".jpeg", ".gif", ".tga", ".psd")]
+        return {emblem_key(n) for n in names} | {emblem_key(SWEDISH_COUNTRY.get(n.strip().lower(), n)) for n in names}
 
     def section(title, folder, counts, short_ok):
         found = have(folder)
@@ -499,7 +599,7 @@ def write_emblem_list(cards, today):
         "Riktiga profilbilder läggs i Resources/Profilbilder och heter som löparen, t.ex. Tove Alexandersson.jpg.",
         "Använd bara foton som du har lov att använda. Löpare utan foto får en ritad basbild.",
         "Stora och små bokstäver, mellanslag och bindestreck spelar ingen roll.",
-        "Flaggor får också heta på svenska (Danmark.png), men då ser den här listan inte att de finns.",
+        "Flaggor får också heta på svenska (Danmark.png).",
         "Ett klubbmärke kan också heta som klubbens förkortning när den står först i namnet (IKHP.png).",
         "PNG med genomskinlig bakgrund blir finast. Kort som saknar bild visar namnet i text i stället.",
         "",
