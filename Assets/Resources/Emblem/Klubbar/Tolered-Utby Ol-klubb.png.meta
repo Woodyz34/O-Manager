@@ -1,0 +1,692 @@
+fileFormatVersion: 2
+guid: f060c6339deef7547b9d68aafc5e217e
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -3922654167653138234
+    second: Tolered-Utby Ol-klubb_0
+  - first:
+      213: 560006229012644132
+    second: Tolered-Utby Ol-klubb_1
+  - first:
+      213: 7983165596093295380
+    second: Tolered-Utby Ol-klubb_2
+  - first:
+      213: -1049797553816969362
+    second: Tolered-Utby Ol-klubb_3
+  - first:
+      213: -1698601829475002349
+    second: Tolered-Utby Ol-klubb_4
+  - first:
+      213: -7096546291827817553
+    second: Tolered-Utby Ol-klubb_5
+  - first:
+      213: 7102165372226785036
+    second: Tolered-Utby Ol-klubb_6
+  - first:
+      213: -1418947222642657587
+    second: Tolered-Utby Ol-klubb_7
+  - first:
+      213: 2452876138631830344
+    second: Tolered-Utby Ol-klubb_8
+  - first:
+      213: 5377974308420084895
+    second: Tolered-Utby Ol-klubb_9
+  - first:
+      213: -9091874099816405916
+    second: Tolered-Utby Ol-klubb_10
+  - first:
+      213: -4872138777752544307
+    second: Tolered-Utby Ol-klubb_11
+  - first:
+      213: -5773569599159256278
+    second: Tolered-Utby Ol-klubb_12
+  - first:
+      213: 2878693490299024035
+    second: Tolered-Utby Ol-klubb_13
+  - first:
+      213: -3478136101922279921
+    second: Tolered-Utby Ol-klubb_14
+  - first:
+      213: 953424198721042312
+    second: Tolered-Utby Ol-klubb_15
+  - first:
+      213: 453178141349832249
+    second: Tolered-Utby Ol-klubb_16
+  - first:
+      213: -7541039958546832689
+    second: Tolered-Utby Ol-klubb_17
+  - first:
+      213: 5373308904953866014
+    second: Tolered-Utby Ol-klubb_18
+  - first:
+      213: -1226520515431604372
+    second: Tolered-Utby Ol-klubb_19
+  - first:
+      213: -36557589716750962
+    second: Tolered-Utby Ol-klubb_20
+  - first:
+      213: -8147631508868899977
+    second: Tolered-Utby Ol-klubb_21
+  - first:
+      213: 7844289085350851735
+    second: Tolered-Utby Ol-klubb_22
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 512
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 401
+        width: 69
+        height: 143
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6c0445051deef89c0800000000000000
+      internalID: -3922654167653138234
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_1
+      rect:
+        serializedVersion: 2
+        x: 22
+        y: 485
+        width: 45
+        height: 151
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4210e40c2ba85c700800000000000000
+      internalID: 560006229012644132
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_2
+      rect:
+        serializedVersion: 2
+        x: 60
+        y: 407
+        width: 36
+        height: 142
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 41ba24220d6e9ce60800000000000000
+      internalID: 7983165596093295380
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_3
+      rect:
+        serializedVersion: 2
+        x: 114
+        y: 95
+        width: 571
+        height: 704
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e6f5aa6dfae5e61f0800000000000000
+      internalID: -1049797553816969362
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_4
+      rect:
+        serializedVersion: 2
+        x: 703
+        y: 406
+        width: 32
+        height: 151
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 318505bb2aa5d68e0800000000000000
+      internalID: -1698601829475002349
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_5
+      rect:
+        serializedVersion: 2
+        x: 726
+        y: 406
+        width: 74
+        height: 157
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fa3cc772fb0048d90800000000000000
+      internalID: -7096546291827817553
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_6
+      rect:
+        serializedVersion: 2
+        x: 730
+        y: 478
+        width: 44
+        height: 163
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c0f48a3f6c5ff8260800000000000000
+      internalID: 7102165372226785036
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_7
+      rect:
+        serializedVersion: 2
+        x: 16
+        y: 319
+        width: 89
+        height: 124
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dc67b57d403ee4ce0800000000000000
+      internalID: -1418947222642657587
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_8
+      rect:
+        serializedVersion: 2
+        x: 44
+        y: 241
+        width: 104
+        height: 114
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 84b9e292add5a0220800000000000000
+      internalID: 2452876138631830344
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_9
+      rect:
+        serializedVersion: 2
+        x: 86
+        y: 319
+        width: 37
+        height: 149
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f946e88c32762aa40800000000000000
+      internalID: 5377974308420084895
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_10
+      rect:
+        serializedVersion: 2
+        x: 650
+        y: 245
+        width: 105
+        height: 119
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4646ed15dac23d180800000000000000
+      internalID: -9091874099816405916
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_11
+      rect:
+        serializedVersion: 2
+        x: 678
+        y: 326
+        width: 31
+        height: 147
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dcb57a7689fa26cb0800000000000000
+      internalID: -4872138777752544307
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_12
+      rect:
+        serializedVersion: 2
+        x: 691
+        y: 323
+        width: 90
+        height: 122
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a2b3e1c0a0920efa0800000000000000
+      internalID: -5773569599159256278
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_13
+      rect:
+        serializedVersion: 2
+        x: 83
+        y: 173
+        width: 113
+        height: 101
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3a2b08a3a7c23f720800000000000000
+      internalID: 2878693490299024035
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_14
+      rect:
+        serializedVersion: 2
+        x: 467
+        y: 58
+        width: 73
+        height: 122
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f0ee57ca4ad2bbfc0800000000000000
+      internalID: -3478136101922279921
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_15
+      rect:
+        serializedVersion: 2
+        x: 600
+        y: 176
+        width: 113
+        height: 100
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 887770dd14e3b3d00800000000000000
+      internalID: 953424198721042312
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_16
+      rect:
+        serializedVersion: 2
+        x: 191
+        y: 49
+        width: 132
+        height: 70
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 936e0275e130a4600800000000000000
+      internalID: 453178141349832249
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_17
+      rect:
+        serializedVersion: 2
+        x: 253
+        y: 0
+        width: 144
+        height: 58
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fc22ac1ac18d85790800000000000000
+      internalID: -7541039958546832689
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_18
+      rect:
+        serializedVersion: 2
+        x: 263
+        y: 56
+        width: 67
+        height: 112
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e17e734eaf3d19a40800000000000000
+      internalID: 5373308904953866014
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_19
+      rect:
+        serializedVersion: 2
+        x: 314
+        y: 10
+        width: 84
+        height: 113
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c6f58ffe6168afee0800000000000000
+      internalID: -1226520515431604372
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_20
+      rect:
+        serializedVersion: 2
+        x: 402
+        y: 10
+        width: 80
+        height: 110
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e8da61bd01f1e7ff0800000000000000
+      internalID: -36557589716750962
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_21
+      rect:
+        serializedVersion: 2
+        x: 411
+        y: 0
+        width: 141
+        height: 61
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 77bd6198f4ccdee80800000000000000
+      internalID: -8147631508868899977
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tolered-Utby Ol-klubb_22
+      rect:
+        serializedVersion: 2
+        x: 472
+        y: 50
+        width: 137
+        height: 73
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 794bfcfbc538cdc60800000000000000
+      internalID: 7844289085350851735
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable: {}
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

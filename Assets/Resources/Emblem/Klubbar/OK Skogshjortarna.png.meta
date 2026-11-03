@@ -1,0 +1,992 @@
+fileFormatVersion: 2
+guid: fa1e0979c14cc4f4aa989640100a8441
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -6915255756128078146
+    second: OK Skogshjortarna_0
+  - first:
+      213: 7170232535992413258
+    second: OK Skogshjortarna_1
+  - first:
+      213: 6047060607451327188
+    second: OK Skogshjortarna_2
+  - first:
+      213: -4646683211285941914
+    second: OK Skogshjortarna_3
+  - first:
+      213: -3782577982963191982
+    second: OK Skogshjortarna_4
+  - first:
+      213: 2788673613548793550
+    second: OK Skogshjortarna_5
+  - first:
+      213: -5582068911249233022
+    second: OK Skogshjortarna_6
+  - first:
+      213: 7938961452287655790
+    second: OK Skogshjortarna_7
+  - first:
+      213: 845725116848842844
+    second: OK Skogshjortarna_8
+  - first:
+      213: 720513481253406167
+    second: OK Skogshjortarna_9
+  - first:
+      213: 1838313881832083709
+    second: OK Skogshjortarna_10
+  - first:
+      213: -2837800068571694911
+    second: OK Skogshjortarna_11
+  - first:
+      213: -5111467971957981649
+    second: OK Skogshjortarna_12
+  - first:
+      213: -9104801281270251079
+    second: OK Skogshjortarna_13
+  - first:
+      213: 5397656393858813468
+    second: OK Skogshjortarna_14
+  - first:
+      213: 4594319443249034589
+    second: OK Skogshjortarna_15
+  - first:
+      213: -590603208808237741
+    second: OK Skogshjortarna_16
+  - first:
+      213: 6060099818296386756
+    second: OK Skogshjortarna_17
+  - first:
+      213: 1344118865107364005
+    second: OK Skogshjortarna_18
+  - first:
+      213: 4972483533395054643
+    second: OK Skogshjortarna_19
+  - first:
+      213: -6440325998121800710
+    second: OK Skogshjortarna_20
+  - first:
+      213: 4139686766417482603
+    second: OK Skogshjortarna_21
+  - first:
+      213: -176289268178848915
+    second: OK Skogshjortarna_22
+  - first:
+      213: 8450276176424612109
+    second: OK Skogshjortarna_23
+  - first:
+      213: 8139852893027767193
+    second: OK Skogshjortarna_24
+  - first:
+      213: 3928551515184724749
+    second: OK Skogshjortarna_25
+  - first:
+      213: -3110269557382417197
+    second: OK Skogshjortarna_26
+  - first:
+      213: -8969550045384289278
+    second: OK Skogshjortarna_27
+  - first:
+      213: 1802494801880636367
+    second: OK Skogshjortarna_28
+  - first:
+      213: -5738961810010441782
+    second: OK Skogshjortarna_29
+  - first:
+      213: -8318621824786113734
+    second: OK Skogshjortarna_30
+  - first:
+      213: 3423466207318064157
+    second: OK Skogshjortarna_31
+  - first:
+      213: -3535017748110052116
+    second: OK Skogshjortarna_32
+  - first:
+      213: 161068802236031430
+    second: OK Skogshjortarna_33
+  - first:
+      213: -154334834644880822
+    second: OK Skogshjortarna_34
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 512
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: OK Skogshjortarna_0
+      rect:
+        serializedVersion: 2
+        x: 47
+        y: 100
+        width: 361
+        height: 173
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: eb6b20547831800a0800000000000000
+      internalID: -6915255756128078146
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_1
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 36
+        width: 34
+        height: 51
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a4ca6c08088c18360800000000000000
+      internalID: 7170232535992413258
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_2
+      rect:
+        serializedVersion: 2
+        x: 32
+        y: 37
+        width: 34
+        height: 48
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4dae46275997be350800000000000000
+      internalID: 6047060607451327188
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_3
+      rect:
+        serializedVersion: 2
+        x: 74
+        y: 36
+        width: 26
+        height: 51
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 661b78f0d3aa38fb0800000000000000
+      internalID: -4646683211285941914
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_4
+      rect:
+        serializedVersion: 2
+        x: 100
+        y: 38
+        width: 32
+        height: 47
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 25fe34e8d55918bc0800000000000000
+      internalID: -3782577982963191982
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_5
+      rect:
+        serializedVersion: 2
+        x: 126
+        y: 36
+        width: 62
+        height: 51
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ecea41260eb53b620800000000000000
+      internalID: 2788673613548793550
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_6
+      rect:
+        serializedVersion: 2
+        x: 185
+        y: 37
+        width: 27
+        height: 50
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 28bec3976e18882b0800000000000000
+      internalID: -5582068911249233022
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_7
+      rect:
+        serializedVersion: 2
+        x: 211
+        y: 37
+        width: 50
+        height: 48
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e6fff11e06bdc2e60800000000000000
+      internalID: 7938961452287655790
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_8
+      rect:
+        serializedVersion: 2
+        x: 261
+        y: 36
+        width: 33
+        height: 51
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c58a66f438e9cbb00800000000000000
+      internalID: 845725116848842844
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_9
+      rect:
+        serializedVersion: 2
+        x: 293
+        y: 37
+        width: 167
+        height: 48
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7d54df99137cff900800000000000000
+      internalID: 720513481253406167
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_10
+      rect:
+        serializedVersion: 2
+        x: 8
+        y: 12
+        width: 15
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: df055485cb0038910800000000000000
+      internalID: 1838313881832083709
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_11
+      rect:
+        serializedVersion: 2
+        x: 27
+        y: 12
+        width: 10
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1c874397fdb1e98d0800000000000000
+      internalID: -2837800068571694911
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_12
+      rect:
+        serializedVersion: 2
+        x: 42
+        y: 12
+        width: 9
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f2e78a216fa6019b0800000000000000
+      internalID: -5111467971957981649
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_13
+      rect:
+        serializedVersion: 2
+        x: 56
+        y: 12
+        width: 15
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9b18d57597f35a180800000000000000
+      internalID: -9104801281270251079
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_14
+      rect:
+        serializedVersion: 2
+        x: 76
+        y: 13
+        width: 13
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c1e029764e358ea40800000000000000
+      internalID: 5397656393858813468
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_15
+      rect:
+        serializedVersion: 2
+        x: 94
+        y: 12
+        width: 11
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d55778f113d42cf30800000000000000
+      internalID: 4594319443249034589
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_16
+      rect:
+        serializedVersion: 2
+        x: 110
+        y: 12
+        width: 15
+        height: 24
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 35577cfb281cdc7f0800000000000000
+      internalID: -590603208808237741
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_17
+      rect:
+        serializedVersion: 2
+        x: 128
+        y: 12
+        width: 13
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4c427fc4dacc91450800000000000000
+      internalID: 6060099818296386756
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_18
+      rect:
+        serializedVersion: 2
+        x: 164
+        y: 12
+        width: 14
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5a820a28cf447a210800000000000000
+      internalID: 1344118865107364005
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_19
+      rect:
+        serializedVersion: 2
+        x: 183
+        y: 12
+        width: 14
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 330dd73ad6fc10540800000000000000
+      internalID: 4972483533395054643
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_20
+      rect:
+        serializedVersion: 2
+        x: 201
+        y: 13
+        width: 7
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: afbac3480ad5f96a0800000000000000
+      internalID: -6440325998121800710
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_21
+      rect:
+        serializedVersion: 2
+        x: 215
+        y: 12
+        width: 12
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b6313b95e2f137930800000000000000
+      internalID: 4139686766417482603
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_22
+      rect:
+        serializedVersion: 2
+        x: 232
+        y: 12
+        width: 14
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d637c7838d1bd8df0800000000000000
+      internalID: -176289268178848915
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_23
+      rect:
+        serializedVersion: 2
+        x: 250
+        y: 12
+        width: 11
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d013cb53969654570800000000000000
+      internalID: 8450276176424612109
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_24
+      rect:
+        serializedVersion: 2
+        x: 267
+        y: 12
+        width: 12
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9931bd4541196f070800000000000000
+      internalID: 8139852893027767193
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_25
+      rect:
+        serializedVersion: 2
+        x: 284
+        y: 13
+        width: 13
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d0b7868e9c4058630800000000000000
+      internalID: 3928551515184724749
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_26
+      rect:
+        serializedVersion: 2
+        x: 303
+        y: 13
+        width: 7
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3d47284015a16d4d0800000000000000
+      internalID: -3110269557382417197
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_27
+      rect:
+        serializedVersion: 2
+        x: 316
+        y: 12
+        width: 14
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 204d7c5a1c1c58380800000000000000
+      internalID: -8969550045384289278
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_28
+      rect:
+        serializedVersion: 2
+        x: 336
+        y: 12
+        width: 13
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fcb5597e87fb30910800000000000000
+      internalID: 1802494801880636367
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_29
+      rect:
+        serializedVersion: 2
+        x: 354
+        y: 12
+        width: 10
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ac77bced3ac1b50b0800000000000000
+      internalID: -5738961810010441782
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_30
+      rect:
+        serializedVersion: 2
+        x: 371
+        y: 13
+        width: 12
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a3bdfc836815e8c80800000000000000
+      internalID: -8318621824786113734
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_31
+      rect:
+        serializedVersion: 2
+        x: 388
+        y: 12
+        width: 10
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d1c3fb39068928f20800000000000000
+      internalID: 3423466207318064157
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_32
+      rect:
+        serializedVersion: 2
+        x: 405
+        y: 12
+        width: 12
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ce4f231661811fec0800000000000000
+      internalID: -3535017748110052116
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_33
+      rect:
+        serializedVersion: 2
+        x: 423
+        y: 12
+        width: 13
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6c12da5e83b3c3200800000000000000
+      internalID: 161068802236031430
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: OK Skogshjortarna_34
+      rect:
+        serializedVersion: 2
+        x: 441
+        y: 12
+        width: 13
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a42f58c1941bbddf0800000000000000
+      internalID: -154334834644880822
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable: {}
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

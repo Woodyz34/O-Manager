@@ -1,0 +1,1142 @@
+fileFormatVersion: 2
+guid: 825eccf892bafac4fa4fb59a662d79a8
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -811410775260548888
+    second: Tjalve Orienteringsklubb_0
+  - first:
+      213: -7130264452802240247
+    second: Tjalve Orienteringsklubb_1
+  - first:
+      213: -7961961577594696585
+    second: Tjalve Orienteringsklubb_2
+  - first:
+      213: -6422661677617746656
+    second: Tjalve Orienteringsklubb_3
+  - first:
+      213: 4598294836623306587
+    second: Tjalve Orienteringsklubb_4
+  - first:
+      213: -1840476359276560198
+    second: Tjalve Orienteringsklubb_5
+  - first:
+      213: -3742094855316269688
+    second: Tjalve Orienteringsklubb_6
+  - first:
+      213: -3846248392149746980
+    second: Tjalve Orienteringsklubb_7
+  - first:
+      213: 4335635163643482620
+    second: Tjalve Orienteringsklubb_8
+  - first:
+      213: -4441192265591351725
+    second: Tjalve Orienteringsklubb_9
+  - first:
+      213: -7325022193087510929
+    second: Tjalve Orienteringsklubb_10
+  - first:
+      213: 4619728548169954571
+    second: Tjalve Orienteringsklubb_11
+  - first:
+      213: -8007126994249581317
+    second: Tjalve Orienteringsklubb_12
+  - first:
+      213: 4429377391446933160
+    second: Tjalve Orienteringsklubb_13
+  - first:
+      213: -8315797943740397330
+    second: Tjalve Orienteringsklubb_14
+  - first:
+      213: 1363835019189016885
+    second: Tjalve Orienteringsklubb_15
+  - first:
+      213: -7154560499184084276
+    second: Tjalve Orienteringsklubb_16
+  - first:
+      213: 319280091250091031
+    second: Tjalve Orienteringsklubb_17
+  - first:
+      213: 4210135454642354571
+    second: Tjalve Orienteringsklubb_18
+  - first:
+      213: -6964838145526382304
+    second: Tjalve Orienteringsklubb_19
+  - first:
+      213: -3483835912688058178
+    second: Tjalve Orienteringsklubb_20
+  - first:
+      213: 5144227658046909810
+    second: Tjalve Orienteringsklubb_21
+  - first:
+      213: 8981618141816050836
+    second: Tjalve Orienteringsklubb_22
+  - first:
+      213: -7295762669292857737
+    second: Tjalve Orienteringsklubb_23
+  - first:
+      213: -8337583226082416219
+    second: Tjalve Orienteringsklubb_24
+  - first:
+      213: -8828062638383817027
+    second: Tjalve Orienteringsklubb_25
+  - first:
+      213: -7850441486177889668
+    second: Tjalve Orienteringsklubb_26
+  - first:
+      213: -1264638581202653503
+    second: Tjalve Orienteringsklubb_27
+  - first:
+      213: -6582016948241645279
+    second: Tjalve Orienteringsklubb_28
+  - first:
+      213: 1752351051267767018
+    second: Tjalve Orienteringsklubb_29
+  - first:
+      213: 1317310033569350712
+    second: Tjalve Orienteringsklubb_30
+  - first:
+      213: 6511102828975433676
+    second: Tjalve Orienteringsklubb_31
+  - first:
+      213: -5684911940064853012
+    second: Tjalve Orienteringsklubb_32
+  - first:
+      213: -7453050725059855347
+    second: Tjalve Orienteringsklubb_33
+  - first:
+      213: 8953934229576351898
+    second: Tjalve Orienteringsklubb_34
+  - first:
+      213: -3064486970510038342
+    second: Tjalve Orienteringsklubb_35
+  - first:
+      213: -8708710211609070714
+    second: Tjalve Orienteringsklubb_36
+  - first:
+      213: 9104990279973245768
+    second: Tjalve Orienteringsklubb_37
+  - first:
+      213: 983844257418073986
+    second: Tjalve Orienteringsklubb_38
+  - first:
+      213: 1073827760290063306
+    second: Tjalve Orienteringsklubb_39
+  - first:
+      213: 6085953660523957995
+    second: Tjalve Orienteringsklubb_40
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 512
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_0
+      rect:
+        serializedVersion: 2
+        x: 189
+        y: 327
+        width: 96
+        height: 150
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8e0bbade23a4db4f0800000000000000
+      internalID: -811410775260548888
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_1
+      rect:
+        serializedVersion: 2
+        x: 220
+        y: 408
+        width: 37
+        height: 134
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 901a02802463c0d90800000000000000
+      internalID: -7130264452802240247
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_2
+      rect:
+        serializedVersion: 2
+        x: 258
+        y: 285
+        width: 92
+        height: 169
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 77cc824212e618190800000000000000
+      internalID: -7961961577594696585
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_3
+      rect:
+        serializedVersion: 2
+        x: 282
+        y: 293
+        width: 422
+        height: 470
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 02d6411ab3f1ed6a0800000000000000
+      internalID: -6422661677617746656
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_4
+      rect:
+        serializedVersion: 2
+        x: 639
+        y: 286
+        width: 91
+        height: 169
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b5fe1758acc60df30800000000000000
+      internalID: 4598294836623306587
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_5
+      rect:
+        serializedVersion: 2
+        x: 704
+        y: 328
+        width: 96
+        height: 150
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ab001d3a0805576e0800000000000000
+      internalID: -1840476359276560198
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_6
+      rect:
+        serializedVersion: 2
+        x: 732
+        y: 409
+        width: 37
+        height: 134
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8859e093e88611cc0800000000000000
+      internalID: -3742094855316269688
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_7
+      rect:
+        serializedVersion: 2
+        x: 940
+        y: 392
+        width: 227
+        height: 306
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cda3ff337716f9ac0800000000000000
+      internalID: -3846248392149746980
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_8
+      rect:
+        serializedVersion: 2
+        x: 1092
+        y: 388
+        width: 208
+        height: 310
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cf199acc5354b2c30800000000000000
+      internalID: 4335635163643482620
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_9
+      rect:
+        serializedVersion: 2
+        x: 1238
+        y: 391
+        width: 307
+        height: 307
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 35617363a27bd52c0800000000000000
+      internalID: -4441192265591351725
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_10
+      rect:
+        serializedVersion: 2
+        x: 1559
+        y: 392
+        width: 194
+        height: 306
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f668a21002b485a90800000000000000
+      internalID: -7325022193087510929
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_11
+      rect:
+        serializedVersion: 2
+        x: 1757
+        y: 391
+        width: 306
+        height: 307
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b05b66063a29c1040800000000000000
+      internalID: 4619728548169954571
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_12
+      rect:
+        serializedVersion: 2
+        x: 2016
+        y: 392
+        width: 262
+        height: 306
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bfcff4c1c68f0e090800000000000000
+      internalID: -8007126994249581317
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_13
+      rect:
+        serializedVersion: 2
+        x: 233
+        y: 259
+        width: 138
+        height: 88
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8ae3759054f487d30800000000000000
+      internalID: 4429377391446933160
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_14
+      rect:
+        serializedVersion: 2
+        x: 349
+        y: 240
+        width: 112
+        height: 100
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ee80e6344d9589c80800000000000000
+      internalID: -8315797943740397330
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_15
+      rect:
+        serializedVersion: 2
+        x: 529
+        y: 242
+        width: 112
+        height: 99
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 539dffa59b05de210800000000000000
+      internalID: 1363835019189016885
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_16
+      rect:
+        serializedVersion: 2
+        x: 618
+        y: 260
+        width: 138
+        height: 88
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cca571ae125e5bc90800000000000000
+      internalID: -7154560499184084276
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_17
+      rect:
+        serializedVersion: 2
+        x: 914
+        y: 224
+        width: 114
+        height: 123
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 714e0d62d8f4e6400800000000000000
+      internalID: 319280091250091031
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_18
+      rect:
+        serializedVersion: 2
+        x: 1109
+        y: 314
+        width: 34
+        height: 30
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b893c36c3e76d6a30800000000000000
+      internalID: 4210135454642354571
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_19
+      rect:
+        serializedVersion: 2
+        x: 1322
+        y: 225
+        width: 64
+        height: 103
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0214fc1ab9ce75f90800000000000000
+      internalID: -6964838145526382304
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_20
+      rect:
+        serializedVersion: 2
+        x: 1547
+        y: 314
+        width: 33
+        height: 30
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: eb0ca7012bde6afc0800000000000000
+      internalID: -3483835912688058178
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_21
+      rect:
+        serializedVersion: 2
+        x: 1838
+        y: 225
+        width: 98
+        height: 110
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 27d20a9bcc7f36740800000000000000
+      internalID: 5144227658046909810
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_22
+      rect:
+        serializedVersion: 2
+        x: 1926
+        y: 225
+        width: 51
+        height: 110
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 49456230d1e15ac70800000000000000
+      internalID: 8981618141816050836
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_23
+      rect:
+        serializedVersion: 2
+        x: 2061
+        y: 224
+        width: 94
+        height: 111
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7765e33c18e30ca90800000000000000
+      internalID: -7295762669292857737
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_24
+      rect:
+        serializedVersion: 2
+        x: 2155
+        y: 224
+        width: 93
+        height: 111
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5a92a14fa34fa4c80800000000000000
+      internalID: -8337583226082416219
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_25
+      rect:
+        serializedVersion: 2
+        x: 303
+        y: 209
+        width: 157
+        height: 44
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dbe1c30bdcb6c7580800000000000000
+      internalID: -8828062638383817027
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_26
+      rect:
+        serializedVersion: 2
+        x: 470
+        y: 188
+        width: 46
+        height: 80
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c72906ecf01ad0390800000000000000
+      internalID: -7850441486177889668
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_27
+      rect:
+        serializedVersion: 2
+        x: 530
+        y: 210
+        width: 156
+        height: 44
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1ce692629e9137ee0800000000000000
+      internalID: -1264638581202653503
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_28
+      rect:
+        serializedVersion: 2
+        x: 1027
+        y: 225
+        width: 71
+        height: 85
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 121c476657af7a4a0800000000000000
+      internalID: -6582016948241645279
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_29
+      rect:
+        serializedVersion: 2
+        x: 1090
+        y: 225
+        width: 47
+        height: 83
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: aeaf89c2ff9915810800000000000000
+      internalID: 1752351051267767018
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_30
+      rect:
+        serializedVersion: 2
+        x: 1138
+        y: 225
+        width: 84
+        height: 85
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 83485f10f76084210800000000000000
+      internalID: 1317310033569350712
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_31
+      rect:
+        serializedVersion: 2
+        x: 1224
+        y: 225
+        width: 90
+        height: 85
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cc72f1196851c5a50800000000000000
+      internalID: 6511102828975433676
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_32
+      rect:
+        serializedVersion: 2
+        x: 1382
+        y: 225
+        width: 85
+        height: 85
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ce3ce01e5b22b11b0800000000000000
+      internalID: -5684911940064853012
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_33
+      rect:
+        serializedVersion: 2
+        x: 1468
+        y: 225
+        width: 70
+        height: 85
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d0cf6df7ad1719890800000000000000
+      internalID: -7453050725059855347
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_34
+      rect:
+        serializedVersion: 2
+        x: 1528
+        y: 225
+        width: 47
+        height: 83
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a900c18edb3c24c70800000000000000
+      internalID: 8953934229576351898
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_35
+      rect:
+        serializedVersion: 2
+        x: 1571
+        y: 225
+        width: 91
+        height: 85
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: abaafef2651c875d0800000000000000
+      internalID: -3064486970510038342
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_36
+      rect:
+        serializedVersion: 2
+        x: 1663
+        y: 199
+        width: 99
+        height: 111
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 68379390432742780800000000000000
+      internalID: -8708710211609070714
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_37
+      rect:
+        serializedVersion: 2
+        x: 1759
+        y: 224
+        width: 81
+        height: 86
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 84390395b6c6b5e70800000000000000
+      internalID: 9104990279973245768
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_38
+      rect:
+        serializedVersion: 2
+        x: 1973
+        y: 224
+        width: 91
+        height: 84
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 28756b5b32157ad00800000000000000
+      internalID: 983844257418073986
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_39
+      rect:
+        serializedVersion: 2
+        x: 378
+        y: 171
+        width: 85
+        height: 42
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ac3ea0a98a007ee00800000000000000
+      internalID: 1073827760290063306
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Tjalve Orienteringsklubb_40
+      rect:
+        serializedVersion: 2
+        x: 526
+        y: 172
+        width: 85
+        height: 42
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: beec4070c96a57450800000000000000
+      internalID: 6085953660523957995
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable: {}
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
