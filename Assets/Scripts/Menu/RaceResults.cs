@@ -33,7 +33,8 @@ public class RaceResults : MonoBehaviour
         public string distance;
         public int length;
         public int finishers;
-        public List<string> controls;
+        public bool forked;              // runners ran different forks; each row has its own controls
+        public List<string> controls;    // the controls most runners had, one per column
         public List<ResultRow> runners;
     }
 
@@ -46,6 +47,7 @@ public class RaceResults : MonoBehaviour
         public int place;
         public int time;
         public List<int> splits;
+        public List<string> codes;      // only when forked: this runner's control in each column ("" = no punch)
     }
 
     ScrollRect leftScroll;
@@ -223,6 +225,9 @@ public class RaceResults : MonoBehaviour
             {
                 int at = j < legs - 1 ? (j < row.splits.Count ? row.splits[j] : -1) : row.time;
                 cells.Append("<pos=").Append(j * ColumnWidth).Append(">").Append(at >= 0 ? Clock(at) : "-");
+                // On another fork than the header: show which control this runner took here
+                string own = j < legs - 1 ? Code(data, row, j) : "";
+                if (own.Length > 0 && own != data.controls[j]) cells.Append(" <size=16>").Append(Muted).Append("(").Append(own).Append(")</color></size>");
                 legLine.Append("<pos=").Append(j * ColumnWidth).Append(">");
                 int rank = legRank[i, j];
                 if (rank > 0)
@@ -340,20 +345,40 @@ public class RaceResults : MonoBehaviour
                 legTime[i, j] = at >= 0 && before >= 0 && at >= before ? at - before : -1;
             }
         }
-        List<int> times = new List<int>();
-        for (int j = 0; j < legs; j++)
+        // A leg is ranked among the runners who ran the same two controls, so forks are not mixed
+        Dictionary<string, List<int>> byLeg = new Dictionary<string, List<int>>();
+        string[,] legKey = new string[data.runners.Count, legs];
+        for (int i = 0; i < data.runners.Count; i++)
         {
-            times.Clear();
-            for (int i = 0; i < data.runners.Count; i++)
+            ResultRow row = data.runners[i];
+            for (int j = 0; j < legs; j++)
             {
-                if (legTime[i, j] >= 0) times.Add(legTime[i, j]);
-            }
-            times.Sort();
-            for (int i = 0; i < data.runners.Count; i++)
-            {
-                legRank[i, j] = legTime[i, j] >= 0 ? times.BinarySearchFirst(legTime[i, j]) + 1 : 0;
+                string from = j == 0 ? "Start" : Code(data, row, j - 1);
+                string to = j == legs - 1 ? "Finish" : Code(data, row, j);
+                string key = j + "|" + from + ">" + to;
+                if (data.forked) key = from + ">" + to;
+                legKey[i, j] = key;
+                if (legTime[i, j] < 0) continue;
+                List<int> list;
+                if (!byLeg.TryGetValue(key, out list)) byLeg[key] = list = new List<int>();
+                list.Add(legTime[i, j]);
             }
         }
+        foreach (List<int> list in byLeg.Values) list.Sort();
+        for (int i = 0; i < data.runners.Count; i++)
+        {
+            for (int j = 0; j < legs; j++)
+            {
+                legRank[i, j] = legTime[i, j] >= 0 ? byLeg[legKey[i, j]].BinarySearchFirst(legTime[i, j]) + 1 : 0;
+            }
+        }
+    }
+
+    // The control a runner took in a column: their own when the course was forked, else the header's
+    static string Code(ResultFile data, ResultRow row, int column)
+    {
+        if (data.forked && row.codes != null && column < row.codes.Count) return row.codes[column] ?? "";
+        return column < data.controls.Count ? data.controls[column] : "";
     }
 
     static int FindRunner(ResultFile data, string id, string name)
