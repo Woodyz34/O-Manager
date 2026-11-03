@@ -5,7 +5,7 @@ Lägg resultat från VM, EM, världscupen (och nivå 2-tävlingar du vill ha med
 Döp filen så här:
 
 ```
-ÅÅÅÅ-MM-DD_<VM|EM|VC|niva2>_<lang|medel>_<H|D>[_kval][_loppets namn].txt
+ÅÅÅÅ-MM-DD_<VM|EM|VC|niva2>_<lang|medel>_<klass>[_kval][_loppets namn].txt
 ```
 
 Exempel:
@@ -14,6 +14,10 @@ Exempel:
 - `2026-05-30_VC_lang_D_kval.txt`
 - `2026-08-23_EM_medel_D_final_A.txt`
 - `2026-07-19_niva2_medel_H_O-Ringen_E1.txt`
+- `2026-07-19_niva2_medel_D20_O-Ringen_E1.txt`
+- `2026-07-19_niva2_medel_H21Kort_O-Ringen_E1.txt`
+
+Klassen är `H` eller `D` (betyder H21/D21) eller hela klassnamnet, t.ex. `D20`, `H18` eller `H21Kort`. Två klasser i samma lopp får olika filnamn tack vare klassen.
 
 I spelet får loppet ett engelskt namn: "World Championships Middle", "World Cup Long Qualification". Texten sist i filnamnet (med _ som mellanslag) läggs till inom parentes, "European Championships Middle (final A)". För niva2 är texten loppets eget namn: "O-Ringen E1, Middle".
 
