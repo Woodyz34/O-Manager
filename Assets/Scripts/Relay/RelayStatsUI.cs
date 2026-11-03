@@ -132,8 +132,10 @@ public class RelayStatsUI : MonoBehaviour
         rows.padding = new RectOffset(10, 10, 10, 10);
         rows.childControlWidth = true;
         rows.childControlHeight = true;
-        rows.childForceExpandWidth = false;
+        rows.childForceExpandWidth = true;
         rows.childForceExpandHeight = false;
+        // The rows are at least as wide as the card; a wider table (many splits) scrolls sideways
+        content.gameObject.AddComponent<LayoutElement>().minWidth = viewport.rectTransform.sizeDelta.x;
         ContentSizeFitter fitter = content.gameObject.AddComponent<ContentSizeFitter>();
         fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -223,7 +225,8 @@ public class RelayStatsUI : MonoBehaviour
     void BuildResults(List<RelayTeamResult> teams)
     {
         if (race.IsRelay) Row(48, true, Cell("Pl.", 80), Cell("+/-", 90), Cell("Team", 300), Cell("Runner", 300), Cell("Leg time", 170), Cell("Leg pl.", 110), Cell("Total", 170), Cell("Mistakes (est.)", 230));
-        else Row(48, true, Cell("Pl.", 80), Cell("", 90), Cell("Player", 300), Cell("Runner", 300), Cell("Time", 170), Cell("", 110), Cell("", 170), Cell("Mistakes (est.)", 230));
+        // One leg only: no place changes or leg columns, and the time is the race clock the places are made from
+        else Row(48, true, Cell("Pl.", 80), Cell("Player", 300), Cell("Runner", 300), Cell("Time", 170), Cell("Mistakes (est.)", 230));
         foreach (RelayTeamResult t in teams)
         {
             string change = "";
@@ -233,6 +236,13 @@ public class RelayStatsUI : MonoBehaviour
                 change = gained > 0 ? "<color=" + Green + ">+" + gained + "</color>" : gained < 0 ? "<color=" + Red + ">" + gained + "</color>" : "<color=" + Muted + ">0</color>";
             }
             string mistakes = !t.hasSplits ? "<color=" + Muted + ">-</color>" : t.totalLoss > 0 ? "<color=" + Red + ">" + RelayStats.Time(t.totalLoss) + "</color>" : "0:00";
+            if (!race.IsRelay)
+            {
+                Row(52, false, t.isLocal,
+                    Cell(t.place.ToString(), 80, FontStyles.Bold), Cell(t.team, 300, FontStyles.Bold), Cell(t.runner, 300),
+                    Cell(RelayStats.Time(t.total), 170), Cell(mistakes, 230));
+                continue;
+            }
             Row(52, false, t.isLocal,
                 Cell(t.place.ToString(), 80, FontStyles.Bold), Cell(change, 90), Cell(t.team, 300, FontStyles.Bold), Cell(t.runner, 300),
                 Cell(RelayStats.Time(t.legTime), 170), Cell(t.legPlace.ToString(), 110), Cell(RelayStats.Time(t.total), 170), Cell(mistakes, 230));
@@ -364,12 +374,14 @@ public class RelayStatsUI : MonoBehaviour
         LayoutElement rowSize = row.gameObject.AddComponent<LayoutElement>();
         rowSize.minHeight = height;
         rowSize.preferredHeight = height;
-        foreach (CellData cell in cells)
+        for (int i = 0; i < cells.Length; i++)
         {
+            CellData cell = cells[i];
             Image back = CourseUI.Panel("Cell", row.transform, cell.back ?? new Color(1f, 1f, 1f, 0f), false);
             LayoutElement size = back.gameObject.AddComponent<LayoutElement>();
             size.minWidth = cell.width;
             size.preferredWidth = cell.width;
+            if (i == cells.Length - 1) size.flexibleWidth = 1; // the last column takes what is left of the row
             TextMeshProUGUI text = CourseUI.Text("Text", back.transform, cell.text, header ? 21 : 21, CourseUI.Ink,
                 header ? FontStyles.Bold : cell.style, TextAlignmentOptions.MidlineLeft);
             CourseUI.Stretch(text.rectTransform, 6, 4, 2, 2);
