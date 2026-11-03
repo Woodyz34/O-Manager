@@ -118,6 +118,11 @@ public class PlayerColorPicker : MonoBehaviour
         {
             ColorUtility.TryParseHtmlString("#" + hex, out Color swatch);
             Image image = CourseUI.Panel("Swatch " + hex, swatches, swatch);
+            // A thin dark edge so light colours (white) stand out on the cream card
+            Outline edge = image.gameObject.AddComponent<Outline>();
+            edge.effectColor = new Color(CourseUI.Ink.r, CourseUI.Ink.g, CourseUI.Ink.b, 0.45f);
+            edge.effectDistance = new Vector2(2f, -2f);
+            edge.useGraphicAlpha = false;
             Button button = image.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
             button.onClick.AddListener(() => SetColor(swatch, true));
