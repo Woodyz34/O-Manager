@@ -1206,8 +1206,9 @@ public class CourseBuilder : MonoBehaviour
         toolButtons[Tool.Control] = CourseUI.Button("Control", toolRow, "Controls", CourseUI.ButtonKind.Light, () => SetTool(Tool.Control), 24);
         toolButtons[Tool.Finish] = CourseUI.Button("Finish", toolRow, "Finish", CourseUI.ButtonKind.Light, () => SetTool(Tool.Finish), 24);
 
+        // Room for four lines: the tool's own hint can take two, the mouse help after it two more
         hintText = CourseUI.Text("Hint", panel.transform, "", 19, CourseUI.InkMuted);
-        CourseUI.Size(hintText, 66);
+        CourseUI.Size(hintText, 92);
 
         summaryText = CourseUI.Text("Summary", panel.transform, "", 24, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(summaryText, 32);
