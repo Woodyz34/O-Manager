@@ -108,7 +108,37 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         if (lobbyCourse3.ToString() != Part(2)) lobbyCourse3 = Part(2);
         if (lobbyCourse4.ToString() != Part(3)) lobbyCourse4 = Part(3);
     }
-    [Networked] public bool lobbyImposter { get; set; }
+    // The extra game modes the host has turned on in the lobby (ExtraMode flags)
+    [Networked] public int lobbyModes { get; set; }
+
+    // The extra game modes of the competition being played, set by the host on its own player when the game
+    // starts (ExtraMode flags + ExtraModes.KnownBit, 0 = not set)
+    [Networked] public int competitionModes { get; set; }
+
+    // Bears mode: where this player hid their bear (BearMode)
+    [Networked] public NetworkBool bearPlaced { get; set; }
+    [Networked] public Vector2 bearPosition { get; set; }
+
+    // Move a control mode: the control this player moved and where to (MoveControlMode)
+    [Networked] public NetworkBool moveUsed { get; set; }
+    [Networked] public int moveControl { get; set; }
+    [Networked] public Vector2 moveTarget { get; set; }
+
+    void ClearModeChoices()
+    {
+        bearPlaced = false;
+        bearPosition = Vector2.zero;
+        moveUsed = false;
+        moveControl = -1;
+        moveTarget = Vector2.zero;
+    }
+
+    // Sent by a runner who got scared by someone's bear: everyone sees it
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_BearScare(PlayerRef owner, Vector2 where)
+    {
+        BearMode.OnScare(owner, where, this);
+    }
 
     // Relays: where this team's runner is, so the other runners can run behind it or hang on to it (PackRunning)
     [Networked] public int relayLeg { get; set; }
@@ -422,7 +452,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         string effectiveGameMode = GetSharedGameMode();
         Debug.Log("Shared gameMode: " + effectiveGameMode);
 
-        if (Object.HasStateAuthority && string.IsNullOrEmpty(effectiveGameMode))
+        if (Object.HasStateAuthority && (string.IsNullOrEmpty(effectiveGameMode) || !ExtraModes.Known))
         {
             // Wait for RPC or networked value to arrive (non-blocking)
             StartCoroutine(WaitForGameModeAndShow());
@@ -460,7 +490,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     {
         int attempts = 0;
         string effective = GetSharedGameMode();
-        while (string.IsNullOrEmpty(effective) && attempts < 60)
+        // The extra game modes (bears, route analysis, ...) are shared the same way and may come a moment later
+        while ((string.IsNullOrEmpty(effective) || !ExtraModes.Known) && attempts < 180)
         {
             attempts++;
             yield return null; // wait one frame
@@ -480,13 +511,21 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
         // Imposter is an extra on top of either runner-choice mode. The intro shows itself only
         // if the host picked an imposter for this competition.
-        bool imposterMode = CompetitionFlow.IsImposterMode(effectiveGameMode);
         if (Object.HasStateAuthority)
         {
             ImposterOverlay.ShowRoleIntro();
+            // Bears and Move a control: the tools shown while drawing
+            GameModeRuntime.StartIfNeeded(this);
         }
 
-        if (Object.HasStateAuthority && (effectiveGameMode.Contains("Choose a runner") || imposterMode))
+        // Route analysis: nobody picks a runner, everyone runs with the same one
+        if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteAnalysis) && RelayRace.Active == null)
+        {
+            RouteAnalysis.Begin(this);
+            return;
+        }
+
+        if (Object.HasStateAuthority && effectiveGameMode.Contains("Choose a runner"))
         {
             Debug.Log("Choose runner startades");
             manager.ChooseRunnerOf3Mode = true;
@@ -593,6 +632,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             ClearRelayResults();
             hasGuessedImposter = false;
             imposterGuess = PlayerRef.None;
+            ClearModeChoices();
 
             InitializeAfterSceneLoad();
 
@@ -623,6 +663,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                 imposter = PlayerRef.None;
                 imposterGuess = PlayerRef.None;
                 hasGuessedImposter = false;
+                competitionModes = 0;
+                ClearModeChoices();
                 agentMovement.NetPosition = spawnPosition;
                 Debug.Log("Set spawn position for lobby: " + spawnPosition);
                 transform.position = agentMovement.NetPosition;
@@ -736,7 +778,6 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             // Denna spelare tillhör inte denna peer
             return;
         }
-        Debug.Log("RunAfterdrawned (lokal spelare)");
         var agent = GetComponent<AgentMovement>();
 
         if (agent == null)
@@ -745,6 +786,22 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             return;
         }
 
+        // Move a control: the moved control flies to its new place first, then everyone runs
+        if (MoveControlMode.InterceptAllDrawn(agent, ContinueAfterAllDrawn))
+        {
+            return;
+        }
+        ContinueAfterAllDrawn();
+    }
+
+    private void ContinueAfterAllDrawn()
+    {
+        Debug.Log("RunAfterdrawned (lokal spelare)");
+        var agent = GetComponent<AgentMovement>();
+        if (agent == null)
+        {
+            return;
+        }
         agent.canRunNextSegment = true;
         agent.WaitingForAllPlayersToDraw = false;
 

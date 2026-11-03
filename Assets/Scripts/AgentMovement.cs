@@ -96,6 +96,8 @@ public class AgentMovement : NetworkBehaviour
     [HideInInspector] public List<List<Vector2Int>> relaySegments = new List<List<Vector2Int>>();
     [HideInInspector] public PackRunning packRunning;
     [HideInInspector] public bool relayHold = false;
+    // Game modes: the runner stands still for a moment (scared by a bear). The clock keeps running.
+    [HideInInspector] public bool modeHold = false;
     public bool IsMissing => isAngleMissing || isDrawMissing || isMissingControl;
 
 
@@ -174,6 +176,7 @@ public class AgentMovement : NetworkBehaviour
         }
         WaitingForAllPlayersToDraw = false;
         WaitingForAllPlayersToReachKontroll = false;
+        modeHold = false;
         hasFinished  = false;
         isWaiting = false;
         isDrawMissing = false;
@@ -414,7 +417,7 @@ public class AgentMovement : NetworkBehaviour
                 }
             }
 
-            if (relayHold)
+            if (relayHold || modeHold)
                 return;
             bool hanging = packRunning != null && packRunning.IsHanging;
             if (isWaiting || (path == null && !useManualPath) || (currentTargetIndex >= path.Count && currentTargetIndex != 0) || manualPathDrawer.isDrawing || !canRunNextSegment)

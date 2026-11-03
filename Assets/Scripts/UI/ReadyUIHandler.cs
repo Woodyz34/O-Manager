@@ -81,10 +81,19 @@ public class ReadyUIHandler : NetworkBehaviour
 
         // "Your runners": every player needs a runner of their own for every leg of a relay
         string chosenMode = gameModeHandler != null && !string.IsNullOrWhiteSpace(gameModeHandler.gameMode) ? gameModeHandler.gameMode : GameModes.YourRunners;
-        string tooFew = GameModes.RelayNeedsMoreRunners(CourseLibrary.Current, chosenMode);
+        LobbySettingsUI lobbySettings = FindObjectOfType<LobbySettingsUI>();
+        ExtraMode extraModes = lobbySettings != null ? lobbySettings.modes : ExtraMode.None;
+        // Route analysis gives everyone the same runner, so nobody needs runners of their own
+        string tooFew = (extraModes & ExtraMode.RouteAnalysis) != 0 ? null : GameModes.RelayNeedsMoreRunners(CourseLibrary.Current, chosenMode);
         if (tooFew != null)
         {
             UIToast.Show(tooFew);
+            return;
+        }
+        string modeProblem = ExtraModes.CourseProblem(extraModes, CourseLibrary.Current);
+        if (modeProblem != null)
+        {
+            UIToast.Show(modeProblem);
             return;
         }
 
@@ -113,9 +122,10 @@ public class ReadyUIHandler : NetworkBehaviour
         {
             // set networked field on server and broadcast via RPC
             serverPlayer.gameMode = selectedMode;
+            // The extra game modes, for everyone to read when the competition starts
+            serverPlayer.competitionModes = (int)extraModes | ExtraModes.KnownBit;
             // Imposter mode: one random player gets the secret job of finishing last
-            LobbySettingsUI lobbySettings = FindObjectOfType<LobbySettingsUI>();
-            bool imposterOn = (lobbySettings != null && lobbySettings.imposterEnabled) || CompetitionFlow.IsImposterMode(selectedMode);
+            bool imposterOn = (extraModes & ExtraMode.Imposter) != 0 || CompetitionFlow.IsImposterMode(selectedMode);
             serverPlayer.imposter = imposterOn
                 ? CompetitionFlow.PickRandomPlayer(Runner)
                 : PlayerRef.None;

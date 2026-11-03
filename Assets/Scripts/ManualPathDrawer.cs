@@ -113,6 +113,11 @@ public class ManualPathDrawer : MonoBehaviour
             worldPos.z = -1;
             // Kolla om musen är över UI
             bool overUI = IsPointerOverTaggedCanvas() || EscMenu.IsOpen; // no drawing behind the Esc menu
+            // Placing a bear or moving a control takes the clicks on the map instead
+            if (GameModeTools.TakesMouse)
+            {
+                return;
+            }
             if (!overUI && canDraw) // Endast rita om vi inte trycker på UI
             {
                 if (Input.GetMouseButtonDown(0) && Vector3.Distance(worldPos, ThisControll.position) < manager.cellSize * 3f)
@@ -345,7 +350,18 @@ public class ManualPathDrawer : MonoBehaviour
         canDraw = true;
     }
 
-    List<Vector2Int> FindOptimizedPathInCorridor(List<Vector2Int> drawnPath, int corridorRadius)
+    // Throws away the line being drawn (e.g. when the control it was heading for is moved)
+    public void CancelCurrentLine()
+    {
+        if (relayMode) return;
+        isDrawing = false;
+        gridPath.Clear();
+        smoothPath.Clear();
+        if (line != null) line.positionCount = 0;
+    }
+
+    // Only reads the grid, so it can also be run on a background thread
+    public List<Vector2Int> FindOptimizedPathInCorridor(List<Vector2Int> drawnPath, int corridorRadius)
     {
         int rows = manager.speedGrid2D.GetLength(0);
         int cols = manager.speedGrid2D.GetLength(1);
