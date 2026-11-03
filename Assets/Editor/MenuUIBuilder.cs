@@ -729,6 +729,9 @@ public static class MenuUIBuilder
         UI.Place(oddsHeading.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(26, -18), new Vector2(500, 28));
         TextMeshProUGUI oddsText = Label(odds, "Odds", "Elite 25%     Gold 75%", 30, UI.Ink, TextAlignmentOptions.MidlineLeft);
         oddsText.fontStyle = FontStyles.Normal;
+        oddsText.enableAutoSizing = true;
+        oddsText.fontSizeMin = 18;
+        oddsText.fontSizeMax = 30;
         UI.Place(oddsText.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(26, 18), new Vector2(510, 44));
 
         TextMeshProUGUI owned = Label(shopCard, "Owned", "You have 0 of 6 runners", 27, UI.Ink, TextAlignmentOptions.MidlineLeft);

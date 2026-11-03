@@ -161,7 +161,10 @@ public class CourseBuilder : MonoBehaviour
         if (mapRenderer == null || mapRenderer.sprite == null) return;
         Bounds bounds = mapRenderer.bounds;
         // Leave room for the panel on the right
-        float visibleWidthShare = 1f - PanelWidth / Mathf.Max(1f, Screen.width * (1920f / Mathf.Max(1, Screen.width)));
+        // The canvas is scaled so all of 1920x1080 fits (ScreenSettings), so on a wide screen it is wider than 1920
+        float uiScale = Mathf.Min(Screen.width / ScreenSettings.ReferenceResolution.x, Screen.height / ScreenSettings.ReferenceResolution.y);
+        float canvasWidth = Screen.width / Mathf.Max(0.01f, uiScale);
+        float visibleWidthShare = 1f - PanelWidth / Mathf.Max(1f, canvasWidth);
         mapCamera.orthographicSize = Mathf.Max(bounds.extents.y, bounds.extents.x / (mapCamera.aspect * visibleWidthShare)) * 1.02f;
         float worldPanel = mapCamera.orthographicSize * mapCamera.aspect * 2f * (1f - visibleWidthShare);
         mapCamera.transform.position = new Vector3(bounds.center.x + worldPanel / 2f, bounds.center.y, -10f);
@@ -1166,9 +1169,7 @@ public class CourseBuilder : MonoBehaviour
         Canvas canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 1f;
+        ScreenSettings.Fit(scaler);
         if (FindObjectOfType<EventSystem>() == null)
         {
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
@@ -1205,8 +1206,9 @@ public class CourseBuilder : MonoBehaviour
         toolButtons[Tool.Control] = CourseUI.Button("Control", toolRow, "Controls", CourseUI.ButtonKind.Light, () => SetTool(Tool.Control), 24);
         toolButtons[Tool.Finish] = CourseUI.Button("Finish", toolRow, "Finish", CourseUI.ButtonKind.Light, () => SetTool(Tool.Finish), 24);
 
+        // Room for four lines: the tool's own hint can take two, the mouse help after it two more
         hintText = CourseUI.Text("Hint", panel.transform, "", 19, CourseUI.InkMuted);
-        CourseUI.Size(hintText, 66);
+        CourseUI.Size(hintText, 92);
 
         summaryText = CourseUI.Text("Summary", panel.transform, "", 24, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(summaryText, 32);

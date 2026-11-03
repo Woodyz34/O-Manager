@@ -59,9 +59,7 @@ public class SinglePlayerMenu : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 50;
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 1f;
+        ScreenSettings.Fit(scaler);
 
         // Covers the old page underneath
         Image back = CourseUI.Panel("Background", canvasObject.transform, CourseUI.Hex("DCE8D6"), false);
@@ -70,9 +68,10 @@ public class SinglePlayerMenu : MonoBehaviour
         TextMeshProUGUI title = CourseUI.Text("Title", back.transform, "Single player", 60, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -30), new Vector2(1200, 80));
 
-        // Left: the courses
+        // Left: the courses. Both cards hang from the top middle, so on a wide screen they stay
+        // together in the middle instead of drifting apart to the edges.
         Image left = CourseUI.CardPanel("Courses", back.transform);
-        CourseUI.Place(left.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(60, -130), new Vector2(1060, 900));
+        CourseUI.Place(left.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, 1f), new Vector2(-900, -130), new Vector2(1060, 900));
         CourseUI.Column(left.gameObject, 12, new RectOffset(28, 28, 24, 24));
         TextMeshProUGUI coursesTitle = CourseUI.Text("Title", left.transform, "Course", 34, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(coursesTitle, 44);
@@ -98,7 +97,7 @@ public class SinglePlayerMenu : MonoBehaviour
 
         // Right: game mode and start
         Image right = CourseUI.CardPanel("Play", back.transform);
-        CourseUI.Place(right.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-60, -130), new Vector2(680, 900));
+        CourseUI.Place(right.rectTransform, new Vector2(0.5f, 1f), new Vector2(1f, 1f), new Vector2(900, -130), new Vector2(680, 900));
         CourseUI.Column(right.gameObject, 14, new RectOffset(28, 28, 24, 24));
         TextMeshProUGUI modeTitle = CourseUI.Text("Title", right.transform, "Runner pool", 34, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(modeTitle, 44);
