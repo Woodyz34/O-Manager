@@ -24,9 +24,7 @@ public class ChoicePopup : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 200;
         CanvasScaler scaler = go.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 1f;
+        ScreenSettings.Fit(scaler);
         open = go.AddComponent<ChoicePopup>();
         open.Build(heading, options, selected, chosen);
     }

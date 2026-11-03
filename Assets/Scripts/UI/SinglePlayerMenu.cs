@@ -59,9 +59,7 @@ public class SinglePlayerMenu : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 50;
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 1f;
+        ScreenSettings.Fit(scaler);
 
         // Covers the old page underneath
         Image back = CourseUI.Panel("Background", canvasObject.transform, CourseUI.Hex("DCE8D6"), false);

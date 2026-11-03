@@ -22,6 +22,8 @@ public class EscMenu : MonoBehaviour
     TextMeshProUGUI subtitle;
     TextMeshProUGUI volumeValue;
     Slider volumeSlider;
+    Button fullscreenButton;
+    Button windowButton;
     Button endButton;
     Button mainMenuButton;
     TextMeshProUGUI hostNote;
@@ -48,11 +50,13 @@ public class EscMenu : MonoBehaviour
     void OnEnable()
     {
         SceneManager.sceneLoaded += OnSceneLoaded;
+        ScreenSettings.Changed += ShowDisplayMode;
     }
 
     void OnDisable()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
+        ScreenSettings.Changed -= ShowDisplayMode;
     }
 
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -99,6 +103,7 @@ public class EscMenu : MonoBehaviour
         ShowVolume(volumeSlider.value);
         root.SetActive(true);
         Cursor.visible = true;
+        ShowDisplayMode();
         Refresh();
     }
 
@@ -179,7 +184,31 @@ public class EscMenu : MonoBehaviour
         volumeValue.text = Mathf.RoundToInt(percent) + "%";
     }
 
+    // The chosen display mode is the orange one
+    void ShowDisplayMode()
+    {
+        if (fullscreenButton == null)
+        {
+            return;
+        }
+        bool full = ScreenSettings.Fullscreen;
+        CourseUI.SetButtonColor(fullscreenButton, full ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        CourseUI.SetButtonColor(windowButton, full ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Primary);
+    }
+
     // ---- Buttons ----
+
+    void OnFullscreen()
+    {
+        ScreenSettings.SetFullscreen(true);
+        ShowDisplayMode();
+    }
+
+    void OnWindow()
+    {
+        ScreenSettings.SetFullscreen(false);
+        ShowDisplayMode();
+    }
 
     void OnVolumeChanged(float percent)
     {
@@ -242,9 +271,7 @@ public class EscMenu : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 250; // above every page, below the short messages at the bottom
         CanvasScaler scaler = root.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 1f;
+        ScreenSettings.Fit(scaler);
 
         // A dark veil that also catches clicks, so nothing behind the menu is pressed. Clicking it closes the menu.
         Image veil = CourseUI.Panel("Veil", root.transform, CourseUI.Hex("10241A", 0.6f), false);
@@ -277,6 +304,17 @@ public class EscMenu : MonoBehaviour
         volumeSlider = CourseUI.SliderControl("Volume", card.transform, 0, 100, 100, true, OnVolumeChanged);
         CourseUI.Size(volumeSlider, 40);
 
+        // Display: fullscreen or a window (F11 / Alt+Enter switch too)
+        TextMeshProUGUI displayLabel = CourseUI.Text("Display label", card.transform, "Display", 28, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Size(displayLabel, 40);
+        RectTransform displayRow = CourseUI.Rect("Display row", card.transform);
+        CourseUI.Row(displayRow.gameObject, 12, new RectOffset(0, 0, 0, 0));
+        CourseUI.Size(displayRow, 56);
+        fullscreenButton = CourseUI.Button("Fullscreen", displayRow, "Fullscreen", CourseUI.ButtonKind.Primary, OnFullscreen, 24);
+        CourseUI.Size(fullscreenButton, -1, -1, 1);
+        windowButton = CourseUI.Button("Window", displayRow, "Window", CourseUI.ButtonKind.Light, OnWindow, 24);
+        CourseUI.Size(windowButton, -1, -1, 1);
+
         RectTransform gap = CourseUI.Rect("Gap", card.transform);
         CourseUI.Size(gap, 6);
 
@@ -295,7 +333,7 @@ public class EscMenu : MonoBehaviour
         Button quit = CourseUI.Button("Quit", card.transform, "Quit game", CourseUI.ButtonKind.Light, OnQuit, 26);
         CourseUI.Size(quit, 68);
 
-        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, "Esc closes the menu", 18, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
+        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, "Esc closes the menu  ·  F11 switches fullscreen", 18, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
         CourseUI.Size(hint, 24);
 
         root.SetActive(false);
