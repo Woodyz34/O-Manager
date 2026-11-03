@@ -1180,55 +1180,6 @@
 ]
 },
 {
-"id": "e17452",
-"name": "Sara Hagström",
-"sex": "F",
-"birth_year": 1995,
-"club": "IFK Göteborg Orientering",
-"country": "Sweden",
-"physic": 87.03,
-"technique": 95.38,
-"adjusted_races": 5,
-"all_races": 5,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "European Championships Long",
-"date": "2026-09-24",
-"klass": "D21",
-"place": 5,
-"of": 54,
-"behind": 464,
-"score": 92.06,
-"field": 96.43,
-"results": "ws20260924EMlangD_0_D21"
-},
-{
-"race": "European Championships Middle",
-"date": "2026-09-26",
-"klass": "D21",
-"place": 7,
-"of": 70,
-"behind": 182,
-"score": 89.75,
-"field": 96.43,
-"results": "ws20260926EMmedelD_0_D21"
-},
-{
-"race": "SM, medel (Swedish League, #6)",
-"date": "2026-08-22",
-"klass": "D21 A-Final",
-"place": 5,
-"of": 41,
-"behind": 162,
-"score": 89.34,
-"field": 92.22,
-"results": "54929_56785_D21AFinal"
-}
-]
-},
-{
 "id": "w:denisa kralova:F",
 "name": "Denisa Kralova",
 "sex": "F",
@@ -1274,6 +1225,55 @@
 "score": 78.95,
 "field": 95.56,
 "results": "ws20260808VCmedelD_0_D21"
+}
+]
+},
+{
+"id": "e17452",
+"name": "Sara Hagström",
+"sex": "F",
+"birth_year": 1995,
+"club": "IFK Göteborg Orientering",
+"country": "Sweden",
+"physic": 87.03,
+"technique": 95.38,
+"adjusted_races": 5,
+"all_races": 5,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "European Championships Long",
+"date": "2026-09-24",
+"klass": "D21",
+"place": 5,
+"of": 54,
+"behind": 464,
+"score": 92.06,
+"field": 96.43,
+"results": "ws20260924EMlangD_0_D21"
+},
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "D21",
+"place": 7,
+"of": 70,
+"behind": 182,
+"score": 89.75,
+"field": 96.43,
+"results": "ws20260926EMmedelD_0_D21"
+},
+{
+"race": "SM, medel (Swedish League, #6)",
+"date": "2026-08-22",
+"klass": "D21 A-Final",
+"place": 5,
+"of": 41,
+"behind": 162,
+"score": 89.34,
+"field": 92.22,
+"results": "54929_56785_D21AFinal"
 }
 ]
 },
@@ -1905,44 +1905,6 @@
 ]
 },
 {
-"id": "w:amy nymalm:F",
-"name": "Amy Nymalm",
-"sex": "F",
-"birth_year": null,
-"club": null,
-"country": "Finland",
-"physic": 85.3,
-"technique": 97.76,
-"adjusted_races": 2,
-"all_races": 2,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "European Championships Middle",
-"date": "2026-09-26",
-"klass": "D21",
-"place": 18,
-"of": 70,
-"behind": 265,
-"score": 86.46,
-"field": 96.43,
-"results": "ws20260926EMmedelD_0_D21"
-},
-{
-"race": "European Championships Long",
-"date": "2026-09-24",
-"klass": "D21",
-"place": 21,
-"of": 54,
-"behind": 1048,
-"score": 83.7,
-"field": 96.43,
-"results": "ws20260924EMlangD_0_D21"
-}
-]
-},
-{
 "id": "e74055",
 "name": "Eleonora Alinder",
 "sex": "F",
@@ -1988,6 +1950,44 @@
 "score": 81.65,
 "field": 87.84,
 "results": "57153_59041_D21"
+}
+]
+},
+{
+"id": "w:amy nymalm:F",
+"name": "Amy Nymalm",
+"sex": "F",
+"birth_year": null,
+"club": null,
+"country": "Finland",
+"physic": 85.3,
+"technique": 97.76,
+"adjusted_races": 2,
+"all_races": 2,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "D21",
+"place": 18,
+"of": 70,
+"behind": 265,
+"score": 86.46,
+"field": 96.43,
+"results": "ws20260926EMmedelD_0_D21"
+},
+{
+"race": "European Championships Long",
+"date": "2026-09-24",
+"klass": "D21",
+"place": 21,
+"of": 54,
+"behind": 1048,
+"score": 83.7,
+"field": 96.43,
+"results": "ws20260924EMlangD_0_D21"
 }
 ]
 },
@@ -2279,6 +2279,44 @@
 ]
 },
 {
+"id": "w:judita traubaite:F",
+"name": "Judita Traubaite",
+"sex": "F",
+"birth_year": null,
+"club": null,
+"country": "Lithuania",
+"physic": 84.3,
+"technique": 66.15,
+"adjusted_races": 2,
+"all_races": 2,
+"international": true,
+"visible": true,
+"merits": [
+{
+"race": "European Championships Middle",
+"date": "2026-09-26",
+"klass": "D21",
+"place": 8,
+"of": 70,
+"behind": 187,
+"score": 89.55,
+"field": 96.43,
+"results": "ws20260926EMmedelD_0_D21"
+},
+{
+"race": "European Championships Long",
+"date": "2026-09-24",
+"klass": "D21",
+"place": 46,
+"of": 54,
+"behind": 1939,
+"score": 73.51,
+"field": 96.43,
+"results": "ws20260924EMlangD_0_D21"
+}
+]
+},
+{
 "id": "w:annika simonsen:F",
 "name": "Annika Simonsen",
 "sex": "F",
@@ -2328,59 +2366,6 @@
 ]
 },
 {
-"id": "w:judita traubaite:F",
-"name": "Judita Traubaite",
-"sex": "F",
-"birth_year": null,
-"club": null,
-"country": "Lithuania",
-"physic": 84.3,
-"technique": 66.15,
-"adjusted_races": 2,
-"all_races": 2,
-"international": true,
-"visible": true,
-"merits": [
-{
-"race": "European Championships Middle",
-"date": "2026-09-26",
-"klass": "D21",
-"place": 8,
-"of": 70,
-"behind": 187,
-"score": 89.55,
-"field": 96.43,
-"results": "ws20260926EMmedelD_0_D21"
-},
-{
-"race": "European Championships Long",
-"date": "2026-09-24",
-"klass": "D21",
-"place": 46,
-"of": 54,
-"behind": 1939,
-"score": 73.51,
-"field": 96.43,
-"results": "ws20260924EMlangD_0_D21"
-}
-]
-},
-{
-"id": "e210668",
-"name": "Tyra Lilleholt Kraugerud",
-"sex": "F",
-"birth_year": 2009,
-"club": "Ås-NMBU Orientering",
-"country": "NOR",
-"physic": 84.26,
-"technique": 94.97,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "w:janne tjorhom aasheim:F",
 "name": "Janne Tjorhom Aasheim",
 "sex": "F",
@@ -2428,6 +2413,21 @@
 "results": "ws20260808VCmedelD_0_D21"
 }
 ]
+},
+{
+"id": "e210668",
+"name": "Tyra Lilleholt Kraugerud",
+"sex": "F",
+"birth_year": 2009,
+"club": "Ås-NMBU Orientering",
+"country": "NOR",
+"physic": 84.26,
+"technique": 94.97,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e6152",
@@ -3611,21 +3611,6 @@
 ]
 },
 {
-"id": "e47083",
-"name": "Alva Björk",
-"sex": "F",
-"birth_year": 2005,
-"club": "OK Pan-Kristianstad",
-"country": "SWE",
-"physic": 82.32,
-"technique": 91.94,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "w:anouk van der burgt:F",
 "name": "Anouk van der Burgt",
 "sex": "F",
@@ -3651,6 +3636,21 @@
 "results": "ws20260808VCmedelD_0_D21"
 }
 ]
+},
+{
+"id": "e47083",
+"name": "Alva Björk",
+"sex": "F",
+"birth_year": 2005,
+"club": "OK Pan-Kristianstad",
+"country": "SWE",
+"physic": 82.32,
+"technique": 91.94,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e9534",
@@ -4529,21 +4529,6 @@
 ]
 },
 {
-"id": "e267079",
-"name": "Mélissa Trochut",
-"sex": "F",
-"birth_year": 2006,
-"club": "OK Skogshjortarna",
-"country": "SWE",
-"physic": 80.69,
-"technique": 53.48,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e160253",
 "name": "Jenny Ojala",
 "sex": "F",
@@ -4552,6 +4537,21 @@
 "country": "FIN",
 "physic": 80.69,
 "technique": 54.85,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e267079",
+"name": "Mélissa Trochut",
+"sex": "F",
+"birth_year": 2006,
+"club": "OK Skogshjortarna",
+"country": "SWE",
+"physic": 80.69,
+"technique": 53.48,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -5355,21 +5355,6 @@
 "merits": []
 },
 {
-"id": "e226218",
-"name": "Sara Nystrøm Olsen",
-"sex": "F",
-"birth_year": 2002,
-"club": "NTNUI",
-"country": "NOR",
-"physic": 79.04,
-"technique": 35.22,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "w:ausrine kutkaite:F",
 "name": "Ausrine Kutkaite",
 "sex": "F",
@@ -5417,6 +5402,21 @@
 "results": "ws20260808VCmedelD_0_D21"
 }
 ]
+},
+{
+"id": "e226218",
+"name": "Sara Nystrøm Olsen",
+"sex": "F",
+"birth_year": 2002,
+"club": "NTNUI",
+"country": "NOR",
+"physic": 79.04,
+"technique": 35.22,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e95317",
@@ -5468,6 +5468,21 @@
 ]
 },
 {
+"id": "e147107",
+"name": "Emmi Markki",
+"sex": "F",
+"birth_year": 2003,
+"club": "Espoon Suunta",
+"country": "FIN",
+"physic": 78.91,
+"technique": 61.87,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e247661",
 "name": "Kateryna Kropyvnytska",
 "sex": "F",
@@ -5515,21 +5530,6 @@
 "results": "53555_55362_D20"
 }
 ]
-},
-{
-"id": "e147107",
-"name": "Emmi Markki",
-"sex": "F",
-"birth_year": 2003,
-"club": "Espoon Suunta",
-"country": "FIN",
-"physic": 78.91,
-"technique": 61.87,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e9582",
@@ -6449,21 +6449,6 @@
 ]
 },
 {
-"id": "e46471",
-"name": "Sandra Ling",
-"sex": "F",
-"birth_year": 2005,
-"club": "IKHP Huskvarna Idrottsklubb",
-"country": "SWE",
-"physic": 77.39,
-"technique": 66.36,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e109428",
 "name": "Tyra Larsson",
 "sex": "F",
@@ -6474,6 +6459,21 @@
 "technique": 76.65,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e46471",
+"name": "Sandra Ling",
+"sex": "F",
+"birth_year": 2005,
+"club": "IKHP Huskvarna Idrottsklubb",
+"country": "SWE",
+"physic": 77.39,
+"technique": 66.36,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -6849,21 +6849,6 @@
 ]
 },
 {
-"id": "e144284",
-"name": "Linnea Persson",
-"sex": "F",
-"birth_year": 2010,
-"club": "OK Kåre",
-"country": "SWE",
-"physic": 76.85,
-"technique": 62.61,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e12089",
 "name": "Emma Martner",
 "sex": "F",
@@ -6874,6 +6859,21 @@
 "technique": 95.62,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e144284",
+"name": "Linnea Persson",
+"sex": "F",
+"birth_year": 2010,
+"club": "OK Kåre",
+"country": "SWE",
+"physic": 76.85,
+"technique": 62.61,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -6928,21 +6928,6 @@
 ]
 },
 {
-"id": "e35247",
-"name": "Vilma Von Krusenstierna",
-"sex": "F",
-"birth_year": 1999,
-"club": "OK Kåre",
-"country": "SWE",
-"physic": 76.68,
-"technique": 81.38,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e265892",
 "name": "Lisa Hubmann",
 "sex": "F",
@@ -6953,6 +6938,21 @@
 "technique": 40.11,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e35247",
+"name": "Vilma Von Krusenstierna",
+"sex": "F",
+"birth_year": 1999,
+"club": "OK Kåre",
+"country": "SWE",
+"physic": 76.68,
+"technique": 81.38,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -7637,21 +7637,6 @@
 ]
 },
 {
-"id": "e18866",
-"name": "Hanna Hugosson",
-"sex": "F",
-"birth_year": 1998,
-"club": "Sundsvalls OK",
-"country": "SWE",
-"physic": 75.48,
-"technique": 79.75,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e31110",
 "name": "Lovisa Persson",
 "sex": "F",
@@ -7660,6 +7645,21 @@
 "country": "SWE",
 "physic": 75.48,
 "technique": 91.0,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e18866",
+"name": "Hanna Hugosson",
+"sex": "F",
+"birth_year": 1998,
+"club": "Sundsvalls OK",
+"country": "SWE",
+"physic": 75.48,
+"technique": 79.75,
 "adjusted_races": 3,
 "all_races": 3,
 "international": false,
@@ -7677,21 +7677,6 @@
 "technique": 68.04,
 "adjusted_races": 3,
 "all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e76947",
-"name": "Svetlana Mironova",
-"sex": "F",
-"birth_year": 1986,
-"club": "Halden SK",
-"country": "NOR",
-"physic": 75.18,
-"technique": 70.76,
-"adjusted_races": 2,
-"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -7746,6 +7731,21 @@
 ]
 },
 {
+"id": "e76947",
+"name": "Svetlana Mironova",
+"sex": "F",
+"birth_year": 1986,
+"club": "Halden SK",
+"country": "NOR",
+"physic": 75.18,
+"technique": 70.76,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e46470",
 "name": "Emma Ling",
 "sex": "F",
@@ -7786,21 +7786,6 @@
 "technique": 73.48,
 "adjusted_races": 2,
 "all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e15015",
-"name": "Sara Bengtsson",
-"sex": "F",
-"birth_year": 1986,
-"club": "Sävedalens AIK",
-"country": "SWE",
-"physic": 75.08,
-"technique": 62.05,
-"adjusted_races": 1,
-"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -7853,6 +7838,21 @@
 "results": "57153_59041_D20"
 }
 ]
+},
+{
+"id": "e15015",
+"name": "Sara Bengtsson",
+"sex": "F",
+"birth_year": 1986,
+"club": "Sävedalens AIK",
+"country": "SWE",
+"physic": 75.08,
+"technique": 62.05,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "w:anna groell:F",
@@ -8527,21 +8527,6 @@
 "merits": []
 },
 {
-"id": "e250667",
-"name": "Jana Pekarova",
-"sex": "F",
-"birth_year": 2002,
-"club": "OK Pan-Kristianstad",
-"country": "SWE",
-"physic": 73.84,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e40563",
 "name": "Agnes Djurstedt",
 "sex": "F",
@@ -8589,6 +8574,21 @@
 "results": "53397_55204_D21"
 }
 ]
+},
+{
+"id": "e250667",
+"name": "Jana Pekarova",
+"sex": "F",
+"birth_year": 2002,
+"club": "OK Pan-Kristianstad",
+"country": "SWE",
+"physic": 73.84,
+"technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e31899",
@@ -8862,21 +8862,6 @@
 ]
 },
 {
-"id": "e73501",
-"name": "Ebba Thern",
-"sex": "F",
-"birth_year": 2004,
-"club": "OK Skogshjortarna",
-"country": "SWE",
-"physic": 73.35,
-"technique": 17.82,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e14074",
 "name": "Lisa Johansson",
 "sex": "F",
@@ -8887,6 +8872,21 @@
 "technique": 45.39,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e73501",
+"name": "Ebba Thern",
+"sex": "F",
+"birth_year": 2004,
+"club": "OK Skogshjortarna",
+"country": "SWE",
+"physic": 73.35,
+"technique": 17.82,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -8986,21 +8986,6 @@
 ]
 },
 {
-"id": "e260856",
-"name": "Aline Schmuki",
-"sex": "F",
-"birth_year": 2005,
-"club": "OK Linné",
-"country": "SWE",
-"physic": 73.06,
-"technique": 66.79,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e153349",
 "name": "Marthe Gløersen",
 "sex": "F",
@@ -9011,6 +8996,21 @@
 "technique": 74.75,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e260856",
+"name": "Aline Schmuki",
+"sex": "F",
+"birth_year": 2005,
+"club": "OK Linné",
+"country": "SWE",
+"physic": 73.06,
+"technique": 66.79,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -9163,21 +9163,6 @@
 "merits": []
 },
 {
-"id": "e25566",
-"name": "Amilia Björklund",
-"sex": "F",
-"birth_year": 1993,
-"club": "Sävedalens AIK",
-"country": "SWE",
-"physic": 72.71,
-"technique": 78.06,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e70335",
 "name": "Tuva Henricsson",
 "sex": "F",
@@ -9225,6 +9210,21 @@
 "results": "57153_59041_D20"
 }
 ]
+},
+{
+"id": "e25566",
+"name": "Amilia Björklund",
+"sex": "F",
+"birth_year": 1993,
+"club": "Sävedalens AIK",
+"country": "SWE",
+"physic": 72.71,
+"technique": 78.06,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "w:lone constanze pompe:F",
@@ -9743,6 +9743,21 @@
 "merits": []
 },
 {
+"id": "e116834",
+"name": "Ella Kruse",
+"sex": "F",
+"birth_year": 2007,
+"club": "KFUM Örebro OK",
+"country": "SWE",
+"physic": 71.46,
+"technique": 50.1,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e149649",
 "name": "Gerda Medin",
 "sex": "F",
@@ -9790,21 +9805,6 @@
 "results": "56195_58064_D18A"
 }
 ]
-},
-{
-"id": "e116834",
-"name": "Ella Kruse",
-"sex": "F",
-"birth_year": 2007,
-"club": "KFUM Örebro OK",
-"country": "SWE",
-"physic": 71.46,
-"technique": 50.1,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e71089",
@@ -10345,21 +10345,6 @@
 "merits": []
 },
 {
-"id": "e63494",
-"name": "Hedda Rosengren Svensson",
-"sex": "F",
-"birth_year": 2005,
-"club": "OK Orion",
-"country": "SWE",
-"physic": 70.49,
-"technique": 56.98,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e60341",
 "name": "Ebba Skullman",
 "sex": "F",
@@ -10370,6 +10355,21 @@
 "technique": 100.0,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e63494",
+"name": "Hedda Rosengren Svensson",
+"sex": "F",
+"birth_year": 2005,
+"club": "OK Orion",
+"country": "SWE",
+"physic": 70.49,
+"technique": 56.98,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -11880,21 +11880,6 @@
 "merits": []
 },
 {
-"id": "e83875",
-"name": "Emma Caspari",
-"sex": "F",
-"birth_year": 2004,
-"club": "OL Team Lippe",
-"country": "GER",
-"physic": 67.66,
-"technique": 24.7,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e204064",
 "name": "Sanna Grendelmeier",
 "sex": "F",
@@ -11942,6 +11927,21 @@
 "results": "56195_58063_D182"
 }
 ]
+},
+{
+"id": "e83875",
+"name": "Emma Caspari",
+"sex": "F",
+"birth_year": 2004,
+"club": "OL Team Lippe",
+"country": "GER",
+"physic": 67.66,
+"technique": 24.7,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e11573",
@@ -12053,21 +12053,6 @@
 "merits": []
 },
 {
-"id": "e208957",
-"name": "Sigrid Aamand",
-"sex": "F",
-"birth_year": 2008,
-"club": "Fredrikstad SK",
-"country": "NOR",
-"physic": 67.52,
-"technique": 64.49,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e99582",
 "name": "Malva Arvidsson",
 "sex": "F",
@@ -12078,6 +12063,21 @@
 "technique": 37.25,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e208957",
+"name": "Sigrid Aamand",
+"sex": "F",
+"birth_year": 2008,
+"club": "Fredrikstad SK",
+"country": "NOR",
+"physic": 67.52,
+"technique": 64.49,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -12096,55 +12096,6 @@
 "international": false,
 "visible": false,
 "merits": []
-},
-{
-"id": "e141690",
-"name": "Ellen Skovbjerg",
-"sex": "F",
-"birth_year": 2007,
-"club": "Frölunda OL",
-"country": "SWE",
-"physic": 67.35,
-"technique": 60.07,
-"adjusted_races": 8,
-"all_races": 8,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "SM, natt (Swedish League, #3)",
-"date": "2026-04-10",
-"klass": "D20",
-"place": 20,
-"of": 47,
-"behind": 1324,
-"score": 75.05,
-"field": 74.89,
-"results": "52726_54529_D20"
-},
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-12",
-"klass": "D20-1",
-"place": 17,
-"of": 21,
-"behind": 1362,
-"score": 65.84,
-"field": 84.68,
-"results": "56195_58063_D201"
-},
-{
-"race": "25mannamedeln (WRE)",
-"date": "2026-10-11",
-"klass": "D20E",
-"place": 31,
-"of": 66,
-"behind": 817,
-"score": 65.05,
-"field": 86.16,
-"results": "55918_57782_D20E"
-}
-]
 },
 {
 "id": "e12504",
@@ -12192,6 +12143,55 @@
 "score": 66.59,
 "field": 90.37,
 "results": "53801_55624_W21E"
+}
+]
+},
+{
+"id": "e141690",
+"name": "Ellen Skovbjerg",
+"sex": "F",
+"birth_year": 2007,
+"club": "Frölunda OL",
+"country": "SWE",
+"physic": 67.35,
+"technique": 60.07,
+"adjusted_races": 8,
+"all_races": 8,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "SM, natt (Swedish League, #3)",
+"date": "2026-04-10",
+"klass": "D20",
+"place": 20,
+"of": 47,
+"behind": 1324,
+"score": 75.05,
+"field": 74.89,
+"results": "52726_54529_D20"
+},
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-12",
+"klass": "D20-1",
+"place": 17,
+"of": 21,
+"behind": 1362,
+"score": 65.84,
+"field": 84.68,
+"results": "56195_58063_D201"
+},
+{
+"race": "25mannamedeln (WRE)",
+"date": "2026-10-11",
+"klass": "D20E",
+"place": 31,
+"of": 66,
+"behind": 817,
+"score": 65.05,
+"field": 86.16,
+"results": "55918_57782_D20E"
 }
 ]
 },
@@ -12448,21 +12448,6 @@
 ]
 },
 {
-"id": "e249870",
-"name": "Patricia Toledo",
-"sex": "F",
-"birth_year": 2004,
-"club": "IKHP Huskvarna Idrottsklubb",
-"country": "SWE",
-"physic": 66.8,
-"technique": 33.52,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e105260",
 "name": "Alice Rytterstedt",
 "sex": "F",
@@ -12512,6 +12497,21 @@
 ]
 },
 {
+"id": "e249870",
+"name": "Patricia Toledo",
+"sex": "F",
+"birth_year": 2004,
+"club": "IKHP Huskvarna Idrottsklubb",
+"country": "SWE",
+"physic": 66.8,
+"technique": 33.52,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e157009",
 "name": "Ingrid Hedman",
 "sex": "F",
@@ -12557,21 +12557,6 @@
 "merits": []
 },
 {
-"id": "e24939",
-"name": "Vilma Engström",
-"sex": "F",
-"birth_year": 2004,
-"club": "OK Orion",
-"country": "SWE",
-"physic": 66.73,
-"technique": 78.03,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e52276",
 "name": "Lovisa Gustafsson",
 "sex": "F",
@@ -12582,6 +12567,21 @@
 "technique": 48.25,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e24939",
+"name": "Vilma Engström",
+"sex": "F",
+"birth_year": 2004,
+"club": "OK Orion",
+"country": "SWE",
+"physic": 66.73,
+"technique": 78.03,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -12933,21 +12933,6 @@
 "merits": []
 },
 {
-"id": "e106619",
-"name": "Maja Nordenfelt",
-"sex": "F",
-"birth_year": 2005,
-"club": "Tolered-Utby Ol-klubb",
-"country": "SWE",
-"physic": 65.95,
-"technique": 95.38,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e35892",
 "name": "Elvira Larsson",
 "sex": "F",
@@ -12958,6 +12943,21 @@
 "technique": 42.92,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e106619",
+"name": "Maja Nordenfelt",
+"sex": "F",
+"birth_year": 2005,
+"club": "Tolered-Utby Ol-klubb",
+"country": "SWE",
+"physic": 65.95,
+"technique": 95.38,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -14174,21 +14174,6 @@
 "merits": []
 },
 {
-"id": "e117337",
-"name": "Maja Sveder",
-"sex": "F",
-"birth_year": 2009,
-"club": "Domnarvets GOIF",
-"country": "SWE",
-"physic": 63.62,
-"technique": 55.63,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e174357",
 "name": "Magdalena Hajkova",
 "sex": "F",
@@ -14214,6 +14199,21 @@
 "technique": 70.48,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e117337",
+"name": "Maja Sveder",
+"sex": "F",
+"birth_year": 2009,
+"club": "Domnarvets GOIF",
+"country": "SWE",
+"physic": 63.62,
+"technique": 55.63,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -14670,21 +14670,6 @@
 "merits": []
 },
 {
-"id": "e35709",
-"name": "Maja Ahlström",
-"sex": "F",
-"birth_year": 2004,
-"club": "Västerås SOK",
-"country": "SWE",
-"physic": 62.55,
-"technique": 79.92,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e94374",
 "name": "Miranda Strand",
 "sex": "F",
@@ -14695,6 +14680,21 @@
 "technique": 100.0,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e35709",
+"name": "Maja Ahlström",
+"sex": "F",
+"birth_year": 2004,
+"club": "Västerås SOK",
+"country": "SWE",
+"physic": 62.55,
+"technique": 79.92,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -14843,55 +14843,6 @@
 ]
 },
 {
-"id": "e94698",
-"name": "Elin Doering",
-"sex": "F",
-"birth_year": 2007,
-"club": "Garphyttans IF",
-"country": "SWE",
-"physic": 62.29,
-"technique": 82.54,
-"adjusted_races": 6,
-"all_races": 6,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "SM, medel (Swedish League, #6)",
-"date": "2026-08-22",
-"klass": "D20 B-Final",
-"place": 5,
-"of": 27,
-"behind": 226,
-"score": 66.6,
-"field": 70.94,
-"results": "54929_56785_D20BFinal"
-},
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-12",
-"klass": "D20-2",
-"place": 18,
-"of": 22,
-"behind": 1553,
-"score": 61.57,
-"field": 84.04,
-"results": "56195_58063_D202"
-},
-{
-"race": "SM, natt (Swedish League, #3)",
-"date": "2026-04-10",
-"klass": "D20",
-"place": 35,
-"of": 47,
-"behind": 2054,
-"score": 60.93,
-"field": 85.52,
-"results": "52726_54529_D20"
-}
-]
-},
-{
 "id": "e34914",
 "name": "Lisa Börnstedt",
 "sex": "F",
@@ -14937,6 +14888,55 @@
 "score": 59.38,
 "field": 57.54,
 "results": "53556_55363_D21Kort"
+}
+]
+},
+{
+"id": "e94698",
+"name": "Elin Doering",
+"sex": "F",
+"birth_year": 2007,
+"club": "Garphyttans IF",
+"country": "SWE",
+"physic": 62.29,
+"technique": 82.54,
+"adjusted_races": 6,
+"all_races": 6,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "SM, medel (Swedish League, #6)",
+"date": "2026-08-22",
+"klass": "D20 B-Final",
+"place": 5,
+"of": 27,
+"behind": 226,
+"score": 66.6,
+"field": 70.94,
+"results": "54929_56785_D20BFinal"
+},
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-12",
+"klass": "D20-2",
+"place": 18,
+"of": 22,
+"behind": 1553,
+"score": 61.57,
+"field": 84.04,
+"results": "56195_58063_D202"
+},
+{
+"race": "SM, natt (Swedish League, #3)",
+"date": "2026-04-10",
+"klass": "D20",
+"place": 35,
+"of": 47,
+"behind": 2054,
+"score": 60.93,
+"field": 85.52,
+"results": "52726_54529_D20"
 }
 ]
 },
@@ -15020,21 +15020,6 @@
 "merits": []
 },
 {
-"id": "e212003",
-"name": "Linn M. Bjørnstad Waaler",
-"sex": "F",
-"birth_year": 2000,
-"club": "Ås-NMBU Orientering",
-"country": "NOR",
-"physic": 62.12,
-"technique": 56.37,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e131071",
 "name": "Julia Ek",
 "sex": "F",
@@ -15043,6 +15028,21 @@
 "country": "SWE",
 "physic": 62.12,
 "technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e212003",
+"name": "Linn M. Bjørnstad Waaler",
+"sex": "F",
+"birth_year": 2000,
+"club": "Ås-NMBU Orientering",
+"country": "NOR",
+"physic": 62.12,
+"technique": 56.37,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -15159,21 +15159,6 @@
 ]
 },
 {
-"id": "e124332",
-"name": "Hedvig Grahn",
-"sex": "F",
-"birth_year": 2009,
-"club": "IFK Göteborg Orientering",
-"country": "SWE",
-"physic": 61.78,
-"technique": 26.67,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e133743",
 "name": "Inga Skaarer Wiklund",
 "sex": "F",
@@ -15184,6 +15169,21 @@
 "technique": 80.84,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e124332",
+"name": "Hedvig Grahn",
+"sex": "F",
+"birth_year": 2009,
+"club": "IFK Göteborg Orientering",
+"country": "SWE",
+"physic": 61.78,
+"technique": 26.67,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -15587,6 +15587,21 @@
 "merits": []
 },
 {
+"id": "e204015",
+"name": "Madara Brice",
+"sex": "F",
+"birth_year": 1996,
+"club": "Tullinge SK",
+"country": "SWE",
+"physic": 61.09,
+"technique": 77.38,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e111790",
 "name": "Tindra Blomkvist",
 "sex": "F",
@@ -15634,21 +15649,6 @@
 "results": "53889_55714_D18"
 }
 ]
-},
-{
-"id": "e204015",
-"name": "Madara Brice",
-"sex": "F",
-"birth_year": 1996,
-"club": "Tullinge SK",
-"country": "SWE",
-"physic": 61.09,
-"technique": 77.38,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e12903",
@@ -16625,21 +16625,6 @@
 ]
 },
 {
-"id": "e23943",
-"name": "Lovisa Leman",
-"sex": "F",
-"birth_year": 1995,
-"club": "Göteborgs SK",
-"country": "SWE",
-"physic": 58.67,
-"technique": 40.53,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e49687",
 "name": "Emma Rindstig",
 "sex": "F",
@@ -16655,6 +16640,21 @@
 "merits": []
 },
 {
+"id": "e23943",
+"name": "Lovisa Leman",
+"sex": "F",
+"birth_year": 1995,
+"club": "Göteborgs SK",
+"country": "SWE",
+"physic": 58.67,
+"technique": 40.53,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e88224",
 "name": "Hanna Rydesäter",
 "sex": "F",
@@ -16665,21 +16665,6 @@
 "technique": 41.86,
 "adjusted_races": 3,
 "all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e70130",
-"name": "Maja Falk",
-"sex": "F",
-"birth_year": 2006,
-"club": "Sundbybergs IK",
-"country": "SWE",
-"physic": 58.59,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -16732,6 +16717,21 @@
 "results": "54929_56784_D182"
 }
 ]
+},
+{
+"id": "e70130",
+"name": "Maja Falk",
+"sex": "F",
+"birth_year": 2006,
+"club": "Sundbybergs IK",
+"country": "SWE",
+"physic": 58.59,
+"technique": 100.0,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e143449",
@@ -16873,21 +16873,6 @@
 "merits": []
 },
 {
-"id": "e4412",
-"name": "Lovisa Tjernström",
-"sex": "F",
-"birth_year": 1990,
-"club": "Sävedalens AIK",
-"country": "SWE",
-"physic": 58.12,
-"technique": 66.99,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e110625",
 "name": "Wilma Wikström",
 "sex": "F",
@@ -16935,6 +16920,21 @@
 "results": "52726_54529_D20"
 }
 ]
+},
+{
+"id": "e4412",
+"name": "Lovisa Tjernström",
+"sex": "F",
+"birth_year": 1990,
+"club": "Sävedalens AIK",
+"country": "SWE",
+"physic": 58.12,
+"technique": 66.99,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e92982",
@@ -17483,21 +17483,6 @@
 ]
 },
 {
-"id": "e143054",
-"name": "Selma Sundberg",
-"sex": "F",
-"birth_year": 2008,
-"club": "Sundbybergs IK",
-"country": "SWE",
-"physic": 57.2,
-"technique": 93.77,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e50528",
 "name": "Josefin Erlandsson",
 "sex": "F",
@@ -17508,6 +17493,21 @@
 "technique": 55.4,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e143054",
+"name": "Selma Sundberg",
+"sex": "F",
+"birth_year": 2008,
+"club": "Sundbybergs IK",
+"country": "SWE",
+"physic": 57.2,
+"technique": 93.77,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -17682,6 +17682,21 @@
 "merits": []
 },
 {
+"id": "e129669",
+"name": "Astrid Hjelm",
+"sex": "F",
+"birth_year": 2007,
+"club": "Lunds OK",
+"country": "SWE",
+"physic": 56.71,
+"technique": 51.2,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e110312",
 "name": "Tilda Berggren",
 "sex": "F",
@@ -17729,21 +17744,6 @@
 "results": "52726_54529_D20"
 }
 ]
-},
-{
-"id": "e129669",
-"name": "Astrid Hjelm",
-"sex": "F",
-"birth_year": 2007,
-"club": "Lunds OK",
-"country": "SWE",
-"physic": 56.71,
-"technique": 51.2,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e28698",
@@ -18584,21 +18584,6 @@
 "merits": []
 },
 {
-"id": "e20870",
-"name": "Amanda Johansson",
-"sex": "F",
-"birth_year": 1996,
-"club": "OK Orion",
-"country": "SWE",
-"physic": 53.67,
-"technique": 80.33,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e142185",
 "name": "Linnea Westfeldt",
 "sex": "F",
@@ -18607,6 +18592,21 @@
 "country": "SWE",
 "physic": 53.67,
 "technique": 76.54,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e20870",
+"name": "Amanda Johansson",
+"sex": "F",
+"birth_year": 1996,
+"club": "OK Orion",
+"country": "SWE",
+"physic": 53.67,
+"technique": 80.33,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -18719,21 +18719,6 @@
 "merits": []
 },
 {
-"id": "e91118",
-"name": "Klara Bäckstäde",
-"sex": "F",
-"birth_year": 2004,
-"club": "Visborgs OK",
-"country": "SWE",
-"physic": 53.22,
-"technique": 2.39,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e217867",
 "name": "Inka Boldingh Debernard",
 "sex": "F",
@@ -18744,6 +18729,21 @@
 "technique": 74.27,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e91118",
+"name": "Klara Bäckstäde",
+"sex": "F",
+"birth_year": 2004,
+"club": "Visborgs OK",
+"country": "SWE",
+"physic": 53.22,
+"technique": 2.39,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -18869,21 +18869,6 @@
 "merits": []
 },
 {
-"id": "e77048",
-"name": "Vera Folkestad",
-"sex": "F",
-"birth_year": 2008,
-"club": "Anderstorps OK",
-"country": "SWE",
-"physic": 52.59,
-"technique": 61.33,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e155711",
 "name": "Märta Creutzer Lans",
 "sex": "F",
@@ -18894,6 +18879,21 @@
 "technique": 33.27,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e77048",
+"name": "Vera Folkestad",
+"sex": "F",
+"birth_year": 2008,
+"club": "Anderstorps OK",
+"country": "SWE",
+"physic": 52.59,
+"technique": 61.33,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -19019,21 +19019,6 @@
 "merits": []
 },
 {
-"id": "e74679",
-"name": "Petra Eklund",
-"sex": "F",
-"birth_year": 1989,
-"club": "Lunds OK",
-"country": "SWE",
-"physic": 52.17,
-"technique": 21.92,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e35059",
 "name": "Tindra Hjort",
 "sex": "F",
@@ -19044,6 +19029,21 @@
 "technique": 3.16,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e74679",
+"name": "Petra Eklund",
+"sex": "F",
+"birth_year": 1989,
+"club": "Lunds OK",
+"country": "SWE",
+"physic": 52.17,
+"technique": 21.92,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -19323,21 +19323,6 @@
 "merits": []
 },
 {
-"id": "e87201",
-"name": "Elisabet Engberg",
-"sex": "F",
-"birth_year": 2008,
-"club": "Sundsvalls OK",
-"country": "SWE",
-"physic": 50.68,
-"technique": 82.17,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e76906",
 "name": "Rebecka Rundblad",
 "sex": "F",
@@ -19348,6 +19333,21 @@
 "technique": 8.42,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e87201",
+"name": "Elisabet Engberg",
+"sex": "F",
+"birth_year": 2008,
+"club": "Sundsvalls OK",
+"country": "SWE",
+"physic": 50.68,
+"technique": 82.17,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -19402,21 +19402,6 @@
 ]
 },
 {
-"id": "e181746",
-"name": "Mathilde Sønsterudbråten",
-"sex": "F",
-"birth_year": 1999,
-"club": "Lillomarka OL",
-"country": "NOR",
-"physic": 50.62,
-"technique": 38.3,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e101610",
 "name": "Kajsa Wallin",
 "sex": "F",
@@ -19425,6 +19410,21 @@
 "country": "SWE",
 "physic": 50.62,
 "technique": 74.21,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e181746",
+"name": "Mathilde Sønsterudbråten",
+"sex": "F",
+"birth_year": 1999,
+"club": "Lillomarka OL",
+"country": "NOR",
+"physic": 50.62,
+"technique": 38.3,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -19586,21 +19586,6 @@
 "merits": []
 },
 {
-"id": "e56216",
-"name": "Emma Hallendal",
-"sex": "F",
-"birth_year": 2005,
-"club": "Söders-Tyresö",
-"country": "SWE",
-"physic": 49.79,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e128401",
 "name": "Evelina Petersson",
 "sex": "F",
@@ -19611,6 +19596,21 @@
 "technique": 64.14,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e56216",
+"name": "Emma Hallendal",
+"sex": "F",
+"birth_year": 2005,
+"club": "Söders-Tyresö",
+"country": "SWE",
+"physic": 49.79,
+"technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -20213,21 +20213,6 @@
 "merits": []
 },
 {
-"id": "e180095",
-"name": "Ebba Nilsson",
-"sex": "F",
-"birth_year": 2009,
-"club": "OK Enen",
-"country": "SWE",
-"physic": 45.68,
-"technique": 74.45,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e4092",
 "name": "Sara Ivarsson",
 "sex": "F",
@@ -20236,6 +20221,21 @@
 "country": "SWE",
 "physic": 45.68,
 "technique": 72.84,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e180095",
+"name": "Ebba Nilsson",
+"sex": "F",
+"birth_year": 2009,
+"club": "OK Enen",
+"country": "SWE",
+"physic": 45.68,
+"technique": 74.45,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -20858,21 +20858,6 @@
 "merits": []
 },
 {
-"id": "e74234",
-"name": "Hilma Ekström",
-"sex": "F",
-"birth_year": 2007,
-"club": "Stenungsunds OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e267404",
 "name": "Nadiia Abramenko",
 "sex": "F",
@@ -20888,27 +20873,12 @@
 "merits": []
 },
 {
-"id": "e116935",
-"name": "Lova Jonsson",
+"id": "e21508",
+"name": "Emma Bengtsson",
 "sex": "F",
-"birth_year": 2009,
-"club": "Skarpnäcks OL",
+"birth_year": 1997,
+"club": "Linköpings OK",
 "country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:kiia kuusikko:F",
-"name": "Kiia Kuusikko",
-"sex": "F",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
@@ -20923,51 +20893,6 @@
 "sex": "F",
 "birth_year": 2003,
 "club": "OK Ravinen",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e75112",
-"name": "Alva Hagelberg",
-"sex": "F",
-"birth_year": 2006,
-"club": "Eksjö SOK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:joana monge conti:F",
-"name": "Joana Monge Conti",
-"sex": "F",
-"birth_year": null,
-"club": "Team Spain",
-"country": "ESP",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e146371",
-"name": "Tuva Andersson",
-"sex": "F",
-"birth_year": 2008,
-"club": "NAIS Orienteringsklubb",
 "country": "SWE",
 "physic": null,
 "technique": null,
@@ -20993,12 +20918,12 @@
 "merits": []
 },
 {
-"id": "n:arlet sales turro:F",
-"name": "Arlet Sales Turró",
+"id": "n:anni jantunen:F",
+"name": "Anni Jantunen",
 "sex": "F",
 "birth_year": null,
-"club": "Team Spain",
-"country": "ESP",
+"club": "Team Fin",
+"country": null,
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
@@ -21008,11 +20933,11 @@
 "merits": []
 },
 {
-"id": "e11990",
-"name": "Anna Kindlundh",
+"id": "e133090",
+"name": "Julia Gellerbrant",
 "sex": "F",
-"birth_year": 1996,
-"club": "Södertälje-Nykvarn OF",
+"birth_year": 2006,
+"club": "Malungs OK Skogsmårdarna",
 "country": "SWE",
 "physic": null,
 "technique": null,
@@ -21023,12 +20948,12 @@
 "merits": []
 },
 {
-"id": "n:maria guma martinez:F",
-"name": "María Gumà Martínez",
+"id": "n:lotta laakso:F",
+"name": "Lotta Laakso",
 "sex": "F",
 "birth_year": null,
-"club": "Team Spain",
-"country": "ESP",
+"club": "Team Fin",
+"country": null,
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
@@ -21053,16 +20978,61 @@
 "merits": []
 },
 {
-"id": "e232296",
-"name": "Guinedell Sanjaume Faja",
+"id": "e215068",
+"name": "Maria Terehova",
 "sex": "F",
-"birth_year": 2006,
-"club": "Team Spain",
-"country": "ESP",
+"birth_year": 2007,
+"club": "OK Denseln",
+"country": "SWE",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:roosa muukkonen:F",
+"name": "Roosa Muukkonen",
+"sex": "F",
+"birth_year": null,
+"club": "Team Fin",
+"country": null,
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:kiia kuusikko:F",
+"name": "Kiia Kuusikko",
+"sex": "F",
+"birth_year": null,
+"club": "Team Fin",
+"country": null,
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e11990",
+"name": "Anna Kindlundh",
+"sex": "F",
+"birth_year": 1996,
+"club": "Södertälje-Nykvarn OF",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -21083,8 +21053,38 @@
 "merits": []
 },
 {
-"id": "n:roosa muukkonen:F",
-"name": "Roosa Muukkonen",
+"id": "n:joana monge conti:F",
+"name": "Joana Monge Conti",
+"sex": "F",
+"birth_year": null,
+"club": "Team Spain",
+"country": "ESP",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e116935",
+"name": "Lova Jonsson",
+"sex": "F",
+"birth_year": 2009,
+"club": "Skarpnäcks OL",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:matilda nynas:F",
+"name": "Matilda Nynäs",
 "sex": "F",
 "birth_year": null,
 "club": "Team Fin",
@@ -21113,106 +21113,31 @@
 "merits": []
 },
 {
-"id": "n:matilda nynas:F",
-"name": "Matilda Nynäs",
+"id": "e74234",
+"name": "Hilma Ekström",
 "sex": "F",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:lotta laakso:F",
-"name": "Lotta Laakso",
-"sex": "F",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e21508",
-"name": "Emma Bengtsson",
-"sex": "F",
-"birth_year": 1997,
-"club": "Linköpings OK",
+"birth_year": 2007,
+"club": "Stenungsunds OK",
 "country": "SWE",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
-"all_races": 2,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
 },
 {
-"id": "e133090",
-"name": "Julia Gellerbrant",
+"id": "e232296",
+"name": "Guinedell Sanjaume Faja",
 "sex": "F",
 "birth_year": 2006,
-"club": "Malungs OK Skogsmårdarna",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e215068",
-"name": "Maria Terehova",
-"sex": "F",
-"birth_year": 2007,
-"club": "OK Denseln",
-"country": "SWE",
+"club": "Team Spain",
+"country": "ESP",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
 "all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:anni jantunen:F",
-"name": "Anni Jantunen",
-"sex": "F",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e168814",
-"name": "Klara Loberg",
-"sex": "F",
-"birth_year": 2007,
-"club": "Järfälla OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -21233,12 +21158,57 @@
 "merits": []
 },
 {
+"id": "e146371",
+"name": "Tuva Andersson",
+"sex": "F",
+"birth_year": 2008,
+"club": "NAIS Orienteringsklubb",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:arlet sales turro:F",
+"name": "Arlet Sales Turró",
+"sex": "F",
+"birth_year": null,
+"club": "Team Spain",
+"country": "ESP",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e218009",
 "name": "Anni Mäki-Hokkonen",
 "sex": "F",
 "birth_year": null,
 "club": "Team Fin",
 "country": null,
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "n:maria guma martinez:F",
+"name": "María Gumà Martínez",
+"sex": "F",
+"birth_year": null,
+"club": "Team Spain",
+"country": "ESP",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
@@ -21278,15 +21248,30 @@
 "merits": []
 },
 {
-"id": "e221379",
-"name": "Katja Lahtinen",
+"id": "e75112",
+"name": "Alva Hagelberg",
 "sex": "F",
-"birth_year": 1992,
-"club": "Helsingin Suunnistajat",
-"country": "FIN",
-"physic": -1.94,
-"technique": 0.0,
-"adjusted_races": 1,
+"birth_year": 2006,
+"club": "Eksjö SOK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e168814",
+"name": "Klara Loberg",
+"sex": "F",
+"birth_year": 2007,
+"club": "Järfälla OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
 "all_races": 1,
 "international": false,
 "visible": false,
@@ -21299,6 +21284,21 @@
 "birth_year": 1995,
 "club": "Kils OK",
 "country": "SWE",
+"physic": -1.94,
+"technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e221379",
+"name": "Katja Lahtinen",
+"sex": "F",
+"birth_year": 1992,
+"club": "Helsingin Suunnistajat",
+"country": "FIN",
 "physic": -1.94,
 "technique": 0.0,
 "adjusted_races": 1,
@@ -23905,21 +23905,6 @@
 "merits": []
 },
 {
-"id": "e86144",
-"name": "Edvin Nilsson",
-"sex": "M",
-"birth_year": 2004,
-"club": "Långhundra IF",
-"country": "SWE",
-"physic": 88.43,
-"technique": 96.76,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "w:daniel bolehovsky:M",
 "name": "Daniel Bolehovsky",
 "sex": "M",
@@ -23967,6 +23952,21 @@
 "results": "ws20260926EMmedelH_0_H21"
 }
 ]
+},
+{
+"id": "e86144",
+"name": "Edvin Nilsson",
+"sex": "M",
+"birth_year": 2004,
+"club": "Långhundra IF",
+"country": "SWE",
+"physic": 88.43,
+"technique": 96.76,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "w:ueli werren:M",
@@ -24875,55 +24875,6 @@
 ]
 },
 {
-"id": "e19199",
-"name": "Emil Ljungemyr",
-"sex": "M",
-"birth_year": 1998,
-"club": "OK Kolmården",
-"country": "SWE",
-"physic": 86.8,
-"technique": 94.17,
-"adjusted_races": 6,
-"all_races": 6,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "SM, medel (Swedish League, #6)",
-"date": "2026-08-22",
-"klass": "H21 B-Final",
-"place": 3,
-"of": 37,
-"behind": 37,
-"score": 91.52,
-"field": 88.07,
-"results": "54929_56785_H21BFinal"
-},
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-13",
-"klass": "H21A",
-"place": 23,
-"of": 41,
-"behind": 853,
-"score": 86.8,
-"field": 92.69,
-"results": "56195_58064_H21A"
-},
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-12",
-"klass": "H21-2",
-"place": 7,
-"of": 31,
-"behind": 211,
-"score": 86.03,
-"field": 90.11,
-"results": "56195_58063_H212"
-}
-]
-},
-{
 "id": "e177059",
 "name": "Nicolas Kastner",
 "sex": "M",
@@ -24969,6 +24920,55 @@
 "score": 83.41,
 "field": 93.67,
 "results": "55918_57782_M21E1"
+}
+]
+},
+{
+"id": "e19199",
+"name": "Emil Ljungemyr",
+"sex": "M",
+"birth_year": 1998,
+"club": "OK Kolmården",
+"country": "SWE",
+"physic": 86.8,
+"technique": 94.17,
+"adjusted_races": 6,
+"all_races": 6,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "SM, medel (Swedish League, #6)",
+"date": "2026-08-22",
+"klass": "H21 B-Final",
+"place": 3,
+"of": 37,
+"behind": 37,
+"score": 91.52,
+"field": 88.07,
+"results": "54929_56785_H21BFinal"
+},
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-13",
+"klass": "H21A",
+"place": 23,
+"of": 41,
+"behind": 853,
+"score": 86.8,
+"field": 92.69,
+"results": "56195_58064_H21A"
+},
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-12",
+"klass": "H21-2",
+"place": 7,
+"of": 31,
+"behind": 211,
+"score": 86.03,
+"field": 90.11,
+"results": "56195_58063_H212"
 }
 ]
 },
@@ -25640,21 +25640,6 @@
 "merits": []
 },
 {
-"id": "e104878",
-"name": "Niklas Ekström",
-"sex": "M",
-"birth_year": 2002,
-"club": "MS Parma",
-"country": "FIN",
-"physic": 85.69,
-"technique": 89.67,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e14815",
 "name": "Olle Boström",
 "sex": "M",
@@ -25665,6 +25650,21 @@
 "technique": 100.0,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e104878",
+"name": "Niklas Ekström",
+"sex": "M",
+"birth_year": 2002,
+"club": "MS Parma",
+"country": "FIN",
+"physic": 85.69,
+"technique": 89.67,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -27096,6 +27096,21 @@
 "merits": []
 },
 {
+"id": "e230991",
+"name": "Mads Christian Maarup",
+"sex": "M",
+"birth_year": 2006,
+"club": "Eksjö SOK",
+"country": "SWE",
+"physic": 83.82,
+"technique": 55.58,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e29176",
 "name": "Emil Björnlinger",
 "sex": "M",
@@ -27145,16 +27160,16 @@
 ]
 },
 {
-"id": "e230991",
-"name": "Mads Christian Maarup",
+"id": "e159180",
+"name": "Florian Attinger",
 "sex": "M",
-"birth_year": 2006,
-"club": "Eksjö SOK",
+"birth_year": 1997,
+"club": "IFK Mora OK",
 "country": "SWE",
-"physic": 83.82,
-"technique": 55.58,
-"adjusted_races": 4,
-"all_races": 4,
+"physic": 83.77,
+"technique": 100.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -27170,21 +27185,6 @@
 "technique": 93.47,
 "adjusted_races": 4,
 "all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e159180",
-"name": "Florian Attinger",
-"sex": "M",
-"birth_year": 1997,
-"club": "IFK Mora OK",
-"country": "SWE",
-"physic": 83.77,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -27213,21 +27213,6 @@
 "country": "SWE",
 "physic": 83.6,
 "technique": 88.81,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "n:florian fritzen:M",
-"name": "Florian Fritzen",
-"sex": "M",
-"birth_year": null,
-"club": "Team Fin",
-"country": null,
-"physic": 83.59,
-"technique": 67.23,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -27282,6 +27267,21 @@
 "results": "53556_55363_H21"
 }
 ]
+},
+{
+"id": "n:florian fritzen:M",
+"name": "Florian Fritzen",
+"sex": "M",
+"birth_year": null,
+"club": "Team Fin",
+"country": null,
+"physic": 83.59,
+"technique": 67.23,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e12560",
@@ -27906,21 +27906,6 @@
 "merits": []
 },
 {
-"id": "e24560",
-"name": "Kent Ohlsson",
-"sex": "M",
-"birth_year": 1989,
-"club": "Södertälje-Nykvarn OF",
-"country": "SWE",
-"physic": 83.05,
-"technique": 94.47,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e137715",
 "name": "Daniel Hájek",
 "sex": "M",
@@ -27968,6 +27953,21 @@
 "results": "55918_57782_H212"
 }
 ]
+},
+{
+"id": "e24560",
+"name": "Kent Ohlsson",
+"sex": "M",
+"birth_year": 1989,
+"club": "Södertälje-Nykvarn OF",
+"country": "SWE",
+"physic": 83.05,
+"technique": 94.47,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e17586",
@@ -28030,6 +28030,21 @@
 "merits": []
 },
 {
+"id": "e123809",
+"name": "Stefan Zölly",
+"sex": "M",
+"birth_year": 2006,
+"club": "OK Kåre",
+"country": "SWE",
+"physic": 82.89,
+"technique": 65.6,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e250665",
 "name": "Tautvydas Rimkus",
 "sex": "M",
@@ -28077,21 +28092,6 @@
 "results": "ws20260926EMmedelH_0_H21"
 }
 ]
-},
-{
-"id": "e123809",
-"name": "Stefan Zölly",
-"sex": "M",
-"birth_year": 2006,
-"club": "OK Kåre",
-"country": "SWE",
-"physic": 82.89,
-"technique": 65.6,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "w:tomasz rzenca:M",
@@ -28837,21 +28837,6 @@
 "merits": []
 },
 {
-"id": "e11105",
-"name": "Filip Wadsten",
-"sex": "M",
-"birth_year": 1996,
-"club": "Malungs OK Skogsmårdarna",
-"country": "SWE",
-"physic": 82.21,
-"technique": 95.63,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e238986",
 "name": "Rune De Clercq",
 "sex": "M",
@@ -28862,6 +28847,21 @@
 "technique": 84.89,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e11105",
+"name": "Filip Wadsten",
+"sex": "M",
+"birth_year": 1996,
+"club": "Malungs OK Skogsmårdarna",
+"country": "SWE",
+"physic": 82.21,
+"technique": 95.63,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -29462,21 +29462,6 @@
 "merits": []
 },
 {
-"id": "e10983",
-"name": "Björn Cederberg",
-"sex": "M",
-"birth_year": 1995,
-"club": "Vänersborgs SK",
-"country": "SWE",
-"physic": 81.64,
-"technique": 67.82,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e268230",
 "name": "Álvaro Pérez Otero",
 "sex": "M",
@@ -29487,6 +29472,21 @@
 "technique": 16.91,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e10983",
+"name": "Björn Cederberg",
+"sex": "M",
+"birth_year": 1995,
+"club": "Vänersborgs SK",
+"country": "SWE",
+"physic": 81.64,
+"technique": 67.82,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -30188,21 +30188,6 @@
 "merits": []
 },
 {
-"id": "e72575",
-"name": "Sindre Østgulen Deisz",
-"sex": "M",
-"birth_year": 1994,
-"club": "Nydalens SK",
-"country": "NOR",
-"physic": 80.63,
-"technique": 78.84,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "w:jekabs locmelis:M",
 "name": "Jekabs Locmelis",
 "sex": "M",
@@ -30250,6 +30235,21 @@
 "results": "ws20260926EMmedelH_0_H21"
 }
 ]
+},
+{
+"id": "e72575",
+"name": "Sindre Østgulen Deisz",
+"sex": "M",
+"birth_year": 1994,
+"club": "Nydalens SK",
+"country": "NOR",
+"physic": 80.63,
+"technique": 78.84,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e197164",
@@ -30380,21 +30380,6 @@
 "merits": []
 },
 {
-"id": "e254843",
-"name": "Bernat Selva Torras",
-"sex": "M",
-"birth_year": 2006,
-"club": "OK Skogshjortarna",
-"country": "SWE",
-"physic": 80.44,
-"technique": 96.45,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e80133",
 "name": "Anders Nordberg",
 "sex": "M",
@@ -30405,6 +30390,21 @@
 "technique": 81.62,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e254843",
+"name": "Bernat Selva Torras",
+"sex": "M",
+"birth_year": 2006,
+"club": "OK Skogshjortarna",
+"country": "SWE",
+"physic": 80.44,
+"technique": 96.45,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -30692,21 +30692,6 @@
 "merits": []
 },
 {
-"id": "e147995",
-"name": "Ludvig Eggöy Markhester",
-"sex": "M",
-"birth_year": 2007,
-"club": "IFK Mora OK",
-"country": "SWE",
-"physic": 80.12,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e80521",
 "name": "Magnus Dewett",
 "sex": "M",
@@ -30730,6 +30715,21 @@
 "country": "SWE",
 "physic": 80.12,
 "technique": 87.93,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e147995",
+"name": "Ludvig Eggöy Markhester",
+"sex": "M",
+"birth_year": 2007,
+"club": "IFK Mora OK",
+"country": "SWE",
+"physic": 80.12,
+"technique": 100.0,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -30797,21 +30797,6 @@
 "merits": []
 },
 {
-"id": "e71710",
-"name": "Axel Örnhagen Jørgensen",
-"sex": "M",
-"birth_year": 2007,
-"club": "Farum Tisvilde OK",
-"country": "DEN",
-"physic": 79.99,
-"technique": 95.13,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e14210",
 "name": "Elias Bäcklund Ekvall",
 "sex": "M",
@@ -30822,6 +30807,21 @@
 "technique": 72.8,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e71710",
+"name": "Axel Örnhagen Jørgensen",
+"sex": "M",
+"birth_year": 2007,
+"club": "Farum Tisvilde OK",
+"country": "DEN",
+"physic": 79.99,
+"technique": 95.13,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -31639,21 +31639,6 @@
 "merits": []
 },
 {
-"id": "e9780",
-"name": "Oskar Andrén",
-"sex": "M",
-"birth_year": 1994,
-"club": "OK Tisaren",
-"country": "SWE",
-"physic": 78.97,
-"technique": 97.74,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e3438",
 "name": "Joakim Karlsson",
 "sex": "M",
@@ -31664,6 +31649,21 @@
 "technique": 89.32,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e9780",
+"name": "Oskar Andrén",
+"sex": "M",
+"birth_year": 1994,
+"club": "OK Tisaren",
+"country": "SWE",
+"physic": 78.97,
+"technique": 97.74,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -32023,21 +32023,6 @@
 "merits": []
 },
 {
-"id": "e125809",
-"name": "Emil Øbro",
-"sex": "M",
-"birth_year": 1996,
-"club": "Sävedalens AIK",
-"country": "SWE",
-"physic": 78.55,
-"technique": 94.53,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e5593",
 "name": "Sebastian Tegnebratt",
 "sex": "M",
@@ -32048,6 +32033,21 @@
 "technique": 0.0,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e125809",
+"name": "Emil Øbro",
+"sex": "M",
+"birth_year": 1996,
+"club": "Sävedalens AIK",
+"country": "SWE",
+"physic": 78.55,
+"technique": 94.53,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -33374,6 +33374,21 @@
 "merits": []
 },
 {
+"id": "e143682",
+"name": "Mathias Buchgreitz",
+"sex": "M",
+"birth_year": 2003,
+"club": "Farum Tisvilde OK",
+"country": "DEN",
+"physic": 77.1,
+"technique": 84.68,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e30186",
 "name": "Albin Weiden",
 "sex": "M",
@@ -33423,16 +33438,16 @@
 ]
 },
 {
-"id": "e143682",
-"name": "Mathias Buchgreitz",
+"id": "e212791",
+"name": "Finn Selmer Duguid",
 "sex": "M",
-"birth_year": 2003,
-"club": "Farum Tisvilde OK",
-"country": "DEN",
-"physic": 77.1,
-"technique": 84.68,
-"adjusted_races": 2,
-"all_races": 2,
+"birth_year": 2008,
+"club": "Eksjö SOK",
+"country": "SWE",
+"physic": 77.08,
+"technique": 82.14,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -33487,21 +33502,6 @@
 ]
 },
 {
-"id": "e212791",
-"name": "Finn Selmer Duguid",
-"sex": "M",
-"birth_year": 2008,
-"club": "Eksjö SOK",
-"country": "SWE",
-"physic": 77.08,
-"technique": 82.14,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e41566",
 "name": "Jacob Påledal",
 "sex": "M",
@@ -33547,21 +33547,6 @@
 "merits": []
 },
 {
-"id": "e265320",
-"name": "Algirdas Bartkevicius",
-"sex": "M",
-"birth_year": 1995,
-"club": "OK Denseln",
-"country": "SWE",
-"physic": 76.84,
-"technique": 85.61,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e3278",
 "name": "Andreas Källming",
 "sex": "M",
@@ -33570,6 +33555,21 @@
 "country": "SWE",
 "physic": 76.84,
 "technique": 81.62,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e265320",
+"name": "Algirdas Bartkevicius",
+"sex": "M",
+"birth_year": 1995,
+"club": "OK Denseln",
+"country": "SWE",
+"physic": 76.84,
+"technique": 85.61,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -33938,55 +33938,6 @@
 "merits": []
 },
 {
-"id": "e85731",
-"name": "Hjalmar Axelsson",
-"sex": "M",
-"birth_year": 2006,
-"club": "FK Göingarna",
-"country": "SWE",
-"physic": 76.38,
-"technique": 94.57,
-"adjusted_races": 7,
-"all_races": 7,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-13",
-"klass": "H20A",
-"place": 12,
-"of": 41,
-"behind": 660,
-"score": 78.35,
-"field": 81.51,
-"results": "56195_58064_H20A"
-},
-{
-"race": "Kolmårdsmedeln (Swedish League, #2, WRE)",
-"date": "2026-04-05",
-"klass": "H20 Elit",
-"place": 14,
-"of": 90,
-"behind": 223,
-"score": 76.3,
-"field": 78.0,
-"results": "53086_54889_H20Elit"
-},
-{
-"race": "Sverigepremiären, medel",
-"date": "2026-02-28",
-"klass": "H20",
-"place": 5,
-"of": 35,
-"behind": 141,
-"score": 75.42,
-"field": 79.47,
-"results": "53555_55362_H20"
-}
-]
-},
-{
 "id": "e143355",
 "name": "Love Persson",
 "sex": "M",
@@ -34032,6 +33983,55 @@
 "score": 78.77,
 "field": 85.32,
 "results": "53556_55363_H21"
+}
+]
+},
+{
+"id": "e85731",
+"name": "Hjalmar Axelsson",
+"sex": "M",
+"birth_year": 2006,
+"club": "FK Göingarna",
+"country": "SWE",
+"physic": 76.38,
+"technique": 94.57,
+"adjusted_races": 7,
+"all_races": 7,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-13",
+"klass": "H20A",
+"place": 12,
+"of": 41,
+"behind": 660,
+"score": 78.35,
+"field": 81.51,
+"results": "56195_58064_H20A"
+},
+{
+"race": "Kolmårdsmedeln (Swedish League, #2, WRE)",
+"date": "2026-04-05",
+"klass": "H20 Elit",
+"place": 14,
+"of": 90,
+"behind": 223,
+"score": 76.3,
+"field": 78.0,
+"results": "53086_54889_H20Elit"
+},
+{
+"race": "Sverigepremiären, medel",
+"date": "2026-02-28",
+"klass": "H20",
+"place": 5,
+"of": 35,
+"behind": 141,
+"score": 75.42,
+"field": 79.47,
+"results": "53555_55362_H20"
 }
 ]
 },
@@ -34548,21 +34548,6 @@
 "merits": []
 },
 {
-"id": "e95934",
-"name": "Hugo Braam",
-"sex": "M",
-"birth_year": 2006,
-"club": "OK Denseln",
-"country": "SWE",
-"physic": 75.71,
-"technique": 81.74,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e16082",
 "name": "Emil Åberg",
 "sex": "M",
@@ -34573,6 +34558,21 @@
 "technique": 100.0,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e95934",
+"name": "Hugo Braam",
+"sex": "M",
+"birth_year": 2006,
+"club": "OK Denseln",
+"country": "SWE",
+"physic": 75.71,
+"technique": 81.74,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -35138,21 +35138,6 @@
 ]
 },
 {
-"id": "e26292",
-"name": "Mikael Håkansson",
-"sex": "M",
-"birth_year": 1988,
-"club": "OK Kolmården",
-"country": "SWE",
-"physic": 74.99,
-"technique": 93.24,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "w:fryderyk pryjma:M",
 "name": "Fryderyk Pryjma",
 "sex": "M",
@@ -35178,6 +35163,36 @@
 "results": "ws20260926EMmedelH_0_H21"
 }
 ]
+},
+{
+"id": "e26292",
+"name": "Mikael Håkansson",
+"sex": "M",
+"birth_year": 1988,
+"club": "OK Kolmården",
+"country": "SWE",
+"physic": 74.99,
+"technique": 93.24,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e261336",
+"name": "Ruari Cottier",
+"sex": "M",
+"birth_year": 2008,
+"club": "OK Ravinen",
+"country": "SWE",
+"physic": 74.97,
+"technique": 16.49,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e113368",
@@ -35227,21 +35242,6 @@
 "results": "55291_57153_H20ESVE"
 }
 ]
-},
-{
-"id": "e261336",
-"name": "Ruari Cottier",
-"sex": "M",
-"birth_year": 2008,
-"club": "OK Ravinen",
-"country": "SWE",
-"physic": 74.97,
-"technique": 16.49,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e74220",
@@ -35447,6 +35447,21 @@
 "merits": []
 },
 {
+"id": "e256255",
+"name": "Charlie Rennie",
+"sex": "M",
+"birth_year": 2003,
+"club": "IFK Lidingö SOK",
+"country": "SWE",
+"physic": 74.72,
+"technique": 91.0,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e249687",
 "name": "Anton Kupriyanov Hviid",
 "sex": "M",
@@ -35462,14 +35477,14 @@
 "merits": []
 },
 {
-"id": "e256255",
-"name": "Charlie Rennie",
+"id": "e34087",
+"name": "Emil Axelsson",
 "sex": "M",
-"birth_year": 2003,
-"club": "IFK Lidingö SOK",
+"birth_year": 2002,
+"club": "Sävedalens AIK",
 "country": "SWE",
-"physic": 74.72,
-"technique": 91.0,
+"physic": 74.67,
+"technique": 42.99,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -35487,21 +35502,6 @@
 "technique": 56.72,
 "adjusted_races": 1,
 "all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e34087",
-"name": "Emil Axelsson",
-"sex": "M",
-"birth_year": 2002,
-"club": "Sävedalens AIK",
-"country": "SWE",
-"physic": 74.67,
-"technique": 42.99,
-"adjusted_races": 2,
-"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -35676,21 +35676,6 @@
 "merits": []
 },
 {
-"id": "e34622",
-"name": "Hugo Ericsson",
-"sex": "M",
-"birth_year": 2003,
-"club": "Växjö OK",
-"country": "SWE",
-"physic": 74.34,
-"technique": 96.91,
-"adjusted_races": 3,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e216404",
 "name": "Isaac Hernandez Pindado",
 "sex": "M",
@@ -35740,15 +35725,15 @@
 ]
 },
 {
-"id": "e94589",
-"name": "Elis Peterson",
+"id": "e34622",
+"name": "Hugo Ericsson",
 "sex": "M",
-"birth_year": 2005,
-"club": "OK Denseln",
+"birth_year": 2003,
+"club": "Växjö OK",
 "country": "SWE",
-"physic": 74.29,
-"technique": 97.89,
-"adjusted_races": 4,
+"physic": 74.34,
+"technique": 96.91,
+"adjusted_races": 3,
 "all_races": 4,
 "international": false,
 "visible": false,
@@ -35785,16 +35770,16 @@
 "merits": []
 },
 {
-"id": "e267417",
-"name": "Jan Vaníček",
+"id": "e94589",
+"name": "Elis Peterson",
 "sex": "M",
-"birth_year": 2007,
-"club": "Turun Suunnistajat",
-"country": "FIN",
-"physic": 74.28,
-"technique": 96.79,
-"adjusted_races": 1,
-"all_races": 1,
+"birth_year": 2005,
+"club": "OK Denseln",
+"country": "SWE",
+"physic": 74.29,
+"technique": 97.89,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -35864,14 +35849,14 @@
 "merits": []
 },
 {
-"id": "e274206",
-"name": "Martin Vilismäe",
+"id": "e267417",
+"name": "Jan Vaníček",
 "sex": "M",
-"birth_year": 1989,
-"club": "SK Saue Tammed",
-"country": "EST",
-"physic": 74.27,
-"technique": 0.0,
+"birth_year": 2007,
+"club": "Turun Suunnistajat",
+"country": "FIN",
+"physic": 74.28,
+"technique": 96.79,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -35928,6 +35913,21 @@
 ]
 },
 {
+"id": "e274206",
+"name": "Martin Vilismäe",
+"sex": "M",
+"birth_year": 1989,
+"club": "SK Saue Tammed",
+"country": "EST",
+"physic": 74.27,
+"technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "w:jan erik naess:M",
 "name": "Jan Erik Naess",
 "sex": "M",
@@ -35965,6 +35965,21 @@
 "technique": 100.0,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e35380",
+"name": "Allan Hedberg",
+"sex": "M",
+"birth_year": 2001,
+"club": "Lunds OK",
+"country": "SWE",
+"physic": 74.09,
+"technique": 77.31,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -36032,21 +36047,6 @@
 "results": "55918_57782_H18E1"
 }
 ]
-},
-{
-"id": "e35380",
-"name": "Allan Hedberg",
-"sex": "M",
-"birth_year": 2001,
-"club": "Lunds OK",
-"country": "SWE",
-"physic": 74.09,
-"technique": 77.31,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e121703",
@@ -36177,6 +36177,36 @@
 "merits": []
 },
 {
+"id": "e219273",
+"name": "Vegard Kittilsen",
+"sex": "M",
+"birth_year": 2001,
+"club": "IFK Göteborg Orientering",
+"country": "SWE",
+"physic": 74.01,
+"technique": 92.6,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e75654",
+"name": "Matjaz Stanfel",
+"sex": "M",
+"birth_year": 1990,
+"club": "Malungs OK Skogsmårdarna",
+"country": "SWE",
+"physic": 74.01,
+"technique": 96.72,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e141868",
 "name": "Rasmus Viertel",
 "sex": "M",
@@ -36224,36 +36254,6 @@
 "results": "53753_55572_H20ESVE"
 }
 ]
-},
-{
-"id": "e219273",
-"name": "Vegard Kittilsen",
-"sex": "M",
-"birth_year": 2001,
-"club": "IFK Göteborg Orientering",
-"country": "SWE",
-"physic": 74.01,
-"technique": 92.6,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e75654",
-"name": "Matjaz Stanfel",
-"sex": "M",
-"birth_year": 1990,
-"club": "Malungs OK Skogsmårdarna",
-"country": "SWE",
-"physic": 74.01,
-"technique": 96.72,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e237146",
@@ -36391,6 +36391,21 @@
 "merits": []
 },
 {
+"id": "e16149",
+"name": "Oscar Stomberg",
+"sex": "M",
+"birth_year": 1999,
+"club": "Ulricehamns OK",
+"country": "SWE",
+"physic": 73.71,
+"technique": 44.97,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e28389",
 "name": "Melker Larsson",
 "sex": "M",
@@ -36438,21 +36453,6 @@
 "results": "53555_55362_H21"
 }
 ]
-},
-{
-"id": "e16149",
-"name": "Oscar Stomberg",
-"sex": "M",
-"birth_year": 1999,
-"club": "Ulricehamns OK",
-"country": "SWE",
-"physic": 73.71,
-"technique": 44.97,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e54967",
@@ -36681,16 +36681,16 @@
 ]
 },
 {
-"id": "e207258",
-"name": "Brais Piñeiro",
+"id": "e116202",
+"name": "Victor Beischer",
 "sex": "M",
-"birth_year": 1996,
-"club": "Snättringe SK",
+"birth_year": 2004,
+"club": "IK Uven",
 "country": "SWE",
 "physic": 73.5,
-"technique": 71.72,
-"adjusted_races": 2,
-"all_races": 2,
+"technique": 100.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -36711,6 +36711,21 @@
 "merits": []
 },
 {
+"id": "e207258",
+"name": "Brais Piñeiro",
+"sex": "M",
+"birth_year": 1996,
+"club": "Snättringe SK",
+"country": "SWE",
+"physic": 73.5,
+"technique": 71.72,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e136583",
 "name": "Arvid Andersson",
 "sex": "M",
@@ -36721,21 +36736,6 @@
 "technique": 81.87,
 "adjusted_races": 3,
 "all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e116202",
-"name": "Victor Beischer",
-"sex": "M",
-"birth_year": 2004,
-"club": "IK Uven",
-"country": "SWE",
-"physic": 73.5,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -38016,6 +38016,21 @@
 "merits": []
 },
 {
+"id": "e184078",
+"name": "Carl-Meijer Axelsson",
+"sex": "M",
+"birth_year": 2008,
+"club": "OK Ravinen",
+"country": "SWE",
+"physic": 71.64,
+"technique": 78.62,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e14022",
 "name": "Albin Andersson",
 "sex": "M",
@@ -38063,21 +38078,6 @@
 "results": "56195_58064_H21B"
 }
 ]
-},
-{
-"id": "e184078",
-"name": "Carl-Meijer Axelsson",
-"sex": "M",
-"birth_year": 2008,
-"club": "OK Ravinen",
-"country": "SWE",
-"physic": 71.64,
-"technique": 78.62,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e207396",
@@ -38358,21 +38358,6 @@
 "merits": []
 },
 {
-"id": "e84951",
-"name": "Joar Oldernes",
-"sex": "M",
-"birth_year": 1999,
-"club": "Lillomarka OL",
-"country": "NOR",
-"physic": 71.08,
-"technique": 60.69,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e19305",
 "name": "Eddie Karlsson",
 "sex": "M",
@@ -38420,6 +38405,21 @@
 "results": "56195_58063_H202"
 }
 ]
+},
+{
+"id": "e84951",
+"name": "Joar Oldernes",
+"sex": "M",
+"birth_year": 1999,
+"club": "Lillomarka OL",
+"country": "NOR",
+"physic": 71.08,
+"technique": 60.69,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e125462",
@@ -38659,21 +38659,6 @@
 "merits": []
 },
 {
-"id": "e88223",
-"name": "Elias Ljungdell",
-"sex": "M",
-"birth_year": 2005,
-"club": "Täby OK",
-"country": "SWE",
-"physic": 70.82,
-"technique": 29.81,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e194757",
 "name": "Niels Christian Hellerud",
 "sex": "M",
@@ -38684,6 +38669,21 @@
 "technique": 45.93,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e88223",
+"name": "Elias Ljungdell",
+"sex": "M",
+"birth_year": 2005,
+"club": "Täby OK",
+"country": "SWE",
+"physic": 70.82,
+"technique": 29.81,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -38704,21 +38704,6 @@
 "merits": []
 },
 {
-"id": "e137537",
-"name": "Maxime Bonneau",
-"sex": "M",
-"birth_year": 1991,
-"club": "OK Tisaren",
-"country": "SWE",
-"physic": 70.81,
-"technique": 40.07,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e3500",
 "name": "Marcus Karlsson Sennevik",
 "sex": "M",
@@ -38729,6 +38714,21 @@
 "technique": 69.43,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e137537",
+"name": "Maxime Bonneau",
+"sex": "M",
+"birth_year": 1991,
+"club": "OK Tisaren",
+"country": "SWE",
+"physic": 70.81,
+"technique": 40.07,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -39012,21 +39012,6 @@
 "merits": []
 },
 {
-"id": "e15620",
-"name": "Isak Langerak",
-"sex": "M",
-"birth_year": 1996,
-"club": "Järfälla OK",
-"country": "SWE",
-"physic": 70.4,
-"technique": 34.24,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e138467",
 "name": "Elias Trossing",
 "sex": "M",
@@ -39074,6 +39059,21 @@
 "results": "56195_58064_H18B"
 }
 ]
+},
+{
+"id": "e15620",
+"name": "Isak Langerak",
+"sex": "M",
+"birth_year": 1996,
+"club": "Järfälla OK",
+"country": "SWE",
+"physic": 70.4,
+"technique": 34.24,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e97615",
@@ -39851,6 +39851,21 @@
 ]
 },
 {
+"id": "e27049",
+"name": "Gabriel Öhgren",
+"sex": "M",
+"birth_year": 2002,
+"club": "Sävedalens AIK",
+"country": "SWE",
+"physic": 69.52,
+"technique": 75.05,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e59701",
 "name": "Liam Hogedal",
 "sex": "M",
@@ -39898,21 +39913,6 @@
 "results": "56195_58063_H202"
 }
 ]
-},
-{
-"id": "e27049",
-"name": "Gabriel Öhgren",
-"sex": "M",
-"birth_year": 2002,
-"club": "Sävedalens AIK",
-"country": "SWE",
-"physic": 69.52,
-"technique": 75.05,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e100753",
@@ -40039,55 +40039,6 @@
 "merits": []
 },
 {
-"id": "e143405",
-"name": "Linus Danielsson",
-"sex": "M",
-"birth_year": 2009,
-"club": "Sundbybergs IK",
-"country": "SWE",
-"physic": 69.37,
-"technique": 64.12,
-"adjusted_races": 7,
-"all_races": 7,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-13",
-"klass": "H18B",
-"place": 6,
-"of": 35,
-"behind": 76,
-"score": 71.03,
-"field": 70.42,
-"results": "56195_58064_H18B"
-},
-{
-"race": "SM, medel (Swedish League, #6)",
-"date": "2026-08-21",
-"klass": "H18-4",
-"place": 8,
-"of": 30,
-"behind": 139,
-"score": 67.45,
-"field": 74.59,
-"results": "54929_56784_H184"
-},
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-12",
-"klass": "H18-3",
-"place": 13,
-"of": 31,
-"behind": 474,
-"score": 66.76,
-"field": 76.0,
-"results": "56195_58063_H183"
-}
-]
-},
-{
 "id": "e130979",
 "name": "Jonathan Petersson",
 "sex": "M",
@@ -40133,6 +40084,55 @@
 "score": 68.74,
 "field": 75.6,
 "results": "53837_55662_H18"
+}
+]
+},
+{
+"id": "e143405",
+"name": "Linus Danielsson",
+"sex": "M",
+"birth_year": 2009,
+"club": "Sundbybergs IK",
+"country": "SWE",
+"physic": 69.37,
+"technique": 64.12,
+"adjusted_races": 7,
+"all_races": 7,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-13",
+"klass": "H18B",
+"place": 6,
+"of": 35,
+"behind": 76,
+"score": 71.03,
+"field": 70.42,
+"results": "56195_58064_H18B"
+},
+{
+"race": "SM, medel (Swedish League, #6)",
+"date": "2026-08-21",
+"klass": "H18-4",
+"place": 8,
+"of": 30,
+"behind": 139,
+"score": 67.45,
+"field": 74.59,
+"results": "54929_56784_H184"
+},
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-12",
+"klass": "H18-3",
+"place": 13,
+"of": 31,
+"behind": 474,
+"score": 66.76,
+"field": 76.0,
+"results": "56195_58063_H183"
 }
 ]
 },
@@ -40295,21 +40295,6 @@
 "merits": []
 },
 {
-"id": "e243468",
-"name": "Tobias Schulthess",
-"sex": "M",
-"birth_year": 2003,
-"club": "IFK Mora OK",
-"country": "SWE",
-"physic": 69.21,
-"technique": 47.64,
-"adjusted_races": 1,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e12187",
 "name": "Philip Pålsson",
 "sex": "M",
@@ -40320,6 +40305,21 @@
 "technique": 57.66,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e243468",
+"name": "Tobias Schulthess",
+"sex": "M",
+"birth_year": 2003,
+"club": "IFK Mora OK",
+"country": "SWE",
+"physic": 69.21,
+"technique": 47.64,
+"adjusted_races": 1,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -40577,21 +40577,6 @@
 ]
 },
 {
-"id": "e52557",
-"name": "William Grunder",
-"sex": "M",
-"birth_year": 2003,
-"club": "Järfälla OK",
-"country": "SWE",
-"physic": 68.94,
-"technique": 94.91,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e162185",
 "name": "Johannes Marager",
 "sex": "M",
@@ -40615,6 +40600,21 @@
 "country": "SWE",
 "physic": 68.94,
 "technique": 73.66,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e52557",
+"name": "William Grunder",
+"sex": "M",
+"birth_year": 2003,
+"club": "Järfälla OK",
+"country": "SWE",
+"physic": 68.94,
+"technique": 94.91,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -41171,6 +41171,21 @@
 "merits": []
 },
 {
+"id": "e66251",
+"name": "Martin Hässler",
+"sex": "M",
+"birth_year": 1978,
+"club": "Sundsvalls OK",
+"country": "SWE",
+"physic": 68.27,
+"technique": 68.68,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e141511",
 "name": "Lukas Larsson",
 "sex": "M",
@@ -41218,21 +41233,6 @@
 "results": "54929_56784_H184"
 }
 ]
-},
-{
-"id": "e66251",
-"name": "Martin Hässler",
-"sex": "M",
-"birth_year": 1978,
-"club": "Sundsvalls OK",
-"country": "SWE",
-"physic": 68.27,
-"technique": 68.68,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e147994",
@@ -41517,55 +41517,6 @@
 "merits": []
 },
 {
-"id": "e57430",
-"name": "Alexander Dufva",
-"sex": "M",
-"birth_year": 2009,
-"club": "Sundsvalls OK",
-"country": "SWE",
-"physic": 67.88,
-"technique": 73.68,
-"adjusted_races": 11,
-"all_races": 11,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "Norrlandsmästerskapen, lång",
-"date": "2026-08-08",
-"klass": "H18",
-"place": 2,
-"of": 5,
-"behind": 124,
-"score": 74.5,
-"field": 64.6,
-"results": "53691_55508_H18"
-},
-{
-"race": "25mannamedeln (WRE)",
-"date": "2026-10-11",
-"klass": "H18E-1",
-"place": 18,
-"of": 79,
-"behind": 184,
-"score": 70.0,
-"field": 80.07,
-"results": "55918_57782_H18E1"
-},
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-12",
-"klass": "H18-4",
-"place": 9,
-"of": 29,
-"behind": 654,
-"score": 66.11,
-"field": 77.11,
-"results": "56195_58063_H184"
-}
-]
-},
-{
 "id": "e102049",
 "name": "Noel Hellberg",
 "sex": "M",
@@ -41611,6 +41562,55 @@
 "score": 69.24,
 "field": 83.05,
 "results": "53086_54889_H20Elit"
+}
+]
+},
+{
+"id": "e57430",
+"name": "Alexander Dufva",
+"sex": "M",
+"birth_year": 2009,
+"club": "Sundsvalls OK",
+"country": "SWE",
+"physic": 67.88,
+"technique": 73.68,
+"adjusted_races": 11,
+"all_races": 11,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "Norrlandsmästerskapen, lång",
+"date": "2026-08-08",
+"klass": "H18",
+"place": 2,
+"of": 5,
+"behind": 124,
+"score": 74.5,
+"field": 64.6,
+"results": "53691_55508_H18"
+},
+{
+"race": "25mannamedeln (WRE)",
+"date": "2026-10-11",
+"klass": "H18E-1",
+"place": 18,
+"of": 79,
+"behind": 184,
+"score": 70.0,
+"field": 80.07,
+"results": "55918_57782_H18E1"
+},
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-12",
+"klass": "H18-4",
+"place": 9,
+"of": 29,
+"behind": 654,
+"score": 66.11,
+"field": 77.11,
+"results": "56195_58063_H184"
 }
 ]
 },
@@ -41833,85 +41833,6 @@
 "merits": []
 },
 {
-"id": "e138104",
-"name": "Ulrik Olsson",
-"sex": "M",
-"birth_year": 2009,
-"club": "Tolered-Utby Ol-klubb",
-"country": "SWE",
-"physic": 67.35,
-"technique": 46.15,
-"adjusted_races": 7,
-"all_races": 8,
-"international": false,
-"visible": true,
-"merits": [
-{
-"race": "SM, lång (Swedish League, #7)",
-"date": "2026-09-12",
-"klass": "H18-1",
-"place": 7,
-"of": 31,
-"behind": 468,
-"score": 73.4,
-"field": 78.0,
-"results": "56195_58063_H181"
-},
-{
-"race": "Sverigepremiären, medel",
-"date": "2026-02-28",
-"klass": "H18",
-"place": 14,
-"of": 48,
-"behind": 262,
-"score": 64.91,
-"field": 75.99,
-"results": "53555_55362_H18"
-},
-{
-"race": "Sverigepremiären, lång",
-"date": "2026-03-01",
-"klass": "H18",
-"place": 15,
-"of": 44,
-"behind": 504,
-"score": 63.58,
-"field": 74.52,
-"results": "53556_55363_H18"
-}
-]
-},
-{
-"id": "e117798",
-"name": "Teodor Jonsson",
-"sex": "M",
-"birth_year": 2007,
-"club": "Skarpnäcks OL",
-"country": "SWE",
-"physic": 67.35,
-"technique": 35.05,
-"adjusted_races": 4,
-"all_races": 4,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e270984",
-"name": "Joseph Hudd",
-"sex": "M",
-"birth_year": 2003,
-"club": "IFK Lidingö SOK",
-"country": "SWE",
-"physic": 67.35,
-"technique": 88.35,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e21220",
 "name": "Rasmus Arfwedson",
 "sex": "M",
@@ -41957,6 +41878,85 @@
 "score": 66.07,
 "field": 88.34,
 "results": "53397_55204_H21"
+}
+]
+},
+{
+"id": "e117798",
+"name": "Teodor Jonsson",
+"sex": "M",
+"birth_year": 2007,
+"club": "Skarpnäcks OL",
+"country": "SWE",
+"physic": 67.35,
+"technique": 35.05,
+"adjusted_races": 4,
+"all_races": 4,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e270984",
+"name": "Joseph Hudd",
+"sex": "M",
+"birth_year": 2003,
+"club": "IFK Lidingö SOK",
+"country": "SWE",
+"physic": 67.35,
+"technique": 88.35,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e138104",
+"name": "Ulrik Olsson",
+"sex": "M",
+"birth_year": 2009,
+"club": "Tolered-Utby Ol-klubb",
+"country": "SWE",
+"physic": 67.35,
+"technique": 46.15,
+"adjusted_races": 7,
+"all_races": 8,
+"international": false,
+"visible": true,
+"merits": [
+{
+"race": "SM, lång (Swedish League, #7)",
+"date": "2026-09-12",
+"klass": "H18-1",
+"place": 7,
+"of": 31,
+"behind": 468,
+"score": 73.4,
+"field": 78.0,
+"results": "56195_58063_H181"
+},
+{
+"race": "Sverigepremiären, medel",
+"date": "2026-02-28",
+"klass": "H18",
+"place": 14,
+"of": 48,
+"behind": 262,
+"score": 64.91,
+"field": 75.99,
+"results": "53555_55362_H18"
+},
+{
+"race": "Sverigepremiären, lång",
+"date": "2026-03-01",
+"klass": "H18",
+"place": 15,
+"of": 44,
+"behind": 504,
+"score": 63.58,
+"field": 74.52,
+"results": "53556_55363_H18"
 }
 ]
 },
@@ -42356,21 +42356,6 @@
 "merits": []
 },
 {
-"id": "e211522",
-"name": "Odin Øysteinson Østby",
-"sex": "M",
-"birth_year": 2008,
-"club": "Hamar OK",
-"country": "NOR",
-"physic": 66.83,
-"technique": 90.08,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e117271",
 "name": "Adam Lindblom",
 "sex": "M",
@@ -42379,6 +42364,21 @@
 "country": "SWE",
 "physic": 66.83,
 "technique": 87.32,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e211522",
+"name": "Odin Øysteinson Østby",
+"sex": "M",
+"birth_year": 2008,
+"club": "Hamar OK",
+"country": "NOR",
+"physic": 66.83,
+"technique": 90.08,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -42461,21 +42461,6 @@
 "merits": []
 },
 {
-"id": "e110732",
-"name": "Sam Deferm",
-"sex": "M",
-"birth_year": 1979,
-"club": "DreamTeam Belgium",
-"country": "BEL",
-"physic": 66.73,
-"technique": 78.59,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e102814",
 "name": "Axel Ekdala",
 "sex": "M",
@@ -42486,6 +42471,21 @@
 "technique": 76.61,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e110732",
+"name": "Sam Deferm",
+"sex": "M",
+"birth_year": 1979,
+"club": "DreamTeam Belgium",
+"country": "BEL",
+"physic": 66.73,
+"technique": 78.59,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -42867,6 +42867,21 @@
 "merits": []
 },
 {
+"id": "e102611",
+"name": "Ville Elgesjö",
+"sex": "M",
+"birth_year": 2008,
+"club": "Domnarvets GOIF",
+"country": "SWE",
+"physic": 66.11,
+"technique": 26.21,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e162020",
 "name": "Simon Marklund",
 "sex": "M",
@@ -42916,21 +42931,6 @@
 ]
 },
 {
-"id": "e102611",
-"name": "Ville Elgesjö",
-"sex": "M",
-"birth_year": 2008,
-"club": "Domnarvets GOIF",
-"country": "SWE",
-"physic": 66.11,
-"technique": 26.21,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e134272",
 "name": "Samuel Böke",
 "sex": "M",
@@ -42961,21 +42961,6 @@
 "merits": []
 },
 {
-"id": "e264166",
-"name": "Dzmitry Alikhver",
-"sex": "M",
-"birth_year": 1993,
-"club": "IS Skanne",
-"country": "SWE",
-"physic": 66.02,
-"technique": 85.86,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e245071",
 "name": "Rico Maissen",
 "sex": "M",
@@ -42991,16 +42976,31 @@
 "merits": []
 },
 {
-"id": "e110368",
-"name": "Elvis Åberg",
+"id": "e264166",
+"name": "Dzmitry Alikhver",
 "sex": "M",
-"birth_year": 2007,
-"club": "Tolered-Utby Ol-klubb",
+"birth_year": 1993,
+"club": "IS Skanne",
+"country": "SWE",
+"physic": 66.02,
+"technique": 85.86,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e122330",
+"name": "Oscar Grip",
+"sex": "M",
+"birth_year": 2008,
+"club": "Sundsvalls OK",
 "country": "SWE",
 "physic": 66.0,
-"technique": 81.09,
-"adjusted_races": 3,
-"all_races": 3,
+"technique": 67.76,
+"adjusted_races": 4,
+"all_races": 4,
 "international": false,
 "visible": false,
 "merits": []
@@ -43021,16 +43021,16 @@
 "merits": []
 },
 {
-"id": "e122330",
-"name": "Oscar Grip",
+"id": "e110368",
+"name": "Elvis Åberg",
 "sex": "M",
-"birth_year": 2008,
-"club": "Sundsvalls OK",
+"birth_year": 2007,
+"club": "Tolered-Utby Ol-klubb",
 "country": "SWE",
 "physic": 66.0,
-"technique": 67.76,
-"adjusted_races": 4,
-"all_races": 4,
+"technique": 81.09,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -43510,21 +43510,6 @@
 "merits": []
 },
 {
-"id": "e12609",
-"name": "Daniel Olsson",
-"sex": "M",
-"birth_year": 1986,
-"club": "Uddevalla OK",
-"country": "SWE",
-"physic": 65.49,
-"technique": 97.48,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e145651",
 "name": "Axel Persson",
 "sex": "M",
@@ -43572,6 +43557,21 @@
 "results": "53556_55363_H18"
 }
 ]
+},
+{
+"id": "e12609",
+"name": "Daniel Olsson",
+"sex": "M",
+"birth_year": 1986,
+"club": "Uddevalla OK",
+"country": "SWE",
+"physic": 65.49,
+"technique": 97.48,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
 },
 {
 "id": "e209748",
@@ -44195,21 +44195,6 @@
 "merits": []
 },
 {
-"id": "e105822",
-"name": "Gustav Granqvist",
-"sex": "M",
-"birth_year": 2007,
-"club": "FK Göingarna",
-"country": "SWE",
-"physic": 64.78,
-"technique": 83.46,
-"adjusted_races": 3,
-"all_races": 3,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e130077",
 "name": "Cedric Wangheim",
 "sex": "M",
@@ -44259,6 +44244,21 @@
 ]
 },
 {
+"id": "e105822",
+"name": "Gustav Granqvist",
+"sex": "M",
+"birth_year": 2007,
+"club": "FK Göingarna",
+"country": "SWE",
+"physic": 64.78,
+"technique": 83.46,
+"adjusted_races": 3,
+"all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e240555",
 "name": "Hjalmar Wihlborg",
 "sex": "M",
@@ -44304,6 +44304,21 @@
 "merits": []
 },
 {
+"id": "e231613",
+"name": "Michael Bishenden",
+"sex": "M",
+"birth_year": 2006,
+"club": "Söders-Tyresö",
+"country": "SWE",
+"physic": 64.72,
+"technique": 59.83,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e121705",
 "name": "Joel Gustafsson",
 "sex": "M",
@@ -44334,21 +44349,6 @@
 "merits": []
 },
 {
-"id": "e231613",
-"name": "Michael Bishenden",
-"sex": "M",
-"birth_year": 2006,
-"club": "Söders-Tyresö",
-"country": "SWE",
-"physic": 64.72,
-"technique": 59.83,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e189770",
 "name": "Lukas Nilsson",
 "sex": "M",
@@ -44359,6 +44359,21 @@
 "technique": 67.44,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e55461",
+"name": "Noa Helgars",
+"sex": "M",
+"birth_year": 2005,
+"club": "Täby OK",
+"country": "SWE",
+"physic": 64.56,
+"technique": 81.07,
+"adjusted_races": 3,
+"all_races": 3,
 "international": false,
 "visible": false,
 "merits": []
@@ -44379,16 +44394,16 @@
 "merits": []
 },
 {
-"id": "e55461",
-"name": "Noa Helgars",
+"id": "e170448",
+"name": "Karl-Henrik Drott",
 "sex": "M",
-"birth_year": 2005,
-"club": "Täby OK",
+"birth_year": 2009,
+"club": "IFK Umeå",
 "country": "SWE",
-"physic": 64.56,
-"technique": 81.07,
-"adjusted_races": 3,
-"all_races": 3,
+"physic": 64.55,
+"technique": 80.19,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -44441,21 +44456,6 @@
 "results": "53837_55662_H21"
 }
 ]
-},
-{
-"id": "e170448",
-"name": "Karl-Henrik Drott",
-"sex": "M",
-"birth_year": 2009,
-"club": "IFK Umeå",
-"country": "SWE",
-"physic": 64.55,
-"technique": 80.19,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e217665",
@@ -44867,6 +44867,21 @@
 "merits": []
 },
 {
+"id": "e139807",
+"name": "Albin Berggren",
+"sex": "M",
+"birth_year": 2009,
+"club": "OK Renen",
+"country": "SWE",
+"physic": 63.7,
+"technique": 64.23,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e69094",
 "name": "Rasmus Granäng",
 "sex": "M",
@@ -44914,21 +44929,6 @@
 "results": "54929_56785_H20BFinal"
 }
 ]
-},
-{
-"id": "e139807",
-"name": "Albin Berggren",
-"sex": "M",
-"birth_year": 2009,
-"club": "OK Renen",
-"country": "SWE",
-"physic": 63.7,
-"technique": 64.23,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e26593",
@@ -45164,6 +45164,21 @@
 "merits": []
 },
 {
+"id": "e20117",
+"name": "Fredrik Norell",
+"sex": "M",
+"birth_year": 1989,
+"club": "Göteborg-Majorna OK",
+"country": "SWE",
+"physic": 63.12,
+"technique": 88.45,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
 "id": "e156533",
 "name": "Linus Claesson",
 "sex": "M",
@@ -45211,21 +45226,6 @@
 "results": "53556_55363_H18"
 }
 ]
-},
-{
-"id": "e20117",
-"name": "Fredrik Norell",
-"sex": "M",
-"birth_year": 1989,
-"club": "Göteborg-Majorna OK",
-"country": "SWE",
-"physic": 63.12,
-"technique": 88.45,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
 },
 {
 "id": "e206910",
@@ -46273,21 +46273,6 @@
 "merits": []
 },
 {
-"id": "e185606",
-"name": "Roberts Arnicāns",
-"sex": "M",
-"birth_year": 2006,
-"club": "OK Kāpa",
-"country": "LAT",
-"physic": 61.05,
-"technique": 86.97,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e49538",
 "name": "Nils Forsberg Rundström",
 "sex": "M",
@@ -46298,6 +46283,21 @@
 "technique": 63.1,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e185606",
+"name": "Roberts Arnicāns",
+"sex": "M",
+"birth_year": 2006,
+"club": "OK Kāpa",
+"country": "LAT",
+"physic": 61.05,
+"technique": 86.97,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -46502,21 +46502,6 @@
 "merits": []
 },
 {
-"id": "e8723",
-"name": "Anders Hedberg",
-"sex": "M",
-"birth_year": 1990,
-"club": "Göteborg-Majorna OK",
-"country": "SWE",
-"physic": 60.64,
-"technique": 63.21,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e154583",
 "name": "Hugo Olsson",
 "sex": "M",
@@ -46525,6 +46510,21 @@
 "country": "SWE",
 "physic": 60.64,
 "technique": 85.46,
+"adjusted_races": 2,
+"all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e8723",
+"name": "Anders Hedberg",
+"sex": "M",
+"birth_year": 1990,
+"club": "Göteborg-Majorna OK",
+"country": "SWE",
+"physic": 60.64,
+"technique": 63.21,
 "adjusted_races": 2,
 "all_races": 2,
 "international": false,
@@ -47731,21 +47731,6 @@
 "merits": []
 },
 {
-"id": "e199442",
-"name": "Romain Figuière",
-"sex": "M",
-"birth_year": 1995,
-"club": "OK Linné",
-"country": "SWE",
-"physic": 58.37,
-"technique": 35.79,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e8300",
 "name": "Mattias Kuosku",
 "sex": "M",
@@ -47756,6 +47741,21 @@
 "technique": 64.94,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e199442",
+"name": "Romain Figuière",
+"sex": "M",
+"birth_year": 1995,
+"club": "OK Linné",
+"country": "SWE",
+"physic": 58.37,
+"technique": 35.79,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -48223,21 +48223,6 @@
 ]
 },
 {
-"id": "e54501",
-"name": "Olle Erlandsson",
-"sex": "M",
-"birth_year": 2003,
-"club": "SOK Viljan",
-"country": "SWE",
-"physic": 57.23,
-"technique": 97.58,
-"adjusted_races": 2,
-"all_races": 2,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e274431",
 "name": "Lars Depuydt",
 "sex": "M",
@@ -48248,6 +48233,21 @@
 "technique": 49.93,
 "adjusted_races": 1,
 "all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e54501",
+"name": "Olle Erlandsson",
+"sex": "M",
+"birth_year": 2003,
+"club": "SOK Viljan",
+"country": "SWE",
+"physic": 57.23,
+"technique": 97.58,
+"adjusted_races": 2,
+"all_races": 2,
 "international": false,
 "visible": false,
 "merits": []
@@ -48313,21 +48313,6 @@
 "merits": []
 },
 {
-"id": "e34142",
-"name": "Niklas Svensson",
-"sex": "M",
-"birth_year": 2001,
-"club": "Järfälla OK",
-"country": "SWE",
-"physic": 57.04,
-"technique": 62.49,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e151484",
 "name": "Vilgot Nilsson",
 "sex": "M",
@@ -48338,6 +48323,21 @@
 "technique": 30.22,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e34142",
+"name": "Niklas Svensson",
+"sex": "M",
+"birth_year": 2001,
+"club": "Järfälla OK",
+"country": "SWE",
+"physic": 57.04,
+"technique": 62.49,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -49057,21 +49057,6 @@
 "merits": []
 },
 {
-"id": "e3248",
-"name": "Tobias Edström",
-"sex": "M",
-"birth_year": 1992,
-"club": "FK Friskus-Varberg",
-"country": "SWE",
-"physic": 54.83,
-"technique": 48.27,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e9781",
 "name": "Johan Nordin",
 "sex": "M",
@@ -49080,6 +49065,21 @@
 "country": "SWE",
 "physic": 54.83,
 "technique": 0.0,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e3248",
+"name": "Tobias Edström",
+"sex": "M",
+"birth_year": 1992,
+"club": "FK Friskus-Varberg",
+"country": "SWE",
+"physic": 54.83,
+"technique": 48.27,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -49530,21 +49530,6 @@
 "merits": []
 },
 {
-"id": "e170735",
-"name": "Alfred Holtan Sanderud",
-"sex": "M",
-"birth_year": 2008,
-"club": "Lillomarka OL",
-"country": "NOR",
-"physic": 53.39,
-"technique": 0.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e203771",
 "name": "Viktor Hultqvist",
 "sex": "M",
@@ -49553,6 +49538,21 @@
 "country": "SWE",
 "physic": 53.39,
 "technique": 75.71,
+"adjusted_races": 1,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e170735",
+"name": "Alfred Holtan Sanderud",
+"sex": "M",
+"birth_year": 2008,
+"club": "Lillomarka OL",
+"country": "NOR",
+"physic": 53.39,
+"technique": 0.0,
 "adjusted_races": 1,
 "all_races": 1,
 "international": false,
@@ -50656,21 +50656,6 @@
 "merits": []
 },
 {
-"id": "e8302",
-"name": "Kristian Narbro Porath",
-"sex": "M",
-"birth_year": 1993,
-"club": "Tolered-Utby Ol-klubb",
-"country": "SWE",
-"physic": 49.43,
-"technique": 61.88,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e161967",
 "name": "Casper Björklund",
 "sex": "M",
@@ -50681,6 +50666,21 @@
 "technique": 63.25,
 "adjusted_races": 3,
 "all_races": 3,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e8302",
+"name": "Kristian Narbro Porath",
+"sex": "M",
+"birth_year": 1993,
+"club": "Tolered-Utby Ol-klubb",
+"country": "SWE",
+"physic": 49.43,
+"technique": 61.88,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -51718,21 +51718,6 @@
 "merits": []
 },
 {
-"id": "e22361",
-"name": "Mattis Ernstsson",
-"sex": "M",
-"birth_year": 1995,
-"club": "FK Göingarna",
-"country": "SWE",
-"physic": 43.21,
-"technique": 100.0,
-"adjusted_races": 1,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e51647",
 "name": "Ture Forsberg",
 "sex": "M",
@@ -51743,6 +51728,21 @@
 "technique": 27.79,
 "adjusted_races": 2,
 "all_races": 2,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e22361",
+"name": "Mattis Ernstsson",
+"sex": "M",
+"birth_year": 1995,
+"club": "FK Göingarna",
+"country": "SWE",
+"physic": 43.21,
+"technique": 100.0,
+"adjusted_races": 1,
+"all_races": 1,
 "international": false,
 "visible": false,
 "merits": []
@@ -52213,41 +52213,11 @@
 "merits": []
 },
 {
-"id": "e112658",
-"name": "Einar Söderberg Beckman",
+"id": "e99847",
+"name": "Carl-Johan Olvegård",
 "sex": "M",
 "birth_year": 2007,
-"club": "Sjövalla FK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e121228",
-"name": "Filip Sjölander",
-"sex": "M",
-"birth_year": 2008,
-"club": "Täby OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e149937",
-"name": "Hugo Alm",
-"sex": "M",
-"birth_year": 2007,
-"club": "Sjövalla FK",
+"club": "Skånes",
 "country": "SWE",
 "physic": null,
 "technique": null,
@@ -52273,102 +52243,12 @@
 "merits": []
 },
 {
-"id": "e185053",
-"name": "Roberts Graudins",
-"sex": "M",
-"birth_year": 2007,
-"club": "OK Kāpa",
-"country": "LAT",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e265071",
-"name": "Luke Fisher",
-"sex": "M",
-"birth_year": 1997,
-"club": "IFK Lidingö SOK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e21184",
 "name": "Jacob Eriksson",
 "sex": "M",
 "birth_year": 1997,
 "club": "KFUM Örebro OK",
 "country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e114320",
-"name": "Eric Olofsson",
-"sex": "M",
-"birth_year": 2007,
-"club": "Sjövalla FK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e31316",
-"name": "Niklas Aldén",
-"sex": "M",
-"birth_year": 1993,
-"club": "OK Linné",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e103833",
-"name": "Viktor Danielsson",
-"sex": "M",
-"birth_year": 2007,
-"club": "Vimmerby OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e255198",
-"name": "Joshua Ho Kiu Au",
-"sex": "M",
-"birth_year": 2004,
-"club": "Hongkongers",
-"country": "HKG",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
@@ -52393,146 +52273,11 @@
 "merits": []
 },
 {
-"id": "e71132",
-"name": "Gabriel Ekström",
-"sex": "M",
-"birth_year": 2006,
-"club": "Hallands",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e88142",
-"name": "Joel Golsäter",
-"sex": "M",
-"birth_year": 2004,
-"club": "OK Kåre",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e108347",
-"name": "Jonatan Anderson",
-"sex": "M",
-"birth_year": 2005,
-"club": "Järfälla OK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e237840",
-"name": "Elias Jensen",
-"sex": "M",
-"birth_year": 2006,
-"club": "IF Rigor",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e83736",
-"name": "Olli-Markus Taivainen",
-"sex": "M",
-"birth_year": 1989,
-"club": "Ikaalisten Nouseva-Voima",
-"country": "FIN",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
 "id": "e97441",
 "name": "Rickard Jemth",
 "sex": "M",
 "birth_year": 2008,
 "club": "IF Thor",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e24516",
-"name": "Pontus Lindblom",
-"sex": "M",
-"birth_year": 1998,
-"club": "Almby IK",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e99847",
-"name": "Carl-Johan Olvegård",
-"sex": "M",
-"birth_year": 2007,
-"club": "Skånes",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e254981",
-"name": "Prokop Tomášek",
-"sex": "M",
-"birth_year": 2007,
-"club": "OK Kåre",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e87150",
-"name": "Alfons Peterson",
-"sex": "M",
-"birth_year": 2003,
-"club": "OK Denseln",
 "country": "SWE",
 "physic": null,
 "technique": null,
@@ -52558,12 +52303,132 @@
 "merits": []
 },
 {
-"id": "e115851",
-"name": "Tuukka Mäkinen",
+"id": "e225925",
+"name": "Mihály Ormay",
+"sex": "M",
+"birth_year": 1999,
+"club": "Turun Suunnistajat",
+"country": "FIN",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e103833",
+"name": "Viktor Danielsson",
+"sex": "M",
+"birth_year": 2007,
+"club": "Vimmerby OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e185053",
+"name": "Roberts Graudins",
+"sex": "M",
+"birth_year": 2007,
+"club": "OK Kāpa",
+"country": "LAT",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e114320",
+"name": "Eric Olofsson",
+"sex": "M",
+"birth_year": 2007,
+"club": "Sjövalla FK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e255198",
+"name": "Joshua Ho Kiu Au",
+"sex": "M",
+"birth_year": 2004,
+"club": "Hongkongers",
+"country": "HKG",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e71132",
+"name": "Gabriel Ekström",
+"sex": "M",
+"birth_year": 2006,
+"club": "Hallands",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e24516",
+"name": "Pontus Lindblom",
 "sex": "M",
 "birth_year": 1998,
-"club": "MS Parma",
-"country": "FIN",
+"club": "Almby IK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e265071",
+"name": "Luke Fisher",
+"sex": "M",
+"birth_year": 1997,
+"club": "IFK Lidingö SOK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e31316",
+"name": "Niklas Aldén",
+"sex": "M",
+"birth_year": 1993,
+"club": "OK Linné",
+"country": "SWE",
 "physic": null,
 "technique": null,
 "adjusted_races": 0,
@@ -52588,11 +52453,176 @@
 "merits": []
 },
 {
-"id": "e138443",
-"name": "Erik Johansson",
+"id": "e149937",
+"name": "Hugo Alm",
 "sex": "M",
 "birth_year": 2007,
-"club": "IK Uven",
+"club": "Sjövalla FK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e117224",
+"name": "Noah Korall",
+"sex": "M",
+"birth_year": 2006,
+"club": "Motala AIF OL",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e254981",
+"name": "Prokop Tomášek",
+"sex": "M",
+"birth_year": 2007,
+"club": "OK Kåre",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e121228",
+"name": "Filip Sjölander",
+"sex": "M",
+"birth_year": 2008,
+"club": "Täby OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e35110",
+"name": "Olle Kalered",
+"sex": "M",
+"birth_year": 1990,
+"club": "Stora Tuna OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e108347",
+"name": "Jonatan Anderson",
+"sex": "M",
+"birth_year": 2005,
+"club": "Järfälla OK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e115851",
+"name": "Tuukka Mäkinen",
+"sex": "M",
+"birth_year": 1998,
+"club": "MS Parma",
+"country": "FIN",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e83736",
+"name": "Olli-Markus Taivainen",
+"sex": "M",
+"birth_year": 1989,
+"club": "Ikaalisten Nouseva-Voima",
+"country": "FIN",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e88142",
+"name": "Joel Golsäter",
+"sex": "M",
+"birth_year": 2004,
+"club": "OK Kåre",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e237840",
+"name": "Elias Jensen",
+"sex": "M",
+"birth_year": 2006,
+"club": "IF Rigor",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e112658",
+"name": "Einar Söderberg Beckman",
+"sex": "M",
+"birth_year": 2007,
+"club": "Sjövalla FK",
+"country": "SWE",
+"physic": null,
+"technique": null,
+"adjusted_races": 0,
+"all_races": 1,
+"international": false,
+"visible": false,
+"merits": []
+},
+{
+"id": "e87150",
+"name": "Alfons Peterson",
+"sex": "M",
+"birth_year": 2003,
+"club": "OK Denseln",
 "country": "SWE",
 "physic": null,
 "technique": null,
@@ -52618,41 +52648,11 @@
 "merits": []
 },
 {
-"id": "e225925",
-"name": "Mihály Ormay",
+"id": "e138443",
+"name": "Erik Johansson",
 "sex": "M",
-"birth_year": 1999,
-"club": "Turun Suunnistajat",
-"country": "FIN",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e117224",
-"name": "Noah Korall",
-"sex": "M",
-"birth_year": 2006,
-"club": "Motala AIF OL",
-"country": "SWE",
-"physic": null,
-"technique": null,
-"adjusted_races": 0,
-"all_races": 1,
-"international": false,
-"visible": false,
-"merits": []
-},
-{
-"id": "e35110",
-"name": "Olle Kalered",
-"sex": "M",
-"birth_year": 1990,
-"club": "Stora Tuna OK",
+"birth_year": 2007,
+"club": "IK Uven",
 "country": "SWE",
 "physic": null,
 "technique": null,
