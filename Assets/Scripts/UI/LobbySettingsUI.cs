@@ -4,8 +4,8 @@ using UnityEngine.UI;
 
 // Shows everyone in the lobby which runner pool, game mode and course the host has picked.
 // "Runner pool" (your runners or any runner) is what used to be called game mode; "Game mode" is now
-// Normal or Imposter (it used to be an Imposter on/off switch). The names are changed here at start,
-// so the saved lobby scene needs no rebuild.
+// a set of extra modes that can be combined (Imposter, Bears, Move a control) or Route analysis on its own.
+// The names are changed here at start, so the saved lobby scene needs no rebuild.
 // The host publishes its choices on its own player object; the other players read them from there.
 // If the host leaves, the player who takes over keeps the settings the old host had.
 public class LobbySettingsUI : MonoBehaviour
@@ -25,25 +25,32 @@ public class LobbySettingsUI : MonoBehaviour
     public Color toggleOnColor = new Color(0.91f, 0.45f, 0.16f);
     public Color toggleOffTextColor = new Color(0.12f, 0.24f, 0.17f);
 
-    // The host's choice: one random player becomes the imposter when the game starts
-    public bool imposterEnabled;
+    // The host's choice of extra game modes
+    public ExtraMode modes;
+
+    // Imposter: one random player becomes the imposter when the game starts
+    public bool imposterEnabled => (modes & ExtraMode.Imposter) != 0;
 
     string seenMode;
     string seenMap;
-    bool seenImposter;
+    ExtraMode seenModes;
     bool hasSeenHostSettings;
     bool wasHost;
     float nextRefresh;
-
-    const string Normal = "Normal";
-    const string Imposter = "Imposter";
 
     void Start()
     {
         imposterToggle.onClick.AddListener(OpenGameModes);
         imposterToggle.gameObject.SetActive(false);
         Rename();
-        Show("...", false, "...");
+        // Several modes can be on at once, so the text has to fit a longer line
+        if (imposterText != null)
+        {
+            imposterText.enableAutoSizing = true;
+            imposterText.fontSizeMax = imposterText.fontSize;
+            imposterText.fontSizeMin = Mathf.Min(14f, imposterText.fontSize);
+        }
+        Show("...", ExtraMode.None, "...");
     }
 
     void Rename()
@@ -66,24 +73,19 @@ public class LobbySettingsUI : MonoBehaviour
         if (text != null) text.text = caption;
     }
 
-    // The host picks the game mode. Imposter: one random player secretly has to finish last.
+    // The host picks the game modes. Several can be on at once; none means a normal race.
     public void OpenGameModes()
     {
-        ChoicePopup.Option[] options =
+        ModesPopup.Open(modes, chosen =>
         {
-            new ChoicePopup.Option { id = Normal, title = "Normal", description = "Everyone races to finish first." },
-            new ChoicePopup.Option { id = Imposter, title = "Imposter", description = "One random player secretly has to finish last. Can you spot who?" },
-        };
-        ChoicePopup.Open("Game mode", options, imposterEnabled ? Imposter : Normal, id =>
-        {
-            imposterEnabled = id == Imposter;
+            modes = chosen;
             nextRefresh = 0f;
         });
     }
 
     public void ToggleImposter()
     {
-        imposterEnabled = !imposterEnabled;
+        modes = ExtraModes.Toggle(modes, ExtraMode.Imposter);
         nextRefresh = 0f;
     }
 
@@ -116,16 +118,16 @@ public class LobbySettingsUI : MonoBehaviour
                 if (!string.IsNullOrEmpty(seenMode)) gameModeHandler.gameMode = seenMode;
                 // CourseLibrary.Current already holds the course the old host had picked
                 if (CourseLibrary.Current != null) mapHandler.Select(CourseLibrary.Current);
-                imposterEnabled = seenImposter;
+                modes = seenModes;
             }
 
             if (local.lobbyGameMode.ToString() != gameModeHandler.gameMode) local.lobbyGameMode = gameModeHandler.gameMode;
             if (local.lobbyMap.ToString() != mapHandler.map) local.lobbyMap = mapHandler.map;
             string courseText = mapHandler.course != null ? mapHandler.course.ToLobbyString() : "";
             local.SetLobbyCourseText(courseText);
-            if (local.lobbyImposter != imposterEnabled) local.lobbyImposter = imposterEnabled;
+            if (local.lobbyModes != (int)modes) local.lobbyModes = (int)modes;
 
-            Show(gameModeHandler.gameMode, imposterEnabled, CourseTitle(mapHandler.course));
+            Show(gameModeHandler.gameMode, modes, CourseTitle(mapHandler.course));
         }
         else
         {
@@ -142,13 +144,13 @@ public class LobbySettingsUI : MonoBehaviour
                 seenMode = player.lobbyGameMode.ToString();
                 seenMap = player.lobbyMap.ToString();
                 CourseLibrary.ApplyLobbyString(player.LobbyCourseText());
-                seenImposter = player.lobbyImposter;
+                seenModes = (ExtraMode)player.lobbyModes;
                 hasSeenHostSettings = true;
                 break;
             }
             if (hasSeenHostSettings)
             {
-                Show(seenMode, seenImposter, CourseLibrary.Current != null ? CourseTitle(CourseLibrary.Current) : seenMap);
+                Show(seenMode, seenModes, CourseLibrary.Current != null ? CourseTitle(CourseLibrary.Current) : seenMap);
             }
         }
         wasHost = host;
@@ -164,10 +166,11 @@ public class LobbySettingsUI : MonoBehaviour
         return string.IsNullOrEmpty(course.author) ? course.name : course.name + "  <size=70%>by " + course.author + "</size>";
     }
 
-    void Show(string mode, bool imposter, string map)
+    void Show(string mode, ExtraMode extra, string map)
     {
-        modeText.text = mode == "..." ? mode : GameModes.PoolName(mode);
-        imposterText.text = imposter ? "Imposter" : "Normal";
+        // Route analysis gives everyone the same runner, so the pool does not matter then
+        modeText.text = mode == "..." ? mode : (extra & ExtraMode.RouteAnalysis) != 0 ? "Same runner for all" : GameModes.PoolName(mode);
+        imposterText.text = mode == "..." ? "..." : ExtraModes.Describe(extra);
         mapText.text = map;
     }
 }

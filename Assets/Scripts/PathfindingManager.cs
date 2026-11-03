@@ -203,6 +203,12 @@ public class PathfindingManager : MonoBehaviour
         return new Vector3(x, y, -1f);
     }
 
+    // The grid cell (x = column, y = row) a world position is in
+    public Vector2Int WorldToGridPositionCentered(Vector3 worldPos)
+    {
+        return WorldToGridPosition(worldPos);
+    }
+
     Vector2Int WorldToGridPosition(Vector3 worldPos)
     {
         int rows = speedGrid2D.GetLength(0);

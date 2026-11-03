@@ -8,7 +8,7 @@ using UnityEngine.UI;
 // (or, after the last leg, by showing the results).
 public class RelayStatsUI : MonoBehaviour
 {
-    enum Tab { Results, Splits, Legs }
+    enum Tab { Results, Splits, Legs, Routes }
 
     static readonly Color MistakeBack = new Color(0.86f, 0.22f, 0.18f, 0.18f);
     static readonly Color LocalBack = new Color(0.91f, 0.45f, 0.16f, 0.16f);
@@ -33,11 +33,12 @@ public class RelayStatsUI : MonoBehaviour
     TextMeshProUGUI waitingText;
     readonly Dictionary<Tab, Button> tabButtons = new Dictionary<Tab, Button>();
     RelayReplayView replay;
+    RouteCompareView routes;
     Button replayButton;
     float nextRefresh;
     string lastSignature = "";
 
-    public bool IsOpen => root != null && (root.activeSelf || replay != null);
+    public bool IsOpen => root != null && (root.activeSelf || replay != null || routes != null);
 
     public static RelayStatsUI Create(IRaceStats race)
     {
@@ -69,6 +70,7 @@ public class RelayStatsUI : MonoBehaviour
     public void Close()
     {
         if (replay != null) replay.Close();
+        if (routes != null) routes.Close();
         if (root != null) root.SetActive(false);
     }
 
@@ -114,6 +116,7 @@ public class RelayStatsUI : MonoBehaviour
         AddTab(tabs, Tab.Results, "Leg results");
         AddTab(tabs, Tab.Splits, "Split times");
         AddTab(tabs, Tab.Legs, "All legs");
+        AddTab(tabs, Tab.Routes, "Route choices");
         replayButton = CourseUI.Button("Replay", tabs, "Replay the leg", CourseUI.ButtonKind.Secondary, OpenReplay, 22);
         CourseUI.Size(replayButton, 54, 230);
 
@@ -176,6 +179,17 @@ public class RelayStatsUI : MonoBehaviour
         });
     }
 
+    // Everyone's routes on one leg, on the map (individual competitions)
+    void OpenRoutes(int leg)
+    {
+        root.SetActive(false);
+        routes = RouteCompareView.Open(race, tracks, leg, () =>
+        {
+            routes = null;
+            if (root != null && !CompetitionFlow.ResultsShown) root.SetActive(true);
+        });
+    }
+
     // ---- Content ----
 
     void Refresh()
@@ -194,6 +208,7 @@ public class RelayStatsUI : MonoBehaviour
         title.text = !race.IsRelay ? "Competition finished" : final ? "Relay finished: leg " + (leg + 1) + " of " + race.LegCount : "After leg " + (leg + 1) + " of " + race.LegCount;
         subtitle.text = race.LegDescription(leg) + (race.IsRelay ? ". The clock is stopped while you look." : ".");
         if (tabButtons.TryGetValue(Tab.Legs, out Button legsTab)) legsTab.gameObject.SetActive(race.IsRelay);
+        if (tabButtons.TryGetValue(Tab.Routes, out Button routesTab)) routesTab.gameObject.SetActive(!race.IsRelay);
         if (tabButtons.TryGetValue(Tab.Results, out Button resultsTab)) CourseUI.SetButtonText(resultsTab, race.IsRelay ? "Leg results" : "Results");
         if (replayButton != null) CourseUI.SetButtonText(replayButton, race.IsRelay ? "Replay the leg" : "Replay");
         foreach (var pair in tabButtons)
@@ -212,10 +227,13 @@ public class RelayStatsUI : MonoBehaviour
             case Tab.Results: BuildResults(teams); break;
             case Tab.Splits: BuildSplits(teams); break;
             case Tab.Legs: BuildLegs(teams); break;
+            case Tab.Routes: BuildRoutes(teams); break;
         }
         bool anyMistakeData = teams.Count > 1;
         footnote.text = tab == Tab.Legs
             ? "Each leg: leg time (place on the leg), then the team's total time (place after the leg)."
+            : tab == Tab.Routes
+            ? "Click a leg to see everyone's route on the map, next to the computer's fastest route."
             : "Mistakes are estimated the way WinSplits does it: compared with the fastest 25 % on each split and the runner's own normal pace, a split that lost more than 30 s and 25 % is marked red."
               + (anyMistakeData ? "" : " With only one team there is nothing to compare with.");
     }
@@ -331,6 +349,41 @@ public class RelayStatsUI : MonoBehaviour
         }
     }
 
+    // One row per leg with every player's time on it; a click shows the routes on the map
+    void BuildRoutes(List<RelayTeamResult> teams)
+    {
+        int points = race.Course.Route(leg, null).CommonCount;
+        List<RelayTeamResult> players = new List<RelayTeamResult>(teams);
+        players.Sort((a, b) => b.isLocal.CompareTo(a.isLocal));
+        List<CellData> header = new List<CellData> { Cell("Leg", 230), Cell("", 150) };
+        foreach (RelayTeamResult t in players) header.Add(Cell(t.team + (t.isLocal ? " (you)" : ""), 190));
+        Row(48, true, header.ToArray());
+        for (int c = 1; c < points; c++)
+        {
+            string name = (c - 1 == 0 ? "Start" : (c - 1).ToString()) + " - " + (c == points - 1 ? "Finish" : c.ToString());
+            List<CellData> cells = new List<CellData> { Cell("<b>" + c + ".</b>  " + name, 230) };
+            int captured = c;
+            CellData open = Cell("<color=" + Green + "><b>Show routes ></b></color>", 150);
+            open.click = () => OpenRoutes(captured);
+            cells.Add(open);
+            foreach (RelayTeamResult t in players)
+            {
+                if (!t.hasSplits)
+                {
+                    cells.Add(Cell("<color=" + Muted + ">-</color>", 190));
+                    continue;
+                }
+                string text = RelayStats.Time(t.split[c]) + " (" + t.splitPlace[c] + ")";
+                CellData cell = Cell(t.splitPlace[c] == 1 ? "<b>" + text + "</b>" : text, 190);
+                cells.Add(cell);
+            }
+            Row(52, false, cells.ToArray());
+        }
+        Row(40, false, Cell("<size=85%><color=" + Muted + ">" + (RouteAnalysis.On
+            ? "Everyone ran with the same runner and nobody made mistakes, so the times show which route choice was best."
+            : "Time on each leg (place on the leg). The runners have different speed and technique, so the times are not only about the route.") + "</color></size>", 1500));
+    }
+
     // ---- Table helpers ----
 
     class CellData
@@ -339,6 +392,7 @@ public class RelayStatsUI : MonoBehaviour
         public float width;
         public FontStyles style;
         public Color? back;
+        public UnityEngine.Events.UnityAction click;
     }
 
     static CellData Cell(string text, float width, FontStyles style = FontStyles.Normal)
@@ -375,6 +429,13 @@ public class RelayStatsUI : MonoBehaviour
             CourseUI.Stretch(text.rectTransform, 6, 4, 2, 2);
             text.overflowMode = TextOverflowModes.Overflow;
             text.enableWordWrapping = cell.width > 600f;
+            if (cell.click != null)
+            {
+                back.raycastTarget = true;
+                Button button = back.gameObject.AddComponent<Button>();
+                button.targetGraphic = back;
+                button.onClick.AddListener(cell.click);
+            }
         }
     }
 }
