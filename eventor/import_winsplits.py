@@ -35,14 +35,18 @@ IN_DIR = os.path.join(HERE, "winsplits")
 OUT_DIR = os.path.join(HERE, "data", "races")
 
 NAME_RE = re.compile(
-    r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<kind>VM|EM|VC|niva2)_(?P<dist>lang|lång|medel)_(?P<sex>[HD])(?P<age>\d{2}[A-Za-zÅÄÖåäö]*)?"
+    r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<kind>VM|EM|VC|niva2)_(?P<dist>lang|lång|long|medel|mellan|middle)_(?P<sex>[HD])(?P<age>\d{2}[A-Za-zÅÄÖåäö0-9]*)?"
     r"(?P<kval>_kval)?(?:_(?P<free>.*))?\.txt$", re.I)
-IMPORTER_VERSION = 3          # bump to re-import every file after a parser change
+IMPORTER_VERSION = 5          # bump to re-import every file after a parser change
+MIDDLE = ("medel", "mellan", "middle")
 KIND_LEVEL = {"vm": 6, "em": 6, "vc": 6, "niva2": 2}
 KIND_NAME = {"vm": "World Championships", "em": "European Championships", "vc": "World Cup", "niva2": "National race"}
 STATUS = {"mp": "MissingPunch", "dns": "DidNotStart", "dnf": "DidNotFinish",
-          "dsq": "Disqualified", "-": "NotFinished", "": "NotFinished"}
-LEG_RE = re.compile(r"^(S|\d+)-(\d+|F)(?:\s*\((\w+)\))?$")
+          "dsq": "Disqualified", "-": "NotFinished", "": "NotFinished",
+          # Swedish WinSplits exports
+          "felst": "MissingPunch", "felst.": "MissingPunch", "ej start": "DidNotStart",
+          "utg": "DidNotFinish", "utg.": "DidNotFinish", "brutit": "DidNotFinish", "disk": "Disqualified"}
+LEG_RE = re.compile(r"^(S|\d+)-(\d+|F|M)(?:\s*\((\w+)\))?$")      # F = finish, M = mål in Swedish files
 
 
 def parse_time(s):
@@ -61,16 +65,20 @@ def parse_file(text):
     while lines and not lines[-1].strip():
         lines.pop()
     header = lines[0].split("\t")
-    if not header or header[0].strip() != "Pos":
-        raise ValueError("första raden ska börja med Pos")
+    if not header or header[0].strip() not in ("Pos", "Pl"):
+        raise ValueError("första raden ska börja med Pos eller Pl")
     legs = []                                 # (column, control code or None for finish)
     for col, h in enumerate(header):
         m = LEG_RE.match(h.strip())
         if m:
-            legs.append((col, None if m.group(2) == "F" else (m.group(3) or m.group(2))))
+            legs.append((col, None if m.group(2) in ("F", "M") else (m.group(3) or m.group(2))))
     if not legs or legs[-1][1] is not None:
         raise ValueError("hittar inga sträckor S-1 ... -F i rubriken")
     controls = len(legs) - 1
+    # The finish time column ("Finish time" / "Sluttid"). Some exports have none; then the
+    # cumulative time at the finish on the runner's second row is the finish time.
+    names = [h.strip().lower() for h in header]
+    finish_col = next((names.index(n) for n in ("finish time", "sluttid", "tid", "time") if n in names), None)
 
     runners = []
     rows = lines[2:]                          # line 2 is the Club header
@@ -79,7 +87,8 @@ def parse_file(text):
         if len(r1) < 3 or not r1[1].strip():
             continue
         cell = lambda r, c: r[c].strip() if c < len(r) else ""
-        pos, name, finish = cell(r1, 0), cell(r1, 1), cell(r1, 2)
+        pos, name = cell(r1, 0), cell(r1, 1)
+        finish = cell(r1, finish_col) if finish_col is not None else cell(r2, legs[-1][0])
         org = cell(r2, 1)
         t = parse_time(finish)
         status = "OK" if pos.isdigit() and t is not None else STATUS.get(finish.lower(), "NotFinished")
@@ -100,7 +109,7 @@ def parse_file(text):
 def race_name(kind, dist, kval, free):
     """The name shown in the game, in English: "World Cup Long", "European Championships Middle
     Qualification (final A)", or for a national race its own name, "O-Ringen E1, Middle"."""
-    distance = "Middle" if dist.lower() == "medel" else "Long"
+    distance = "Middle" if dist.lower() in MIDDLE else "Long"
     extra = " ".join((free or "").replace("_", " ").split())
     if kind == "niva2" and extra:
         name = f"{extra}, {distance}"
@@ -143,8 +152,10 @@ def main():
             errors.append(f"{fname}: {e}")
             continue
         kind, sex = m.group("kind").lower(), m.group("sex").upper()
-        klass = sex + (m.group("age") or "21")
         international = kind != "niva2"
+        # Plain H or D is the top class: H21/D21 at VM, EM and World Cup, H21 Elit/D21 Elit at a
+        # national race, where H21 and D21 are other classes
+        klass = sex + (m.group("age") or ("21" if international else "21 Elit"))
         for r in runners:
             r["sex"] = "M" if sex == "H" else "F"
             if international:
@@ -155,7 +166,7 @@ def main():
             "event_id": f"ws:{stem}", "race_id": "", "single_race": True,
             "event_name": race_name(kind, m.group("dist"), bool(m.group("kval")), m.group("free")),
             "race_name": "", "date": m.group("date"), "level": KIND_LEVEL[kind],
-            "distance": "Middle" if m.group("dist").lower() == "medel" else "Long",
+            "distance": "Middle" if m.group("dist").lower() in MIDDLE else "Long",
             "light": "Day", "qualification": bool(m.group("kval")),
             "classes": [{"class": klass, "course_length": None, "controls": controls, "runners": runners}],
         }
