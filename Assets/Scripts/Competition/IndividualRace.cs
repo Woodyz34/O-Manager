@@ -68,6 +68,14 @@ public class IndividualRace : MonoBehaviour, IRaceStats
             back.raycastTarget = false;
             pickInfo = CourseUI.Text("Text", back.transform, "", 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
             CourseUI.Stretch(pickInfo.rectTransform, 16, 16, 4, 4);
+
+            // The runner list ends above the bar, so the bar does not cover its last row
+            RunnerPickerUI picker = panel.GetComponentInChildren<RunnerPickerUI>(true);
+            if (picker != null && picker.scroll != null)
+            {
+                RectTransform list = (RectTransform)picker.scroll.transform;
+                list.offsetMin = new Vector2(list.offsetMin.x, Mathf.Max(list.offsetMin.y, 96f));
+            }
         }
         pickInfo.text = LegDescription(0);
     }
