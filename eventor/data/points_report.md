@@ -253,8 +253,8 @@ Löpare: 2165, med betyg: 2107, synliga i spelet: 633 (359 herrar, 274 damer). F
 | 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | W21E | 30 | ja | 31:58 |
 | 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | W21E | 4 | ojusterad | 37:25 |
 | 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | W21E | 5 | ja | 31:30 |
-| 2026-08-06 | Världscup lång | D21 | 59 | ankare | 95:32 |
-| 2026-08-06 | Världscup lång | H21 | 55 | ankare | 94:56 |
+| 2026-08-06 | World Cup Long | D21 | 59 | ankare | 95:32 |
+| 2026-08-06 | World Cup Long | H21 | 55 | ankare | 94:56 |
 | 2026-08-08 | Götalandsmästerskapen, lång | D18 | 8 | ja | 26:18 |
 | 2026-08-08 | Götalandsmästerskapen, lång | D20 | 3 | ja | 31:19 |
 | 2026-08-08 | Götalandsmästerskapen, lång | H18 | 15 | ja | 21:26 |
@@ -265,8 +265,8 @@ Löpare: 2165, med betyg: 2107, synliga i spelet: 633 (359 herrar, 274 damer). F
 | 2026-08-08 | Norrlandsmästerskapen, lång | H18 | 5 | ja | 38:22 |
 | 2026-08-08 | Norrlandsmästerskapen, lång | H20 | 4 | ja | 48:56 |
 | 2026-08-08 | Norrlandsmästerskapen, lång | H21 | 17 | ja | 66:28 |
-| 2026-08-08 | Världscup medel | D21 | 70 | ankare | 31:22 |
-| 2026-08-08 | Världscup medel | H21 | 71 | ankare | 31:51 |
+| 2026-08-08 | World Cup Middle | D21 | 70 | ankare | 31:22 |
+| 2026-08-08 | World Cup Middle | H21 | 71 | ankare | 31:51 |
 | 2026-08-09 | Norrlandsmästerskapen, medel | D18 | 7 | ja | 23:06 |
 | 2026-08-09 | Norrlandsmästerskapen, medel | D20 | 3 | ja | 28:23 |
 | 2026-08-09 | Norrlandsmästerskapen, medel | D21 | 10 | ja | 28:16 |
@@ -379,10 +379,10 @@ Löpare: 2165, med betyg: 2107, synliga i spelet: 633 (359 herrar, 274 damer). F
 | 2026-09-13 | SM, lång (Swedish League, #7) | H21A | 20 | ja | 85:35 |
 | 2026-09-13 | SM, lång (Swedish League, #7) | H21B | 33 | ja | 78:16 |
 | 2026-09-13 | SM, lång (Swedish League, #7) | H21C | 10 | ja | 73:04 |
-| 2026-09-24 | EM lång | D21 | 54 | ankare | 89:40 |
-| 2026-09-24 | EM lång | H21 | 56 | ankare | 94:03 |
-| 2026-09-26 | EM medel | D21 | 70 | ankare | 32:38 |
-| 2026-09-26 | EM medel | H21 | 73 | ankare | 32:56 |
+| 2026-09-24 | European Championships Long | D21 | 54 | ankare | 89:40 |
+| 2026-09-24 | European Championships Long | H21 | 56 | ankare | 94:03 |
+| 2026-09-26 | European Championships Middle | D21 | 70 | ankare | 32:38 |
+| 2026-09-26 | European Championships Middle | H21 | 73 | ankare | 32:56 |
 | 2026-10-11 | 25mannamedeln (WRE) | D18 | 22 | ja | 21:47 |
 | 2026-10-11 | 25mannamedeln (WRE) | D18E-1 | 78 | ja | 24:24 |
 | 2026-10-11 | 25mannamedeln (WRE) | D18E-2 | 14 | ja | 27:14 |
