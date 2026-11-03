@@ -1,4 +1,5 @@
 using System.Collections;
+using Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -41,6 +42,17 @@ public class SceneLoader : MonoBehaviour
         loading = true;
         page.SetActive(true);
         runner.StartCoroutine(runner.Run(page, scene, message));
+    }
+
+    // Leaves a network game and then changes scene. The scene only changes once the runner has shut down:
+    // loading it while the runner is still leaving made Photon kick the player and log an error.
+    public static async void LeaveSession(NetworkRunner runner, string scene)
+    {
+        if (runner != null && runner.IsRunning)
+        {
+            await runner.Shutdown();
+        }
+        SceneManager.LoadScene(scene);
     }
 
     static GameObject Page()

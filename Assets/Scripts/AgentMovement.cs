@@ -1493,7 +1493,14 @@ public class AgentMovement : NetworkBehaviour
         Debug.Log("SetRunner starts");
         baseSpeed = unscaledBaseSpeed * card.speed/100;
         runnerStatTec = card.technique;
-        runnerName = card.name;
+        runnerName = card.runnerName;
+
+        // The results table after the race shows who ran
+        NetworkPlayer np = GetComponent<NetworkPlayer>();
+        if (np != null && np.Object != null && np.Object.HasStateAuthority)
+        {
+            np.relayRunnerName = runnerName ?? "";
+        }
 
         runnerStatTec = (100 - runnerStatTec) / 100;
         originalBaseSpeed = baseSpeed;
