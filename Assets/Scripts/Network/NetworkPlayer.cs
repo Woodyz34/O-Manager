@@ -132,10 +132,23 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int analysisLegCount { get; set; }
     [Networked] public NetworkBool analysisDone { get; set; }
 
+    // Route choice game: this player's points, right answers, questions answered so far, and when done how many
+    // questions there were (RouteChoiceGame)
+    [Networked] public int choiceScore { get; set; }
+    [Networked] public int choiceRight { get; set; }
+    [Networked] public int choiceAnswered { get; set; }
+    [Networked] public int choiceQuestions { get; set; }
+    [Networked] public NetworkBool choiceDone { get; set; }
+
     void ClearModeChoices()
     {
         analysisDone = false;
         analysisLegCount = 0;
+        choiceScore = 0;
+        choiceRight = 0;
+        choiceAnswered = 0;
+        choiceQuestions = 0;
+        choiceDone = false;
         bearPlaced = false;
         bearPosition = Vector2.zero;
         moveUsed = false;
@@ -532,6 +545,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteAnalysis) && RelayRace.Active == null)
         {
             RouteAnalysis.Begin(this);
+            return;
+        }
+
+        // Route choice game: nobody picks a runner either; the routes are timed with a speed-100 runner
+        if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteChoice) && RelayRace.Active == null)
+        {
+            RouteChoiceGame.Begin(this);
             return;
         }
 
@@ -964,6 +984,11 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             // Route analysis: the whole course is drawn first, and nobody runs
             RouteAnalysis.StartDrawing(agent);
+        }
+        else if (RouteChoiceGame.On)
+        {
+            // Route choice game: questions on the map, nobody draws or runs
+            RouteChoiceGame.Start(agent);
         }
         else
         {

@@ -171,7 +171,8 @@ public class CameraController : MonoBehaviour
             && !agent.manualPathDrawer.timeToDraw
             && !agent.WaitingForAllPlayersToChooseRunner
             && !agent.hasFinished
-            && !RouteAnalysis.On; // nobody runs in route analysis
+            && !RouteAnalysis.On // nobody runs in route analysis
+            && !RouteChoiceGame.On; // nor in the route choice game
     }
 
     private bool IsFollowingRunner()
