@@ -21,6 +21,19 @@ public class MapGrid
             return cached;
         }
         MapGrid grid = null;
+        if (MapPackages.IsPackagePath(gridName))
+        {
+            byte[] bytes = MapPackages.LoadBytes(gridName, ".bytes");
+            if (bytes == null || !GridBinary.TryRead(bytes, out GridData _, out float[,] packageSpeed, out Dictionary<string, float[,]> packageSlopes))
+            {
+                Debug.LogError("MapGrid: could not read grid " + gridName);
+                return null;
+            }
+            grid = new MapGrid { speed = packageSpeed, slopes = packageSlopes };
+            TerrainSpeedModel.Apply(grid.speed, grid.slopes);
+            cache[gridName] = grid;
+            return grid;
+        }
         TextAsset binary = Resources.Load<TextAsset>("2d-gridJson/" + gridName + GridBinary.Suffix);
         if (binary != null)
         {

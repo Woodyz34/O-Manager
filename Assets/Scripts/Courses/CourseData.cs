@@ -36,6 +36,7 @@ public class CourseData
     public string background;        // which picture of the map to show; empty = the map's own clean picture
     public bool builtIn;
     public long createdAt;           // unix seconds
+    public string terrain;           // "forest" or "sprint", chosen when the course is saved; empty = the map's type
     public CoursePoint start;
     public List<CoursePoint> controls = new List<CoursePoint>();
     public CoursePoint finish;
@@ -65,6 +66,17 @@ public class CourseData
     public List<bool> forkedLegs = new List<bool>();
 
     public bool IsRelay() => kind == KindRelay;
+
+    public const string Forest = "forest";
+    public const string Sprint = "sprint";
+
+    // A sprint course: no mistakes, the runners run the route as it is drawn
+    public bool IsSprint()
+    {
+        if (!string.IsNullOrEmpty(terrain)) return terrain == Sprint;
+        MapDefinition map = MapDefinition.All.Find(m => m.id == mapId);
+        return map != null && map.IsSprint;
+    }
 
     public static string BranchLetter(int branch) => ((char)('A' + branch)).ToString();
 
@@ -165,7 +177,7 @@ public class CourseData
         CourseData result = new CourseData
         {
             id = id, name = name, author = author, authorId = authorId, mapId = mapId, background = background,
-            builtIn = builtIn, createdAt = createdAt
+            builtIn = builtIn, createdAt = createdAt, terrain = terrain
         };
         route.course = result;
         if (relayCourse == null) return route;
@@ -325,6 +337,7 @@ public class CourseData
     // 2 branches (C) with 1 (B) and 0 (A) controls, fork 1 has 2 branches (C) with 0 and 0... (each fork: number of
     // branches, then the number of controls on each branch).
     // (v3 and v4 were earlier relay formats; they are still read.)
+    // Last comes the course type when it is set: "s" sprint, "f" forest (older versions of the game ignore it).
 
     const string Digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     const int StepOffset = 131072; // 64^3 / 2
@@ -389,6 +402,7 @@ public class CourseData
                 foreach (RelayBranch branch in relayForks[f].branches) sb.Append(Digits[branch.controls.Count]);
             }
         }
+        if (!string.IsNullOrEmpty(terrain)) sb.Append('|').Append(terrain == Sprint ? 's' : 'f');
         return sb.ToString();
     }
 
@@ -456,6 +470,9 @@ public class CourseData
                 author = parts[6],
                 authorId = parts[7]
             };
+            // The course type comes after the points (v2) or after the relay field (v3 to v5)
+            int terrainPart = parts[0] == "v2" ? 9 : 10;
+            if (parts.Length > terrainPart) course.terrain = parts[terrainPart] == "s" ? Sprint : parts[terrainPart] == "f" ? Forest : null;
             string coords = parts[8];
             if (coords.Length < 14 || (coords.Length - 8) % 6 != 0)
             {

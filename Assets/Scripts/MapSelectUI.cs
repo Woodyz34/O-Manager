@@ -118,6 +118,8 @@ public class MapSelectUI : MonoBehaviour
 
         string search = searchField != null ? searchField.text : "";
         list.RemoveAll(entry => !CourseFilter.Matches(entry.course, search, kind));
+        // Courses on a map this computer does not have (a map someone imported on their own computer)
+        list.RemoveAll(entry => !MapDefinition.Exists(entry.course.mapId));
         foreach (var entry in list)
         {
             AddCard(entry.course, entry.tag);
@@ -194,7 +196,7 @@ public class MapSelectUI : MonoBehaviour
 
         MapDefinition map = MapDefinition.Find(course.mapId);
         string facts = (course.IsRelay() ? "Relay, " + course.legs + " legs  ·  " : course.controls.Count + " controls  ·  ")
-            + course.LengthText() + (map != null ? "  ·  " + map.displayName : "");
+            + course.LengthText() + (course.IsSprint() ? "  ·  Sprint" : "") + (map != null ? "  ·  " + map.displayName : "");
         TextMeshProUGUI details = CourseUI.Text("Details", card.transform, facts, 22, CourseUI.Ink);
         CourseUI.Place(details.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -410), new Vector2(360, 30));
         details.enableWordWrapping = false;

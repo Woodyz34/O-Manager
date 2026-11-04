@@ -38,12 +38,22 @@ public class MapDefinition : ScriptableObject
 
     public string id;
     public string displayName;
+    public string mapType = "forest";     // "forest" or "sprint" (sprint maps have no mistakes and 2 m cells)
 
-    [Header("Grid (Resources/2d-gridJson)")]
+    [Header("Grid: a name in Resources/2d-gridJson, or a map package path (see MapPackages)")]
     public string gridName = "output_grid";
     public float minx, miny, maxx, maxy;
     public float gridSize = 10f;
     public int rows, cols;
+
+    [Header("Map objects (GeoJSON) for imported maps; empty uses the files set on GeoJsonSpawner")]
+    public string pointsPath;
+    public string linesPath;
+
+    // Imported on this computer and not yet built into the game
+    [NonSerialized] public bool isLocal;
+
+    public bool IsSprint => mapType == "sprint";
 
     [Header("Pictures")]
     public string defaultBackground;
@@ -112,10 +122,26 @@ public class MapDefinition : ScriptableObject
             if (all == null)
             {
                 all = new List<MapDefinition>(Resources.LoadAll<MapDefinition>("MapDefs"));
+                // Maps imported on this computer, unless the same map is already built into the game
+                foreach (MapDefinition local in MapPackages.LoadLocal())
+                {
+                    if (!all.Exists(m => m.id == local.id)) all.Add(local);
+                }
                 all.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
             }
             return all;
         }
+    }
+
+    // Read the list again, after a map has been imported
+    public static void Refresh()
+    {
+        all = null;
+    }
+
+    public static bool Exists(string mapId)
+    {
+        return string.IsNullOrEmpty(mapId) || All.Exists(m => m.id == mapId);
     }
 
     public static MapDefinition Find(string mapId)

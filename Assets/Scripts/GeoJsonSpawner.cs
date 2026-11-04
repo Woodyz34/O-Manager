@@ -107,15 +107,27 @@ public class GeoJsonSpawner : MonoBehaviour
             maxy = bounds.maxy
         };
 
-        var files = new List<TextAsset>();
-        if (pointGeoJsonFile != null) files.Add(pointGeoJsonFile);
-        if (lineGeoJsonFile != null) files.Add(lineGeoJsonFile);
-        if (polygonGeoJsonFile != null && spawnPolygons) files.Add(polygonGeoJsonFile);
+        // Imported maps bring their own map objects; the old Illern map uses the files set in the scene
+        var files = new List<byte[]>(); // måste läsas på huvudtråden
+        MapDefinition map = CourseLoader.LoadedMap;
+        if (map != null && !string.IsNullOrEmpty(map.pointsPath) && pathfindingManager.jsonFileName == map.gridName + ".json")
+        {
+            byte[] pointData = MapPackages.LoadBytes(map.pointsPath, ".json");
+            byte[] lineData = MapPackages.LoadBytes(map.linesPath, ".json");
+            if (pointData != null) files.Add(pointData);
+            if (lineData != null) files.Add(lineData);
+        }
+        else
+        {
+            if (pointGeoJsonFile != null) files.Add(pointGeoJsonFile.bytes);
+            if (lineGeoJsonFile != null) files.Add(lineGeoJsonFile.bytes);
+            if (polygonGeoJsonFile != null && spawnPolygons) files.Add(polygonGeoJsonFile.bytes);
+        }
 
         var tasks = new List<Task<List<ParsedFeature>>>();
-        foreach (TextAsset file in files)
+        foreach (byte[] file in files)
         {
-            byte[] data = file.bytes; // måste läsas på huvudtråden
+            byte[] data = file;
             tasks.Add(Task.Run(() => ParseGeoJson(data, mapping)));
         }
 

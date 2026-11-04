@@ -52,6 +52,7 @@ public class CourseBuilder : MonoBehaviour
     readonly List<EditFork> forks = new List<EditFork>();
     readonly List<int> legCourse = new List<int>();   // relay: the course each leg runs
     bool relay;
+    string terrain = CourseData.Forest;   // forest or sprint course, for sorting and for mistakes
     int legs = 3;
     bool forkEveryVariant = true;
     int selectedLeg;
@@ -97,6 +98,8 @@ public class CourseBuilder : MonoBehaviour
     Button saveButton;
     Button mapButton;
     Button typeButton;
+    Button forestButton;
+    Button sprintButton;
     Image relayPanel;
     TextMeshProUGUI legsLabel;
     RectTransform legButtonRow;
@@ -138,7 +141,7 @@ public class CourseBuilder : MonoBehaviour
         MapBackground background = map.GetBackground(map.defaultBackground);
         if (background != null)
         {
-            mapRenderer.sprite = Resources.Load<Sprite>(background.spritePath);
+            mapRenderer.sprite = MapPackages.LoadSprite(background);
             mapRenderer.transform.position = new Vector3(background.position.x, background.position.y, 0f);
             mapRenderer.transform.rotation = Quaternion.Euler(0, 0, background.rotation);
             mapRenderer.transform.localScale = new Vector3(background.scale, background.scale, 1f);
@@ -146,6 +149,27 @@ public class CourseBuilder : MonoBehaviour
         if (mapButton != null) CourseUI.SetButtonText(mapButton, "Map: " + map.displayName + (MapDefinition.All.Count > 1 ? "  (change)" : ""));
         ClearCourse();
         FitCamera();
+    }
+
+    void SetTerrain(string value)
+    {
+        terrain = value == CourseData.Sprint ? CourseData.Sprint : CourseData.Forest;
+        if (forestButton == null) return;
+        CourseUI.SetButtonColor(forestButton, terrain == CourseData.Forest ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light);
+        CourseUI.SetButtonColor(sprintButton, terrain == CourseData.Sprint ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light);
+    }
+
+    // A map file from OCAD or OpenOrienteering Mapper becomes a new map to lay courses on
+    void OpenMapImport()
+    {
+        if (busy || MapImportPanel.IsOpen) return;
+        MapImportPanel.Open(canvasObject.transform, imported =>
+        {
+            if (imported == null) return;
+            SelectMap(imported);
+            // Whether it was also sent in is said in the message at the bottom of the screen
+            SetStatus("Imported " + imported.displayName + ". You can lay courses on it now.", false);
+        });
     }
 
     void NextMap()
@@ -174,7 +198,7 @@ public class CourseBuilder : MonoBehaviour
 
     void Update()
     {
-        if (map == null || busy || forkPopup != null) return;
+        if (map == null || busy || forkPopup != null || MapImportPanel.IsOpen) return;
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
         bool typing = EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null
                       && EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>() != null;
@@ -186,7 +210,8 @@ public class CourseBuilder : MonoBehaviour
         if (!overUI && Mathf.Abs(wheel) > 0.01f)
         {
             float oldSize = mapCamera.orthographicSize;
-            float newSize = Mathf.Clamp(oldSize * (wheel > 0 ? 0.85f : 1.18f), 1.5f, 45f);
+            // Sprint maps have 2 m cells, so they can be zoomed in further
+            float newSize = Mathf.Clamp(oldSize * (wheel > 0 ? 0.85f : 1.18f), map.IsSprint ? 0.4f : 1.5f, 45f);
             mapCamera.orthographicSize = newSize;
             Vector3 after = mapCamera.ScreenToWorldPoint(Input.mousePosition);
             mapCamera.transform.position += new Vector3(mouseWorld.x - after.x, mouseWorld.y - after.y, 0f);
@@ -836,6 +861,7 @@ public class CourseBuilder : MonoBehaviour
         selectedLeg = 0;
         editing = null;
         errorPoint = null;
+        SetTerrain(map != null && map.IsSprint ? CourseData.Sprint : CourseData.Forest);
         if (nameField != null) nameField.text = "";
         SetTool(Tool.Start);
         SetStatus("", false);
@@ -852,6 +878,7 @@ public class CourseBuilder : MonoBehaviour
             authorId = CloudCourses.PlayerId,
             mapId = map.id,
             background = "",
+            terrain = terrain,
             builtIn = false,
             createdAt = editing != null ? editing.createdAt : DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         };
@@ -1068,6 +1095,7 @@ public class CourseBuilder : MonoBehaviour
         ClearCourse();
         editing = course;
         nameField.text = course.name;
+        SetTerrain(course.IsSprint() ? CourseData.Sprint : CourseData.Forest);
         courses.Clear();
         legCourse.Clear();
         forks.Clear();
@@ -1222,6 +1250,16 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Size(statusText, 76);
         statusText.overflowMode = TextOverflowModes.Overflow;
 
+        // Forest or sprint course: chosen after the course is laid; the map's type is the default
+        RectTransform terrainRow = CourseUI.Rect("Course type", panel.transform);
+        CourseUI.Row(terrainRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(terrainRow, 44);
+        TextMeshProUGUI terrainLabel = CourseUI.Text("Label", terrainRow, "Course type:", 21, CourseUI.Ink, FontStyles.Bold);
+        terrainLabel.alignment = TextAlignmentOptions.MidlineLeft;
+        forestButton = CourseUI.Button("Forest", terrainRow, "Forest", CourseUI.ButtonKind.Light, () => SetTerrain(CourseData.Forest), 20);
+        sprintButton = CourseUI.Button("Sprint", terrainRow, "Sprint", CourseUI.ButtonKind.Light, () => SetTerrain(CourseData.Sprint), 20);
+        SetTerrain(terrain);
+
         RectTransform actionRow = CourseUI.Rect("Actions", panel.transform);
         CourseUI.Row(actionRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(actionRow, 58);
@@ -1238,6 +1276,7 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(bottomRow, 52);
         CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Light, ClearCourse, 22);
+        CourseUI.Button("Import map", bottomRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 22);
         CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
 
         BuildRelayPanel(canvasObject.transform);
