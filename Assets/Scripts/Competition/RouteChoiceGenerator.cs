@@ -34,20 +34,20 @@ public class RouteChoiceLeg
 // Finds 2 to 4 clearly different routes on a leg for the route choice game. Plain C# with no Unity objects, so it
 // runs on a background thread.
 //
-// How: the fastest route is found with A*. Then the ground along and around the routes found so far is made much
-// slower (a "penalty corridor") and A* is asked again, which pushes the next route to the other side of a house,
-// hill or lake. The pushed route is not shown itself: a few of its points are taken (the one farthest from the
-// fastest route, and points along it), and the fastest way through each point is used, so the alternatives are
-// routes a runner would really take and not a wiggle round the corridor. All routes are timed with the speed-100 runner, including slope and the speed lost
+// How: the fastest time from the start to every point of the map round the leg, and from every point to the goal,
+// is worked out once (Dijkstra both ways). The fastest route through any point is then known at once. Points are
+// taken cheapest first, skipping points close to a route already taken, so every route found runs somewhere new:
+// left, right, straight on, along a road or across the open. Each is the real fastest way through its point,
+// on roads and paths before and after. All routes are timed with the speed-100 runner, including slope and the speed lost
 // in turns (as AgentMovement runs). Routes that mostly run in the same place, or take nearly the same time as one
 // already picked, are left out, so the choices are spread out and worth thinking about.
 public class RouteChoiceGenerator
 {
-    const int Iterations = 7;              // penalty rounds per leg
-    const float PenaltyShare = 0.35f;      // ground speed kept inside a corridor, per round
-    const float MinGapSeconds = 4f;        // two choices must differ at least this much (race seconds)...
-    const float MinGapShare = 0.03f;       // ...and at least this share of the fastest time
-    const float MaxSlower = 1.45f;         // choices slower than this x the fastest are too easy to rule out
+    const int MaxCandidates = 12;          // different routes timed per leg before picking
+    const int MaxTries = 600;              // points tried per leg
+    const float MinGapSeconds = 2f;        // two choices must differ at least this much (race seconds)...
+    const float MinGapShare = 0.02f;       // ...and at least this share of the fastest time
+    const float MaxSlower = 1.5f;         // choices slower than this x the fastest are too easy to rule out
     const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
     const float MaxSameShare = 0.5f;       // at most half of a route's middle may run next to another route
     const float TurnAcceleration = 2f;     // as AgentMovement.TurnAcceleration (world units per second²)
@@ -168,36 +168,66 @@ public class RouteChoiceGenerator
         float endMeters = Mathf.Max(corridorMeters, 3f * cellMeters); // near the controls all routes may meet
         int endCells = Mathf.CeilToInt(endMeters / cellMeters);
 
-        List<RouteChoice> candidates = new List<RouteChoice> { Evaluate(best) };
-        float[,] work = (float[,])speed.Clone();
-        int[] stamp = new int[width * height];
-        List<Vector2Int> last = best;
-        for (int round = 1; round <= Iterations; round++)
+        // Every point in the window, with the fastest time from the start to it and from it to the goal: the
+        // fastest route through any point is then known at once. Points are taken cheapest first; a point next to a
+        // route already taken adds nothing new, so each new one gives a route that is somewhere else. Together
+        // that is every sensible way: left, right, straight on, along a road or across the open.
+        int cellCount = width * height;
+        float[] fromStart = new float[cellCount], toGoal = new float[cellCount];
+        int[] backToStart = new int[cellCount], onToGoal = new int[cellCount];
+        Tree(from, false, fromStart, backToStart);
+        Tree(to, true, toGoal, onToGoal);
+        int goalIndex = to.y * width + to.x;
+        float bestCost = fromStart[goalIndex];
+        if (float.IsInfinity(bestCost))
         {
-            Penalise(work, stamp, round, last, corridor, from, to, endCells);
-            List<Vector2Int> pushed = Path(from, to, work);
-            if (pushed == null) break;
-            last = pushed;
-            // The pushed route itself is not shown: it avoids the corridors all the way, also where the real best
-            // way is the same road as another route. Only its farthest point from the fastest route is used.
-            // The fastest route through a few points of it: the point farthest from the fastest route, and points a
-            // third, half and two thirds along. Each is a route a runner would really take: away from the others
-            // only where it has to be, and on the best way (roads, paths) before and after.
-            List<Vector2Int> vias = new List<Vector2Int> { FarthestFrom(pushed, best) };
-            foreach (float share in new[] { 0.3f, 0.5f, 0.7f }) vias.Add(pushed[Mathf.RoundToInt(share * (pushed.Count - 1))]);
-            foreach (Vector2Int via in vias)
+            result.skipped = "no way through";
+            return result;
+        }
+        List<KeyValuePair<float, int>> vias = new List<KeyValuePair<float, int>>();
+        int every = Mathf.Max(1, Mathf.RoundToInt(sameMeters / cellMeters));
+        for (int y = 0; y < height; y += every)
+        {
+            for (int x = 0; x < width; x += every)
             {
-                if (NearestSquared(via, best, int.MaxValue) * cellMeters * cellMeters < sameMeters * sameMeters) continue;
-                List<Vector2Int> natural = Through(from, via, to);
-                if (natural != null) candidates.Add(Evaluate(natural));
+                int i = y * width + x;
+                float total = fromStart[i] + toGoal[i];
+                if (total <= bestCost * MaxSlower * 1.1f) vias.Add(new KeyValuePair<float, int>(total, i));
             }
+        }
+        vias.Sort((p, q) => p.Key.CompareTo(q.Key));
+
+        List<RouteChoice> candidates = new List<RouteChoice> { Evaluate(best) };
+        bool[] covered = new bool[cellCount];
+        Cover(covered, best, corridor);
+        int tried = 0;
+        foreach (KeyValuePair<float, int> via in vias)
+        {
+            if (covered[via.Value]) continue;
+            List<Vector2Int> route = Through(via.Value, backToStart, onToGoal);
+            // (A point just beside a good route gives a route with a spike out to the point and back: the sharp
+            // turn rules it out below.)
+            covered[via.Value] = true;
+            Cover(covered, route, corridor);
+            if (route.Count < 2) continue;
+            if (++tried > MaxTries) break;
+            // Only routes that run somewhere else than every route found so far
+            bool fresh = true;
+            foreach (RouteChoice c in candidates)
+            {
+                if (!Different(route, c.cells, from, to, endCells, sameMeters / cellMeters)) { fresh = false; break; }
+            }
+            if (!fresh) continue;
+            candidates.Add(Evaluate(route));
+            if (candidates.Count >= MaxCandidates) break;
         }
 
         // Fastest first; take every route that is clearly different from the ones already taken
         candidates.Sort((a, b) => a.seconds.CompareTo(b.seconds));
         float fastest = candidates[0].seconds;
         float gap = Mathf.Max(MinGapSeconds, fastest * MinGapShare);
-        int most = straightMeters < 80f ? 2 : straightMeters < 200f ? 3 : 4;
+        // Up to 4 choices, as many as there are clearly different ones; on short legs at most 3, as more would not fit
+        int most = straightMeters < 100f ? 3 : 4;
         float sameCells = sameMeters / cellMeters;
         List<RouteChoice> picked = new List<RouteChoice>();
         foreach (RouteChoice c in candidates)
@@ -244,59 +274,6 @@ public class RouteChoiceGenerator
     }
 
     // ---- Building the alternatives ----
-
-    // Makes the ground round a route slower, except close to the controls (every route has to leave and reach them)
-    void Penalise(float[,] work, int[] stamp, int round, List<Vector2Int> route, int radius, Vector2Int from, Vector2Int to, int endCells)
-    {
-        int r2 = radius * radius;
-        int e2 = endCells * endCells;
-        foreach (Vector2Int c in route)
-        {
-            for (int dy = -radius; dy <= radius; dy++)
-            {
-                int y = c.y + dy;
-                if (y < 0 || y >= height) continue;
-                for (int dx = -radius; dx <= radius; dx++)
-                {
-                    if (dx * dx + dy * dy > r2) continue;
-                    int x = c.x + dx;
-                    if (x < 0 || x >= width) continue;
-                    int index = y * width + x;
-                    if (stamp[index] == round) continue;
-                    stamp[index] = round;
-                    int fx = x - from.x, fy = y - from.y, tx = x - to.x, ty = y - to.y;
-                    if (fx * fx + fy * fy <= e2 || tx * tx + ty * ty <= e2) continue;
-                    work[y, x] *= PenaltyShare;
-                }
-            }
-        }
-    }
-
-    // The point of a route farthest from another route
-    static Vector2Int FarthestFrom(List<Vector2Int> route, List<Vector2Int> other)
-    {
-        Vector2Int farthest = route[route.Count / 2];
-        int worst = -1;
-        for (int i = 0; i < route.Count; i++)
-        {
-            int d = NearestSquared(route[i], other, int.MaxValue);
-            if (d > worst) { worst = d; farthest = route[i]; }
-        }
-        return farthest;
-    }
-
-    // The fastest route through a point, without loops
-    List<Vector2Int> Through(Vector2Int from, Vector2Int via, Vector2Int to)
-    {
-        if (via == from || via == to) return null;
-        List<Vector2Int> first = Path(from, via);
-        List<Vector2Int> second = Path(via, to);
-        if (first == null || second == null) return null;
-        List<Vector2Int> joined = new List<Vector2Int>(first.Count + second.Count);
-        joined.AddRange(first);
-        for (int i = 1; i < second.Count; i++) joined.Add(second[i]);
-        return RemoveLoops(joined);
-    }
 
     static List<Vector2Int> RemoveLoops(List<Vector2Int> route)
     {
@@ -389,6 +366,86 @@ public class RouteChoiceGenerator
             sum += along.x * v.y - along.y * v.x; // > 0 = left
         }
         return -sum / Mathf.Max(1, route.Count);
+    }
+
+    // ---- Fastest times from the start and to the goal ----
+
+    // Dijkstra over the whole window: the fastest time from the root to every cell (or, backwards, from every cell
+    // to the root), and the next cell on the way back to the root
+    void Tree(Vector2Int root, bool backwards, float[] cost, int[] next)
+    {
+        for (int i = 0; i < cost.Length; i++) { cost[i] = float.PositiveInfinity; next[i] = -1; }
+        bool[] done = new bool[cost.Length];
+        int rootIndex = root.y * width + root.x;
+        cost[rootIndex] = 0f;
+        heapCount = 0;
+        Push(rootIndex, 0f);
+        while (heapCount > 0)
+        {
+            int current = Pop();
+            if (done[current]) continue;
+            done[current] = true;
+            int cx = current % width, cy = current / width;
+            for (int d = 0; d < 8; d++)
+            {
+                int nx = cx + DirX[d], ny = cy + DirY[d];
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                int other = ny * width + nx;
+                if (done[other] || speed[ny, nx] <= 0.01f) continue;
+                float step = (DirX[d] != 0 && DirY[d] != 0) ? 1.414f : 1f;
+                float c;
+                if (!backwards)
+                {
+                    // current -> other
+                    float slope = slopes[d] != null ? slopes[d][cy, cx] : 1f;
+                    if (slope <= 0f) continue;
+                    c = step / speed[ny, nx] / slope;
+                }
+                else
+                {
+                    // other -> current, in the opposite direction
+                    int back = (d + 4) % 8;
+                    float slope = slopes[back] != null ? slopes[back][ny, nx] : 1f;
+                    if (slope <= 0f) continue;
+                    c = step / Mathf.Max(0.01f, speed[cy, cx]) / slope;
+                }
+                float total = cost[current] + c;
+                if (total >= cost[other]) continue;
+                cost[other] = total;
+                next[other] = current;
+                Push(other, total);
+            }
+        }
+    }
+
+    // The fastest route from the start through a cell to the goal, without loops
+    List<Vector2Int> Through(int via, int[] backToStart, int[] onToGoal)
+    {
+        List<Vector2Int> route = new List<Vector2Int>();
+        for (int c = via; c >= 0; c = backToStart[c]) route.Add(new Vector2Int(c % width, c / width));
+        route.Reverse();
+        for (int c = onToGoal[via]; c >= 0; c = onToGoal[c]) route.Add(new Vector2Int(c % width, c / width));
+        return RemoveLoops(route);
+    }
+
+    // Marks the cells round a route
+    void Cover(bool[] covered, List<Vector2Int> route, int radius)
+    {
+        int r2 = radius * radius;
+        foreach (Vector2Int c in route)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                int y = c.y + dy;
+                if (y < 0 || y >= height) continue;
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    int x = c.x + dx;
+                    if (x < 0 || x >= width || dx * dx + dy * dy > r2) continue;
+                    covered[y * width + x] = true;
+                }
+            }
+        }
     }
 
     // ---- A* ----
