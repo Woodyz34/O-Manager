@@ -470,10 +470,15 @@ public class RouteChoiceView : MonoBehaviour
     {
         ClearDrawn();
         float width = cam.orthographicSize * 0.012f;
+        // Where routes run in the same place they are drawn side by side, edge to edge, not on top of each other
+        float spacing = width * 1.6f;
+        List<List<Vector3>> earlier = new List<List<Vector3>>();
         for (int i = 0; i < current.choices.Count; i++)
         {
             RouteChoice c = current.choices[i];
-            List<Vector3> points = WorldPoints(c.points);
+            List<Vector3> line = Densify(WorldPoints(c.points), width * 0.7f);
+            List<Vector3> points = SideBySide(line, earlier, spacing);
+            earlier.Add(line);
             bool highlight = fastest < 0 || i == fastest;
             float w = fastest >= 0 && i == fastest ? width * 1.5f : width;
             Color colour = RouteChoiceGame.Colours[c.colour];
@@ -482,6 +487,55 @@ public class RouteChoiceView : MonoBehaviour
             Line("Route edge " + i, points, new Color(0.08f, 0.08f, 0.08f, highlight ? 0.75f : 0.35f), w * 1.6f, 40 + 2 * i);
             Line("Route " + i, points, colour, w, 41 + 2 * i + (fastest >= 0 && i == fastest ? 20 : 0));
         }
+    }
+
+    // Points no further apart than "step"
+    static List<Vector3> Densify(List<Vector3> line, float step)
+    {
+        List<Vector3> dense = new List<Vector3>();
+        for (int i = 0; i < line.Count - 1; i++)
+        {
+            int parts = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(line[i], line[i + 1]) / step));
+            for (int s = 0; s < parts; s++) dense.Add(Vector3.Lerp(line[i], line[i + 1], (float)s / parts));
+        }
+        if (line.Count > 0) dense.Add(line[line.Count - 1]);
+        return dense;
+    }
+
+    // Moves a line sideways, one line width for each route already drawn in the same place, smoothly in and out
+    static List<Vector3> SideBySide(List<Vector3> line, List<List<Vector3>> earlier, float spacing)
+    {
+        int n = line.Count;
+        float[] shift = new float[n];
+        float near2 = spacing * spacing * 0.8f;
+        for (int k = 0; k < n; k++)
+        {
+            foreach (List<Vector3> other in earlier)
+            {
+                foreach (Vector3 q in other)
+                {
+                    if (((Vector2)(q - line[k])).sqrMagnitude <= near2) { shift[k] += 1f; break; }
+                }
+            }
+        }
+        // Ease in and out over a few points so the line bends aside instead of jumping
+        const int ease = 4;
+        float[] eased = new float[n];
+        for (int k = 0; k < n; k++)
+        {
+            float sum = 0f;
+            int count = 0;
+            for (int j = Mathf.Max(0, k - ease); j <= Mathf.Min(n - 1, k + ease); j++) { sum += shift[j]; count++; }
+            eased[k] = sum / count;
+        }
+        List<Vector3> result = new List<Vector3>(n);
+        for (int k = 0; k < n; k++)
+        {
+            Vector2 dir = (Vector2)(line[Mathf.Min(n - 1, k + 1)] - line[Mathf.Max(0, k - 1)]);
+            Vector2 left = dir.sqrMagnitude > 0f ? new Vector2(-dir.y, dir.x).normalized : Vector2.zero;
+            result.Add(line[k] + (Vector3)(left * eased[k] * spacing));
+        }
+        return result;
     }
 
     // The smooth line (grid coordinates, cell centres on whole numbers) on the map, from control to control
