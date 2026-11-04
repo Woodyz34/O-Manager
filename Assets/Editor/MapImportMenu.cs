@@ -27,6 +27,19 @@ public static class MapImportMenu
         }
         string file = EditorUtility.OpenFilePanelWithFilters("Map file", "", new[] { "Map files", "ocd,omap,xmap", "All files", "*" });
         if (string.IsNullOrEmpty(file)) return;
+        // A map a player sent in comes as map-<id>-source.<ext> with map-<id>-info.json (and maybe map-<id>-picture.png)
+        // next to it: then the name, type and contact come from there and nothing is asked
+        MapPackageInfo sent = ReadSentInfo(file);
+        string sentPicture = SentFile(file, "picture.png");
+        if (sent != null)
+        {
+            string result0 = Import(file, sentPicture, sent.name, sent.mapType == "sprint", sent);
+            EditorUtility.DisplayDialog("Import map", result0.StartsWith("Failed") ? "Could not import the map:\n" + result0.Substring(8) :
+                "Imported " + sent.name + " (" + sent.mapType + ")" +
+                (string.IsNullOrEmpty(sent.sender) ? "" : "\nSent by " + sent.sender + ", " + sent.ownerClub + ", " + sent.contact) +
+                (sent.permissionConfirmed ? "\nThe sender confirmed the club's permission." : "\nThe sender did NOT confirm the club's permission."), "OK");
+            return;
+        }
         string pictureFile = null;
         if (EditorUtility.DisplayDialog("Map picture", "Should the game draw the map picture itself, or do you have a PNG of the whole map exported from OCAD/OOM?", "Draw it", "Use a PNG"))
         {
@@ -43,7 +56,35 @@ public static class MapImportMenu
 
     // Can be called from scripts too: with name and sprint given it asks nothing (the name is the file's when null,
     // and the map type is asked when sprint is null)
-    public static string Import(string file, string pictureFile, string name, bool? sprint)
+    public static string Import(string file, string pictureFile, string name, bool? sprint) => Import(file, pictureFile, name, sprint, null);
+
+    // The map-<id>-<what> file next to a sent-in map-<id>-source.<ext>, or null
+    static string SentFile(string file, string what)
+    {
+        string fileName = Path.GetFileName(file);
+        int at = fileName.LastIndexOf("source", System.StringComparison.OrdinalIgnoreCase);
+        if (at <= 0) return null;
+        string path = Path.Combine(Path.GetDirectoryName(file), fileName.Substring(0, at) + what);
+        return File.Exists(path) ? path : null;
+    }
+
+    static MapPackageInfo ReadSentInfo(string file)
+    {
+        string path = SentFile(file, "info.json");
+        if (path == null) return null;
+        try
+        {
+            MapPackageInfo info = JsonUtility.FromJson<MapPackageInfo>(File.ReadAllText(path));
+            return info == null || string.IsNullOrEmpty(info.name) ? null : info;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("Import map: could not read " + path + ": " + e.Message);
+            return null;
+        }
+    }
+
+    static string Import(string file, string pictureFile, string name, bool? sprint, MapPackageInfo sent)
     {
         try
         {
@@ -73,6 +114,14 @@ public static class MapImportMenu
             package.info.id = MapPackages.Slug(name);   // importing the same map again replaces it
             package.info.sourceFile = Path.GetFileName(file);
             package.info.permissionConfirmed = true;   // imported by the game's owner
+            if (sent != null)
+            {
+                package.info.permissionConfirmed = sent.permissionConfirmed;
+                package.info.author = string.IsNullOrEmpty(sent.author) ? package.info.author : sent.author;
+                package.info.sender = sent.sender;
+                package.info.ownerClub = sent.ownerClub;
+                package.info.contact = sent.contact;
+            }
             string folder = PackagesFolder + "/" + package.info.id;
             MapPackageBuilder.WriteFolder(folder, package, ownPng, (step, share) => EditorUtility.DisplayProgressBar("Import map", step, share));
             if (ownPng != null) MapPackages.WriteThumbnail(folder, ownPng);

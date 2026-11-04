@@ -28,6 +28,9 @@ public static class CloudMaps
         public string mapType;
         public string sourceFile;
         public string author;
+        public string sender;
+        public string ownerClub;
+        public string contact;
         public long sentAt;               // unix seconds
         public bool permissionConfirmed;
         public string permissionText;
@@ -57,6 +60,9 @@ public static class CloudMaps
             mapType = info.mapType,
             sourceFile = sourceName,
             author = info.author,
+            sender = info.sender,
+            ownerClub = info.ownerClub,
+            contact = info.contact,
             sentAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             permissionConfirmed = true,
             permissionText = PermissionText

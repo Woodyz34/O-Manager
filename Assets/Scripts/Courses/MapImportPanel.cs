@@ -40,6 +40,8 @@ public class MapImportPanel : MonoBehaviour
     RectTransform list;
     ScrollRect listScroll;
     TMP_InputField nameField;
+    TMP_InputField senderField, clubField, contactField;   // who sends the map in, so the game's owner can reach them
+    GameObject contactRow;
     Button typeButton, pictureButton, permissionButton, sendButton, importButton, cancelButton;
     Image permissionBox;
 
@@ -92,7 +94,7 @@ public class MapImportPanel : MonoBehaviour
 
         list = CourseUI.ScrollList("Files", card.transform, out listScroll);
         CourseUI.Column(list.gameObject, 4, new RectOffset(0, 8, 0, 0));
-        CourseUI.Size(list.parent.GetComponent<Image>(), 270);
+        CourseUI.Size(list.parent.GetComponent<Image>(), 210);
 
         fileText = CourseUI.Text("File", card.transform, "No map file chosen yet.", 21, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(fileText, 32);
@@ -126,6 +128,17 @@ public class MapImportPanel : MonoBehaviour
 
         sendButton = CourseUI.Button("Send in", card.transform, "", CourseUI.ButtonKind.Light, () => { sendIn = !sendIn; Refresh(); }, 18);
         CourseUI.Size(sendButton, 44);
+
+        // Needed when the map is sent in: if a club asks about its map, the game's owner knows who to ask
+        RectTransform contact = CourseUI.Rect("Contact", card.transform);
+        CourseUI.Row(contact.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(contact, 52);
+        contactRow = contact.gameObject;
+        senderField = CourseUI.Input("Your name", contact, "Your full name", 40, _ => Refresh());
+        clubField = CourseUI.Input("Club", contact, "Club that owns the map", 60, _ => Refresh());
+        contactField = CourseUI.Input("Contact", contact, "E-mail or phone", 60, _ => Refresh());
+        senderField.SetTextWithoutNotify(PlayerPrefs.GetString("MapImport.Sender", ""));   // no Refresh yet: the buttons below are not made
+        contactField.SetTextWithoutNotify(PlayerPrefs.GetString("MapImport.Contact", ""));
 
         statusText = CourseUI.Text("Status", card.transform, "", 20, CourseUI.Forest, FontStyles.Bold);
         CourseUI.Size(statusText, 50);
@@ -320,12 +333,18 @@ public class MapImportPanel : MonoBehaviour
             ? "Send the map in too, so it can be built into the game for everyone  (on)"
             : "Keep the map on this computer only  (sending it in is off)");
         sendButton.interactable = !working;
-        bool ready = mapFile != null && permission && !working && browsing == Browse.MapFile;
+        contactRow.SetActive(sendIn);
+        bool ready = mapFile != null && permission && !working && browsing == Browse.MapFile && (!sendIn || ContactGiven());
         importButton.interactable = ready;
         cancelButton.interactable = !working;
         typeButton.interactable = !working;
         pictureButton.interactable = !working;
         permissionButton.interactable = !working;
+    }
+
+    bool ContactGiven()
+    {
+        return senderField.text.Trim().Length >= 2 && clubField.text.Trim().Length >= 2 && contactField.text.Trim().Length >= 5;
     }
 
     void SetStatus(string message, bool error)
@@ -363,6 +382,17 @@ public class MapImportPanel : MonoBehaviour
             SetStatus("Give the map a name.", true);
             yield break;
         }
+        if (sendIn && !ContactGiven())
+        {
+            SetStatus("To send the map in, write your name, the club that owns the map and your e-mail or phone.", true);
+            yield break;
+        }
+        string sender = senderField.text.Trim(), club = clubField.text.Trim(), contactInfo = contactField.text.Trim();
+        if (sendIn)
+        {
+            PlayerPrefs.SetString("MapImport.Sender", sender);
+            PlayerPrefs.SetString("MapImport.Contact", contactInfo);
+        }
         working = true;
         Refresh();
 
@@ -397,6 +427,12 @@ public class MapImportPanel : MonoBehaviour
             package.info.id = id;
             package.info.sourceFile = sourceName;
             package.info.author = author;
+            package.info.ownerClub = club;
+            if (sendIn)
+            {
+                package.info.sender = sender;
+                package.info.contact = contactInfo;
+            }
             package.info.permissionConfirmed = true;
             MapPackageBuilder.WriteFolder(target, package, ownPng, (step, share) => { progressShare = share; progressStep = step; });
         });

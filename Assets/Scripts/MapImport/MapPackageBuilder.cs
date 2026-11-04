@@ -37,6 +37,10 @@ namespace MapImport
         // (courses are sent as whole positive metres): ground = paper mm * scale / 1000 + offset
         public double offsetEast, offsetNorth;
         public string author;
+        // Who sent the map in and the club that owns it, so the game's owner can ask if a club gets in touch
+        public string sender;
+        public string ownerClub;
+        public string contact;
         public string created;                // ISO date
         public bool permissionConfirmed;      // the uploader says the map's owner allows it
     }
@@ -224,7 +228,7 @@ namespace MapImport
             N("pivotX", i.pivotX); N("pivotY", i.pivotY); B("ownPicture", i.ownPicture); B("hasHeights", i.hasHeights);
             B("georeferenced", i.georeferenced); N("refEast", i.refEast); N("refNorth", i.refNorth); N("gridAngle", i.gridAngle); N("crs", i.crs);
             N("offsetEast", i.offsetEast); N("offsetNorth", i.offsetNorth);
-            S("author", i.author); S("created", i.created);
+            S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created);
             sb.Append("  \"permissionConfirmed\": ").Append(i.permissionConfirmed ? "true" : "false").Append("\n}\n");
             File.WriteAllText(Path.Combine(folder, "map.json"), sb.ToString());
         }
