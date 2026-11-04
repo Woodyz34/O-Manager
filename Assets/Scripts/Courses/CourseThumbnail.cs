@@ -30,7 +30,7 @@ public static class CourseThumbnail
             recent.AddFirst(key);
             return cached;
         }
-        Texture2D source = Resources.Load<Texture2D>(background.thumbnailPath);
+        Texture2D source = MapPackages.LoadThumbnail(background);
         if (source == null || !source.isReadable)
         {
             return null;

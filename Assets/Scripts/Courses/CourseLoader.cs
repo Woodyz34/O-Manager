@@ -32,7 +32,7 @@ public class CourseLoader : MonoBehaviour
         MapBackground background = map.GetBackground(course.background);
         if (background != null)
         {
-            Sprite sprite = Resources.Load<Sprite>(background.spritePath);
+            Sprite sprite = MapPackages.LoadSprite(background);
             if (sprite != null)
             {
                 mapRenderer.sprite = sprite;

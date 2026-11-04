@@ -66,6 +66,15 @@ public static class TerrainSpeedModel
         }
     }
 
+    // Factors that are already in the new model (made from heights), so Apply leaves them alone
+    public static void MarkConverted(float[,] factors)
+    {
+        if (factors != null && !converted.TryGetValue(factors, out _))
+        {
+            converted.Add(factors, null);
+        }
+    }
+
     // Positive = uphill
     public static float GradientFromOldFactor(float oldFactor)
     {

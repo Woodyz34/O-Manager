@@ -144,7 +144,25 @@ public class PathfindingManager : MonoBehaviour
     {
         var loadWatch = System.Diagnostics.Stopwatch.StartNew();
         float scaleFactor = 0.01f;  // <-- prova olika (5, 10, 20 osv)
-        string gridName = Path.GetFileNameWithoutExtension(jsonFileName);
+        string gridName = jsonFileName.EndsWith(".json") ? jsonFileName.Substring(0, jsonFileName.Length - 5) : jsonFileName;
+
+        // Imported maps (MapImport) keep their grid in a map package, in Resources or on disk
+        if (MapPackages.IsPackagePath(gridName))
+        {
+            byte[] packageGrid = MapPackages.LoadBytes(gridName, ".bytes");
+            if (packageGrid != null && GridBinary.TryRead(packageGrid, out GridData packageData, out float[,] packageSpeed, out Dictionary<string, float[,]> packageSlopes))
+            {
+                gridData = packageData;
+                speedGrid2D = packageSpeed;
+                slopeFactors = packageSlopes;
+                TerrainSpeedModel.Apply(speedGrid2D, slopeFactors);
+                cellSize = gridData.grid_size * scaleFactor;
+                Debug.Log($"PathfindingManager: laddade kartpaketets grid {gridName} på {loadWatch.Elapsed.TotalSeconds:F2} s");
+                return;
+            }
+            Debug.LogError("PathfindingManager: kunde inte läsa grid " + gridName);
+            return;
+        }
 
         // Läs den bakade binärfilen om den finns (Editor/GridBinaryBaker.cs skapar den från JSON-filen).
         // Den går mycket fortare att läsa än JSON-filen, som bara används som reserv.

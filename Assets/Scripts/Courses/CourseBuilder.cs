@@ -138,7 +138,7 @@ public class CourseBuilder : MonoBehaviour
         MapBackground background = map.GetBackground(map.defaultBackground);
         if (background != null)
         {
-            mapRenderer.sprite = Resources.Load<Sprite>(background.spritePath);
+            mapRenderer.sprite = MapPackages.LoadSprite(background);
             mapRenderer.transform.position = new Vector3(background.position.x, background.position.y, 0f);
             mapRenderer.transform.rotation = Quaternion.Euler(0, 0, background.rotation);
             mapRenderer.transform.localScale = new Vector3(background.scale, background.scale, 1f);
@@ -146,6 +146,18 @@ public class CourseBuilder : MonoBehaviour
         if (mapButton != null) CourseUI.SetButtonText(mapButton, "Map: " + map.displayName + (MapDefinition.All.Count > 1 ? "  (change)" : ""));
         ClearCourse();
         FitCamera();
+    }
+
+    // A map file from OCAD or OpenOrienteering Mapper becomes a new map to lay courses on
+    void OpenMapImport()
+    {
+        if (busy || MapImportPanel.IsOpen) return;
+        MapImportPanel.Open(canvasObject.transform, imported =>
+        {
+            if (imported == null) return;
+            SelectMap(imported);
+            SetStatus("Imported " + imported.displayName + ". It is on this computer only until it is built into the game.", false);
+        });
     }
 
     void NextMap()
@@ -174,7 +186,7 @@ public class CourseBuilder : MonoBehaviour
 
     void Update()
     {
-        if (map == null || busy || forkPopup != null) return;
+        if (map == null || busy || forkPopup != null || MapImportPanel.IsOpen) return;
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
         bool typing = EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null
                       && EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>() != null;
@@ -186,7 +198,8 @@ public class CourseBuilder : MonoBehaviour
         if (!overUI && Mathf.Abs(wheel) > 0.01f)
         {
             float oldSize = mapCamera.orthographicSize;
-            float newSize = Mathf.Clamp(oldSize * (wheel > 0 ? 0.85f : 1.18f), 1.5f, 45f);
+            // Sprint maps have 2 m cells, so they can be zoomed in further
+            float newSize = Mathf.Clamp(oldSize * (wheel > 0 ? 0.85f : 1.18f), map.IsSprint ? 0.4f : 1.5f, 45f);
             mapCamera.orthographicSize = newSize;
             Vector3 after = mapCamera.ScreenToWorldPoint(Input.mousePosition);
             mapCamera.transform.position += new Vector3(mouseWorld.x - after.x, mouseWorld.y - after.y, 0f);
@@ -1238,6 +1251,7 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(bottomRow, 52);
         CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Light, ClearCourse, 22);
+        CourseUI.Button("Import map", bottomRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 22);
         CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
 
         BuildRelayPanel(canvasObject.transform);

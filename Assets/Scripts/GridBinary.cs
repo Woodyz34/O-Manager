@@ -48,7 +48,16 @@ public static class GridBinary
             using (var stream = new MemoryStream(bytes))
             using (var reader = new BinaryReader(stream))
             {
-                if (reader.ReadInt32() != Magic || reader.ReadInt32() != Version)
+                if (reader.ReadInt32() != Magic)
+                {
+                    return false;
+                }
+                int version = reader.ReadInt32();
+                if (version == 2)
+                {
+                    return ReadVersion2(reader, bytes, out gridData, out speedGrid, out slopeFactors);
+                }
+                if (version != Version)
                 {
                     return false;
                 }
@@ -110,5 +119,57 @@ public static class GridBinary
         Buffer.BlockCopy(bytes, offset, grid, 0, byteCount);
         reader.BaseStream.Position = offset + byteCount;
         return grid;
+    }
+    // Version 2 is written by the map import (MapImport/MapPackageBuilder.cs): speed and ground height per cell.
+    // The uphill/downhill factors are worked out here from the heights with TerrainSpeedModel.
+    static readonly string[] directionNames = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+    static readonly int[] directionX = { 0, 1, 1, 1, 0, -1, -1, -1 };
+    static readonly int[] directionY = { 1, 1, 0, -1, -1, -1, 0, 1 };
+
+    private static bool ReadVersion2(BinaryReader reader, byte[] bytes, out GridData gridData, out float[,] speedGrid, out Dictionary<string, float[,]> slopeFactors)
+    {
+        var data = new GridData { bounds = new GridData.BoundsData() };
+        data.bounds.minx = reader.ReadSingle();
+        data.bounds.miny = reader.ReadSingle();
+        data.bounds.maxx = reader.ReadSingle();
+        data.bounds.maxy = reader.ReadSingle();
+        data.grid_size = reader.ReadSingle();
+        int rows = reader.ReadInt32();
+        int cols = reader.ReadInt32();
+        int count = rows * cols;
+        speedGrid = new float[rows, cols];
+        int offset = (int)reader.BaseStream.Position;
+        Buffer.BlockCopy(bytes, offset, speedGrid, 0, count * sizeof(float));
+        reader.BaseStream.Position = offset + count * sizeof(float);
+        bool hasHeights = reader.ReadBoolean();
+        float[,] height = new float[rows, cols];
+        offset = (int)reader.BaseStream.Position;
+        Buffer.BlockCopy(bytes, offset, height, 0, count * sizeof(float));
+
+        slopeFactors = new Dictionary<string, float[,]>(8);
+        for (int d = 0; d < 8; d++)
+        {
+            float[,] factors = new float[rows, cols];
+            float distance = data.grid_size * ((directionX[d] != 0 && directionY[d] != 0) ? 1.41421356f : 1f);
+            for (int i = 0; i < rows; i++)
+            {
+                int ni = i + directionY[d];
+                for (int j = 0; j < cols; j++)
+                {
+                    int nj = j + directionX[d];
+                    if (!hasHeights || ni < 0 || ni >= rows || nj < 0 || nj >= cols)
+                    {
+                        factors[i, j] = 1f;
+                        continue;
+                    }
+                    float gradient = (height[ni, nj] - height[i, j]) / distance;
+                    factors[i, j] = TerrainSpeedModel.Factor(gradient, speedGrid[i, j]);
+                }
+            }
+            TerrainSpeedModel.MarkConverted(factors);
+            slopeFactors[directionNames[d]] = factors;
+        }
+        gridData = data;
+        return true;
     }
 }

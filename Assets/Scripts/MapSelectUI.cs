@@ -118,6 +118,8 @@ public class MapSelectUI : MonoBehaviour
 
         string search = searchField != null ? searchField.text : "";
         list.RemoveAll(entry => !CourseFilter.Matches(entry.course, search, kind));
+        // Courses on a map this computer does not have (a map someone imported on their own computer)
+        list.RemoveAll(entry => !MapDefinition.Exists(entry.course.mapId));
         foreach (var entry in list)
         {
             AddCard(entry.course, entry.tag);
