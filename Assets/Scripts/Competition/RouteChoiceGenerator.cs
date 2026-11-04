@@ -499,7 +499,6 @@ public class RouteChoiceGenerator
     // Points are in grid coordinates (cell centres on whole numbers).
 
     const float LookAheadMeters = 120f;   // longest straight piece tried at once
-    const float CornerMeters = 10f;       // corners are rounded over at most this distance on each side
 
     List<Vector2> Smooth(List<Vector2Int> cells)
     {
@@ -531,43 +530,66 @@ public class RouteChoiceGenerator
             at = best;
         }
 
-        // Round the corners: a curve from a bit before each corner to a bit after it, if nothing is in the way
-        float most = Mathf.Max(1.5f, CornerMeters / cellMeters);
-        List<Vector2> round = new List<Vector2> { line[0] };
-        for (int k = 1; k < line.Count - 1; k++)
+        // Pull the line tight, like a string: each point moves towards the middle of its neighbours as long as that
+        // is no slower and crosses nothing impassable. This takes the inside of bends in a road and rounds the
+        // corners where the ground allows, the way a runner cuts a curve.
+        List<Vector2> tight = new List<Vector2>();
+        for (int i = 0; i < line.Count - 1; i++)
         {
-            Vector2 a = line[k - 1], b = line[k], c = line[k + 1];
-            Vector2 ab = a - b, cb = c - b;
-            float d = Mathf.Min(most, 0.4f * ab.magnitude, 0.4f * cb.magnitude);
-            if (d < 0.3f || Vector2.Angle(-ab, cb) < 8f)
-            {
-                round.Add(b);
-                continue;
-            }
-            List<Vector2> curve = null;
-            for (int attempt = 0; attempt < 2 && curve == null; attempt++, d *= 0.5f)
-            {
-                Vector2 p0 = b + ab.normalized * d, p2 = b + cb.normalized * d;
-                List<Vector2> pts = new List<Vector2>();
-                for (int s = 0; s <= 6; s++)
-                {
-                    float t = s / 6f;
-                    pts.Add((1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * b + t * t * p2);
-                }
-                bool clear = true;
-                for (int s = 0; s < pts.Count - 1 && clear; s++)
-                {
-                    LineCost(pts[s], pts[s + 1], out bool blocked);
-                    if (blocked) clear = false;
-                }
-                LineCost(round[round.Count - 1], pts[0], out bool blockedIn);
-                if (clear && !blockedIn) curve = pts;
-            }
-            if (curve != null) round.AddRange(curve);
-            else round.Add(b);
+            Vector2 ab = line[i + 1] - line[i];
+            int parts = Mathf.Max(1, Mathf.CeilToInt(ab.magnitude / 1.5f));
+            for (int s = 0; s < parts; s++) tight.Add(line[i] + ab * ((float)s / parts));
         }
-        round.Add(line[line.Count - 1]);
-        return round;
+        tight.Add(line[line.Count - 1]);
+        for (int round = 0; round < 40; round++)
+        {
+            bool moved = false;
+            for (int i = 1; i < tight.Count - 1; i++)
+            {
+                Vector2 a = tight[i - 1], b = tight[i], c = tight[i + 1];
+                Vector2 to = b + ((a + c) * 0.5f - b) * 0.6f;
+                if ((to - b).sqrMagnitude < 0.0004f) continue;
+                float before = LineCost(a, b, out _) + LineCost(b, c, out _);
+                float after = LineCost(a, to, out bool blocked1) + LineCost(to, c, out bool blocked2);
+                if (blocked1 || blocked2 || after > before) continue;
+                tight[i] = to;
+                moved = true;
+            }
+            if (!moved) break;
+        }
+        return Simplify(tight, 0.15f);
+    }
+
+    // Drops points that lie (almost) on the line between their neighbours
+    static List<Vector2> Simplify(List<Vector2> line, float tolerance)
+    {
+        if (line.Count <= 2) return line;
+        bool[] keep = new bool[line.Count];
+        keep[0] = keep[line.Count - 1] = true;
+        Stack<Vector2Int> spans = new Stack<Vector2Int>();
+        spans.Push(new Vector2Int(0, line.Count - 1));
+        while (spans.Count > 0)
+        {
+            Vector2Int span = spans.Pop();
+            Vector2 a = line[span.x], ab = line[span.y] - a;
+            float worst = 0f;
+            int index = -1;
+            for (int i = span.x + 1; i < span.y; i++)
+            {
+                float t = ab.sqrMagnitude > 0f ? Mathf.Clamp01(Vector2.Dot(line[i] - a, ab) / ab.sqrMagnitude) : 0f;
+                float d = (line[i] - (a + ab * t)).magnitude;
+                if (d > worst) { worst = d; index = i; }
+            }
+            if (index >= 0 && worst > tolerance)
+            {
+                keep[index] = true;
+                spans.Push(new Vector2Int(span.x, index));
+                spans.Push(new Vector2Int(index, span.y));
+            }
+        }
+        List<Vector2> result = new List<Vector2>();
+        for (int i = 0; i < line.Count; i++) if (keep[i]) result.Add(line[i]);
+        return result;
     }
 
     // The A* cost (distance / ground speed / slope) of a straight line between two points, sampled about every
@@ -697,6 +719,7 @@ public class RouteChoiceGenerator
         // the sharpest point of each corner counts
         int n = pts.Count;
         int k = Mathf.Max(1, Mathf.RoundToInt(TurnWindowMeters / Mathf.Max(0.5f, cellMeters)));
+        float nearControl = Mathf.Max(40f / cellMeters, Vector2.Distance(pts[0], pts[n - 1]) * 0.15f);
         float[] angle = new float[n];
         for (int i = 1; i < n - 1; i++)
         {
@@ -706,7 +729,8 @@ public class RouteChoiceGenerator
         }
         for (int i = 1; i < n - 1; i++)
         {
-            sharpest = Mathf.Max(sharpest, angle[i]);
+            // Coming in to a control from the side or leaving it back the way you came is fine
+            if ((pts[i] - pts[0]).magnitude > nearControl && (pts[i] - pts[n - 1]).magnitude > nearControl) sharpest = Mathf.Max(sharpest, angle[i]);
             if (angle[i] <= 30f) continue;
             bool top = true;
             for (int j = Mathf.Max(0, i - k); j <= Mathf.Min(n - 1, i + k) && top; j++)

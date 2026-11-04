@@ -519,7 +519,7 @@ public class RouteChoiceView : MonoBehaviour
             }
         }
         // Ease in and out over a few points so the line bends aside instead of jumping
-        const int ease = 4;
+        const int ease = 10;
         float[] eased = new float[n];
         for (int k = 0; k < n; k++)
         {
