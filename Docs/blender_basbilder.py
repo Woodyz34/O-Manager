@@ -56,8 +56,8 @@ JERSEYS = [((0.05, 0.30, 0.13), (0.95, 0.45, 0.08), (0.96, 0.92, 0.82)),
            ((0.80, 0.80, 0.80), (0.05, 0.30, 0.13), (0.05, 0.30, 0.13)),
            ((0.55, 0.05, 0.25), (0.98, 0.80, 0.20), (1, 1, 1))]
 # how many of each style among 30 portraits (shuffled once, so every style shows up)
-MEN_HAIR = {"side": 6, "messy": 5, "curly": 3, "slick": 3, "quiff": 2, "crop": 2, "fade_crop": 3, "fluffy": 2,
-            "middle": 1, "undercut": 1, "buzz": 1, "bald": 1}
+MEN_HAIR = {"side": 6, "middle": 3, "mullet": 4, "messy": 4, "curly": 3, "slick": 2, "quiff": 2, "crop": 1,
+            "fade_crop": 2, "fluffy": 1, "buzz": 1, "bald": 1}
 WOMEN_HAIR = {"long": 3, "long_side": 3, "curtain": 4, "wavy": 4, "bob": 2, "lob": 1,
               "pony": 2, "side_pony": 3, "low_pony": 1, "bubble": 2, "braids": 2, "bun": 1, "messy_bun": 1,
               "curly": 1}
@@ -281,7 +281,7 @@ def skin_material(p):
     # beard shadow on men
     if not p["woman"]:
         shade = srgb_to_lin(tuple(v * 0.72 + h * 0.12 for v, h in zip(skin, p["hair_rgb"])))
-        amount = {"stubble": 0.8, "full": 0.6}.get(p["beard"], 0.3 if skin[0] > 0.6 else 0.15)
+        amount = {"stubble": 0.8, "full": 0.75, "short": 0.75}.get(p["beard"], 0.3 if skin[0] > 0.6 else 0.15)
         jaw = (Z.below(-0.33, 0.06) * (1 - lips) * Y.below(0.1, 0.15)
                * ((X.abs() - 0.18).above(0.0, 0.08) + Z.below(-0.55, 0.05) + Z.above(-0.43, 0.02) * Z.below(-0.37, 0.02)).min(1.0))
         grain = node(nt, "ShaderNodeTexNoise", Scale=420.0, Detail=1.0)
@@ -449,6 +449,8 @@ MH_SLIDERS = {
     "ears/ear-scale": ((-0.3, 0.1), (-0.4, 0.0)), "ears/ear-wing": ((-0.6, 0.0), (-0.6, -0.1)),
     "ears/ear-lobe": ((-0.3, 0.3), (-0.3, 0.3)),
 }
+SMILE = {"mouth/mouth-angles": 1.0, "mouth/mouth-scale-horiz": 0.25, "mouth/mouth-laugh-lines": 0.6,
+         "cheek/cheek-volume": 0.3, "mouth/mouth-dimples": -0.3}
 MH_PAIRS = [("decr", "incr"), ("down", "up"), ("in", "out"), ("backward", "forward"), ("compress", "uncompress"),
             ("concave", "convex")]
 
@@ -488,6 +490,10 @@ def mh_verts(p):
             mh_add(V, f"{race}-{gender}-young", gw * rw)
     for key, value in p["mh_sliders"].items():
         mh_slider(V, key, value)
+    # a small closed-mouth smile: corners up, a little wider, cheeks lifted, laugh lines
+    sm = p.get("smile", 0.0)
+    for key, k in SMILE.items():
+        mh_slider(V, key, k * sm)
     # arms down from MakeHuman's A pose, turned about the shoulder joints
     J = d["joints"]
     for side, j in ((1, "l-shoulder"), (-1, "r-shoulder")):
@@ -1734,15 +1740,15 @@ def style_for(p):
         H = rnd.uniform(0.06, 0.09)
         hang_below = -0.15
         st.back_low = -0.65
-        face_guard = 0.35
-        perm = rnd.random() < 0.4
+        perm = rnd.random() < 0.2
         if perm:
             curl = 1.0
 
         def field(pos, t):
             if pos.z > 0.45 and pos.y < 0.35:
-                # messy top pushed forward and to the sides
-                return tangent(Vector((0.4 * pos.x, -0.6, 0.25)), pos)
+                # modern mullet: textured top swept up and to one side, no straight fringe
+                nz = noise.noise_vector(pos * 3.0 + Vector((p["seed"], 0, 0)))
+                return tangent(Vector((-sw * 0.7 + 0.3 * pos.x, -0.15, 0.45)) + nz * 0.4, pos)
             if pos.y > 0.15:
                 return Vector((0.25 * pos.x, 0.25, -1.0))
             return tangent(Vector((0.3 * math.copysign(1, pos.x), 0.6, -1.0)), pos)
@@ -2165,7 +2171,7 @@ def make_beard(p, mat):
             continue    # not down the neck (the jaw line rises towards the ears)
         top = -0.37 + 0.22 * smooth(0.0, 0.6, abs(s.x))        # cheek line, rising towards the ears
         moustache = abs(s.x) < 0.2 * p["mouth_w"] and -0.425 < sz < -0.355 + 0.02 * max(0.0, 1 - abs(s.x) / 0.1)
-        mouth = abs(s.x) < 0.2 and -0.56 < sz < -0.41
+        mouth = abs(s.x) < 0.17 and -0.5 < sz < -0.41     # a narrow bare strip under the lower lip
         if kind == "moustache":
             ok = moustache
         elif kind == "goatee":
@@ -2174,20 +2180,29 @@ def make_beard(p, mat):
             ok = (sz < top and not mouth and sz > -1.05) or moustache
         if not ok:
             continue
+        # thinner towards the cheek line and the edge under the lip, so the beard grows out of the skin
+        # instead of ending in a hard edge
+        edge = smooth(0.0, 0.07, top - sz) if not moustache else 1.0
+        if kind in ("full", "short") and abs(s.x) < 0.17 and sz < -0.41:
+            edge = min(edge, smooth(-0.5, -0.56, sz))
+        if rnd.random() > 0.25 + 0.75 * edge:
+            continue
         n = s.normalized()
         if moustache:
             down = tangent(Vector((math.copysign(0.6, s.x), -0.2, -1.0)), s).normalized()
         else:
             down = tangent(Vector((0.1 * s.x, -0.15, -1.0)), s).normalized()
-        L = (0.08 if kind == "full" else 0.045) * rnd.uniform(0.7, 1.2)
+        L = (0.085 if kind == "full" else 0.05) * rnd.uniform(0.7, 1.2) * (0.5 + 0.5 * edge)
         if moustache:
             L = 0.045 * rnd.uniform(0.8, 1.1)
-        pts = [s - n * 0.005, s + n * 0.02 + down * L * 0.5, s + n * 0.03 + down * L]
+        # the hairs lie along the skin, pointing down, and only stand a little off it
+        lift = 1.0 if kind == "full" else 0.85
+        pts = [s - n * 0.004, s + n * 0.016 * lift + down * L * 0.5, s + n * 0.024 * lift + down * L]
         guides.append(resample([Vector(q) for q in pts], 5))
         normals.append(n)
     if not guides:
         return []
-    return [hair_object("Beard", children(guides, normals, 3, 0.014, 0.2, p["seed"], frizz=0.01, curl=1.0, curl_r=0.008, curl_turns=1.5), mat, 0.004, 0.4)]
+    return [hair_object("Beard", children(guides, normals, 4, 0.014, 0.2, p["seed"], frizz=0.006, curl=1.0, curl_r=0.005, curl_turns=1.2), mat, 0.004, 0.4)]
 
 
 # ---------- one portrait ----------
@@ -2251,6 +2266,7 @@ def person(seed, woman):
         "lipstick": rnd.random() < 0.15,
         "recede": (not woman) and rnd.random() < 0.15,
         "neck_w": 0.84 if woman else 1.1, "shoulders": rnd.uniform(1.35, 1.5) if woman else rnd.uniform(1.6, 1.78),
+        "smile": float(os.environ.get("SMILE", random.Random(seed * 13 + woman).uniform(0.45, 1.0))),
         "beard": beard, "extra": extra, "turn": rnd.uniform(-7, 7), "tilt": rnd.uniform(-2, 2),
     }
 
