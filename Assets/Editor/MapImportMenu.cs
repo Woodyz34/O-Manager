@@ -62,7 +62,7 @@ public static class MapImportMenu
     {
         MapPackageInfo sent = ReadSentInfo(sourceFile);
         if (sent == null) return "Failed: there is no readable " + Path.GetFileName(sourceFile).Replace("source", "info").Split('.')[0] + ".json next to the map file.";
-        return Import(sourceFile, SentFile(sourceFile, "picture.png"), sent.name, sent.mapType == "sprint", sent);
+        return Import(sourceFile, SentFile(sourceFile, "picture.png"), sent.name, sent.mapType == "sprint" || sent.mapType == "both", sent);
     }
 
     // The map-<id>-<what> file next to a sent-in map-<id>-source.<ext>, or null
@@ -98,6 +98,7 @@ public static class MapImportMenu
             byte[] bytes = File.ReadAllBytes(file);
             EditorUtility.DisplayProgressBar("Import map", "Reading " + Path.GetFileName(file), 0f);
             MapFile mapFile = MapPackageBuilder.ReadMapFile(bytes);
+            if (sent != null && sent.contourInterval > 0) mapFile.contourInterval = sent.contourInterval;
             bool isSprint = sprint ?? SymbolRules.LooksLikeSprint(mapFile);
             if (sprint == null)
             {
@@ -128,6 +129,7 @@ public static class MapImportMenu
                 package.info.sender = sent.sender;
                 package.info.ownerClub = sent.ownerClub;
                 package.info.contact = sent.contact;
+                if (!string.IsNullOrEmpty(sent.mapType)) package.info.mapType = sent.mapType;
             }
             string folder = PackagesFolder + "/" + package.info.id;
             MapPackageBuilder.WriteFolder(folder, package, ownPng, (step, share) => EditorUtility.DisplayProgressBar("Import map", step, share));

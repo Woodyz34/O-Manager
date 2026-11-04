@@ -23,17 +23,37 @@ public class AStarPathfinder
 
         // The estimate of the cost left must never be higher than the real cost, or A* reopens cells over and over
         // (one search on the 2 m sprint grid took 10 s). The cheapest step is the fastest cell on the best slope.
-        float fastest = 0.01f;
-        foreach (float s in speedGrid) if (s > fastest) fastest = s;
-        float bestSlope = 1f;
-        if (slopeFactors != null)
-            foreach (float[,] factors in slopeFactors.Values)
-                if (factors != null)
-                    foreach (float f in factors) if (f > bestSlope) bestSlope = f;
-        heuristicScale = 1f / (fastest * bestSlope);
+        // Worked out once per grid (the same grids are searched many times)
+        lock (scaleCache)
+        {
+            if (!scaleCache.TryGetValue(speedGrid, out heuristicScale))
+            {
+                float fastest = 0.01f;
+                foreach (float s in speedGrid) if (s > fastest) fastest = s;
+                float bestSlope = 1f;
+                if (slopeFactors != null)
+                    foreach (float[,] factors in slopeFactors.Values)
+                        if (factors != null)
+                            foreach (float f in factors) if (f > bestSlope) bestSlope = f;
+                heuristicScale = 1f / (fastest * bestSlope);
+                if (speedGrid.Length > 100000)   // small cut-outs are quick anyway
+                {
+                    if (scaleCache.Count > 8) scaleCache.Clear();   // grids of maps played earlier
+                    scaleCache[speedGrid] = heuristicScale;
+                }
+            }
+        }
     }
 
-    private readonly float heuristicScale;
+    private static readonly Dictionary<float[,], float> scaleCache = new Dictionary<float[,], float>(new ReferenceComparer());
+
+    private class ReferenceComparer : IEqualityComparer<float[,]>
+    {
+        public bool Equals(float[,] a, float[,] b) => ReferenceEquals(a, b);
+        public int GetHashCode(float[,] a) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(a);
+    }
+
+    private float heuristicScale;
 
     // Octile distance (diagonal steps cost 1.414) at the fastest possible speed
     private float Estimate(int x, int y, Vector2Int goal)
