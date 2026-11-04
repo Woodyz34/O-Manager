@@ -167,7 +167,8 @@ public class CourseBuilder : MonoBehaviour
         {
             if (imported == null) return;
             SelectMap(imported);
-            SetStatus("Imported " + imported.displayName + ". It is on this computer only until it is built into the game.", false);
+            // Whether it was also sent in is said in the message at the bottom of the screen
+            SetStatus("Imported " + imported.displayName + ". You can lay courses on it now.", false);
         });
     }
 
