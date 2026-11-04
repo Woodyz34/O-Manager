@@ -1923,7 +1923,8 @@ def style_for(p):
             H = 0.035 if style != "messy_bun" else 0.055
             pony_side = rnd.choice((-1, 1))
             if style == "pony":
-                tie = Vector((0, 0.8, 0.55))
+                # mid-height pony: from the front the hair runs back, not up into a crest
+                tie = Vector((0, 0.86, 0.3))
             elif style in ("side_pony", "bubble"):
                 tie = Vector((pony_side * 0.3, 0.7, -0.38))
             elif style == "space_buns":
@@ -2040,7 +2041,7 @@ def style_for(p):
             side = 1 if tie.x > 0 else -1
             mid, end = Vector((side * 0.74, 0.18, -0.98)), Vector((side * 0.66, -0.52, -1.8))
         elif style == "pony":
-            mid, end = Vector((side * 0.15, 1.12, 0.35)), Vector((side * 0.35, 0.95, -0.85))
+            mid, end = Vector((side * 0.15, 1.1, 0.1)), Vector((side * 0.35, 0.95, -0.95))
         elif style == "low_pony":
             if trng.random() < 0.5:
                 mid, end = Vector((side * 0.72, 0.55, -0.95)), Vector((side * 0.7, -0.05, -1.75))
