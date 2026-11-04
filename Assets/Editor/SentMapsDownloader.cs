@@ -53,6 +53,136 @@ public class SentMapsDownloader : EditorWindow
         ScanFolder();   // maps downloaded earlier
     }
 
+    // ---- Automatic check: once each time Unity starts, when the key is saved, look for maps sent in since last time ----
+
+    const string CheckedThisSession = "O-Manager.SentMaps.Checked";
+    const string SeenPrefix = "O-Manager.SentMaps.Seen.";
+
+    class Remote
+    {
+        public string player, prefix;                 // prefix = "map-<id>-"
+        public readonly List<string> keys = new List<string>();
+        public string stamp = "";                     // the files' modified dates: changes when the map is sent again
+        public string SeenKey => SeenPrefix + player + "/" + prefix;
+        public string SourceFile => keys.Find(k => k.StartsWith(prefix + "source"));
+    }
+
+    [InitializeOnLoadMethod]
+    static void CheckOnStart()
+    {
+        if (Application.isBatchMode || SessionState.GetBool(CheckedThisSession, false)) return;
+        SessionState.SetBool(CheckedThisSession, true);
+        if (string.IsNullOrEmpty(EditorPrefs.GetString(SecretPref, "")) || string.IsNullOrEmpty(EditorPrefs.GetString(EnvironmentPref, ""))) return;
+        EditorApplication.delayCall += () => _ = CheckForNew(false);
+    }
+
+    [MenuItem("Tools/O-Manager/Check for new sent-in maps")]
+    static void CheckNow() => _ = CheckForNew(true);
+
+    static async Task CheckForNew(bool askedFor)
+    {
+        try
+        {
+            string projectId = CloudProjectSettings.projectId;
+            if (string.IsNullOrEmpty(projectId) || string.IsNullOrEmpty(EditorPrefs.GetString(SecretPref, "")))
+            {
+                if (askedFor) Open();
+                return;
+            }
+            List<Remote> fresh;
+            using (HttpClient http = Client(EditorPrefs.GetString(KeyIdPref, ""), EditorPrefs.GetString(SecretPref, "")))
+            {
+                string root = Root(projectId, EditorPrefs.GetString(EnvironmentPref, ""));
+                fresh = (await ListMaps(http, root)).FindAll(m => m.SourceFile != null && EditorPrefs.GetString(m.SeenKey, "") != m.stamp);
+                if (fresh.Count == 0)
+                {
+                    if (askedFor) EditorUtility.DisplayDialog("Sent-in maps", "No new maps have been sent in.", "OK");
+                    return;
+                }
+                foreach (Remote m in fresh) await DownloadMap(http, root, m);
+            }
+
+            var lines = new List<string>();
+            foreach (Remote m in fresh)
+            {
+                MapPackageInfo i = ReadInfo(m);
+                lines.Add(i == null ? "- " + m.prefix : "- " + i.name + " (" + i.mapType + "), sent by " + Or(i.sender) + ", " + Or(i.ownerClub) + ", " + Or(i.contact) +
+                    (i.permissionConfirmed ? "" : "  PERMISSION NOT CONFIRMED"));
+            }
+            int choice = EditorUtility.DisplayDialogComplex("New maps sent in",
+                fresh.Count + (fresh.Count == 1 ? " new map has" : " new maps have") + " been sent in:\n\n" + string.Join("\n", lines) +
+                "\n\nImport them into the game now? (Check that the club allows it before you release the game.)",
+                "Import now", "Later", "Ignore these");
+            if (choice == 1) return;   // asked again next time Unity starts
+            var results = new List<string>();
+            foreach (Remote m in fresh)
+            {
+                if (choice == 0) results.Add(MapImportMenu.ImportSent(Path.Combine(DownloadRoot, m.player, m.SourceFile)));
+                EditorPrefs.SetString(m.SeenKey, m.stamp);
+            }
+            if (choice == 0) EditorUtility.DisplayDialog("New maps sent in", string.Join("\n\n", results), "OK");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("Sent-in maps: could not check for new maps: " + e.Message);
+            if (askedFor) EditorUtility.DisplayDialog("Sent-in maps", "Could not check: " + e.Message, "OK");
+        }
+    }
+
+    static string Or(string s) => string.IsNullOrEmpty(s) ? "?" : s;
+
+    static MapPackageInfo ReadInfo(Remote m)
+    {
+        string path = Path.Combine(DownloadRoot, m.player, m.prefix + "info.json");
+        try { return File.Exists(path) ? JsonUtility.FromJson<MapPackageInfo>(File.ReadAllText(path)) : null; }
+        catch { return null; }
+    }
+
+    static HttpClient Client(string keyId, string secret)
+    {
+        var http = new HttpClient();
+        string auth = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(keyId.Trim() + ":" + secret.Trim()));
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", auth);
+        return http;
+    }
+
+    static string Root(string projectId, string environmentId) => Api + projectId + "/environments/" + environmentId.Trim() + "/players";
+
+    // Every map in Cloud Save, grouped by player and map id
+    static async Task<List<Remote>> ListMaps(HttpClient http, string root)
+    {
+        var maps = new List<Remote>();
+        foreach (JObject p in await Pages(http, root, "id"))
+        {
+            string player = (string)p["id"];
+            foreach (JObject f in await Pages(http, root + "/" + player + "/items", "key"))
+            {
+                string key = (string)f["key"];
+                if (!key.StartsWith("map-")) continue;
+                int at = Math.Max(key.LastIndexOf("-source", StringComparison.Ordinal),
+                         Math.Max(key.LastIndexOf("-info.json", StringComparison.Ordinal), key.LastIndexOf("-picture.png", StringComparison.Ordinal)));
+                if (at <= 0) continue;
+                string prefix = key.Substring(0, at + 1);
+                Remote map = maps.Find(m => m.player == player && m.prefix == prefix);
+                if (map == null) maps.Add(map = new Remote { player = player, prefix = prefix });
+                map.keys.Add(key);
+                map.stamp += (string)f["modified"]?["date"] + ";";
+            }
+        }
+        return maps;
+    }
+
+    static async Task DownloadMap(HttpClient http, string root, Remote map)
+    {
+        string folder = Path.Combine(DownloadRoot, map.player);
+        Directory.CreateDirectory(folder);
+        foreach (string key in map.keys)
+        {
+            JObject detail = JObject.Parse(await Get(http, root + "/" + map.player + "/items/" + Uri.EscapeDataString(key)));
+            File.WriteAllBytes(Path.Combine(folder, key), await Download(detail));
+        }
+    }
+
     void OnGUI()
     {
         EditorGUILayout.HelpBox("Uses a service account with the role Cloud Save Viewer (Unity Cloud dashboard > Administration > " +
@@ -119,34 +249,19 @@ public class SentMapsDownloader : EditorWindow
         found.Clear();
         try
         {
-            using (var http = new HttpClient())
+            using (HttpClient http = Client(keyId, secret))
             {
-                string auth = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(keyId.Trim() + ":" + secret.Trim()));
-                http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", auth);
-                string root = Api + projectId + "/environments/" + environmentId.Trim() + "/players";
-
-                SetStatus("Finding players who have sent files...");
-                var players = new List<string>();
-                foreach (JObject p in await Pages(http, root, "id")) players.Add((string)p["id"]);
-
-                int files = 0;
-                foreach (string player in players)
+                string root = Root(projectId, environmentId);
+                SetStatus("Finding the maps players have sent in...");
+                List<Remote> maps = await ListMaps(http, root);
+                foreach (Remote m in maps)
                 {
-                    foreach (JObject f in await Pages(http, root + "/" + player + "/items", "key"))
-                    {
-                        string key = (string)f["key"];
-                        if (!key.StartsWith("map-")) continue;
-                        SetStatus("Downloading " + key + "...");
-                        JObject detail = JObject.Parse(await Get(http, root + "/" + player + "/items/" + Uri.EscapeDataString(key)));
-                        byte[] bytes = await Download(detail);
-                        string folder = Path.Combine(DownloadRoot, player);
-                        Directory.CreateDirectory(folder);
-                        File.WriteAllBytes(Path.Combine(folder, key), bytes);
-                        files++;
-                    }
+                    SetStatus("Downloading " + m.prefix + "...");
+                    await DownloadMap(http, root, m);
+                    EditorPrefs.SetString(m.SeenKey, m.stamp);   // not offered again when Unity starts
                 }
                 ScanFolder();
-                SetStatus($"Downloaded {files} files from {players.Count} players: {found.Count} maps.");
+                SetStatus($"Downloaded {maps.Count} maps.");
             }
         }
         catch (Exception e)
