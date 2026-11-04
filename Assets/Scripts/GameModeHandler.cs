@@ -45,7 +45,7 @@ public static class GameModes
         if (IsSameStats(mode))
         {
             return TryGetSameStats(mode, out int speed, out int technique)
-                ? "Same stats  <size=70%>speed " + speed + ", technique " + technique + "</size>"
+                ? "Same stats " + speed + "/" + technique   // speed/technique, kept short for the lobby bar
                 : "Same stats";
         }
         return IsYourRunners(mode) ? "Your runners" : mode == ChooseAny ? "Any runner" : mode;
