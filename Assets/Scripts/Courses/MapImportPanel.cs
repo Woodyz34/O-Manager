@@ -87,7 +87,7 @@ public class MapImportPanel : MonoBehaviour
         }
         folderText = CourseUI.Text("Folder", folderRow, "", 18, CourseUI.InkMuted);
         folderText.alignment = TextAlignmentOptions.MidlineLeft;
-        folderText.enableWordWrapping = false;
+        folderText.textWrappingMode = TextWrappingModes.NoWrap;
         CourseUI.Size(folderText, -1, -1, 1);
 
         list = CourseUI.ScrollList("Files", card.transform, out listScroll);
@@ -112,7 +112,7 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.Size(permissionButton, 76);
         TextMeshProUGUI permissionText = permissionButton.GetComponentInChildren<TextMeshProUGUI>();
         permissionText.text = CloudMaps.PermissionText;
-        permissionText.enableWordWrapping = true;
+        permissionText.textWrappingMode = TextWrappingModes.Normal;
         permissionText.alignment = TextAlignmentOptions.MidlineLeft;
         permissionText.fontStyle = FontStyles.Normal;
         CourseUI.Stretch(permissionText.rectTransform, 70, 16, 4, 4);
@@ -139,6 +139,7 @@ public class MapImportPanel : MonoBehaviour
         folder = PlayerPrefs.GetString("MapImport.Folder", "");
         if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) folder = DefaultFolder();
         ShowFolder(folder);
+        Refresh();
     }
 
     static string DefaultFolder()
