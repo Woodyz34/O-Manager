@@ -397,9 +397,25 @@ public class ManualPathDrawer : MonoBehaviour
         {
             Vector2Int g = WorldToGrid(Vector3.Lerp(from, point, s / (float)steps));
             if (gridPath.Count > 0 && gridPath[gridPath.Count - 1] == g) continue;
+            // A diagonal step goes through a cell beside it too: otherwise the line could slip between two closed
+            // cells that only touch at a corner (a fence across the grid)
+            if (gridPath.Count > 0)
+            {
+                Vector2Int last = gridPath[gridPath.Count - 1];
+                if (last.x != g.x && last.y != g.y && !AddCell(new Vector2Int(last.x, g.y), pointIndex)) return false;
+            }
+            if (!AddCell(g, pointIndex)) return false;
+        }
+        return true;
+    }
+
+    // Adds one cell of the drawn line and checks closed ground. Returns false when the line was stopped.
+    bool AddCell(Vector2Int g, int pointIndex)
+    {
+        {
             gridPath.Add(g);
             cellPoint.Add(pointIndex);
-            if (RouteAnalysis.On) continue;
+            if (RouteAnalysis.On) return true;
             bool open = Passable(g);
             if (!open && blockedFrom < 0)
             {

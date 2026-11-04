@@ -177,7 +177,11 @@ namespace MapImport
                     {
                         double x0 = (p[i] - ox) * scale, y0 = (p[i + 1] - oy) * scale;
                         double x1 = (p[i + 2] - ox) * scale, y1 = (p[i + 3] - oy) * scale;
-                        Supercover(x0, y0, x1, y1, g.cols, g.rows, (c, r) => visit(r * g.cols + c, rule));
+                        // Fences and walls close only the cells they really run through the middle of (a chain where
+                        // diagonal neighbours touch; A* does not cut corners between two closed cells), so a narrow
+                        // passage next to them stays open on a 2 m grid. Everything else marks every cell it touches.
+                        if (role == TerrainRole.BlockingLine) ThinLine(x0, y0, x1, y1, g.cols, g.rows, (c, r) => visit(r * g.cols + c, rule));
+                        else Supercover(x0, y0, x1, y1, g.cols, g.rows, (c, r) => visit(r * g.cols + c, rule));
                         if (offsets == 0) continue;
                         double len = Math.Sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
                         if (len < 1e-9) continue;
@@ -328,6 +332,23 @@ namespace MapImport
                     }
             }
             return dist;
+        }
+
+        // The cells of a line drawn one cell per step along its longer direction (like Bresenham): neighbouring cells of
+        // the chain can touch only at a corner
+        public static void ThinLine(double x0, double y0, double x1, double y1, int cols, int rows, Action<int, int> visit)
+        {
+            double dx = x1 - x0, dy = y1 - y0;
+            int steps = Math.Max(1, (int)Math.Ceiling(Math.Max(Math.Abs(dx), Math.Abs(dy)) * 2));
+            int lastX = int.MinValue, lastY = int.MinValue;
+            for (int k = 0; k <= steps; k++)
+            {
+                double t = k / (double)steps;
+                int cx = (int)Math.Floor(x0 + dx * t), cy = (int)Math.Floor(y0 + dy * t);
+                if (cx == lastX && cy == lastY) continue;
+                lastX = cx; lastY = cy;
+                if (cx >= 0 && cy >= 0 && cx < cols && cy < rows) visit(cx, cy);
+            }
         }
 
         // Every cell a straight line passes through, in order (Amanatides & Woo)

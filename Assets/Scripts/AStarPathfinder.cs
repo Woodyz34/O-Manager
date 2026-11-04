@@ -252,6 +252,8 @@ public class AStarPathfinder
 
                 float cellSpeed = grid[ny, nx];
                 if (cellSpeed <= 0.01f) continue;
+                // No cutting a corner between two closed cells (a fence drawn diagonally across the grid)
+                if (dirX[d] != 0 && dirY[d] != 0 && (grid[cy, nx] <= 0.01f || grid[ny, cx] <= 0.01f)) continue;
 
                 if (blockedEdges != null && blockedEdges.Contains((new Vector2Int(cx, cy), new Vector2Int(nx, ny))))
                     continue;
