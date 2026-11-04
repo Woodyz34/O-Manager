@@ -1,6 +1,9 @@
 """Render placeholder portraits for the runner cards in Blender (3D, no photos or scans).
 
-Every head, body and hair style is built from code here, so there is nobody to ask permission from.
+The head, neck and shoulders are the MakeHuman base mesh with its shape targets (CC0, free for any use,
+packed in Docs/makehuman/head.npz): every person gets their own mix of sex, build, ancestry and face
+sliders (nose, mouth, chin, cheeks, eyes ...). Eyes, brows, lashes, beards, hair and the top are made here.
+OLD_HEAD=1 uses the older head made from a deformed sphere instead.
 
     blender --background --python Docs/blender_basbilder.py -- <out folder> [count per sex] [first index] [Herr|Dam]
     (or with the bpy module: python Docs/blender_basbilder.py <out folder> ...)
@@ -10,7 +13,8 @@ Set QUICK=1 for small fast test renders, and STYLE=<name> to force one hair styl
 
 Hair is real hair: a few thousand guide strands are grown over the scalp for each style
 (side parting, middle parting, mullet, quiff, ponytail, braids ...) and every guide gets a
-clump of child strands, rendered as Cycles hair with the Principled Hair BSDF.
+group of child strands that blend between neighbouring guides, rendered as Cycles hair with the
+Principled Hair BSDF. Long hair is let fall under gravity over the shoulders and down the back.
 """
 import math
 import os
@@ -20,7 +24,7 @@ import sys
 import bpy
 import bmesh
 import numpy as np
-from mathutils import Vector, noise
+from mathutils import Matrix, Vector, noise
 
 # ---------- settings ----------
 
@@ -28,6 +32,9 @@ QUICK = os.environ.get("QUICK") == "1"
 RES = (300, 450) if QUICK else (600, 900)
 SAMPLES = 24 if QUICK else 64
 CHILD_SCALE = 0.5 if QUICK else 1.0
+DENSITY = 2.5      # child hairs per guide, times the style's own number
+INTERP = os.environ.get("INTERP", "1") == "1"   # children blend between neighbouring guides
+THIN = 0.5         # strand thickness, times the style's own number (fine hair, no spaghetti)
 
 # skin tones and how often each is picked (mostly light and medium, a few darker)
 SKINS = [((0.89, 0.68, 0.54), 4), ((0.86, 0.64, 0.49), 4), ((0.88, 0.66, 0.50), 3), ((0.82, 0.59, 0.44), 3),
@@ -49,11 +56,11 @@ JERSEYS = [((0.05, 0.30, 0.13), (0.95, 0.45, 0.08), (0.96, 0.92, 0.82)),
            ((0.80, 0.80, 0.80), (0.05, 0.30, 0.13), (0.05, 0.30, 0.13)),
            ((0.55, 0.05, 0.25), (0.98, 0.80, 0.20), (1, 1, 1))]
 # how many of each style among 30 portraits (shuffled once, so every style shows up)
-MEN_HAIR = {"side": 3, "middle": 3, "mullet": 3, "quiff": 2, "crop": 1, "fade_crop": 3, "fluffy": 3, "flow": 2,
-            "slick": 1, "messy": 2, "undercut": 2, "long_m": 1, "manbun": 1, "curly": 1, "buzz": 1, "bald": 1}
-WOMEN_HAIR = {"long": 2, "long_side": 2, "curtain": 4, "wavy": 2, "shag": 2, "bob": 2, "lob": 1, "pixie": 1,
+MEN_HAIR = {"side": 6, "messy": 5, "curly": 3, "slick": 3, "quiff": 2, "crop": 2, "fade_crop": 3, "fluffy": 2,
+            "middle": 1, "undercut": 1, "buzz": 1, "bald": 1}
+WOMEN_HAIR = {"long": 3, "long_side": 3, "curtain": 4, "wavy": 4, "bob": 2, "lob": 1,
               "pony": 2, "side_pony": 3, "low_pony": 1, "bubble": 2, "braids": 2, "bun": 1, "messy_bun": 1,
-              "space_buns": 1, "curly": 1}
+              "curly": 1}
 
 
 def style_order(table, seed):
@@ -85,7 +92,7 @@ def reset():
     sc.render.image_settings.file_format = "PNG"
     sc.render.image_settings.color_mode = "RGBA"
     sc.view_settings.view_transform = "AgX"
-    sc.view_settings.look = "AgX - Medium High Contrast"
+    sc.view_settings.look = os.environ.get("LOOK", "AgX - Punchy")
     sc.cycles_curves.shape = "THICK"
     sc.cycles_curves.subdivisions = 2
     world = bpy.data.worlds.new("World")
@@ -102,6 +109,7 @@ def light(name, loc, energy, size, color=(1, 1, 1), target=(0, 0, 0.1)):
     data.energy = energy
     data.size = size
     data.color = color
+    data.shape = "DISK"            # round catchlights in the eyes
     obj = bpy.data.objects.new(name, data)
     bpy.context.collection.objects.link(obj)
     obj.location = loc
@@ -218,11 +226,28 @@ def skin_material(p):
     skin = p["skin"]
     lin = srgb_to_lin(skin)
     mat, bsdf = principled("Skin", lin, rough=0.5, sss=0.3, sss_radius=(1.0, 0.35, 0.2))
+    if "mh_V" in p:
+        # real skin: light goes in and comes out a few millimetres away, reddest in the shadows
+        bsdf.inputs["Subsurface Weight"].default_value = 1.0
+        bsdf.inputs["Subsurface Scale"].default_value = 0.025
+        bsdf.inputs["Subsurface Radius"].default_value = (1.0, 0.4, 0.22)
+        bsdf.inputs["IOR"].default_value = 1.4
     nt = mat.node_tree
     tex = node(nt, "ShaderNodeTexCoord")
     sep = node(nt, "ShaderNodeSeparateXYZ")
     nt.links.new(tex.outputs["Object"], sep.inputs[0])
     X, Y, Z = S(nt, sep.outputs[0]), S(nt, sep.outputs[1]), S(nt, sep.outputs[2])
+    if "mh_V" in p:
+        # the MakeHuman head turns in the mesh, so read the position before the turn,
+        # and move its heights to where the old face had its eyes, nose, mouth and chin
+        rest = nt.nodes.new("ShaderNodeAttribute")
+        rest.attribute_name = "rest"
+        nt.links.new(rest.outputs["Vector"], sep.inputs[0])
+        Zr = S(nt, sep.outputs[2])
+        pts = [(p["chin_z"], -0.8), (p["mouth_z"], -0.466), (p["nose_z"], -0.24), (p["eye_z"], 0.11)]
+        Z = (Zr - pts[0][0]).min(0.0) * 1.2 + pts[0][1] + (Zr - pts[-1][0]).max(0.0)
+        for (a, fa), (b, fb) in zip(pts, pts[1:]):
+            Z = Z + ((Zr - a) / (b - a)).max(0.0).min(1.0) * (fb - fa)
     fw = p["face_w"]
 
     def tint(rgb_mul, add=(0, 0, 0)):
@@ -245,12 +270,14 @@ def skin_material(p):
     layers.append(((X.abs() - 0.62 * fw).above(0.0, 0.05) * 0.5, redder))
     # lips
     lip = srgb_to_lin(tuple(min(1, s * 0.7 + d) for s, d in zip(skin, (0.2, 0.02, 0.04))))
+    if not p["woman"]:
+        lip = srgb_to_lin(tuple(min(1, s * 0.82 + d) for s, d in zip(skin, (0.1, 0.01, 0.02))))
     if p["woman"] and p.get("lipstick"):
         lip = srgb_to_lin(tuple(min(1, s * 0.6 + d) for s, d in zip(skin, (0.25, 0.02, 0.05))))
-    lips = blob_mask(X, Z, Y, 0.0, -0.468, 0.19, 0.072, 0.35, y_max=-0.5)
+    lips = blob_mask(X, Z, Y, 0.0, -0.468, 0.19, 0.072, 0.35 if p["woman"] else 0.7, y_max=-0.5)
     layers.append((lips, lip))
     line = srgb_to_lin(tuple(v * 0.45 for v in skin))
-    layers.append((blob_mask(X, Z, Y, 0.0, -0.466, 0.17 * p["mouth_w"], 0.011, 0.6, y_max=-0.5) * 0.85, line))
+    layers.append((blob_mask(X, Z, Y, 0.0, -0.466, 0.17 * p["mouth_w"], 0.011, 0.6, y_max=-0.5) * (0.85 if p["woman"] else 0.5), line))
     # beard shadow on men
     if not p["woman"]:
         shade = srgb_to_lin(tuple(v * 0.72 + h * 0.12 for v, h in zip(skin, p["hair_rgb"])))
@@ -266,10 +293,11 @@ def skin_material(p):
     rough = 0.56 - tzone * 0.1
     nt.links.new(rough.out, bsdf.inputs["Roughness"])
     # pores and fine skin texture
-    pores = node(nt, "ShaderNodeTexVoronoi", Scale=520.0)
+    mh = "mh_V" in p
+    pores = node(nt, "ShaderNodeTexVoronoi", Scale=420.0 if mh else 520.0)
     fine = node(nt, "ShaderNodeTexNoise", Scale=90.0, Detail=6.0)
-    b1 = node(nt, "ShaderNodeBump", Strength=0.06, Distance=0.002)
-    b2 = node(nt, "ShaderNodeBump", Strength=0.05, Distance=0.004)
+    b1 = node(nt, "ShaderNodeBump", Strength=0.14 if mh else 0.06, Distance=0.002)
+    b2 = node(nt, "ShaderNodeBump", Strength=0.08 if mh else 0.05, Distance=0.004)
     nt.links.new(pores.outputs["Distance"], b1.inputs["Height"])
     nt.links.new(fine.outputs[0], b2.inputs["Height"])
     nt.links.new(b1.outputs[0], b2.inputs["Normal"])
@@ -290,10 +318,10 @@ def hair_material(p):
     h.parametrization = "MELANIN"
     h.inputs["Melanin"].default_value = mel
     h.inputs["Melanin Redness"].default_value = red
-    h.inputs["Roughness"].default_value = 0.38
-    h.inputs["Radial Roughness"].default_value = 0.4
+    h.inputs["Roughness"].default_value = 0.3
+    h.inputs["Radial Roughness"].default_value = 0.35
     h.inputs["Coat"].default_value = 0.05
-    h.inputs["Random Color"].default_value = 0.12
+    h.inputs["Random Color"].default_value = 0.18
     h.inputs["Random Roughness"].default_value = 0.2
     if p["hair"] == "curly" or p["hair_name"] == "gra":
         h.inputs["Roughness"].default_value = 0.42
@@ -304,17 +332,19 @@ def hair_material(p):
 def scalp_material(p):
     """The hair-coloured layer under the strands, so the scalp never shines through."""
     grey = sum(p["hair_rgb"]) / 3
-    c = srgb_to_lin(tuple((v * 0.5 + grey * 0.5) * 0.8 for v in p["hair_rgb"]))
+    c = srgb_to_lin(tuple((v * 0.5 + grey * 0.5) * 0.45 + sk * 0.4 for v, sk in zip(p["hair_rgb"], p["skin"])))
+    if "mh_V" in p:
+        c = srgb_to_lin(tuple(v * 0.75 + sk * 0.2 for v, sk in zip(p["hair_rgb"], p["skin"])))
     mat, bsdf = principled("Scalp", c, rough=0.7)
     nt = mat.node_tree
-    streak = node(nt, "ShaderNodeTexWave", Scale=40.0, Distortion=4.0)
+    streak = node(nt, "ShaderNodeTexWave", Scale=120.0, Distortion=2.0)
     streak.wave_type = "BANDS"
     streak.bands_direction = "Z"
     mix = node(nt, "ShaderNodeMix")
     mix.data_type = "RGBA"
     nt.links.new(streak.outputs[1], mix.inputs[0])
-    mix.inputs[6].default_value = (*[v * 0.7 for v in c], 1)
-    mix.inputs[7].default_value = (*[min(1, v * 1.2) for v in c], 1)
+    mix.inputs[6].default_value = (*[v * 0.85 for v in c], 1)
+    mix.inputs[7].default_value = (*[min(1, v * 1.1) for v in c], 1)
     nt.links.new(mix.outputs[2], bsdf.inputs["Base Color"])
     return mat
 
@@ -344,8 +374,295 @@ def subsurf(obj, levels=2):
     mod.render_levels = levels
 
 
+# ---------- MakeHuman head (CC0 base mesh and targets, see Docs/makehuman) ----------
+
+MH_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "makehuman", "head.npz")
+MH_SCALE = 0.8          # MakeHuman units (decimetres) to ours
+MH_EYE_DEPTH = 0.7     # how far in front of the middle of the head the eyes are (MakeHuman units)
+_MH = {}
+
+
+def mh_data():
+    if not _MH:
+        z = np.load(MH_FILE)
+        _MH["verts"] = z["verts"].astype(np.float64)
+        _MH["faces"] = z["faces"]
+        _MH["joints"] = {k[6:]: z[k] for k in z.files if k.startswith("joint_")}
+        targets = {}
+        for k, name in enumerate(z["names"]):
+            targets.setdefault(str(name), []).append((z[f"i_{k}"], z[f"d_{k}"].astype(np.float64)))
+        _MH["targets"] = targets
+    return _MH
+
+
+def mh_add(V, name, w):
+    if abs(w) < 1e-6:
+        return
+    for idx, d in mh_data()["targets"][name]:
+        np.add.at(V, idx, d * w)
+
+
+def mh_three(v):
+    """MakeHuman's min/average/max split of a 0..1 slider."""
+    if v < 0.5:
+        return {"min": (0.5 - v) * 2, "average": 1 - (0.5 - v) * 2, "max": 0.0}
+    return {"min": 0.0, "average": 1 - (v - 0.5) * 2, "max": (v - 0.5) * 2}
+
+
+# face sliders: (name, low, high) for men and women; a negative value uses the "decr"/"down"/... target
+MH_SLIDERS = {
+    "head/head-oval": ((0.0, 0.5), (0.1, 0.7)), "head/head-rectangular": ((0.0, 0.5), (0.0, 0.2)),
+    "head/head-square": ((0.0, 0.35), (0.0, 0.1)), "head/head-invertedtriangular": ((0.0, 0.3), (0.0, 0.35)),
+    "head/head-round": ((0.0, 0.1), (0.0, 0.12)), "head/head-triangular": ((0.0, 0.15), (0.0, 0.15)),
+    "head/head-scale-horiz": ((-0.45, 0.1), (-0.45, 0.05)), "head/head-scale-vert": ((-0.1, 0.4), (-0.1, 0.35)),
+    "head/head-scale-depth": ((-0.2, 0.25), (-0.2, 0.2)), "head/head-fat": ((-0.5, 0.0), (-0.5, 0.0)),
+    "head/head-angle": ((-0.2, 0.2), (-0.2, 0.2)),
+    "forehead/forehead-scale-vert": ((-0.4, 0.4), (-0.4, 0.3)), "forehead/forehead-trans": ((-0.3, 0.3), (-0.3, 0.3)),
+    "forehead/forehead-temple": ((-0.3, 0.3), (-0.3, 0.3)), "forehead/forehead-nubian": ((-0.3, 0.3), (-0.3, 0.2)),
+    "nose/nose-scale-horiz": ((-0.3, 0.4), (-0.5, 0.15)), "nose/nose-scale-vert": ((-0.3, 0.4), (-0.4, 0.2)),
+    "nose/nose-scale-depth": ((-0.3, 0.4), (-0.4, 0.2)), "nose/nose-hump": ((-0.3, 0.6), (-0.5, 0.2)),
+    "nose/nose-point-width": ((-0.4, 0.3), (-0.5, 0.1)), "nose/nose-flaring": ((-0.4, 0.3), (-0.5, 0.1)),
+    "nose/nose-nostrils-width": ((-0.3, 0.3), (-0.4, 0.1)), "nose/nose-point": ((-0.4, 0.3), (-0.3, 0.5)),
+    "nose/nose-greek": ((-0.3, 0.3), (-0.3, 0.3)), "nose/nose-curve": ((-0.4, 0.4), (-0.4, 0.2)),
+    "nose/nose-trans": ((-0.2, 0.2), (-0.2, 0.2)), "nose/nose-volume": ((-0.3, 0.3), (-0.5, 0.0)),
+    "nose/nose-width1": ((-0.3, 0.3), (-0.4, 0.1)), "nose/nose-width2": ((-0.3, 0.3), (-0.4, 0.1)),
+    "nose/nose-septumangle": ((-0.3, 0.3), (-0.3, 0.3)),
+    "mouth/mouth-scale-horiz": ((-0.2, 0.3), (-0.3, 0.2)), "mouth/mouth-lowerlip-volume": ((-0.3, 0.3), (0.0, 0.5)),
+    "mouth/mouth-upperlip-volume": ((-0.4, 0.2), (0.0, 0.5)), "mouth/mouth-cupidsbow": ((-0.3, 0.3), (0.0, 0.5)),
+    "mouth/mouth-trans": ((-0.2, 0.2), (-0.2, 0.2)), "mouth/mouth-angles": ((-0.2, 0.3), (-0.1, 0.4)),
+    "mouth/mouth-lowerlip-height": ((-0.3, 0.3), (-0.2, 0.3)), "mouth/mouth-upperlip-height": ((-0.3, 0.3), (-0.2, 0.3)),
+    "mouth/mouth-philtrum-volume": ((-0.3, 0.3), (-0.3, 0.3)), "mouth/mouth-laugh-lines": ((-0.4, 0.2), (-0.4, 0.0)),
+    "chin/chin-width": ((-0.2, 0.5), (-0.5, 0.0)), "chin/chin-height": ((-0.3, 0.4), (-0.4, 0.1)),
+    "chin/chin-prominent": ((-0.2, 0.5), (-0.3, 0.2)), "chin/chin-jaw-drop": ((-0.3, 0.3), (-0.3, 0.1)),
+    "chin/chin-bones": ((0.0, 0.6), (-0.5, 0.0)), "chin/chin-prognathism": ((-0.3, 0.3), (-0.3, 0.2)),
+    "chin/chin-cleft": ((0.0, 0.3), (0.0, 0.0)), "chin/chin-triangle": ((0.0, 0.0), (0.0, 0.4)),
+    "cheek/cheek-bones": ((-0.3, 0.5), (-0.1, 0.5)), "cheek/cheek-volume": ((-0.5, 0.1), (-0.4, 0.2)),
+    "cheek/cheek-inner": ((-0.3, 0.3), (-0.3, 0.3)), "cheek/cheek-trans": ((-0.3, 0.3), (-0.3, 0.3)),
+    "eyes/eye-scale": ((-0.2, 0.2), (0.0, 0.3)), "eyes/eye-trans": ((-0.2, 0.2), (-0.2, 0.2)),
+    "eyes/eye-height1": ((0.0, 0.4), (0.1, 0.4)), "eyes/eye-height2": ((0.1, 0.5), (0.15, 0.5)),
+    "eyes/eye-height3": ((0.0, 0.4), (0.1, 0.4)), "eyes/eye-corner1": ((-0.3, 0.3), (-0.3, 0.3)),
+    "eyes/eye-corner2": ((-0.3, 0.3), (-0.2, 0.4)), "eyes/eye-eyefold": ((-0.3, 0.3), (-0.3, 0.3)),
+    "eyes/eye-bag": ((-0.5, 0.1), (-0.6, 0.0)), "eyes/eye-push1": ((-0.3, 0.3), (-0.3, 0.3)),
+    "eyes/eye-push2": ((-0.3, 0.3), (-0.3, 0.3)),
+    "eyebrows/eyebrows-trans": ((-0.4, 0.2), (-0.2, 0.4)), "eyebrows/eyebrows-angle": ((-0.3, 0.3), (-0.2, 0.4)),
+    "neck/neck-scale-horiz": ((0.0, 0.5), (-0.4, 0.0)), "neck/neck-double": ((-0.6, 0.0), (-0.6, 0.0)),
+    "ears/ear-scale": ((-0.3, 0.1), (-0.4, 0.0)), "ears/ear-wing": ((-0.6, 0.0), (-0.6, -0.1)),
+    "ears/ear-lobe": ((-0.3, 0.3), (-0.3, 0.3)),
+}
+MH_PAIRS = [("decr", "incr"), ("down", "up"), ("in", "out"), ("backward", "forward"), ("compress", "uncompress"),
+            ("concave", "convex")]
+
+
+def mh_slider(V, key, value):
+    folder, base = key.split("/")
+    names = mh_data()["targets"]
+    if base in names:
+        mh_add(V, base, max(0.0, value))
+        return
+    for neg, pos in MH_PAIRS:
+        a, b = f"{base}-{neg}", f"{base}-{pos}"
+        if a in names and b in names:
+            mh_add(V, a if value < 0 else b, abs(value))
+            return
+
+
+def mh_sliders(rnd, woman):
+    out = {}
+    for key, (men, women) in MH_SLIDERS.items():
+        lo, hi = women if woman else men
+        out[key] = rnd.uniform(lo, hi) if hi > lo else lo
+    return out
+
+
+def mh_verts(p):
+    """The person's head, neck and shoulders in our coordinates (before the head turns)."""
+    d = mh_data()
+    V = d["verts"].copy()
+    g = p["mh_gender"]
+    musc, weight = mh_three(p["mh_muscle"]), mh_three(p["mh_weight"])
+    for gender, gw in (("female", 1 - g), ("male", g)):
+        for m, mw in musc.items():
+            for w, ww in weight.items():
+                mh_add(V, f"universal-{gender}-young-{m}muscle-{w}weight", gw * mw * ww)
+        for race, rw in p["mh_race"].items():
+            mh_add(V, f"{race}-{gender}-young", gw * rw)
+    for key, value in p["mh_sliders"].items():
+        mh_slider(V, key, value)
+    # arms down from MakeHuman's A pose, turned about the shoulder joints
+    J = d["joints"]
+    for side, j in ((1, "l-shoulder"), (-1, "r-shoulder")):
+        c = V[J[j]].mean(axis=0)
+        w = np.clip((V[:, 0] * side - (c[0] * side - 0.5)) / 0.7, 0, 1)
+        w = w * w * (3 - 2 * w) * (V[:, 1] < c[1] + 0.6)
+        a = -side * math.radians(32) * w
+        dx, dy = V[:, 0] - c[0], V[:, 1] - c[1]
+        V[:, 0] = c[0] + dx * np.cos(a) - dy * np.sin(a)
+        V[:, 1] = c[1] + dx * np.sin(a) + dy * np.cos(a)
+    # eyes at z = 0.11 and the middle of the head at y = 0, whatever the targets did
+    eye = (V[J["l-eye"]].mean(axis=0) + V[J["r-eye"]].mean(axis=0)) / 2
+    out = np.empty_like(V)
+    out[:, 0] = V[:, 0] * MH_SCALE
+    out[:, 1] = -(V[:, 2] - (eye[2] - MH_EYE_DEPTH)) * MH_SCALE
+    out[:, 2] = (V[:, 1] - eye[1]) * MH_SCALE + 0.11
+    return out
+
+
+def mh_setup(p):
+    """Build the person's mesh and the ray tracers the hair, brows and beard use to find the skin."""
+    from mathutils.bvhtree import BVHTree
+    V = mh_verts(p)
+    F = mh_data()["faces"]
+    J = mh_data()["joints"]
+    p["mh_V"] = V
+    keep = [f for f in F if V[f, 2].min() > -1.15]           # head and neck only
+    # the hair sees the ears pressed flat against the head, and grows nowhere on them
+    ear = np.zeros(len(V), bool)
+    for idx, d in mh_data()["targets"]["ear-wing-incr"]:      # moves only the ear itself
+        ear[idx[np.abs(d).max(axis=1) > 1e-4]] = True
+    H = V.copy()
+    for sign in (-1, 1):
+        m = ear & (V[:, 0] * sign > 0)
+        if m.any():
+            x0 = np.abs(V[m, 0]).min()
+            ax = np.abs(V[m, 0])
+            H[m, 0] = sign * np.where(ax > x0, x0 + (ax - x0) * 0.15, ax)
+    p["mh_bvh"] = BVHTree.FromPolygons([tuple(v) for v in H], [tuple(f) for f in keep])
+    # below the jaw (neck, shoulders, chest) there is nothing inside the skin, so nearest-point tests work;
+    # the head has the mouth and eye sockets inside it, so it is tested with rays from outside
+    low = [f for f in F if H[f, 2].max() < -0.8]
+    p["mh_hair_bvh"] = BVHTree.FromPolygons([tuple(v) for v in H], [tuple(f) for f in low])
+    ear_faces = [f for f in keep if ear[f].all()]
+    p["mh_ear"] = BVHTree.FromPolygons([tuple(v) for v in H], [tuple(f) for f in ear_faces]) if ear_faces else None
+    p["mh_body"] = BVHTree.FromPolygons([tuple(v) for v in V], [tuple(f) for f in F])
+    p["eye_c"] = [Vector(V[J["r-eye"]].mean(axis=0)), Vector(V[J["l-eye"]].mean(axis=0))]
+    # landmarks down the middle of the face
+    def front_y(x, z):
+        hit = p["mh_bvh"].ray_cast(Vector((x, -3.0, z)), Vector((0, 1, 0)), 6.0)
+        return hit[0].y if hit[0] else 1.0
+    zs = np.linspace(-1.05, 0.0, 211)
+    prof = np.array([front_y(0.0, z) for z in zs])
+    tip = int(np.argmin(prof))
+    p["nose_z"] = float(zs[tip])
+    below = np.where(zs < zs[tip] - 0.12)[0]
+    # lips: the two forward bumps below the nose, the mouth line the dip between them
+    seg = below[::-1]
+    ups = [i for i in seg[1:-1] if prof[i] <= prof[i - 1] and prof[i] <= prof[i + 1]]
+    lip_up = ups[0] if ups else seg[len(seg) // 3]
+    dips = [i for i in seg if zs[i] < zs[lip_up] and i > 0 and prof[i] >= prof[i - 1] and prof[i] >= prof[i + 1]]
+    mouth = dips[0] if dips else lip_up - 6
+    p["mouth_z"] = float(zs[mouth])
+    # chin: the lowest point of the face where the profile still faces forwards
+    chin = next((i for i in range(len(zs)) if prof[i] < prof[mouth] + 0.25 and zs[i] < zs[mouth] - 0.15), 0)
+    p["chin_z"] = float(zs[chin])
+    p["eye_z"] = float((p["eye_c"][0].z + p["eye_c"][1].z) / 2)
+    xs = V[np.abs(V[:, 2] - 0.45) < 0.04, 0]
+    p["face_w"] = float(np.abs(xs).max() / 0.68)
+    p["eye_x"] = float(abs(p["eye_c"][1].x) / p["face_w"])
+
+
+def mh_ray(bvh, d, far=4.0):
+    d = d.normalized()
+    hit = bvh.ray_cast(d * far, -d, far)
+    return hit[0] if hit[0] is not None else d * 0.9
+
+
+def face_z(p, z):
+    """Our old face heights (mouth at -0.466, chin at -0.8) for a height z on this face."""
+    if "mh_V" not in p:
+        return z
+    pts = [(p["chin_z"], -0.8), (p["mouth_z"], -0.466), (p["nose_z"], -0.24), (p["eye_z"], 0.11)]
+    if z <= pts[0][0]:
+        return -0.8 + (z - pts[0][0]) * 1.2
+    for (a, fa), (b, fb) in zip(pts, pts[1:]):
+        if z <= b:
+            return fa + (z - a) / (b - a) * (fb - fa)
+    return z
+
+
+def make_mh_body(p, skin_mat):
+    """The MakeHuman mesh: head, neck and shoulders in one piece. The head part turns with the head."""
+    V = p["mh_V"].copy()
+    pivot = Vector((0, 0.1, -0.6))
+    rot = Matrix.Rotation(math.radians(p["tilt"]), 3, "X")
+    rot = Matrix.Rotation(math.radians(p["turn"]), 3, "Z") @ rot
+    R = np.array(rot)
+    w = np.clip((V[:, 2] + 1.2) / 0.5, 0, 1)
+    w = w * w * (3 - 2 * w)
+    turned = (V - np.array(pivot)) @ R.T + np.array(pivot)
+    V = V * (1 - w[:, None]) + turned * w[:, None]
+    # the skin under the top is never seen and pokes through it where the arms meet the body: drop it,
+    # but keep the chest under the neckline
+    R0 = p["mh_V"]
+    faces = []
+    for f in mh_data()["faces"]:
+        c = R0[f].mean(axis=0)
+        # well inside the top (see make_mh_jersey), so no gap opens between the top's edge and the skin
+        under = c[2] < -1.3 + 0.1 * smooth(-0.1, 0.4, c[1]) or (abs(c[0]) > 0.8 and c[2] < -1.15)
+        if under and not (c[2] > -1.75 and c[1] < 0.05 and abs(c[0]) < 0.55):
+            continue
+        faces.append(tuple(f))
+    me = bpy.data.meshes.new("Body")
+    me.from_pydata([tuple(v) for v in V], [], faces)
+    obj = bpy.data.objects.new("Body", me)
+    bpy.context.collection.objects.link(obj)
+    for poly in me.polygons:
+        poly.use_smooth = True
+    rest = me.attributes.new("rest", "FLOAT_VECTOR", "POINT")
+    rest.data.foreach_set("vector", p["mh_V"].astype(np.float32).ravel())
+    me.materials.append(skin_mat)
+    subsurf(obj, 2)
+    p["mh_world"] = V
+    return obj
+
+
+def make_mh_jersey(p, jersey_mat):
+    """The top: a copy of the chest and shoulders, a little out from the skin. The shader cuts the neckline."""
+    V = p["mh_world"]
+    F = mh_data()["faces"]
+    me = bpy.data.meshes.new("Torso")
+    neck_line = lambda y: -1.12 + 0.1 * smooth(-0.1, 0.4, y)
+    faces = [f for f in F if (V[f, 2] < neck_line(V[f, 1].mean())).all()]
+    used = sorted({i for f in faces for i in f})
+    remap = {i: k for k, i in enumerate(used)}
+    me.from_pydata([tuple(V[i]) for i in used], [], [tuple(remap[i] for i in f) for f in faces])
+    # cloth does not follow every bump of the body: smooth it, then lift it off the skin
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    for _ in range(12):
+        bmesh.ops.smooth_vert(bm, verts=[v for v in bm.verts if not v.is_boundary], factor=0.5,
+                              use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    bm.to_mesh(me)
+    bm.free()
+    for poly in me.polygons:
+        poly.use_smooth = True
+    me.update()
+    from mathutils.bvhtree import BVHTree
+    body = BVHTree.FromPolygons([tuple(v) for v in V], [tuple(f) for f in F])
+    off = 0.025
+    loc = Vector((0, 0.18, -1.78))
+    for v in me.vertices:
+        q = v.co + v.normal * 0.01
+        for _ in range(3):
+            near, n, _, _ = body.find_nearest(q)
+            if near is None or (q - near).dot(n) >= off:
+                break
+            q = near + n * off
+        v.co = q - loc
+    obj = bpy.data.objects.new("Torso", me)
+    bpy.context.collection.objects.link(obj)
+    obj.location = loc
+    me.materials.append(jersey_mat)
+    sol = obj.modifiers.new("Solid", "SOLIDIFY")    # the cloth has an inside, seen at the collar
+    sol.thickness = 0.012
+    sol.offset = -1.0
+    subsurf(obj, 2)
+    return obj
+
+
 def head_shape(v, p):
     """Turn a unit sphere point into a head. Front of the face is -Y, up is +Z."""
+    if "mh_bvh" in p:
+        return mh_ray(p["mh_bvh"], Vector((v[0] * 0.68 * p["face_w"], v[1] * 0.88, v[2])))
     x, y, z = v
     w = p["face_w"]
     x *= 0.68 * w
@@ -437,6 +754,10 @@ def head_shape(v, p):
 
 def surface_point(p, x, z):
     """The point on the front of the head that is at x, z (found by a few Newton steps)."""
+    if "mh_bvh" in p:
+        hit = p["mh_bvh"].ray_cast(Vector((x, -3.0, z)), Vector((0, 1, 0)), 6.0)
+        if hit[0] is not None:
+            return hit[0]
     d = Vector((x / 0.68, -0.8, z)).normalized()
     for _ in range(12):
         s = head_shape(d, p)
@@ -481,6 +802,8 @@ def hair_object(name, strands, mat, radius=0.0045, tip=0.35):
     """strands: float array (count, points, 3). Rendered as Cycles hair."""
     strands = np.asarray(strands, dtype=np.float32)
     count, n, _ = strands.shape
+    if name not in ("Brows", "Lashes"):
+        radius *= THIN
     hc = bpy.data.hair_curves.new(name)
     hc.add_curves([n] * count)
     hc.attributes["position"].data.foreach_set("vector", strands.ravel())
@@ -510,7 +833,7 @@ def eye_material(p):
     xz = node(nt, "ShaderNodeCombineXYZ")
     nt.links.new(sep.outputs[0], xz.inputs[0]); nt.links.new(sep.outputs[2], xz.inputs[1])
     scale = node(nt, "ShaderNodeVectorMath"); scale.operation = "SCALE"
-    scale.inputs["Scale"].default_value = 1 / 0.1
+    scale.inputs["Scale"].default_value = 1 / 0.118
     nt.links.new(xz.outputs[0], scale.inputs[0])
     r = node(nt, "ShaderNodeVectorMath"); r.operation = "LENGTH"
     nt.links.new(scale.outputs[0], r.inputs[0])
@@ -544,8 +867,61 @@ def eye_material(p):
     return mat
 
 
+def lid_margin(p, c, R, dx, up=True):
+    """How far above (or below) the eye centre the lid edge is, dx to the side: where the
+    skin starts to cover the eyeball when seen from the front."""
+    step = 0.003 if up else -0.003
+    dz = 0.0
+    while abs(dz) < R * 1.3:
+        hit = p["mh_bvh"].ray_cast(Vector((c.x + dx, -3.0, c.z + dz)), Vector((0, 1, 0)), 6.0)[0]
+        q = R * R - dx * dx - dz * dz
+        ey = c.y - math.sqrt(q) if q > 0 else 9.0
+        if hit is not None and hit.y < ey - 0.001:
+            return dz, hit
+        dz += step
+    return None, None
+
+
+def make_mh_eyes(p, hair_mat):
+    """Eyeballs in the MakeHuman eye sockets (the mesh has its own lids) and lashes along the upper lid."""
+    mat = eye_material(p)
+    objs = []
+    R = p["eye_r"]
+    look = p["look"]
+    lash_strands = []
+    L = 0.04 if p["woman"] else 0.028
+    for side, c in zip((-1, 1), p["eye_c"]):
+        c = c + Vector((0, p["eye_back"], 0))
+        eye = sphere("Eye", 48, 32, R)
+        eye.location = c
+        eye.rotation_euler = (math.radians(look[1]), 0, math.radians(look[0]))
+        eye.data.materials.append(mat)
+        objs.append(eye)
+        rnd = random.Random(p["seed"] * 13 + side)
+        n = 60 if p["woman"] else 30
+        for i in range(n):
+            u = (i + rnd.random()) / n * 1.8 - 0.9
+            dx = u * R
+            dz, hit = lid_margin(p, c, R, dx)
+            if hit is None:
+                continue
+            root = hit + Vector((0, 0.002, -0.002))
+            out = Vector((dx * 0.6 * side * side, -1.0, 0.25)).normalized()
+            l = L * (0.55 + 0.45 * max(0.0, 1 - u * u)) * rnd.uniform(0.8, 1.1)
+            if u * side > 0:
+                l *= 1.15   # longer towards the outer corner
+            pts = [root + out * l * tt + Vector((0, 0, 1)) * l * 0.8 * tt * tt + Vector((dx * 0.4 * tt, 0, 0))
+                   for tt in np.linspace(0, 1, 5)]
+            lash_strands.append([tuple(q) for q in pts])
+    if lash_strands:
+        objs.append(hair_object("Lashes", lash_strands, hair_mat_dark(p), 0.0026 if p["woman"] else 0.0016, 0.3))
+    return objs
+
+
 def make_eyes(p, skin_mat, hair_mat):
     """Eyeballs, almond shaped eyelids that cover the top of the iris, and lashes."""
+    if "mh_bvh" in p:
+        return make_mh_eyes(p, hair_mat)
     mat = eye_material(p)
     objs = []
     R = p["eye_r"]
@@ -660,12 +1036,17 @@ def make_brows(p, mat):
     strands = []
     fw = p["face_w"]
     thick = p["brow_thick"]
+    mh = "mh_bvh" in p
     for side in (-1, 1):
         for i in range(int(420 * thick)):
             u = rnd.random()                         # 0 = inner end, 1 = outer end
             bx = side * (0.09 + u * 0.33) * fw
             arch = 0.255 + (0.065 if p["woman"] else 0.045) * math.sin(min(1.0, u / 0.7) * math.pi * 0.5) - (0.06 * max(0.0, u - 0.7) / 0.3) ** 1.3
             arch += p["brow_raise"]
+            if mh:
+                ex = abs(p["eye_c"][0].x)
+                bx = side * ex * (0.32 + u * 1.25)
+                arch += p["eye_z"] - 0.11 + p["brow_h"]
             width = (0.042 - (0.03 if p["woman"] else 0.022) * u) * thick
             bz = arch + rnd.uniform(-0.5, 0.5) * width
             root = surface_point(p, bx, bz)
@@ -673,10 +1054,10 @@ def make_brows(p, mat):
             # inner hairs point up, the rest outwards and a little down
             ang = math.radians(70 * max(0.0, 1 - u / 0.25) + 18 - 30 * u + rnd.uniform(-12, 12))
             d = Vector((side * math.cos(ang), 0.15 * side * math.cos(ang) * (abs(bx) / 0.4), math.sin(ang)))
-            L = rnd.uniform(0.035, 0.06)
+            L = rnd.uniform(0.03, 0.05) if p["woman"] else rnd.uniform(0.035, 0.06)
             pts = [root + n * (0.003 + 0.006 * tt) + d * L * tt for tt in (0, 0.33, 0.66, 1.0)]
             strands.append([tuple(q) for q in pts])
-    return hair_object("Brows", strands, mat, 0.0042 * (1.15 if not p["woman"] else 1.0), 0.4)
+    return hair_object("Brows", strands, mat, 0.0042 * (1.15 if not p["woman"] else 0.8), 0.4)
 
 
 def make_neck_and_body(p, skin_mat, jersey_mat):
@@ -834,6 +1215,8 @@ def jersey_material(p):
     sk.inputs["Subsurface Weight"].default_value = 0.3
     sk.inputs["Subsurface Radius"].default_value = (1.0, 0.35, 0.2)
     sk.inputs["Subsurface Scale"].default_value = 0.06
+    if "mh_V" in p:
+        sk = nt.nodes.new("ShaderNodeBsdfTransparent")    # the real neck and chest show through
     out = nt.nodes["Material Output"]
     mixsh = nt.nodes.new("ShaderNodeMixShader")
     nt.links.new(inside.out, mixsh.inputs[0])
@@ -860,6 +1243,8 @@ def to_sphere(pt, p):
 
 def head_radius(pt, p):
     """Distance from the head's centre to its skin in the direction of pt."""
+    if "mh_bvh" in p:
+        return mh_ray(p["mh_bvh"], pt).length
     return head_shape(to_sphere(pt, p), p).length
 
 
@@ -880,6 +1265,8 @@ class Style:
 
 def hairline(p, st, x, y):
     side = smooth(0.42 * p["face_w"], 0.72 * p["face_w"], abs(x))
+    if "mh_bvh" in p:
+        side = smooth(0.52 * p["face_w"], 0.74 * p["face_w"], abs(x))   # the temples are further in
     back = smooth(-0.2, 0.4, y)
     limit = st.front(x) * (1 - side) + st.side_low * side
     return limit * (1 - back) + st.back_low * back
@@ -894,15 +1281,63 @@ def scalp_roots(p, st, count, rnd):
         th = golden * i + rnd.uniform(-0.05, 0.05)
         d = Vector((r * math.cos(th), r * math.sin(th), z))
         s = head_shape(d, p)
+        if p.get("mh_ear") is not None:
+            near = p["mh_ear"].find_nearest(s, 0.02)
+            if near[0] is not None:
+                continue
+            if s.y < -0.2 and s.z < st.front(0.0) - 0.1 and abs(s.x) < 0.66 * p["face_w"]:
+                continue    # no hair on the temples in front, below the forehead hairline
         # no hair in front of the ears, below the sideburns
         if abs(s.x) > 0.6 * p["face_w"] and -0.05 > s.y > -0.4 and s.z < st.sideburn:
             continue
-        if s.z >= hairline(p, st, s.x, s.y):
+        lim = hairline(p, st, s.x, s.y)
+        if s.z >= lim:
+            # thinner right at the hairline, so it fades into the skin instead of ending in a hard line
+            if "mh_bvh" in p and rnd.random() > 0.35 + 0.65 * smooth(0.0, 0.06, s.z - lim):
+                continue
             pts.append(s)
     return pts
 
 
-def grow(p, root, length, h, field, rnd, steps=14, hang_below=None, rise=3.0, face_guard=None):
+def add_waves(pts, root, amp, wavelength=0.55):
+    """Soft waves along a hanging lock. Neighbouring locks share the phase so they wave together."""
+    a = resample(pts, max(80, len(pts)))
+    seg = np.linalg.norm(np.diff(a, axis=0), axis=1)
+    s = np.concatenate([[0], np.cumsum(seg)])
+    phase = noise.noise(root * 1.5) * 2.0
+    out = []
+    for q, d in zip(a, s):
+        k = smooth(0.0, 0.25, d) * min(1.0, 0.4 + d)
+        if q[2] > -0.1:
+            k = 0.0
+        radial = Vector((q[0], q[1] - 0.15, 0.0))
+        radial = radial.normalized() if radial.length > 1e-6 else Vector((1, 0, 0))
+        side = Vector((-radial.y, radial.x, 0.0))
+        w = math.sin(d / wavelength * 2 * math.pi + phase)
+        out.append(Vector(q) + (radial * 0.7 + side * 0.5) * amp * k * w)
+    return out
+
+
+def torso_y(p, x, z):
+    """Front and back of the torso (y) at x, z, or None above or beside it. Mirrors make_neck_and_body."""
+    if "mh_body" in p:
+        a = p["mh_body"].ray_cast(Vector((x, -3.0, z)), Vector((0, 1, 0)), 6.0)[0]
+        b = p["mh_body"].ray_cast(Vector((x, 3.0, z)), Vector((0, -1, 0)), 6.0)[0]
+        if a is None or b is None:
+            return None
+        return a.y - 0.02, b.y + 0.02
+    zl = z + 1.78
+    xs = x / p["shoulders"]
+    zs = zl / (0.72 + 0.2 * gauss(x * x, 0.45)) if zl > 0 else zl / 2.0
+    q = 1 - xs * xs - zs * zs
+    if q <= 0:
+        return None
+    d = 0.6 * math.sqrt(q)
+    return 0.18 - d, 0.18 + d
+
+
+def grow(p, root, length, h, field, rnd, steps=14, hang_below=None, rise=3.0, face_guard=None, wobble=1.0,
+         drape=0, layer=0.0, stand=0.6):
     """Walk a strand from its root along field(pos, t), keeping it h above the skin.
 
     Hair stands off the scalp quickly (rise) and keeps that height, which is what gives a
@@ -912,31 +1347,138 @@ def grow(p, root, length, h, field, rnd, steps=14, hang_below=None, rise=3.0, fa
     pts = [root - n * 0.01]
     pos = root
     seg = length / steps
-    wob = noise.noise_vector(root * 2.0) * 0.3 + Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))) * 0.05
+    wob = (noise.noise_vector(root * 2.0) * 0.3 + Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))) * 0.05) * wobble
     for k in range(steps):
         t = (k + 1) / steps
         d = (field(pos, t) + wob * (0.3 + 0.5 * t)).normalized()
         if k == 0:
-            d = (d + n * 0.6).normalized()
+            d = (d + n * stand).normalized()
         new = pos + d * seg
         lift = h * min(1.0, 0.15 + rise * t)
-        if hang_below is None or new.z > hang_below:
+        if "mh_hair_bvh" in p and (hang_below is None or new.z > hang_below):
+            pass
+        elif hang_below is None or new.z > hang_below:
             r_head = head_radius(new, p)
             if new.length < r_head + lift:
                 new = new.normalized() * (r_head + lift)
         else:
-            min_x = 0.62 * p["face_w"] + lift
+            # beside the face, then closer in beside the neck
+            min_x = (0.62 * p["face_w"] + lift) if new.z > -0.75 else (0.5 + lift)
             if abs(new.x) < min_x and new.y < 0.35:
                 new.x = math.copysign(min_x, new.x if new.x != 0 else 1)
-            new.y = max(new.y, -0.3)
-            # over the shoulders, not into them
-            if abs(new.x) > 0.5 and new.z < -1.05:
-                new.y = max(new.y, 0.1 + 0.25 * min(1.0, (-1.05 - new.z) * 2))
+            if new.z > -0.95 or drape <= 0:
+                new.y = max(new.y, -0.3)
+            ty = torso_y(p, new.x, new.z - lift)
+            if ty is not None:
+                front, back = ty
+                if drape > 0:
+                    # lies over the shoulder and down the front of the chest
+                    new.y = min(new.y, front - lift * 0.6)
+                elif new.y < back + lift:
+                    # falls down the back, behind the shoulder
+                    new.y = back + lift
         if face_guard is not None and new.y < -0.3 and abs(new.x) < 0.55 * p["face_w"] and new.z < face_guard:
             new.z = face_guard
+        if "mh_hair_bvh" in p:
+            # on the head the hair keeps its height over the skin (it hugs the head, never inside it);
+            # below hang_below it only stays out of the skin
+            # hair from further up lies on top of the hair that grows lower down, so a strand
+            # stands further off the head the further it has come over the scalp (layer)
+            hugging = hang_below is None or new.z > hang_below
+            new = collide(p, new, lift + layer * seg * (k + 1), hug=hugging)
+            # a push out along the neck must not stretch the strand (stray long hairs at the nape)
+            step = new - pos
+            if step.length > seg * 1.5:
+                new = pos + step.normalized() * seg * 1.5
         pts.append(new)
         pos = new
     return pts
+
+
+def drape(p, strands, hang_below, front, gaps, n=40, iters=36):
+    """Hair below hang_below hangs free: gravity pulls it down, it keeps its length and slides off the
+    head, neck and shoulders. front[i]: that lock falls forward over the shoulder, else down the back."""
+    bvh = p["mh_hair_bvh"]
+    P = np.stack([resample(s, n) for s in strands])                      # (g, n, 3)
+    g = len(P)
+    seg = np.linalg.norm(np.diff(P, axis=1), axis=2)                    # (g, n-1)
+    below = P[:, :, 2] < hang_below
+    first = np.where(below.any(axis=1), below.argmax(axis=1), n - 1)
+    free = np.arange(n)[None, :] >= np.maximum(first, 2)[:, None]
+    front = np.asarray(front, bool)
+    gaps = np.asarray(gaps)
+    step = seg.mean() * 0.35
+    for it in range(iters):
+        D = np.zeros_like(P)
+        D[:, :, 2] -= step
+        low = P[:, :, 2] < -0.85
+        D[:, :, 1] += np.where(front[:, None], -0.45, 0.45) * step * low
+        D[:, :, 0] += np.sign(P[:, :, 0]) * 0.25 * step * (P[:, :, 2] > -0.9)   # clear of the face
+        P = np.where(free[:, :, None], P + D, P)
+        for i in range(1, n):
+            d = P[:, i] - P[:, i - 1]
+            d /= np.linalg.norm(d, axis=1, keepdims=True) + 1e-9
+            P[:, i] = np.where(free[:, i, None], P[:, i - 1] + d * seg[:, i - 1, None], P[:, i])
+        if it % 3 == 2 or it == iters - 1:
+            for j in range(g):
+                for i in np.nonzero(free[j])[0]:
+                    P[j, i] = collide(p, Vector(P[j, i]), gaps[j])
+    return [[Vector(q) for q in s] for s in P]
+
+
+def collide(p, q, gap, hug=False):
+    """Keep q at least gap outside the skin (exactly gap over the head when hug)."""
+    if q.z > -0.95:
+        r = mh_ray(p["mh_bvh"], q).length
+        if hug:
+            gap = max(gap, p.get("shell_h", 0.0) + 0.006)
+        if q.length < r + gap or hug:
+            q = q.normalized() * (r + gap)
+    if q.z < -0.7:
+        near, nrm, _, _ = p["mh_hair_bvh"].find_nearest(q)
+        if near is not None and (q - near).dot(nrm) < gap:
+            q = near + nrm * gap
+    return q
+
+
+def keep_outside(p, C, gap):
+    """Lift every hair point that ended up under the scalp (blending guides cuts corners) back out.
+    Uses a table of the head's radius in every direction."""
+    if "rad_tab" not in p:
+        th = np.linspace(0, math.pi, 97)
+        ph = np.linspace(-math.pi, math.pi, 193)
+        tab = np.zeros((len(th), len(ph)))
+        for i, a in enumerate(th):
+            for j, b in enumerate(ph):
+                d = Vector((math.sin(a) * math.cos(b), math.sin(a) * math.sin(b), math.cos(a)))
+                tab[i, j] = mh_ray(p["mh_bvh"], d).length
+        p["rad_tab"] = tab
+    tab = p["rad_tab"]
+    P = C.reshape(-1, 3)
+    r = np.linalg.norm(P, axis=1) + 1e-9
+    i = np.clip(np.rint(np.arccos(np.clip(P[:, 2] / r, -1, 1)) / math.pi * 96).astype(int), 0, 96)
+    j = np.clip(np.rint((np.arctan2(P[:, 1], P[:, 0]) + math.pi) / (2 * math.pi) * 192).astype(int), 0, 192)
+    need = tab[i, j] + gap
+    # only small lifts: towards the neck the table radius can hit the shoulders far away,
+    # and pushing a nape hair out there drew long stray lines beside the neck
+    m = (P[:, 2] > -0.9) & (r < need) & (need - r < 0.1)
+    P[m] *= (need[m] / r[m])[:, None]
+    return P.reshape(C.shape)
+
+
+def push_out(p, q, gap):
+    near, nrm, _, _ = p["mh_hair_bvh"].find_nearest(q)
+    if near is not None and (q - near).dot(nrm) < gap:
+        return near + nrm * gap
+    return q
+
+
+def smooth_line(pts, iters):
+    """Take the kinks out of a grown strand (the root stays where it is)."""
+    a = np.asarray([tuple(q) for q in pts], dtype=np.float64)
+    for _ in range(iters):
+        a[1:-1] = 0.5 * a[1:-1] + 0.25 * (a[:-2] + a[2:])
+    return [Vector(q) for q in a]
 
 
 def resample(pts, n):
@@ -956,7 +1498,7 @@ def children(guides, normals, per, spread, clump, rnd_seed, frizz=0.0, curl=0.0,
     G = np.asarray(guides)                       # (g, n, 3)
     N = np.asarray(normals)                      # (g, 3)
     g, n, _ = G.shape
-    per = max(1, int(round(per * CHILD_SCALE)))
+    per = max(1, int(round(per * CHILD_SCALE * DENSITY)))
     idx = np.repeat(np.arange(g), per)
     m = len(idx)
     t = np.linspace(0, 1, n)
@@ -969,6 +1511,28 @@ def children(guides, normals, per, spread, clump, rnd_seed, frizz=0.0, curl=0.0,
     off = a * r[:, None]
     shrink = 1 - clump * t ** 0.9
     C = G[idx] + off[:, None, :] * shrink[None, :, None]
+    if INTERP and g >= 30:
+        # interpolated children: each hair is a blend of its guide and two neighbouring guides that
+        # go the same way, so the hair is a continuous mass and not separate ropes
+        R0 = G[:, 0]
+        D = np.linalg.norm(R0[:, None, :] - R0[None, :, :], axis=2)
+        k = min(7, g - 1)
+        nb = np.argsort(D, axis=1)[:, 1:k + 1]                             # (g, k)
+        cd = np.linalg.norm(G[:, None, :, :] - G[nb], axis=3).mean(axis=2)  # mean distance of the curves
+        ok = cd < 0.04 + 1.6 * np.take_along_axis(D, nb, axis=1)
+        pick = rng.integers(0, k, (m, 2))
+        n1, n2 = nb[idx, pick[:, 0]], nb[idx, pick[:, 1]]
+        o1, o2 = ok[idx, pick[:, 0]], ok[idx, pick[:, 1]]
+        # long hair blends smoothly; short hair keeps more of its own guide, for texture
+        glen = np.linalg.norm(np.diff(G, axis=1), axis=2).sum(axis=1)
+        longness = np.clip((glen - 0.4) / 0.6, 0, 1)[idx]
+        w = rng.dirichlet((2.0, 1.0, 1.0), m)
+        w[:, 1] *= o1 * (0.35 + 0.65 * longness)
+        w[:, 2] *= o2 * (0.35 + 0.65 * longness)
+        w /= w.sum(axis=1, keepdims=True)
+        blend = w[:, 0, None, None] * G[idx] + w[:, 1, None, None] * G[n1] + w[:, 2, None, None] * G[n2]
+        pull = (clump * (0.9 - 0.4 * longness))[:, None, None] * t[None, :, None] ** 1.5
+        C = blend * (1 - pull) + G[idx] * pull + off[:, None, :] * 0.25 * (1 - t[None, :, None] * 0.5)
     if frizz:
         ph = rng.uniform(0, 6.3, (m, 3))
         fr = rng.uniform(4, 9, (m, 1))
@@ -989,17 +1553,28 @@ def children(guides, normals, per, spread, clump, rnd_seed, frizz=0.0, curl=0.0,
 
 def scalp_shell(p, st, mat, thick=0.03, shell_extra=None):
     """A hair-coloured shell under the strands. Thicker where the hair is fuller."""
+    p["shell_h"] = max(p.get("shell_h", 0.0), thick)
     cap = sphere("HairCap", 128, 96)
     bm = bmesh.new()
     bm.from_mesh(cap.data)
+    drop = []
     for v in bm.verts:
         hv = head_shape(v.co.copy(), p)
         lim = hairline(p, st, hv.x, hv.y)
         if abs(hv.x) > 0.6 * p["face_w"] and -0.05 > hv.y > -0.4 and hv.z < st.sideburn:
             lim = max(lim, st.sideburn)
-        t = smooth(-0.03, 0.12, hv.z - lim)
         extra = shell_extra(hv) if shell_extra else 0.0
+        if "mh_bvh" in p:
+            # starts a little inside the hairline, so the hairline itself is skin with thin hair over it
+            t = smooth(0.03, 0.15, hv.z - lim)
+            v.co = hv + hv.normalized() * ((thick + extra) * t - 0.04 * (1 - t))
+            if hv.z - lim < 0.0:
+                drop.append(v)
+            continue
+        t = smooth(-0.03, 0.12, hv.z - lim)
         v.co = hv + hv.normalized() * ((thick + extra) * t - 0.015 * (1 - t))
+    if drop:
+        bmesh.ops.delete(bm, geom=drop, context="VERTS")
     bm.to_mesh(cap.data)
     bm.free()
     cap.data.materials.append(mat)
@@ -1040,7 +1615,7 @@ def style_for(p):
                                 hair, 0.004, 0.5))
         return objs, 0.0
     if style == "buzz":
-        st = Style(lambda x: 0.5 - 0.08 * x * x, side_low=0.02, back_low=-0.45)
+        st = Style(lambda x: 0.5 + (0.09 if "mh_bvh" in p else 0.0) - 0.08 * x * x, side_low=0.02, back_low=-0.45)
         objs.append(scalp_shell(p, st, scalp, 0.006))
         roots = scalp_roots(p, st, 9000, rnd)
         guides = []
@@ -1055,8 +1630,12 @@ def style_for(p):
     if style == "curly":
         woman = p["woman"]
         top = rnd.uniform(0.18, 0.28) if not woman else rnd.uniform(0.3, 0.42)
-        st = Style(lambda x: 0.46 - 0.1 * x * x, side_low=0.0 if not woman else -0.1, back_low=-0.4)
-        objs.append(scalp_shell(p, st, scalp, 0.04, lambda hv: top * 0.55 * max(0.0, hv.z + 0.2)))
+        dzc = 0.09 if "mh_bvh" in p else 0.0
+        st = Style(lambda x: 0.46 + dzc - 0.1 * x * x, side_low=0.0 if not woman else -0.1, back_low=-0.4)
+        if "mh_bvh" in p:
+            objs.append(scalp_shell(p, st, scalp, 0.02, lambda hv: top * 0.45 * max(0.0, hv.z - 0.3)))
+        else:
+            objs.append(scalp_shell(p, st, scalp, 0.04, lambda hv: top * 0.55 * max(0.0, hv.z + 0.2)))
         roots = scalp_roots(p, st, 1500, rnd)
         guides, normals = [], []
         for r in roots:
@@ -1084,6 +1663,11 @@ def style_for(p):
     lift = None        # optional custom volume(root)
     count = 2600
     tie = None
+    sleek = 1.0        # how much neighbouring locks wander (low = straight, smooth hair)
+    drape_front = False   # long hair: the front part falls over the shoulders onto the chest
+    wave_amp = 0.0        # soft waves in long hair (whole locks wave together)
+    stand = 0.6           # how steeply hair leaves the scalp at the root
+    layer = 0.12          # how much thicker the hair gets per unit it has run over the scalp
     sw = rnd.choice((-1, 1))      # which side the hair is swept to
 
     if style in ("side", "undercut", "long_side"):
@@ -1091,11 +1675,12 @@ def style_for(p):
     elif style in ("middle", "long", "wavy", "lob", "bob", "half_up", "long_m", "curtain", "shag"):
         part_x = rnd.uniform(-0.04, 0.04)
 
+    dz = 0.09 if "mh_bvh" in p else 0.0     # the MakeHuman forehead is higher
     if not p["woman"]:
-        front = lambda x: 0.47 - 0.06 * x * x - (0.05 * smooth(0.15, 0.4, abs(x)) if p["recede"] else 0)
+        front = lambda x: 0.47 + dz - 0.06 * x * x - (0.05 * smooth(0.15, 0.4, abs(x)) if p["recede"] else 0)
         st = Style(front, side_low=0.03, back_low=-0.45, sideburn=-0.02)
     else:
-        front = lambda x: 0.5 - 0.15 * x * x
+        front = lambda x: 0.5 + dz - 0.15 * x * x
         st = Style(front, side_low=-0.05, back_low=-0.5, sideburn=0.08)
 
     def short_sides(r, top_len, side_len):
@@ -1104,8 +1689,8 @@ def style_for(p):
         return side_len + (top_len - side_len) * top
 
     if style == "side":
-        top_len = rnd.uniform(0.32, 0.42)
-        H = rnd.uniform(0.07, 0.1)
+        top_len = rnd.uniform(0.4, 0.5)
+        H = rnd.uniform(0.1, 0.14)
 
         def field(pos, t):
             if pos.z > 0.42 and (pos.x - part_x) * sw > -0.02:
@@ -1201,7 +1786,8 @@ def style_for(p):
         def field(pos, t):
             return tangent(Vector((0.15 * pos.x, 1.0, -0.15 - 0.8 * smooth(0.3, -0.2, pos.z))), pos)
         length = lambda r: short_sides(r, 0.5, 0.2)
-        lift = lambda r: H * smooth(0.0, 0.6, r.z) + 0.015
+        # some volume at the front where it is pushed back, flat over the crown
+        lift = lambda r: H * smooth(0.0, 0.6, r.z) + 0.05 * smooth(0.4, 0.6, r.z) * smooth(0.1, -0.3, r.y) + 0.015
         clump = 0.4
 
     elif style == "messy":
@@ -1211,12 +1797,12 @@ def style_for(p):
         def field(pos, t):
             nz = noise.noise_vector(pos * 3.0 + Vector((p["seed"], 0, 0)))
             if pos.z > 0.4:
-                return tangent(Vector((0.3 * pos.x, -0.4, 0.3)) + nz * 1.2, pos)
-            return tangent(Vector((0.4 * math.copysign(1, pos.x), 0.4, -1.0)) + nz * 0.5, pos)
-        length = lambda r: short_sides(r, rnd.uniform(0.32, 0.42), 0.2)
+                return tangent(Vector((0.3 * pos.x, -0.5, 0.15)) + nz * 0.7, pos)
+            return tangent(Vector((0.4 * math.copysign(1, pos.x), 0.4, -1.0)) + nz * 0.35, pos)
+        length = lambda r: short_sides(r, rnd.uniform(0.36, 0.46), 0.2)
         lift = lambda r: H * smooth(0.0, 0.6, r.z) + 0.02
-        frizz = 0.012
-        clump = 0.75
+        frizz = 0.006
+        clump = 0.5
 
     elif style in ("fade_crop", "fluffy"):
         # skin fade on the sides, the length on top
@@ -1258,10 +1844,13 @@ def style_for(p):
         frizz, clump = 0.006, 0.6
 
     elif style in ("long", "long_side", "wavy", "lob", "bob", "long_m", "half_up", "curtain", "shag"):
-        end_z = {"long": -1.45, "long_side": -1.4, "wavy": -1.35, "lob": -0.98, "bob": -0.6,
-                 "long_m": -0.9, "half_up": -1.35, "curtain": -1.35, "shag": -1.0}[style] + rnd.uniform(-0.1, 0.1)
+        end_z = {"long": -1.95, "long_side": -1.9, "wavy": -1.85, "lob": -1.15, "bob": -0.6,
+                 "long_m": -0.9, "half_up": -1.8, "curtain": -1.85, "shag": -1.2}[style] + rnd.uniform(-0.12, 0.12)
+        drape_front = style in ("long", "long_side", "wavy", "curtain", "half_up", "shag")
         hang_below = -0.05
-        H = rnd.uniform(0.045, 0.07)
+        H = rnd.uniform(0.035, 0.055)
+        sleek = 0.3
+        layer = 0.2
         st.back_low = -0.55
         if style == "wavy" or style == "shag":
             curl = 1.0
@@ -1289,6 +1878,9 @@ def style_for(p):
                 return tangent(Vector((s, 0.1, -0.45)), pos)
             if pos.y > 0.45 and pos.z > 0:
                 return tangent(Vector((0.15 * s, 0.35, -1)), pos)
+            if pos.z < -0.3:
+                # gravity, drawn in a little towards the neck
+                return Vector((-0.08 * math.copysign(1, pos.x), 0.0, -1))
             return Vector((0.1 * s, 0.1 if pos.y > -0.1 else 0.25, -1))
 
         def length(r):
@@ -1300,8 +1892,12 @@ def style_for(p):
             if style == "shag":
                 full *= rnd.uniform(0.55, 1.0)     # choppy layers
             return full
-        lift = lambda r: H * (0.7 + 0.3 * smooth(0.0, 0.8, r.z))
-        clump = 0.6
+        # flat at the parting, fuller further out
+        lift = lambda r: H * (0.7 + 0.3 * smooth(0.0, 0.8, r.z)) * (0.25 + 0.75 * smooth(0.0, 0.15, abs(r.x - part_x)))
+        clump = 0.3
+        frizz = 0.0 if style != "shag" else 0.004
+        curl = 0.0
+        wave_amp = {"wavy": 0.065, "shag": 0.045}.get(style, 0.03 if p["hair_wavy"] and style != "bob" else 0.0)
         count = 3000
 
     elif style in ("pony", "low_pony", "bun", "messy_bun", "manbun", "braids", "pixie", "side_pony", "bubble",
@@ -1353,12 +1949,20 @@ def style_for(p):
             lift = lambda r: H
             clump = 0.45
             frizz = 0.006
+            # pulled-back hair lies flat: no layering, or it piles up into a crest over the top
+            layer = 0.05
+            stand = 0.15
+            if p["woman"]:
+                # hair pulled back shows the real hairline: arched, lower at the temples
+                st.front = lambda x: 0.53 + dz - 0.32 * x * x
             if style == "braids":
                 part_x = 0.0
         count = 2800
     else:
         raise ValueError(style)
 
+    if face_guard is not None:
+        face_guard += dz
     if p["extra"] == "cap":
         # under a cap: the top is pressed flat, only the sides and the back show
         base_length, base_lift = length, lift
@@ -1370,13 +1974,16 @@ def style_for(p):
         objs.append(scalp_shell(p, st, scalp, shell))
     roots = scalp_roots(p, st, count, rnd)
     guides, normals = [], []
+    hanging = []
     for r in roots:
         if part_x is not None and abs(r.x - part_x) < 0.012 and r.z > 0.4 and r.y < 0.4:
             continue    # keep the parting clean
         L = length(r) * rnd.uniform(0.9, 1.1)
         h = lift(r) * rnd.uniform(0.45, 1.0)
         steps = 14 if L < 0.6 else 22
-        pts = grow(p, r, L, h, field, rnd, steps, hang_below=hang_below, face_guard=face_guard)
+        dr = 1 if (drape_front and r.y < 0.25 and rnd.random() < 0.85) else 0
+        pts = grow(p, r, L, h, field, rnd, steps if L < 1.0 else 30, hang_below=hang_below, face_guard=face_guard,
+                   wobble=sleek, drape=dr, layer=layer, stand=stand)
         if style in ("pony", "low_pony", "bun", "messy_bun", "manbun", "side_pony", "bubble", "space_buns"):
             # stop at the tie
             goal = target_for(r) if style == "space_buns" else tie
@@ -1387,12 +1994,33 @@ def style_for(p):
             pts = grow(p, r, (tie - r).length * 1.2, h, lambda pos, t: tangent(tie - pos, pos) + (tie - pos) * 0.3, rnd, 12)
             cut = next((i for i, q in enumerate(pts) if (q - tie).length < 0.05), len(pts) - 1)
             pts = pts[:max(cut + 1, 3)]
-        guides.append(resample(pts, 16))
+        if ("mh_hair_bvh" in p and hang_below is not None and (tie is None or style == "half_up")
+                and sum((b - a).length for a, b in zip(pts, pts[1:])) > 0.7):
+            # long hanging hair: let it fall under gravity over the shoulders (below)
+            off = max((q.length - mh_ray(p["mh_bvh"], q).length for q in pts if q.z > hang_below), default=h)
+            hanging.append((len(guides), pts, r, dr, max(h, min(off, 0.15))))
+            guides.append(None)
+            normals.append(r.normalized())
+            continue
+        if len(pts) > 6:
+            pts = smooth_line(pts, 6 if hang_below is not None else 2)
+        if wave_amp and len(pts) > 8:
+            pts = add_waves(pts, r, wave_amp)
+        guides.append(resample(pts, 44 if hang_below is not None else 16))
         normals.append(r.normalized())
+    if hanging:
+        fallen = drape(p, [h[1] for h in hanging], hang_below, [h[3] for h in hanging], [h[4] for h in hanging])
+        for (k, _, r, _, _), pts in zip(hanging, fallen):
+            pts = smooth_line(pts, 3)
+            if wave_amp:
+                pts = add_waves(pts, r, wave_amp)
+            guides[k] = resample(pts, 44)
     curl_r, curl_turns = {"wavy": (0.035, 2.0), "shag": (0.03, 2.0), "fluffy": (0.016, 3.0),
                           "mullet": (0.018, 2.5)}.get(style, (0.03, 3.5))
     strands = children(guides, normals, per, spread, clump, seed, frizz=frizz, curl=curl,
                        curl_r=curl_r, curl_turns=curl_turns)
+    if "mh_bvh" in p:
+        strands = keep_outside(p, strands, p.get("shell_h", 0.0) + 0.005)
     objs.append(hair_object("Hair", strands, hair, 0.0042, 0.35))
 
     # ---- tails, buns and braids ----
@@ -1500,7 +2128,8 @@ def style_for(p):
             objs.append(hair_object("Braid", children(braid, [Vector((0, 0, 1))] * len(braid), 2, 0.006, 0.5, seed + s),
                                     hair, 0.0042, 0.5))
             objs.append(blob("Tie", p["tie_mat"], tuple(axis[-4]), (0.035, 0.035, 0.03)))
-    if style in ("pony", "low_pony", "bun", "messy_bun", "braids", "side_pony", "bubble", "space_buns") and trng.random() < 0.7:
+    if (style in ("pony", "low_pony", "bun", "messy_bun", "braids", "side_pony", "bubble", "space_buns")
+            and trng.random() < 0.7 and "mh_bvh" not in p):
         # a few loose strands framing the face
         st2 = Style(lambda x: 0.5, -0.05, -0.5)
         wisps = []
@@ -1531,15 +2160,18 @@ def make_beard(p, mat):
         s = head_shape(Vector((r * math.cos(th), r * math.sin(th), z)), p)
         if s.y > 0.18:
             continue
+        sz = face_z(p, s.z)
+        if "mh_V" in p and s.z < p["chin_z"] - 0.07:
+            continue    # not down the neck
         top = -0.37 + 0.22 * smooth(0.0, 0.6, abs(s.x))        # cheek line, rising towards the ears
-        moustache = abs(s.x) < 0.2 * p["mouth_w"] and -0.425 < s.z < -0.355 + 0.02 * max(0.0, 1 - abs(s.x) / 0.1)
-        mouth = abs(s.x) < 0.2 and -0.56 < s.z < -0.41
+        moustache = abs(s.x) < 0.2 * p["mouth_w"] and -0.425 < sz < -0.355 + 0.02 * max(0.0, 1 - abs(s.x) / 0.1)
+        mouth = abs(s.x) < 0.2 and -0.56 < sz < -0.41
         if kind == "moustache":
             ok = moustache
         elif kind == "goatee":
-            ok = moustache or (abs(s.x) < 0.17 and -0.95 * p["len"] < s.z < -0.555)
+            ok = moustache or (abs(s.x) < 0.17 and -0.95 * p["len"] < sz < -0.555)
         else:
-            ok = (s.z < top and not mouth and s.z > -1.05) or moustache
+            ok = (sz < top and not mouth and sz > -1.05) or moustache
         if not ok:
             continue
         n = s.normalized()
@@ -1576,14 +2208,27 @@ def person(seed, woman):
     beard = None
     if not woman:
         r = rnd.random()
-        beard = ("full" if r < 0.08 else "short" if r < 0.18 else "moustache" if r < 0.32 else
-                 "goatee" if r < 0.38 else "stubble" if r < 0.58 else None)
-    extra = rnd.choice([None] * 7 + ["band"])
+        beard = ("full" if r < 0.06 else "short" if r < 0.18 else "moustache" if r < 0.26 else
+                 "stubble" if r < 0.6 else None)
+    extra = None
     if style in ("bun", "quiff", "curly", "manbun", "messy_bun", "pony", "half_up") and extra == "cap":
         extra = None
     if style in ("bun", "messy_bun", "manbun", "pony", "half_up", "space_buns", "fluffy") and extra == "band":
         extra = None
+    # MakeHuman body: slim and fit, ancestry roughly from the skin tone
+    if skin[0] < 0.6:
+        race = {"african": 0.85, "caucasian": 0.15, "asian": 0.0}
+    elif skin[0] < 0.75:
+        a = rnd.choice((0.0, 0.0, 0.6))
+        race = {"african": 0.15, "caucasian": 0.85 - a, "asian": a}
+    else:
+        a = rnd.choice((0.0,) * 7 + (0.5,))
+        race = {"african": 0.0, "caucasian": 1.0 - a, "asian": a}
+    mh = {"mh_gender": rnd.uniform(0.0, 0.12) if woman else rnd.uniform(0.88, 1.0),
+          "mh_muscle": rnd.uniform(0.45, 0.65), "mh_weight": rnd.uniform(0.25, 0.5), "mh_race": race,
+          "mh_sliders": mh_sliders(rnd, woman), "eye_back": rnd.uniform(0.0, 0.004), "brow_h": rnd.uniform(0.0, 0.03)}
     return {
+        **mh,
         "seed": seed, "woman": woman, "skin": skin, "hair_name": hair_name, "hair_col": HAIRS[hair_name],
         "hair_rgb": HAIRS[hair_name][2], "hair": style, "hair_wavy": rnd.random() < 0.3,
         "eye": rnd.choice(EYES if not dark else EYES[2:4]),
@@ -1597,16 +2242,16 @@ def person(seed, woman):
         "tip": rnd.uniform(-0.235, -0.205) if woman else rnd.uniform(-0.27, -0.225),
         "lips": rnd.uniform(1.15, 1.45) if woman else rnd.uniform(0.75, 1.0),
         "mouth_w": rnd.uniform(0.86, 0.98) if woman else rnd.uniform(0.95, 1.1),
-        "eye_x": rnd.uniform(0.255, 0.285), "eye_r": rnd.uniform(0.114, 0.12) if woman else rnd.uniform(0.104, 0.112),
-        "lid": rnd.uniform(0.36, 0.46) if woman else rnd.uniform(0.28, 0.4),
+        "eye_x": rnd.uniform(0.255, 0.285), "eye_r": 0.1,
+        "lid": rnd.uniform(0.3, 0.38) if woman else rnd.uniform(0.24, 0.34),
         "lid_lo": rnd.uniform(0.38, 0.46), "tilt_eye": rnd.uniform(0.1, 0.5) if woman else rnd.uniform(-0.1, 0.35),
         "look": (rnd.uniform(-4, 4), rnd.uniform(-3, 2)),
-        "brow_thick": rnd.uniform(0.6, 0.85) if woman else rnd.uniform(1.0, 1.35),
+        "brow_thick": rnd.uniform(0.45, 0.7) if woman else rnd.uniform(0.8, 1.1),
         "brow_raise": rnd.uniform(-0.01, 0.015),
         "lipstick": rnd.random() < 0.15,
         "recede": (not woman) and rnd.random() < 0.15,
         "neck_w": 0.84 if woman else 1.1, "shoulders": rnd.uniform(1.35, 1.5) if woman else rnd.uniform(1.6, 1.78),
-        "beard": beard, "extra": extra, "turn": rnd.uniform(-12, 12), "tilt": rnd.uniform(-3, 3),
+        "beard": beard, "extra": extra, "turn": rnd.uniform(-7, 7), "tilt": rnd.uniform(-2, 2),
     }
 
 
@@ -1641,19 +2286,27 @@ def face_shape(rnd, woman):
 
 
 # long and narrow faces look most natural, round ones are rare
-FACE_WEIGHTS_M = {"long": 3, "narrow": 3, "oval": 3, "square": 1.5, "diamond": 1, "round": 0.4}
+FACE_WEIGHTS_M = {"long": 3, "narrow": 3, "oval": 3, "square": 1.5, "round": 0.3}
 FACE_WEIGHTS_W = {"long": 3, "narrow": 3, "oval": 3, "heart": 1.5, "square": 0.7, "round": 0.4}
 
 
 def render_person(p, path):
     reset()
     camera()
-    light("Key", (-4.5, -6.0, 3.2), 1000, 3.5, (1.0, 0.95, 0.88))
-    light("Fill", (5.0, -5.5, 0.5), 200, 6.0, (0.9, 0.95, 1.0))
+    if "mh_V" in p:
+        # more from the side, so the face has shape (nose, cheekbones, eye sockets)
+        light("Key", (-6.0, -4.8, 3.6), 1250, 3.0, (1.0, 0.95, 0.88))
+        light("Fill", (5.5, -5.0, 0.5), 120, 6.0, (0.9, 0.95, 1.0))
+    else:
+        light("Key", (-4.5, -6.0, 3.2), 1000, 3.5, (1.0, 0.95, 0.88))
+        light("Fill", (5.0, -5.5, 0.5), 200, 6.0, (0.9, 0.95, 1.0))
     light("Rim", (2.5, 5.0, 3.0), 750, 3.0, (1.0, 0.95, 0.85), target=(0, 0, 0.3))
     light("Rim2", (-3.0, 4.5, 1.5), 420, 3.0, (0.95, 1.0, 1.0), target=(0, 0, 0.3))
     light("Bounce", (0.0, -5.0, -4.0), 260, 6.0, (1.0, 0.92, 0.85), target=(0, 0, 0))
 
+    use_mh = os.path.exists(MH_FILE) and os.environ.get("OLD_HEAD") != "1"
+    if use_mh:
+        mh_setup(p)
     skin = skin_material(p)
     hair = hair_material(p)
     p["hair_mat"] = hair
@@ -1663,7 +2316,8 @@ def render_person(p, path):
     p["vol"] = 0.0
     hair_objs, vol = style_for(p)
     p["vol"] = vol
-    head_parts = ([make_head(p, skin)] + make_ears(p, skin) + make_eyes(p, skin, hair) + [make_brows(p, hair)]
+    face = [] if use_mh else [make_head(p, skin)] + make_ears(p, skin)
+    head_parts = (face + make_eyes(p, skin, hair) + [make_brows(p, hair)]
                   + hair_objs + make_beard(p, hair) + make_extra(p))
     pivot = bpy.data.objects.new("HeadPivot", None)
     bpy.context.collection.objects.link(pivot)
@@ -1673,7 +2327,11 @@ def render_person(p, path):
         obj.parent = pivot
         obj.matrix_parent_inverse = pivot.matrix_world.inverted()
     pivot.rotation_euler = (math.radians(p["tilt"]), 0, math.radians(p["turn"]))
-    make_neck_and_body(p, skin, jersey)
+    if use_mh:
+        make_mh_body(p, skin)
+        make_mh_jersey(p, jersey)
+    else:
+        make_neck_and_body(p, skin, jersey)
     bpy.context.scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
 
