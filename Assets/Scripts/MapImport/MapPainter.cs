@@ -32,6 +32,33 @@ namespace MapImport
             height = Math.Max(1, (int)Math.Ceiling((extent.maxY - extent.minY) * ppm));
             rgba = new byte[width * height * 4];
             for (int i = 0; i < rgba.Length; i++) rgba[i] = 255;   // white paper
+            foreach (MapColor c in map.colors)
+                if (c.maskSpot >= 0) inkAt = new byte[width * height];   // only maps with knockout colours need it
+        }
+
+        // The ink (spot colour priority + 1, 0 = paper or unknown) last painted on each pixel, for knockout colours
+        byte[] inkAt;
+
+        // Paints coverage a of a colour on pixel index p (not times 4)
+        void Put(int p, MapColor c, float a)
+        {
+            int i = p * 4;
+            if (c.maskSpot >= 0)
+            {
+                if (inkAt[p] != c.maskSpot + 1) return;   // only erases its own ink
+                if (a >= 0.5f) inkAt[p] = 0;
+            }
+            else if (inkAt != null && a >= 0.5f) inkAt[p] = (byte)(c.spot >= 0 && c.spot < 255 ? c.spot + 1 : 0);
+            if (a >= 0.999f)
+            {
+                rgba[i] = c.r; rgba[i + 1] = c.g; rgba[i + 2] = c.b;
+            }
+            else
+            {
+                rgba[i] = (byte)(rgba[i] + (c.r - rgba[i]) * a);
+                rgba[i + 1] = (byte)(rgba[i + 1] + (c.g - rgba[i + 1]) * a);
+                rgba[i + 2] = (byte)(rgba[i + 2] + (c.b - rgba[i + 2]) * a);
+            }
         }
 
         // Picks a resolution that stays under maxSide pixels on the longest side
@@ -61,7 +88,7 @@ namespace MapImport
 
         void Add(int color, Action draw, ref int order)
         {
-            if (color < 0 || color >= map.colors.Count) return;
+            if (color < 0 || color >= map.colors.Count || map.colors[color].invisible) return;
             ops.Add(new Op { priority = color, order = order++, draw = draw });
         }
 
@@ -581,17 +608,7 @@ namespace MapImport
                     float a = coverage[x - x0];
                     if (a <= 0.001f) continue;
                     if (a > 1) a = 1;
-                    int i = (row + x) * 4;
-                    if (a >= 0.999f)
-                    {
-                        rgba[i] = c.r; rgba[i + 1] = c.g; rgba[i + 2] = c.b;
-                    }
-                    else
-                    {
-                        rgba[i] = (byte)(rgba[i] + (c.r - rgba[i]) * a);
-                        rgba[i + 1] = (byte)(rgba[i + 1] + (c.g - rgba[i + 1]) * a);
-                        rgba[i + 2] = (byte)(rgba[i + 2] + (c.b - rgba[i + 2]) * a);
-                    }
+                    Put(row + x, c, a);
                 }
             }
         }
@@ -599,11 +616,7 @@ namespace MapImport
         void BlendPixel(int x, int y, int color, float a)
         {
             if (x < 0 || y < 0 || x >= width || y >= height) return;
-            MapColor c = map.colors[color];
-            int i = (y * width + x) * 4;
-            rgba[i] = (byte)(rgba[i] + (c.r - rgba[i]) * a);
-            rgba[i + 1] = (byte)(rgba[i + 1] + (c.g - rgba[i + 1]) * a);
-            rgba[i + 2] = (byte)(rgba[i + 2] + (c.b - rgba[i + 2]) * a);
+            Put(y * width + x, map.colors[color], a);
         }
     }
 }

@@ -13,6 +13,12 @@ namespace MapImport
         public int number;          // the file's own colour number (OCAD), or the index (OOM)
         public byte r, g, b;
         public int priority;        // 0 = drawn on top of everything else
+        // Spot colours (OOM): the printing ink the colour is made of, as the ink colour's priority (-1 = none known).
+        // A "0 % of an ink" colour prints nothing: with knockout it erases that ink only (white over green on a
+        // tree takes the green away but leaves the yellow under it), without knockout it is not seen at all.
+        public int spot = -1;
+        public int maskSpot = -1;
+        public bool invisible;
     }
 
     // One drawing element of a point symbol, a line's mid symbol or an area pattern, in mm around the symbol's origin

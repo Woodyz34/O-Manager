@@ -82,6 +82,25 @@ namespace MapImport
                         color.b = (byte)Math.Round(255 * (1 - y) * (1 - k));
                     }
                     color.priority = map.colors.Count;
+                    var spots = Child(c, "spotcolors");
+                    if (spots != null)
+                    {
+                        if (Child(spots, "namedcolor") != null) color.spot = color.number;   // an ink of its own
+                        double best = 0;
+                        int first = -1;
+                        foreach (XmlElement part in Children(spots, "component"))
+                        {
+                            int ink = (int)Num(part, "spotcolor", -1);
+                            if (first < 0) first = ink;
+                            double factor = Num(part, "factor", 1);
+                            if (factor > best) { best = factor; color.spot = ink; }
+                        }
+                        if (first >= 0 && best <= 0)
+                        {
+                            if (spots.GetAttribute("knockout") == "true") color.maskSpot = first;
+                            else color.invisible = true;
+                        }
+                    }
                     map.colors.Add(color);
                 }
             }

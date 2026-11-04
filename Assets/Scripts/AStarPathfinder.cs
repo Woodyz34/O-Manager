@@ -20,6 +20,28 @@ public class AStarPathfinder
         this.height = speedGrid.GetLength(0);
         this.width = speedGrid.GetLength(1);
         this.slopeFactors = slopeFactors;
+
+        // The estimate of the cost left must never be higher than the real cost, or A* reopens cells over and over
+        // (one search on the 2 m sprint grid took 10 s). The cheapest step is the fastest cell on the best slope.
+        float fastest = 0.01f;
+        foreach (float s in speedGrid) if (s > fastest) fastest = s;
+        float bestSlope = 1f;
+        if (slopeFactors != null)
+            foreach (float[,] factors in slopeFactors.Values)
+                if (factors != null)
+                    foreach (float f in factors) if (f > bestSlope) bestSlope = f;
+        heuristicScale = 1f / (fastest * bestSlope);
+    }
+
+    private readonly float heuristicScale;
+
+    // Octile distance (diagonal steps cost 1.414) at the fastest possible speed
+    private float Estimate(int x, int y, Vector2Int goal)
+    {
+        int dx = x > goal.x ? x - goal.x : goal.x - x;
+        int dy = y > goal.y ? y - goal.y : goal.y - y;
+        int lo = dx < dy ? dx : dy, hi = dx < dy ? dy : dx;
+        return (hi + 0.414f * lo) * heuristicScale;
     }
 
 
@@ -197,7 +219,7 @@ public class AStarPathfinder
             float currentG = gScore[current];
 
             // En cell kan ligga flera gånger i kön. Hoppa över poster som har blivit omsprungna av en billigare väg.
-            if (currentF > currentG + Mathf.Max(Mathf.Abs(cx - goal.x), Mathf.Abs(cy - goal.y)) + 0.0001f && current != startIndex)
+            if (currentF > currentG + Estimate(cx, cy, goal) + 0.0001f && current != startIndex)
                 continue;
 
             if (current == goalIndex) return ReconstructPath(current);
@@ -229,7 +251,7 @@ public class AStarPathfinder
                 {
                     cameFrom[neighbor] = current;
                     gScore[neighbor] = tentativeGScore;
-                    HeapPush(neighbor, tentativeGScore + Mathf.Max(Mathf.Abs(nx - goal.x), Mathf.Abs(ny - goal.y)));
+                    HeapPush(neighbor, tentativeGScore + Estimate(nx, ny, goal));
                 }
             }
         }
