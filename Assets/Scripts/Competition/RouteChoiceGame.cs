@@ -473,7 +473,7 @@ public class RouteChoiceView : MonoBehaviour
         for (int i = 0; i < current.choices.Count; i++)
         {
             RouteChoice c = current.choices[i];
-            List<Vector3> points = WorldPoints(c.cells);
+            List<Vector3> points = WorldPoints(c.points);
             bool highlight = fastest < 0 || i == fastest;
             float w = fastest >= 0 && i == fastest ? width * 1.5f : width;
             Color colour = RouteChoiceGame.Colours[c.colour];
@@ -484,14 +484,20 @@ public class RouteChoiceView : MonoBehaviour
         }
     }
 
-    List<Vector3> WorldPoints(List<Vector2Int> cells)
+    // The smooth line (grid coordinates, cell centres on whole numbers) on the map, from control to control
+    List<Vector3> WorldPoints(List<Vector2> line)
     {
-        List<Vector2Int> simple = RouteAnalysis.Simplify(cells, 0.8f);
-        List<Vector3> points = new List<Vector3>(simple.Count + 2);
+        List<Vector3> points = new List<Vector3>(line.Count + 2);
         points.Add(manager.controlPoints[leg - 1].position);
-        foreach (Vector2Int cell in simple) points.Add(manager.GridToWorldPosition(cell.y, cell.x));
+        foreach (Vector2 p in line) points.Add(GridToWorld(p));
         points.Add(manager.controlPoints[leg].position);
         return points;
+    }
+
+    Vector3 GridToWorld(Vector2 p)
+    {
+        Vector3 origin = manager.GridToWorldPosition(0, 0);
+        return new Vector3(origin.x + p.x * manager.cellSize, origin.y + p.y * manager.cellSize, origin.z);
     }
 
     // Both controls and every route on the screen, to the right of the panel, with half a control circle to spare
@@ -504,7 +510,7 @@ public class RouteChoiceView : MonoBehaviour
         {
             foreach (RouteChoice c in current.choices)
             {
-                foreach (Vector2Int cell in c.cells) bounds.Encapsulate(manager.GridToWorldPosition(cell.y, cell.x));
+                foreach (Vector2 p in c.points) bounds.Encapsulate(GridToWorld(p));
             }
         }
         Fit(bounds, 60f * MapDefinition.WorldUnitsPerMeter);

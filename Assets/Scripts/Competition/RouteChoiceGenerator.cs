@@ -4,7 +4,8 @@ using UnityEngine;
 // One route choice on a leg: the cells of the route and what it costs the speed-100 runner
 public class RouteChoice
 {
-    public List<Vector2Int> cells;
+    public List<Vector2Int> cells;  // the grid cells A* found (used to tell routes apart)
+    public List<Vector2> points;    // the smooth line shown and timed, in grid coordinates
     public float seconds;   // race time (game seconds) for the speed-100 runner
     public float meters;    // length of the route
     public int colour;      // index into RouteChoiceGame.Colours
@@ -143,6 +144,7 @@ public class RouteChoiceGenerator
         foreach (RouteChoice choice in result.choices)
         {
             for (int i = 0; i < choice.cells.Count; i++) choice.cells[i] += offset;
+            for (int i = 0; i < choice.points.Count; i++) choice.points[i] += (Vector2)offset;
         }
         return result;
     }
@@ -485,50 +487,171 @@ public class RouteChoiceGenerator
         return result;
     }
 
+    // ---- Smooth lines ----
+    // A* walks from cell to cell in 8 directions, so its routes zigzag. Before timing, each route is made into the line
+    // a runner (or a pen) would take: straight wherever a straight line is at least as fast as the cells it replaces
+    // and does not cross anything impassable, and with the corners rounded off where the ground allows it.
+    // Points are in grid coordinates (cell centres on whole numbers).
+
+    const float LookAheadMeters = 120f;   // longest straight piece tried at once
+    const float CornerMeters = 10f;       // corners are rounded over at most this distance on each side
+
+    List<Vector2> Smooth(List<Vector2Int> cells)
+    {
+        int n = cells.Count;
+        List<Vector2> line = new List<Vector2>();
+        if (n < 2)
+        {
+            foreach (Vector2Int c in cells) line.Add(c);
+            return line;
+        }
+        // The cost along the cell route, from its start
+        float[] along = new float[n];
+        for (int i = 1; i < n; i++) along[i] = along[i - 1] + LineCost(cells[i - 1], cells[i], out _);
+
+        // Straight pieces, as long as they are no slower than the cells they replace
+        int reach = Mathf.Clamp(Mathf.RoundToInt(LookAheadMeters / cellMeters), 8, 80);
+        line.Add(cells[0]);
+        int at = 0;
+        while (at < n - 1)
+        {
+            int best = at + 1, misses = 0;
+            for (int j = at + 2; j < n && j <= at + reach; j++)
+            {
+                float cost = LineCost(cells[at], cells[j], out bool blocked);
+                if (!blocked && cost <= (along[j] - along[at]) * 1.01f + 0.0001f) { best = j; misses = 0; }
+                else if (++misses > 6) break;
+            }
+            line.Add(cells[best]);
+            at = best;
+        }
+
+        // Round the corners: a curve from a bit before each corner to a bit after it, if nothing is in the way
+        float most = Mathf.Max(1.5f, CornerMeters / cellMeters);
+        List<Vector2> round = new List<Vector2> { line[0] };
+        for (int k = 1; k < line.Count - 1; k++)
+        {
+            Vector2 a = line[k - 1], b = line[k], c = line[k + 1];
+            Vector2 ab = a - b, cb = c - b;
+            float d = Mathf.Min(most, 0.4f * ab.magnitude, 0.4f * cb.magnitude);
+            if (d < 0.3f || Vector2.Angle(-ab, cb) < 8f)
+            {
+                round.Add(b);
+                continue;
+            }
+            List<Vector2> curve = null;
+            for (int attempt = 0; attempt < 2 && curve == null; attempt++, d *= 0.5f)
+            {
+                Vector2 p0 = b + ab.normalized * d, p2 = b + cb.normalized * d;
+                List<Vector2> pts = new List<Vector2>();
+                for (int s = 0; s <= 6; s++)
+                {
+                    float t = s / 6f;
+                    pts.Add((1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * b + t * t * p2);
+                }
+                bool clear = true;
+                for (int s = 0; s < pts.Count - 1 && clear; s++)
+                {
+                    LineCost(pts[s], pts[s + 1], out bool blocked);
+                    if (blocked) clear = false;
+                }
+                LineCost(round[round.Count - 1], pts[0], out bool blockedIn);
+                if (clear && !blockedIn) curve = pts;
+            }
+            if (curve != null) round.AddRange(curve);
+            else round.Add(b);
+        }
+        round.Add(line[line.Count - 1]);
+        return round;
+    }
+
+    // The A* cost (distance / ground speed / slope) of a straight line between two points, sampled about every
+    // third of a cell; blocked when it touches impassable ground
+    float LineCost(Vector2 a, Vector2 b, out bool blocked)
+    {
+        blocked = false;
+        Vector2 ab = b - a;
+        float length = ab.magnitude;
+        if (length < 0.0001f) return 0f;
+        int steps = Mathf.Max(1, Mathf.CeilToInt(length * 3f));
+        float step = length / steps;
+        int d = Direction(ab);
+        float cost = 0f;
+        for (int s = 0; s < steps; s++)
+        {
+            Vector2 p = a + ab * ((s + 0.5f) / steps);
+            int x = Mathf.RoundToInt(p.x), y = Mathf.RoundToInt(p.y);
+            if (x < 0 || y < 0 || x >= width || y >= height) { blocked = true; return float.MaxValue; }
+            float cellSpeed = speed[y, x];
+            if (cellSpeed <= 0.01f) { blocked = true; cellSpeed = 0.05f; }
+            float slope = slopes[d] != null ? Mathf.Max(0.05f, slopes[d][y, x]) : 1f;
+            cost += step / cellSpeed / slope;
+        }
+        return cost;
+    }
+
+    // The nearest of the 8 grid directions
+    static int Direction(Vector2 v)
+    {
+        float degrees = 90f - Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg;
+        int d = Mathf.RoundToInt(degrees / 45f) % 8;
+        return d < 0 ? d + 8 : d;
+    }
+
     // ---- Timing ----
 
     public RouteChoice Evaluate(List<Vector2Int> route)
     {
-        return new RouteChoice { cells = route, seconds = Seconds(route), meters = Meters(route) };
+        List<Vector2> line = Smooth(route);
+        return new RouteChoice { cells = route, points = line, seconds = Seconds(line), meters = Meters(line) };
     }
 
-    float Meters(List<Vector2Int> route)
+    float Meters(List<Vector2> line)
     {
         float m = 0f;
-        for (int i = 0; i < route.Count - 1; i++) m += Vector2.Distance(route[i], route[i + 1]);
+        for (int i = 0; i < line.Count - 1; i++) m += Vector2.Distance(line[i], line[i + 1]);
         return m * cellMeters;
     }
 
-    // The race time of the speed-100 runner on a route: distance / (base speed x ground x slope), step by step,
-    // plus the time lost in each turn (AgentMovement slows down to TurnSpeedShare at the corner and then
-    // accelerates again at TurnAcceleration: that costs v/(2a) x (1 - share)² seconds)
-    public float Seconds(List<Vector2Int> route)
+    // The race time of the speed-100 runner on a line: distance / (base speed x ground x slope) along it, plus the
+    // time lost in each turn (AgentMovement slows down to TurnSpeedShare at the corner and then accelerates again at
+    // TurnAcceleration: that costs v/(2a) x (1 - share)² seconds)
+    public float Seconds(List<Vector2> line)
     {
-        if (route == null || route.Count < 2 || baseSpeed <= 0f) return 0f;
-        int n = route.Count;
-        float[] v = new float[n];
-        float real = 0f;
-        for (int i = 0; i < n - 1; i++)
-        {
-            Vector2Int a = route[i], b = route[i + 1];
-            int d = Direction(a, b);
-            float cellSpeed = speed[b.y, b.x];
-            if (cellSpeed <= 0.01f) cellSpeed = 0.05f;
-            float slope = slopes[d] != null ? Mathf.Max(0.05f, slopes[d][a.y, a.x]) : 1f;
-            float worldSpeed = baseSpeed * cellSpeed * slope;
-            float distance = (a.x != b.x && a.y != b.y ? 1.414f : 1f) * cellSize;
-            real += distance / worldSpeed;
-            v[i] = worldSpeed;
-        }
-        v[n - 1] = v[Mathf.Max(0, n - 2)];
+        if (line == null || line.Count < 2 || baseSpeed <= 0f) return 0f;
+        float cost = 0f;
+        for (int i = 0; i < line.Count - 1; i++) cost += LineCost(line[i], line[i + 1], out _);
+        float real = cost * cellSize / baseSpeed;
 
-        // The turns, measured as AgentMovement.ComputeTurns does
+        // Points about one cell apart, with the runner's speed at each, for the turns
+        List<Vector2> pts = new List<Vector2>();
+        List<float> v = new List<float>();
+        for (int i = 0; i < line.Count - 1; i++)
+        {
+            Vector2 ab = line[i + 1] - line[i];
+            int steps = Mathf.Max(1, Mathf.CeilToInt(ab.magnitude));
+            int d = Direction(ab);
+            for (int s = 0; s < steps; s++)
+            {
+                Vector2 p = line[i] + ab * ((float)s / steps);
+                int x = Mathf.Clamp(Mathf.RoundToInt(p.x), 0, width - 1), y = Mathf.Clamp(Mathf.RoundToInt(p.y), 0, height - 1);
+                float slope = slopes[d] != null ? Mathf.Max(0.05f, slopes[d][y, x]) : 1f;
+                pts.Add(p);
+                v.Add(baseSpeed * Mathf.Max(0.05f, speed[y, x]) * slope);
+            }
+        }
+        pts.Add(line[line.Count - 1]);
+        v.Add(v[v.Count - 1]);
+
+        // The turns, measured as AgentMovement.ComputeTurns does: direction in and out over about 20 m, and only
+        // the sharpest point of each corner counts
+        int n = pts.Count;
         int k = Mathf.Max(1, Mathf.RoundToInt(TurnWindowMeters / Mathf.Max(0.5f, cellMeters)));
         float[] angle = new float[n];
         for (int i = 1; i < n - 1; i++)
         {
-            Vector2 into = route[i] - route[Mathf.Max(0, i - k)];
-            Vector2 outOf = route[Mathf.Min(n - 1, i + k)] - route[i];
+            Vector2 into = pts[i] - pts[Mathf.Max(0, i - k)];
+            Vector2 outOf = pts[Mathf.Min(n - 1, i + k)] - pts[i];
             angle[i] = into.sqrMagnitude > 0.0001f && outOf.sqrMagnitude > 0.0001f ? Vector2.Angle(into, outOf) : 0f;
         }
         for (int i = 1; i < n - 1; i++)
@@ -544,13 +667,5 @@ public class RouteChoiceGenerator
             real += v[i] / (2f * TurnAcceleration) * lost * lost;
         }
         return real * gameSecondsPerSecond;
-    }
-
-    static int Direction(Vector2Int from, Vector2Int to)
-    {
-        int dx = Mathf.Clamp(to.x - from.x, -1, 1);
-        int dy = Mathf.Clamp(to.y - from.y, -1, 1);
-        for (int d = 0; d < 8; d++) if (DirX[d] == dx && DirY[d] == dy) return d;
-        return 0;
     }
 }
