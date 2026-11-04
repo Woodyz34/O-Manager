@@ -140,6 +140,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
         // In "Your runners" only the player's own runners can be picked, each once.
         List<CardData> all = pathfinding.YourRunnersMode ? RunnerCollection.OwnedCards() : RunnerCards.InPacks();
         if (all.Count == 0) all = RunnerCards.InPacks();
+        all = GameModes.WithSameStats(all);
         List<CardData> left = all.FindAll(c => !picks.Contains(c));
         if (left.Count == 0) left = new List<CardData>(all);
         bool showAll = pathfinding.ChooseWhomeverYouWantMode || pathfinding.YourRunnersMode;
