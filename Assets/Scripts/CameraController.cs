@@ -337,12 +337,11 @@ public class CameraController : MonoBehaviour
 
 
         
-        // Zoom so the whole leg fits with room to spare at both ends. The leg runs straight up the screen,
-        // so only the height matters. The size is worked out directly: this used to step the zoom in and out
-        // from wherever it was, which could end one step too tight and gave a different view each time.
-        legCamSize = Mathf.Max(minLegCamSize, distance / (2f * legShareOfScreen));
-        // Start two scroll steps closer than the whole stretch (the player can scroll out to see all of it)
-        cam.orthographicSize = Mathf.Max(minCamSize, legCamSize - 2f * zoomStep);
+        // Zoom so both control circles are wholly on the screen with half a circle more beyond each of them.
+        // The leg runs straight up the screen, so only the height matters (a landscape screen is wider than tall).
+        float circle = 37f * MapDefinition.WorldUnitsPerMeter;   // the control circle's radius (CourseRenderer)
+        legCamSize = distance / 2f + 2f * circle;
+        cam.orthographicSize = Mathf.Max(minCamSize, legCamSize);
         cam.transform.position = camPos;
     }
 
