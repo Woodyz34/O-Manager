@@ -6,6 +6,7 @@ public class RouteChoice
 {
     public List<Vector2Int> cells;  // the grid cells A* found (used to tell routes apart)
     public List<Vector2> points;    // the smooth line shown and timed, in grid coordinates
+    public float sharpestTurn;      // degrees; a runner never turns right round on a real route choice
     public float seconds;   // race time (game seconds) for the speed-100 runner
     public float meters;    // length of the route
     public int colour;      // index into RouteChoiceGame.Colours
@@ -47,6 +48,7 @@ public class RouteChoiceGenerator
     const float MinGapSeconds = 4f;        // two choices must differ at least this much (race seconds)...
     const float MinGapShare = 0.03f;       // ...and at least this share of the fastest time
     const float MaxSlower = 1.45f;         // choices slower than this x the fastest are too easy to rule out
+    const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
     const float MaxSameShare = 0.5f;       // at most half of a route's middle may run next to another route
     const float TurnAcceleration = 2f;     // as AgentMovement.TurnAcceleration (world units per second²)
     const float TurnWindowMeters = 20f;    // as AgentMovement.TurnWindowMeters
@@ -192,6 +194,9 @@ public class RouteChoiceGenerator
         foreach (RouteChoice c in candidates)
         {
             if (c.seconds > fastest * MaxSlower + 8f) break;
+            // Turning right round (out and back) is never a route anyone would choose
+            // (unless the fastest route has to turn as sharply too, e.g. on a zigzag path up a hill)
+            if (c.sharpestTurn > Mathf.Max(MaxTurn, candidates[0].sharpestTurn + 10f)) continue;
             bool ok = true;
             foreach (RouteChoice p in picked)
             {
@@ -602,8 +607,52 @@ public class RouteChoiceGenerator
 
     public RouteChoice Evaluate(List<Vector2Int> route)
     {
+        route = TrimEnds(route);
         List<Vector2> line = Smooth(route);
-        return new RouteChoice { cells = route, points = line, seconds = Seconds(line), meters = Meters(line) };
+        float seconds = Seconds(line, out float sharpest);
+        return new RouteChoice { cells = route, points = line, seconds = seconds, meters = Meters(line), sharpestTurn = sharpest };
+    }
+
+    // A route that is pushed round a corridor, or goes through a far point, can run past a control and come back to
+    // it. Near the controls the fastest way in and out is used instead: from where the route first comes close to the
+    // control you go to, and to where it last is close to the control you leave.
+    List<Vector2Int> TrimEnds(List<Vector2Int> route)
+    {
+        if (route == null || route.Count < 3) return route;
+        Vector2Int from = route[0], to = route[route.Count - 1];
+        float straight = Vector2.Distance(from, to);
+        float near = Mathf.Max(25f / cellMeters, straight * 0.12f);
+        float near2 = near * near;
+        int first = -1;
+        for (int i = 0; i < route.Count; i++)
+        {
+            if ((route[i] - to).sqrMagnitude <= near2) { first = i; break; }
+        }
+        if (first > 0 && first < route.Count - 1)
+        {
+            List<Vector2Int> end = Path(route[first], to);
+            if (end != null)
+            {
+                route = new List<Vector2Int>(route.GetRange(0, first));
+                route.AddRange(end);
+            }
+        }
+        int last = -1;
+        for (int i = route.Count - 1; i >= 0; i--)
+        {
+            if ((route[i] - from).sqrMagnitude <= near2) { last = i; break; }
+        }
+        if (last > 0 && last < route.Count - 1)
+        {
+            List<Vector2Int> start = Path(from, route[last]);
+            if (start != null)
+            {
+                start.RemoveAt(start.Count - 1);
+                start.AddRange(route.GetRange(last, route.Count - last));
+                route = start;
+            }
+        }
+        return RemoveLoops(route);
     }
 
     float Meters(List<Vector2> line)
@@ -616,8 +665,9 @@ public class RouteChoiceGenerator
     // The race time of the speed-100 runner on a line: distance / (base speed x ground x slope) along it, plus the
     // time lost in each turn (AgentMovement slows down to TurnSpeedShare at the corner and then accelerates again at
     // TurnAcceleration: that costs v/(2a) x (1 - share)² seconds)
-    public float Seconds(List<Vector2> line)
+    public float Seconds(List<Vector2> line, out float sharpest)
     {
+        sharpest = 0f;
         if (line == null || line.Count < 2 || baseSpeed <= 0f) return 0f;
         float cost = 0f;
         for (int i = 0; i < line.Count - 1; i++) cost += LineCost(line[i], line[i + 1], out _);
@@ -656,13 +706,14 @@ public class RouteChoiceGenerator
         }
         for (int i = 1; i < n - 1; i++)
         {
+            sharpest = Mathf.Max(sharpest, angle[i]);
             if (angle[i] <= 30f) continue;
-            bool sharpest = true;
-            for (int j = Mathf.Max(0, i - k); j <= Mathf.Min(n - 1, i + k) && sharpest; j++)
+            bool top = true;
+            for (int j = Mathf.Max(0, i - k); j <= Mathf.Min(n - 1, i + k) && top; j++)
             {
-                if (angle[j] > angle[i] || (angle[j] == angle[i] && j < i)) sharpest = false;
+                if (angle[j] > angle[i] || (angle[j] == angle[i] && j < i)) top = false;
             }
-            if (!sharpest) continue;
+            if (!top) continue;
             float lost = 1f - AgentMovement.TurnSpeedShare(angle[i]);
             real += v[i] / (2f * TurnAcceleration) * lost * lost;
         }
