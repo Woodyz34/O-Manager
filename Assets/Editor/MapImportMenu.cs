@@ -37,10 +37,12 @@ public static class MapImportMenu
             pictureFile = EditorUtility.OpenFilePanel("PNG of the whole map", Path.GetDirectoryName(file), "png");
             if (string.IsNullOrEmpty(pictureFile)) return;
         }
-        Import(file, pictureFile, null, null);
+        string result = Import(file, pictureFile, null, null);
+        if (result.StartsWith("Failed")) EditorUtility.DisplayDialog("Import map", "Could not import the map:\n" + result.Substring(8), "OK");
     }
 
-    // Can be called from scripts too: name and sprint are guessed when null
+    // Can be called from scripts too: with name and sprint given it asks nothing (the name is the file's when null,
+    // and the map type is asked when sprint is null)
     public static string Import(string file, string pictureFile, string name, bool? sprint)
     {
         try
@@ -82,7 +84,6 @@ public static class MapImportMenu
         catch (System.Exception e)
         {
             Debug.LogError("Import map: " + e);
-            EditorUtility.DisplayDialog("Import map", "Could not import the map:\n" + e.Message, "OK");
             return "Failed: " + e.Message;
         }
         finally
@@ -149,7 +150,7 @@ public static class MapImportMenu
             importer.maxTextureSize = MaxPictureSide;
             importer.npotScale = TextureImporterNPOTScale.None;
             importer.mipmapEnabled = true;
-            importer.textureCompression = TextureImporterCompression.CompressedHQ;
+            importer.textureCompression = TextureImporterCompression.Compressed;
             importer.wrapMode = TextureWrapMode.Clamp;
             importer.filterMode = FilterMode.Trilinear;
             importer.anisoLevel = 4;
