@@ -276,11 +276,11 @@ namespace MapImport
                 }
             }
             // Back towards the drawn map by the same distance, so the edge of the map is the edge of what is drawn
-            int[] fromFar = Distance(far, rows, cols, reach + 1);
+            int[] fromFar = Distance(far, rows, cols, reach + 2);
             int closed = 0;
             for (int i = 0; i < n; i++)
             {
-                bool isOutside = outside[i] || (fromFar[i] <= reach && !covered[i]);
+                bool isOutside = outside[i] || (fromFar[i] <= reach + 1 && !covered[i]);
                 if (!isOutside) continue;
                 g.speed[i] = 0f;
                 closed++;
