@@ -47,7 +47,8 @@ public class RouteChoiceGenerator
     const int MaxTries = 600;              // points tried per leg
     const float MinGapSeconds = 2f;        // two choices must differ at least this much (race seconds)...
     const float MinGapShare = 0.02f;       // ...and at least this share of the fastest time
-    const float MaxSlower = 1.5f;         // choices slower than this x the fastest are too easy to rule out
+    const float MaxSlower = 1.3f;         // choices slower than this x the fastest are too easy to rule out
+    const float ViaReach = 0.75f;          // route choices split in the first 75 % of the leg; after that, the fastest way in
     const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
     const float MaxSameShare = 0.5f;       // at most half of a route's middle may run next to another route
     const float TurnAcceleration = 2f;     // as AgentMovement.TurnAcceleration (world units per second²)
@@ -186,10 +187,16 @@ public class RouteChoiceGenerator
         }
         List<KeyValuePair<float, int>> vias = new List<KeyValuePair<float, int>>();
         int every = Mathf.Max(1, Mathf.RoundToInt(sameMeters / cellMeters));
+        // Only points in the first part of the leg (measured along the straight line): there the routes may split,
+        // and from the point on each route takes the fastest way to the control
+        Vector2 line = to - from;
+        float lineSquared = Mathf.Max(1f, line.sqrMagnitude);
         for (int y = 0; y < height; y += every)
         {
             for (int x = 0; x < width; x += every)
             {
+                float share = Vector2.Dot(new Vector2(x - from.x, y - from.y), line) / lineSquared;
+                if (share < 0.05f || share > ViaReach) continue;
                 int i = y * width + x;
                 float total = fromStart[i] + toGoal[i];
                 if (total <= bestCost * MaxSlower * 1.1f) vias.Add(new KeyValuePair<float, int>(total, i));
@@ -232,7 +239,7 @@ public class RouteChoiceGenerator
         List<RouteChoice> picked = new List<RouteChoice>();
         foreach (RouteChoice c in candidates)
         {
-            if (c.seconds > fastest * MaxSlower + 8f) break;
+            if (c.seconds > fastest * MaxSlower + 3f) break;
             // Turning right round (out and back) is never a route anyone would choose
             // (unless the fastest route has to turn as sharply too, e.g. on a zigzag path up a hill)
             if (c.sharpestTurn > Mathf.Max(MaxTurn, candidates[0].sharpestTurn + 10f)) continue;
