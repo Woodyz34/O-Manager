@@ -12,7 +12,7 @@ Writes Herr_NN.png and Dam_NN.png, 600 x 900 with a transparent background.
 Set QUICK=1 for small fast test renders, and STYLE=<name> to force one hair style.
 
 Hair is real hair: a few thousand guide strands are grown over the scalp for each style
-(side parting, middle parting, mullet, quiff, ponytail, braids ...) and every guide gets a
+(side parting, messy, curly top, swept back, ponytail, braids, waves ...) and every guide gets a
 group of child strands that blend between neighbouring guides, rendered as Cycles hair with the
 Principled Hair BSDF. Long hair is let fall under gravity over the shoulders and down the back.
 """
@@ -2161,8 +2161,8 @@ def make_beard(p, mat):
         if s.y > 0.18:
             continue
         sz = face_z(p, s.z)
-        if "mh_V" in p and s.z < p["chin_z"] - 0.07:
-            continue    # not down the neck
+        if "mh_V" in p and s.z < p["chin_z"] - 0.07 + 0.3 * smooth(0.15, 0.45, abs(s.x)):
+            continue    # not down the neck (the jaw line rises towards the ears)
         top = -0.37 + 0.22 * smooth(0.0, 0.6, abs(s.x))        # cheek line, rising towards the ears
         moustache = abs(s.x) < 0.2 * p["mouth_w"] and -0.425 < sz < -0.355 + 0.02 * max(0.0, 1 - abs(s.x) / 0.1)
         mouth = abs(s.x) < 0.2 and -0.56 < sz < -0.41
