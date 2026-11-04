@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdf7c09cbde9a0e429736d1cbce57569, type: 3}
+  m_Name: illern-2025
+  m_EditorClassIdentifier: Assembly-CSharp::MapDefinition
+  id: illern-2025
+  displayName: Illern 2025
+  mapType: forest
+  gridName: MapPackages/illern-2025/grid
+  minx: 1005.1
+  miny: 1005.4
+  maxx: 7695.1
+  maxy: 6925.4
+  gridSize: 10
+  rows: 593
+  cols: 670
+  pointsPath: MapPackages/illern-2025/points
+  linesPath: MapPackages/illern-2025/lines
+  defaultBackground: map
+  backgrounds:
+  - id: map
+    spritePath: MapPackages/illern-2025/picture
+    thumbnailPath: MapPackages/illern-2025/thumb
+    position: {x: 0, y: 0, z: 0}
+    rotation: 0
+    scale: 1
+    courseInPicture: 0
+    pixelSize: {x: 10720, y: 9488}
+    pivotPixels: {x: 5360, y: 4744}
+    pixelsPerUnit: 160
