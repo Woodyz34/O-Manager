@@ -154,6 +154,6 @@ namespace MapImport
         }
 
         // Contour interval in metres
-        public static double Equidistance(MapFile map) => map.scale <= 5000 ? 2.5 : 5.0;
+        public static double Equidistance(MapFile map) => map.contourInterval > 0 ? map.contourInterval : map.scale <= 5000 ? 2.5 : 5.0;
     }
 }

@@ -38,7 +38,7 @@ public class MapDefinition : ScriptableObject
 
     public string id;
     public string displayName;
-    public string mapType = "forest";     // "forest" or "sprint" (sprint maps have no mistakes and 2 m cells)
+    public string mapType = "forest";     // "forest", "sprint" or "both" (sprint and both: 2 m cells)
 
     [Header("Grid: a name in Resources/2d-gridJson, or a map package path (see MapPackages)")]
     public string gridName = "output_grid";
@@ -53,7 +53,8 @@ public class MapDefinition : ScriptableObject
     // Imported on this computer and not yet built into the game
     [NonSerialized] public bool isLocal;
 
-    public bool IsSprint => mapType == "sprint";
+    public bool IsSprint => mapType == "sprint" || mapType == "both";   // 2 m cells, sprint courses by default
+    public bool IsForest => mapType != "sprint";                        // forest courses fit it too
 
     [Header("Pictures")]
     public string defaultBackground;

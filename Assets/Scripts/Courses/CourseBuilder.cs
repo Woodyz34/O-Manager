@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -172,12 +173,75 @@ public class CourseBuilder : MonoBehaviour
         });
     }
 
-    void NextMap()
+    // ---- Choosing a map: a pop-up with a search field and forest/sprint filters ----
+
+    GameObject mapPicker;
+    RectTransform mapPickerList;
+    TMP_InputField mapSearch;
+    string mapFilter = "all";
+    readonly Dictionary<string, Button> mapFilterButtons = new Dictionary<string, Button>();
+
+    void OpenMapPicker()
     {
-        List<MapDefinition> maps = MapDefinition.All;
-        if (maps.Count < 2) return;
-        int index = maps.IndexOf(map);
-        SelectMap(maps[(index + 1) % maps.Count]);
+        if (busy || MapImportPanel.IsOpen || mapPicker != null) return;
+        Image dim = CourseUI.Panel("Choose a map", canvasObject.transform, new Color(0.08f, 0.14f, 0.1f, 0.55f), false);
+        CourseUI.Stretch(dim.rectTransform);
+        mapPicker = dim.gameObject;
+        Image card = CourseUI.CardPanel("Card", dim.transform);
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760, 820));
+        CourseUI.Column(card.gameObject, 12, new RectOffset(32, 32, 28, 28));
+        CourseUI.Size(CourseUI.Text("Title", card.transform, "Choose a map", 34, CourseUI.Ink, FontStyles.Bold), 44);
+
+        mapSearch = CourseUI.Input("Search", card.transform, "Search for a map", 40, _ => FillMapPicker());
+        CourseUI.Size(mapSearch, 52);
+
+        RectTransform filters = CourseUI.Rect("Filters", card.transform);
+        CourseUI.Row(filters.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(filters, 46);
+        mapFilterButtons.Clear();
+        foreach (var f in new[] { ("all", "All maps"), ("forest", "Forest"), ("sprint", "Sprint") })
+        {
+            string key = f.Item1;
+            mapFilterButtons[key] = CourseUI.Button(f.Item2, filters, f.Item2, CourseUI.ButtonKind.Light, () => { mapFilter = key; FillMapPicker(); }, 20);
+        }
+
+        mapPickerList = CourseUI.ScrollList("Maps", card.transform, out _);
+        CourseUI.Column(mapPickerList.gameObject, 6, new RectOffset(0, 8, 0, 0));
+        CourseUI.Size(mapPickerList.parent.GetComponent<Image>(), 480).flexibleHeight = 1;
+
+        CourseUI.Size(CourseUI.Button("Close", card.transform, "Cancel", CourseUI.ButtonKind.Light, CloseMapPicker, 22), 52);
+        FillMapPicker();
+    }
+
+    void FillMapPicker()
+    {
+        if (mapPickerList == null) return;
+        foreach (var pair in mapFilterButtons)
+            CourseUI.SetButtonColor(pair.Value, pair.Key == mapFilter ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light);
+        for (int i = mapPickerList.childCount - 1; i >= 0; i--) Destroy(mapPickerList.GetChild(i).gameObject);
+        string search = mapSearch != null ? mapSearch.text.Trim().ToLowerInvariant() : "";
+        int shown = 0;
+        foreach (MapDefinition m in MapDefinition.All)
+        {
+            if (mapFilter == "forest" && !m.IsForest) continue;
+            if (mapFilter == "sprint" && !m.IsSprint) continue;
+            string type = m.mapType == "both" ? "Forest and sprint" : m.mapType == "sprint" ? "Sprint" : "Forest";
+            if (search.Length > 0 && !(m.displayName + " " + type).ToLowerInvariant().Contains(search)) continue;
+            MapDefinition chosen = m;
+            Button button = CourseUI.Button(m.displayName, mapPickerList, m.displayName + "   <size=18><color=#5B7563>" + type + "</color></size>",
+                m == map ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light, () => { CloseMapPicker(); if (chosen != map) SelectMap(chosen); }, 22);
+            button.GetComponentInChildren<TextMeshProUGUI>().alignment = TextAlignmentOptions.MidlineLeft;
+            CourseUI.Size(button, 52);
+            shown++;
+        }
+        if (shown == 0) CourseUI.Size(CourseUI.Text("None", mapPickerList, "No maps match.", 20, CourseUI.InkMuted, FontStyles.Italic), 40);
+    }
+
+    void CloseMapPicker()
+    {
+        if (mapPicker != null) Destroy(mapPicker);
+        mapPicker = null;
+        mapPickerList = null;
     }
 
     void FitCamera()
@@ -198,7 +262,7 @@ public class CourseBuilder : MonoBehaviour
 
     void Update()
     {
-        if (map == null || busy || forkPopup != null || MapImportPanel.IsOpen) return;
+        if (map == null || busy || forkPopup != null || MapImportPanel.IsOpen || mapPicker != null) return;
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
         bool typing = EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null
                       && EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>() != null;
@@ -947,10 +1011,11 @@ public class CourseBuilder : MonoBehaviour
         return new CoursePoint(Math.Round(point.e), Math.Round(point.n));
     }
 
-    // Returns null when the course is fine, otherwise what is wrong (and shows and marks the bad point)
-    string CheckCourse(out CourseValidator.Result result)
+    // Returns null when the course is fine, otherwise what is wrong (and shows, marks and moves the camera to the bad
+    // point). Finding the ways between the controls can take a while on a big 2 m grid, so it runs on a background
+    // thread behind a loading screen.
+    async Task<string> CheckCourseAsync()
     {
-        result = null;
         errorPoint = null;
         if (!relay)
         {
@@ -976,15 +1041,70 @@ public class CourseBuilder : MonoBehaviour
         }
 
         CourseData built = BuildCourse();
-        result = CourseValidator.Check(map, grid, built);
+        MapDefinition checkedMap = map;
+        MapGrid checkedGrid = grid;
+        CourseValidator.Result result;
+        ShowLoading("Checking the course");
+        try
+        {
+            result = await Task.Run(() => CourseValidator.Check(checkedMap, checkedGrid, built));
+        }
+        finally
+        {
+            HideLoading();
+        }
         if (!result.ok)
         {
             if (relay && result.badLeg >= 0) ShowLeg(result.badLeg);
             if (result.hasBadPoint) errorPoint = map.ToWorld(result.badPoint);
             else if (!relay && result.badIndex >= 0) errorPoint = map.ToWorld(built.AllPoints()[Mathf.Clamp(result.badIndex, 0, built.AllPoints().Count - 1)]);
+            if (errorPoint.HasValue)
+            {
+                Vector3 p = errorPoint.Value;
+                mapCamera.transform.position = new Vector3(p.x, p.y, mapCamera.transform.position.z);
+                return result.message + " It is marked in red on the map.";
+            }
             return result.message;
         }
         return null;
+    }
+
+    // ---- Loading screen while the course is checked ----
+
+    GameObject loadingOverlay;
+    TextMeshProUGUI loadingText;
+    string loadingMessage;
+
+    void ShowLoading(string message)
+    {
+        loadingMessage = message;
+        if (loadingOverlay == null)
+        {
+            Image dim = CourseUI.Panel("Loading", canvasObject.transform, new Color(0.08f, 0.14f, 0.1f, 0.55f), false);
+            CourseUI.Stretch(dim.rectTransform);
+            Image card = CourseUI.CardPanel("Card", dim.transform);
+            CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 170));
+            loadingText = CourseUI.Text("Text", card.transform, "", 30, CourseUI.Ink, FontStyles.Bold);
+            loadingText.alignment = TextAlignmentOptions.Center;
+            CourseUI.Stretch(loadingText.rectTransform, 24, 24, 20, 20);
+            loadingOverlay = dim.gameObject;
+        }
+        loadingOverlay.SetActive(true);
+        loadingOverlay.transform.SetAsLastSibling();
+        busy = true;
+    }
+
+    void HideLoading()
+    {
+        if (loadingOverlay != null) loadingOverlay.SetActive(false);
+        busy = false;
+    }
+
+    void LateUpdate()
+    {
+        if (loadingOverlay == null || !loadingOverlay.activeSelf) return;
+        int dots = (int)(Time.unscaledTime * 2f) % 4;
+        loadingText.text = loadingMessage + new string('.', dots) + new string(' ', 3 - dots) + "\n<size=20>The game is finding the way between every control.</size>";
     }
 
     void ShowLeg(int leg)
@@ -1008,20 +1128,6 @@ public class CourseBuilder : MonoBehaviour
         }
     }
 
-    void OnCheck()
-    {
-        string problem = CheckCourse(out CourseValidator.Result result);
-        Redraw();
-        if (problem != null)
-        {
-            SetStatus(problem, true);
-            return;
-        }
-        float walk = 0f;
-        foreach (float leg in result.legMeters) walk += leg;
-        SetStatus(result.message + (walk > 0f ? " Shortest way round: " + (walk / 1000f).ToString("0.0") + " km." : ""), false);
-    }
-
     async void OnSave()
     {
         if (string.IsNullOrWhiteSpace(nameField.text))
@@ -1034,7 +1140,8 @@ public class CourseBuilder : MonoBehaviour
             SetStatus("Write your name, so others can see who made the course.", true);
             return;
         }
-        string problem = CheckCourse(out _);
+        if (busy) return;
+        string problem = await CheckCourseAsync();
         Redraw();
         if (problem != null)
         {
@@ -1218,7 +1325,7 @@ public class CourseBuilder : MonoBehaviour
         RectTransform mapRow = CourseUI.Rect("Map row", panel.transform);
         CourseUI.Row(mapRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(mapRow, 48);
-        mapButton = CourseUI.Button("Map", mapRow, "Map", CourseUI.ButtonKind.Light, NextMap, 22);
+        mapButton = CourseUI.Button("Map", mapRow, "Map", CourseUI.ButtonKind.Light, OpenMapPicker, 22);
         typeButton = CourseUI.Button("Type", mapRow, "Type: Individual", CourseUI.ButtonKind.Light, () => SetRelay(!relay), 22);
 
         nameField = CourseUI.Input("Course name", panel.transform, "Course name", CourseData.MaxNameLength, null);
@@ -1263,7 +1370,6 @@ public class CourseBuilder : MonoBehaviour
         RectTransform actionRow = CourseUI.Rect("Actions", panel.transform);
         CourseUI.Row(actionRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(actionRow, 58);
-        CourseUI.Button("Check", actionRow, "Check course", CourseUI.ButtonKind.Secondary, OnCheck, 24);
         saveButton = CourseUI.Button("Save", actionRow, "Save & publish", CourseUI.ButtonKind.Primary, OnSave, 24);
 
         myCoursesTitle = CourseUI.Text("My courses title", panel.transform, "My courses", 26, CourseUI.Ink, FontStyles.Bold);
