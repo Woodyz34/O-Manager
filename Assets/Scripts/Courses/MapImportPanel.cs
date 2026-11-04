@@ -29,6 +29,7 @@ public class MapImportPanel : MonoBehaviour
     string version;
     bool sprint;
     bool permission;
+    bool sendIn = true;
     bool working;
 
     // Written by the background thread, shown in Update
@@ -39,7 +40,7 @@ public class MapImportPanel : MonoBehaviour
     RectTransform list;
     ScrollRect listScroll;
     TMP_InputField nameField;
-    Button typeButton, pictureButton, permissionButton, importButton, cancelButton;
+    Button typeButton, pictureButton, permissionButton, sendButton, importButton, cancelButton;
     Image permissionBox;
 
     public static MapImportPanel Open(Transform canvas, Action<MapDefinition> onImported)
@@ -66,7 +67,7 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180, 960));
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
 
-        CourseUI.Size(CourseUI.Text("Title", card.transform, "Import a map", 40, CourseUI.Ink, FontStyles.Bold), 50);
+        CourseUI.Size(CourseUI.Text("Title", card.transform, "Import a map", 36, CourseUI.Ink, FontStyles.Bold), 44);
         CourseUI.Size(CourseUI.Text("Info", card.transform,
             "Pick a map file from OCAD (.ocd, version 11 or newer) or OpenOrienteering Mapper (.omap or .xmap). " +
             "The game makes the grid, the heights and the map picture from it. The map is kept on this computer until it is built into the game.",
@@ -91,7 +92,7 @@ public class MapImportPanel : MonoBehaviour
 
         list = CourseUI.ScrollList("Files", card.transform, out listScroll);
         CourseUI.Column(list.gameObject, 4, new RectOffset(0, 8, 0, 0));
-        CourseUI.Size(list.parent.GetComponent<Image>(), 300);
+        CourseUI.Size(list.parent.GetComponent<Image>(), 270);
 
         fileText = CourseUI.Text("File", card.transform, "No map file chosen yet.", 21, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(fileText, 32);
@@ -110,8 +111,7 @@ public class MapImportPanel : MonoBehaviour
         permissionButton = CourseUI.Button("Permission", card.transform, "", CourseUI.ButtonKind.Light, () => { permission = !permission; Refresh(); }, 18);
         CourseUI.Size(permissionButton, 76);
         TextMeshProUGUI permissionText = permissionButton.GetComponentInChildren<TextMeshProUGUI>();
-        permissionText.text = "I have permission from the club that owns this map to use it in O-Manager, and the club knows how the game uses it. " +
-                              "I am responsible for this, not the maker of the game.";
+        permissionText.text = CloudMaps.PermissionText;
         permissionText.enableWordWrapping = true;
         permissionText.alignment = TextAlignmentOptions.MidlineLeft;
         permissionText.fontStyle = FontStyles.Normal;
@@ -124,8 +124,11 @@ public class MapImportPanel : MonoBehaviour
         permissionBox = CourseUI.Panel("Tick", box.transform, CourseUI.Accent);
         CourseUI.Stretch(permissionBox.rectTransform, 6, 6, 6, 6);
 
+        sendButton = CourseUI.Button("Send in", card.transform, "", CourseUI.ButtonKind.Light, () => { sendIn = !sendIn; Refresh(); }, 18);
+        CourseUI.Size(sendButton, 44);
+
         statusText = CourseUI.Text("Status", card.transform, "", 20, CourseUI.Forest, FontStyles.Bold);
-        CourseUI.Size(statusText, 56);
+        CourseUI.Size(statusText, 50);
 
         RectTransform buttons = CourseUI.Rect("Buttons", card.transform);
         CourseUI.Row(buttons.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
@@ -312,6 +315,10 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.SetButtonText(pictureButton, browsing == Browse.Picture ? "Picture: choose a PNG above"
             : string.IsNullOrEmpty(picturePath) ? "Picture: drawn by the game" : "Picture: " + Path.GetFileName(picturePath) + "  (remove)");
         permissionBox.enabled = permission;
+        CourseUI.SetButtonText(sendButton, sendIn
+            ? "Send the map in too, so it can be built into the game for everyone  (on)"
+            : "Keep the map on this computer only  (sending it in is off)");
+        sendButton.interactable = !working;
         bool ready = mapFile != null && permission && !working && browsing == Browse.MapFile;
         importButton.interactable = ready;
         cancelButton.interactable = !working;
@@ -416,6 +423,28 @@ public class MapImportPanel : MonoBehaviour
             }
         }
         foreach (string line in package.log) Debug.Log("MapImportPanel: " + line);
+
+        // Send it in: the map file goes to the game's owner (see CloudMaps); the map is already usable here
+        string sentNote = "";
+        if (sendIn)
+        {
+            progressStep = null;
+            SetStatus("Sending the map in ...", false);
+            string sourcePath = mapPath;
+            Task<byte[]> read = Task.Run(() => File.ReadAllBytes(sourcePath));
+            while (!read.IsCompleted) yield return null;
+            Task submit = read.IsFaulted ? Task.FromException(read.Exception) : CloudMaps.SubmitAsync(package.info, read.Result, sourceName, ownPng);
+            while (!submit.IsCompleted) yield return null;
+            if (submit.IsFaulted)
+            {
+                Debug.LogWarning("MapImportPanel: could not send the map in: " + submit.Exception);
+                sentNote = " It could not be sent in (" + CloudCourses.Describe(submit.Exception) + "), so for now it is only on this computer.";
+            }
+            else
+            {
+                sentNote = " It has been sent in to be built into the game.";
+            }
+        }
         Debug.Log($"MapImportPanel: imported {name} as {id} in {watch.Elapsed.TotalSeconds:F1} s -> {target}");
 
         working = false;
@@ -423,6 +452,7 @@ public class MapImportPanel : MonoBehaviour
         MapDefinition.Refresh();
         MapDefinition map = MapDefinition.All.Find(m => m.id == id);
         onImported?.Invoke(map);
+        if (sentNote.Length > 0) UIToast.Show("Imported " + name + "." + sentNote, 7f);
         Destroy(gameObject);
     }
 }

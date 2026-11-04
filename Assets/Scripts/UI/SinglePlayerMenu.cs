@@ -145,6 +145,7 @@ public class SinglePlayerMenu : MonoBehaviour
         foreach (CourseData course in courses)
         {
             if (!CourseFilter.Matches(course, search, kind)) continue;
+            if (!MapDefinition.Exists(course.mapId)) continue;   // a map imported on someone else's computer
             shown++;
             CourseData captured = course;
             bool selected = chosen != null && chosen.id == course.id;

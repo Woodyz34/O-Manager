@@ -130,8 +130,9 @@ public class ManualPathDrawer : MonoBehaviour
 
                 if (isDrawing && Input.GetMouseButton(0))
                 {
+                    // Sprint maps have 2 m cells, so points are kept at least once a cell there
                     if (smoothPath.Count == 0 ||
-                        Vector3.Distance(smoothPath[smoothPath.Count - 1], worldPos) > minPointDistance)
+                        Vector3.Distance(smoothPath[smoothPath.Count - 1], worldPos) > Mathf.Min(minPointDistance, manager.cellSize))
                     {
                         smoothPath.Add(worldPos);
 
@@ -229,18 +230,41 @@ public class ManualPathDrawer : MonoBehaviour
             return;
         }
 
-        foreach (var wp in smoothPath)
+        // Every cell the line goes through, also between the points (they can be several cells apart on a sprint map)
+        for (int p = 0; p < smoothPath.Count; p++)
         {
-            Vector2Int g = WorldToGrid(wp);
-
-            if (gridPath.Count == 0 || gridPath[gridPath.Count - 1] != g)
+            Vector3 from = p == 0 ? smoothPath[0] : smoothPath[p - 1];
+            Vector3 to = smoothPath[p];
+            int steps = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(from, to) / (manager.cellSize * 0.5f)));
+            for (int s = p == 0 ? 0 : 1; s <= steps; s++)
             {
-                gridPath.Add(g);
+                Vector2Int g = WorldToGrid(Vector3.Lerp(from, to, s / (float)steps));
+                if (gridPath.Count == 0 || gridPath[gridPath.Count - 1] != g)
+                {
+                    gridPath.Add(g);
+                }
             }
         }
 
         // Skapa korridor runt pathen
         List<Vector2Int> corridorPath = FindOptimizedPathInCorridor(gridPath, 1);
+
+        // A line over ground nobody can run on (a building, private land, a lake ...) is moved round it when the way
+        // round stays within 20 m of the line; otherwise the stretch has to be drawn again.
+        // Route analysis keeps such lines as they are (that ground then counts as very slow).
+        if (CrossesBlocked(gridPath) && !RouteAnalysis.On)
+        {
+            if (corridorPath == null || corridorPath.Count == 0)
+            {
+                corridorPath = FindOptimizedPathInCorridor(gridPath, CorrectionCells);
+            }
+            if (corridorPath == null || corridorPath.Count == 0)
+            {
+                RejectLine();
+                return;
+            }
+            ShowCorrection(corridorPath);
+        }
         if (relayMode)
         {
             if (corridorPath == null || corridorPath.Count == 0)
@@ -333,6 +357,65 @@ public class ManualPathDrawer : MonoBehaviour
             agent.Initialize(corridorPath);
         }
 
+    }
+
+    // ---- Lines over ground nobody can run on ----
+
+    const float CorrectionMeters = 20f;
+
+    // How many cells 20 m is (2 cells on a forest map, 10 on a sprint map)
+    int CorrectionCells => Mathf.Max(1, Mathf.CeilToInt(CorrectionMeters * MapDefinition.WorldUnitsPerMeter / manager.cellSize));
+
+    bool CrossesBlocked(List<Vector2Int> cells)
+    {
+        foreach (Vector2Int c in cells)
+        {
+            if (manager.speedGrid2D[c.y, c.x] <= 0.01f) return true;
+        }
+        return false;
+    }
+
+    void RejectLine()
+    {
+        UIToast.Show("You can't run there: buildings, private land, lakes and other closed areas are in the way. Draw the stretch again, round them.", 5f);
+        FlashLine(new List<Vector3>(smoothPath), new Color(0.85f, 0.15f, 0.1f), 1.5f);
+        gridPath.Clear();
+        smoothPath.Clear();
+        line.positionCount = 0;
+        isDrawing = false;
+        timeToDraw = true;
+    }
+
+    // Shows the route the runner will take instead, in orange for a moment
+    void ShowCorrection(List<Vector2Int> cells)
+    {
+        UIToast.Show("Your line went through a closed area, so the route was moved round it.", 3f);
+        var points = new List<Vector3>(cells.Count);
+        foreach (Vector2Int c in cells) points.Add(manager.GridToWorldPosition(c.y, c.x));
+        FlashLine(points, new Color(0.91f, 0.45f, 0.16f), 2f);
+        // A relay keeps the drawn stretches on the map: keep the route that will be run
+        smoothPath.Clear();
+        smoothPath.AddRange(points);
+    }
+
+    void FlashLine(List<Vector3> points, Color color, float seconds)
+    {
+        if (line == null || points.Count < 2) return;
+        GameObject copy = new GameObject("Route flash");
+        LineRenderer flash = copy.AddComponent<LineRenderer>();
+        flash.sharedMaterial = line.sharedMaterial;
+        flash.widthMultiplier = line.widthMultiplier;
+        flash.widthCurve = line.widthCurve;
+        flash.startColor = color;
+        flash.endColor = color;
+        flash.numCapVertices = line.numCapVertices;
+        flash.numCornerVertices = line.numCornerVertices;
+        flash.sortingLayerID = line.sortingLayerID;
+        flash.sortingOrder = line.sortingOrder + 1;
+        flash.useWorldSpace = true;
+        flash.positionCount = points.Count;
+        flash.SetPositions(points.ToArray());
+        Destroy(copy, seconds);
     }
 
     // The fastest route over the whole map from where the line starts to where it ends (the control when that fails)

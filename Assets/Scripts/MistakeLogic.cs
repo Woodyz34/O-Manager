@@ -26,8 +26,8 @@ public class MistakeLogic : MonoBehaviour
         {
             return;
         }
-        // No mistakes on sprint maps for now: the runners run the route as it is drawn
-        if (CourseLoader.LoadedMap != null && CourseLoader.LoadedMap.IsSprint)
+        // No mistakes on sprint courses for now: the runners run the route as it is drawn
+        if (CourseLoader.Loaded != null && CourseLoader.Loaded.IsSprint())
         {
             runnerDetector.shouldMiss = false;
             return;

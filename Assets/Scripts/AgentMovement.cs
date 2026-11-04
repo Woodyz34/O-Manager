@@ -210,6 +210,7 @@ public class AgentMovement : NetworkBehaviour
             return;
         }
         runnerStatTec = (100 - unscaledStatTec) / 100;
+        lastHeading = Vector3.zero;
         baseSpeed = unscaledBaseSpeed; // börja varje tävling från grundhastigheten
         originalBaseSpeed = baseSpeed;
         SlowBaseSpeed = originalBaseSpeed / 20;
@@ -342,7 +343,9 @@ public class AgentMovement : NetworkBehaviour
     {
         path.Clear();
         path = newPath;
+        ComputeTurns();
         currentTargetIndex = 0;
+        ApplyTurn(0);   // the turn at a control, from the way the runner came in
         if (path != null && path.Count > 0)
             currentTargetPosition = GridToWorldPosition(path[currentTargetIndex]);
         isInitialized = true;
@@ -569,11 +572,12 @@ public class AgentMovement : NetworkBehaviour
                 controlPos = pathfindingManager.controlPoints[currentKontroll].position;
                 controlDistance = (controlPos - pos).magnitude;
             }
-            // Om vi nått nästa gridcell
-            if (distanceToTarget < 0.08f)
+            // Om vi nått nästa gridcell (8 m, or less on a map with smaller cells, so a sprint runner keeps to its route)
+            if (distanceToTarget < Mathf.Min(0.08f, pathfindingManager.cellSize * 0.8f))
             {
                 lastGridCell = nextGrid;
                 currentTargetIndex++;
+                ApplyTurn(currentTargetIndex);
                 if ((currentTargetIndex < path.Count) && useManualPath)
                     nextGrid = path[currentTargetIndex];
 
@@ -687,13 +691,33 @@ public class AgentMovement : NetworkBehaviour
             }
 
             // Lerp mot mål-hastighet för mjuk acceleration/deceleration
-            float maxDelta = acceleration * Time.deltaTime;
+            // After a sharp turn the runner gets back up to speed more slowly (see ComputeTurns)
+            if (turnRecovering && currentSpeed >= targetSpeed - 0.001f) turnRecovering = false;
+            float maxDelta = (turnRecovering ? Mathf.Min(acceleration, TurnAcceleration) : acceleration) * Time.deltaTime;
             currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, maxDelta);
 
             // Flytta agent
             float step = currentSpeed * Time.deltaTime;
+            // Small cells (2 m on sprint maps): run on through every cell this frame's step reaches instead of
+            // stopping at each one, which would cap the speed at one cell a frame. The last cell of the path is left
+            // to the check above, which also handles the controls.
+            while (step > distanceToTarget && useManualPath && path != null && currentTargetIndex + 1 < path.Count
+                   && !isDrawMissing && !isAngleMissing && !isMissingControl)
+            {
+                transform.position = new Vector3(targetWorld.x, targetWorld.y, transform.position.z);
+                step -= distanceToTarget;
+                lastGridCell = nextGrid;
+                currentTargetIndex++;
+                ApplyTurn(currentTargetIndex);
+                nextGrid = path[currentTargetIndex];
+                targetWorld = GridToWorldPosition(nextGrid);
+                dirVector = targetWorld - transform.position;
+                distanceToTarget = dirVector.magnitude;
+                dirVector = distanceToTarget > 0.0001f ? dirVector / distanceToTarget : Vector3.zero;
+            }
             if (step > distanceToTarget) step = distanceToTarget;
             transform.position += dirVector * step;
+            if (dirVector.sqrMagnitude > 0.001f) lastHeading = dirVector;
 
             // Fixera Z
             Vector3 posFixed = transform.position;
@@ -743,6 +767,68 @@ public class AgentMovement : NetworkBehaviour
 
 
 
+
+    // ---- Turning ----
+    // Running straight on keeps the speed. A turn costs speed at the corner, and the runner then accelerates again
+    // (more slowly than usual): a gentle bend (up to 30 degrees) costs nothing, a right angle brings the speed down to
+    // 55 %, and turning right round (180 degrees, back the way you came) to a near stop. With the usual speeds that
+    // is about 1 s for a right angle and 4 to 5 s for turning back, in race time.
+    const float TurnAcceleration = 2f;   // world units per second², while getting back up to speed after a turn
+    const float TurnWindowMeters = 20f;  // the direction in and out of a corner is taken over this distance
+
+    private float[] turnFactor;          // per cell of the path: the share of the speed kept there (1 = no turn)
+    private bool turnRecovering;
+    private Vector3 lastHeading;
+
+    public static float TurnSpeedShare(float degrees)
+    {
+        if (degrees <= 30f) return 1f;
+        if (degrees <= 90f) return Mathf.Lerp(1f, 0.55f, (degrees - 30f) / 60f);
+        return Mathf.Lerp(0.55f, 0.05f, (Mathf.Min(degrees, 180f) - 90f) / 90f);
+    }
+
+    // The turns along a new path. The direction in and out of each cell is measured over about 20 m, so the zigzag
+    // of a grid path is not a turn, and only the sharpest point of each corner slows the runner down.
+    private void ComputeTurns()
+    {
+        turnRecovering = false;
+        if (path == null || path.Count == 0 || pathfindingManager == null)
+        {
+            turnFactor = null;
+            return;
+        }
+        int n = path.Count;
+        float cellMeters = pathfindingManager.cellSize / 0.01f;
+        int k = Mathf.Max(1, Mathf.RoundToInt(TurnWindowMeters / Mathf.Max(0.5f, cellMeters)));
+        float[] angle = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            Vector2 into = i > 0 ? (Vector2)(path[i] - path[Mathf.Max(0, i - k)]) : (Vector2)lastHeading;
+            Vector2 outOf = (Vector2)(path[Mathf.Min(n - 1, i + k)] - path[i]);
+            angle[i] = into.sqrMagnitude > 0.0001f && outOf.sqrMagnitude > 0.0001f ? Vector2.Angle(into, outOf) : 0f;
+        }
+        turnFactor = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            turnFactor[i] = 1f;
+            if (angle[i] <= 30f) continue;
+            bool sharpest = true;
+            for (int j = Mathf.Max(0, i - k); j <= Mathf.Min(n - 1, i + k) && sharpest; j++)
+            {
+                // Ties: the first cell of the corner counts
+                if (angle[j] > angle[i] || (angle[j] == angle[i] && j < i)) sharpest = false;
+            }
+            if (sharpest) turnFactor[i] = TurnSpeedShare(angle[i]);
+        }
+    }
+
+    // Called as the runner reaches a cell of its path
+    private void ApplyTurn(int index)
+    {
+        if (turnFactor == null || index < 0 || index >= turnFactor.Length || turnFactor[index] >= 1f) return;
+        currentSpeed *= turnFactor[index];
+        turnRecovering = true;
+    }
 
     private string GetDirectionName(Vector2Int from, Vector2Int to)
     {
@@ -1611,6 +1697,7 @@ public class AgentMovement : NetworkBehaviour
         currentKontroll = 1;
         currentTargetIndex = 0;
         currentSpeed = 0f;
+        lastHeading = Vector3.zero;
         relaySegments = new List<List<Vector2Int>>();
         path = new List<Vector2Int>();
         isInitialized = false;

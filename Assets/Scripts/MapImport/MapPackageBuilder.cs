@@ -33,6 +33,9 @@ namespace MapImport
         public double refEast, refNorth;
         public float gridAngle;
         public int crs;
+        // The game's coordinates are the paper's in metres plus these, so they are never negative
+        // (courses are sent as whole positive metres): ground = paper mm * scale / 1000 + offset
+        public double offsetEast, offsetNorth;
         public string author;
         public string created;                // ISO date
         public bool permissionConfirmed;      // the uploader says the map's owner allows it
@@ -96,8 +99,12 @@ namespace MapImport
             pkg.fullExtent = MapExtent.Full(map);
             pkg.metersPerMm = mpm;
 
+            // Coordinates start at 1000 m, so a course's points are never negative
+            double offE = 1000 - Math.Floor(grid.minE), offN = 1000 - Math.Floor(grid.minN);
             var info = new MapPackageInfo
             {
+                offsetEast = offE,
+                offsetNorth = offN,
                 name = name,
                 mapType = sprint ? "sprint" : "forest",
                 sourceFormat = (map.format + " " + map.version).Trim(),
@@ -105,10 +112,10 @@ namespace MapImport
                 cellSize = cell,
                 rows = grid.rows,
                 cols = grid.cols,
-                minx = (float)(grid.minE + cell / 2.0),
-                miny = (float)(grid.minN + cell / 2.0),
-                maxx = (float)(grid.minE + (grid.cols - 0.5) * cell),
-                maxy = (float)(grid.minN + (grid.rows - 0.5) * cell),
+                minx = (float)(grid.minE + offE + cell / 2.0),
+                miny = (float)(grid.minN + offN + cell / 2.0),
+                maxx = (float)(grid.minE + offE + (grid.cols - 0.5) * cell),
+                maxy = (float)(grid.minN + offN + (grid.rows - 0.5) * cell),
                 hasHeights = grid.hasHeights,
                 georeferenced = map.georeferenced,
                 refEast = map.refEast,
@@ -121,7 +128,7 @@ namespace MapImport
             pkg.grid = WriteGrid(grid, info);
 
             progress?.Invoke("Picking out stones, paths and streams", 0.35f);
-            WriteLayers(map, out pkg.pointsJson, out pkg.linesJson);
+            WriteLayers(map, offE, offN, out pkg.pointsJson, out pkg.linesJson);
 
             if (drawPicture)
             {
@@ -216,6 +223,7 @@ namespace MapImport
             N("pictureWidth", i.pictureWidth); N("pictureHeight", i.pictureHeight); N("pixelsPerMeter", i.pixelsPerMeter);
             N("pivotX", i.pivotX); N("pivotY", i.pivotY); B("ownPicture", i.ownPicture); B("hasHeights", i.hasHeights);
             B("georeferenced", i.georeferenced); N("refEast", i.refEast); N("refNorth", i.refNorth); N("gridAngle", i.gridAngle); N("crs", i.crs);
+            N("offsetEast", i.offsetEast); N("offsetNorth", i.offsetNorth);
             S("author", i.author); S("created", i.created);
             sb.Append("  \"permissionConfirmed\": ").Append(i.permissionConfirmed ? "true" : "false").Append("\n}\n");
             File.WriteAllText(Path.Combine(folder, "map.json"), sb.ToString());
@@ -270,7 +278,7 @@ namespace MapImport
             return (s.major * 1000 + Math.Min(s.minor, 999)).ToString("000000", CultureInfo.InvariantCulture) + " " + name;
         }
 
-        public static void WriteLayers(MapFile map, out string pointsJson, out string linesJson)
+        public static void WriteLayers(MapFile map, double offsetEast, double offsetNorth, out string pointsJson, out string linesJson)
         {
             double mpm = map.MetersPerMm;
             var points = new StringBuilder("{\"type\":\"FeatureCollection\",\"features\":[");
@@ -286,7 +294,7 @@ namespace MapImport
                     firstPoint = false;
                     points.Append("{\"type\":\"Feature\",\"properties\":{\"Layer\":\"").Append(layer)
                           .Append("\"},\"geometry\":{\"type\":\"Point\",\"coordinates\":[");
-                    AppendCoord(points, o.parts[0][0] * mpm, o.parts[0][1] * mpm);
+                    AppendCoord(points, o.parts[0][0] * mpm + offsetEast, o.parts[0][1] * mpm + offsetNorth);
                     points.Append("]}}");
                 }
                 else if (o.kind == SymbolKind.Line)
@@ -304,7 +312,7 @@ namespace MapImport
                         bool firstCoord = true;
                         for (int i = 0; i < n; i++)
                         {
-                            double x = p[2 * i] * mpm, y = p[2 * i + 1] * mpm;
+                            double x = p[2 * i] * mpm + offsetEast, y = p[2 * i + 1] * mpm + offsetNorth;
                             bool last = i == n - 1;
                             if (!last && !double.IsNaN(lastX) && MapGeometry.Dist(x, y, lastX, lastY) < 1.0) continue;
                             if (!firstCoord) lines.Append(',');
