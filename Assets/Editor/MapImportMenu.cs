@@ -30,10 +30,9 @@ public static class MapImportMenu
         // A map a player sent in comes as map-<id>-source.<ext> with map-<id>-info.json (and maybe map-<id>-picture.png)
         // next to it: then the name, type and contact come from there and nothing is asked
         MapPackageInfo sent = ReadSentInfo(file);
-        string sentPicture = SentFile(file, "picture.png");
         if (sent != null)
         {
-            string result0 = Import(file, sentPicture, sent.name, sent.mapType == "sprint", sent);
+            string result0 = ImportSent(file);
             EditorUtility.DisplayDialog("Import map", result0.StartsWith("Failed") ? "Could not import the map:\n" + result0.Substring(8) :
                 "Imported " + sent.name + " (" + sent.mapType + ")" +
                 (string.IsNullOrEmpty(sent.sender) ? "" : "\nSent by " + sent.sender + ", " + sent.ownerClub + ", " + sent.contact) +
@@ -57,6 +56,14 @@ public static class MapImportMenu
     // Can be called from scripts too: with name and sprint given it asks nothing (the name is the file's when null,
     // and the map type is asked when sprint is null)
     public static string Import(string file, string pictureFile, string name, bool? sprint) => Import(file, pictureFile, name, sprint, null);
+
+    // Imports a map a player sent in (map-<id>-source.<ext> with map-<id>-info.json next to it) without asking anything
+    public static string ImportSent(string sourceFile)
+    {
+        MapPackageInfo sent = ReadSentInfo(sourceFile);
+        if (sent == null) return "Failed: there is no readable " + Path.GetFileName(sourceFile).Replace("source", "info").Split('.')[0] + ".json next to the map file.";
+        return Import(sourceFile, SentFile(sourceFile, "picture.png"), sent.name, sent.mapType == "sprint", sent);
+    }
 
     // The map-<id>-<what> file next to a sent-in map-<id>-source.<ext>, or null
     static string SentFile(string file, string what)

@@ -50,3 +50,6 @@ secrets/
 # Eventor cache (raw API responses)
 eventor/cache/
 __pycache__/
+
+# Maps downloaded by Tools > O-Manager > Download sent-in maps
+/SentInMaps/
