@@ -148,6 +148,23 @@ namespace MapImport
 
             // 6. Outside the map
             int closed = MarkOutside(map, g, ox, oy, scale, sprint);
+            // The parts of the map the player left out (not finished)
+            if (map.boundary != null && map.boundary.Length >= 6)
+            {
+                for (int r = 0; r < g.rows; r++)
+                {
+                    double y = oy + (r + 0.5) / scale;
+                    for (int c = 0; c < g.cols; c++)
+                    {
+                        int idx = r * g.cols + c;
+                        if (g.speed[idx] > 0f && !MapBoundary.Inside(map.boundary, ox + (c + 0.5) / scale, y))
+                        {
+                            g.speed[idx] = 0f;
+                            closed++;
+                        }
+                    }
+                }
+            }
             log?.Invoke($"Outside the map: {closed} of {n} cells closed");
             return g;
         }

@@ -118,6 +118,8 @@ namespace MapImport
         public List<MapObject> objects = new List<MapObject>();
         public List<string> warnings = new List<string>();
         public double contourInterval;      // metres between contours, given by the player (0 = guess from the scale)
+        // The edge of the finished map (x,y pairs, paper mm), or null for all of it. See MapBoundary.
+        public double[] boundary;
 
         public double MetersPerMm => scale / 1000.0;
 

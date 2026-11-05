@@ -84,6 +84,15 @@ namespace MapImport
                 if (progress != null && (i & 1023) == 0) progress(i / (float)ops.Count);
             }
             ops.Clear();
+            // White paper outside the edge of the finished map
+            if (map.boundary != null && map.boundary.Length >= 6)
+            {
+                MapBoundary.ForOutside(map.boundary, width, height, row => maxY - (row + 0.5) / ppm, x => (x - minX) * ppm,
+                    (row, from, to) =>
+                    {
+                        for (int i = (row * width + from) * 4, end = (row * width + to) * 4; i < end; i++) rgba[i] = 255;
+                    });
+            }
         }
 
         void Add(int color, Action draw, ref int order)
