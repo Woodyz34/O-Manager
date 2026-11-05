@@ -30,6 +30,11 @@ public class RunnerFilterBar : MonoBehaviour
     bool reversed;                        // lowest rating first, or Z to A
     Button orderChip;
     int tierFilter = -1;                  // -1 = all tiers
+    int classFilter;                      // index in ClassChoices
+    Button classChip;
+
+    // The class chip goes round these: every class, 21, 20, 18, and the two junior classes together
+    static readonly string[][] ClassChoices = { null, new[] { "21" }, new[] { "20" }, new[] { "18" }, new[] { "18", "20" } };
     bool wired;
 
     // Women and men are never shown together. The choice is shared by My Runners and Choose a runner,
@@ -86,6 +91,7 @@ public class RunnerFilterBar : MonoBehaviour
         minTechnique.onValueChanged.AddListener(_ => Notify());
         if (clearButton != null) clearButton.onClick.AddListener(Clear);
         MakeGenderChips();
+        MakeClassChip();
     }
 
     // Two chips, Women and Men, made from a tier chip and put between the search field and "Sort by".
@@ -159,6 +165,45 @@ public class RunnerFilterBar : MonoBehaviour
         get { return sortBy == SortBy.Name || sortBy == SortBy.Club || sortBy == SortBy.Country; }
     }
 
+    // One chip after the tiers that goes round the classes (All classes, H21, H20, H18, H18 + H20).
+    // The tier chips get a little narrower to make room before the sliders.
+    void MakeClassChip()
+    {
+        if (tierButtons == null || tierButtons.Length == 0) return;
+        RectTransform first = (RectTransform)tierButtons[0].transform;
+        float y = first.anchoredPosition.y;
+        float x = first.anchoredPosition.x - first.sizeDelta.x / 2f;
+        for (int i = 0; i < tierButtons.Length; i++)
+        {
+            Place(tierButtons[i], x, y, 98f);
+            x += 106f;
+        }
+        classChip = CopyChip("All classes", 0, y, 136f, tierButtons[0]);
+        classChip.name = "Class";
+        Place(classChip, x + 4f, y, 136f);
+        classChip.onClick.AddListener(() => { classFilter = (classFilter + 1) % ClassChoices.Length; Notify(); });
+    }
+
+    string ClassLabel()
+    {
+        string[] ages = ClassChoices[classFilter];
+        if (ages == null) return "All classes";
+        string sex = ShowWomen ? "D" : "H";
+        return string.Join(" + ", Array.ConvertAll(ages, age => sex + age));
+    }
+
+    bool ClassMatches(CardData card)
+    {
+        string[] ages = ClassChoices[classFilter];
+        if (ages == null) return true;
+        string klass = card.klass ?? "";
+        foreach (string age in ages)
+        {
+            if (klass.EndsWith(age, StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
     Button CopyChip(string label, float x, float y, float width, Button from = null)
     {
         if (from == null) from = tierButtons[0];
@@ -189,7 +234,7 @@ public class RunnerFilterBar : MonoBehaviour
     {
         get
         {
-            return tierFilter >= 0 || !string.IsNullOrWhiteSpace(search.text)
+            return tierFilter >= 0 || classFilter != 0 || !string.IsNullOrWhiteSpace(search.text)
                 || minSpeed.value > minSpeed.minValue || minTechnique.value > minTechnique.minValue;
         }
     }
@@ -201,6 +246,7 @@ public class RunnerFilterBar : MonoBehaviour
         if (wanted.Length > 0 && !Contains(card.RunnerName, wanted) && !Contains(card.clubName, wanted)
             && !Contains(RunnerCards.CountryName(card), wanted)) return false;
         if (tierFilter >= 0 && (int)RunnerCards.Tier(card) != tierFilter) return false;
+        if (!ClassMatches(card)) return false;
         if (Mathf.RoundToInt(card.speed) < minSpeed.value) return false;
         if (Mathf.RoundToInt(card.technique) < minTechnique.value) return false;
         return true;
@@ -247,6 +293,7 @@ public class RunnerFilterBar : MonoBehaviour
     public void Clear()
     {
         tierFilter = -1;
+        classFilter = 0;
         search.SetTextWithoutNotify("");
         minSpeed.SetValueWithoutNotify(minSpeed.minValue);
         minTechnique.SetValueWithoutNotify(minTechnique.minValue);
@@ -266,6 +313,12 @@ public class RunnerFilterBar : MonoBehaviour
             if (order != null) order.text = ByText ? (reversed ? "Z to A" : "A to Z") : (reversed ? "Worst first" : "Best first");
         }
         for (int i = 0; i < tierButtons.Length; i++) PaintChip(tierButtons[i], TierOfButton(i) == tierFilter);
+        if (classChip != null)
+        {
+            PaintChip(classChip, classFilter != 0);
+            TextMeshProUGUI label = classChip.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (label != null) label.text = ClassLabel();
+        }
         if (womenChip != null) PaintChip(womenChip, ShowWomen);
         if (menChip != null) PaintChip(menChip, !ShowWomen);
     }
