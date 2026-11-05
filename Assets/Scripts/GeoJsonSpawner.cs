@@ -38,6 +38,70 @@ public class GeoJsonSpawner : MonoBehaviour
         public FeatureKind kind;
         public string layerName;
         public Vector3[] points;
+        public int pointCount;   // lines: points before simplifying (the miss logic uses it as the line's size)
+    }
+
+    // The only line names the game's miss logic reacts to (RunnerCollision, RunnerMapCollision, AgentMovement),
+    // written without spaces and in lower case. Other lines get no collider: on a sprint map there are thousands
+    // of them (buildings, fences, walls ...) and they made the physics engine stall while the runner ran.
+    private static readonly HashSet<string> UsedLineNames = new HashSet<string>
+    {
+        "höjdkurva", "opasserbarbrant", "opasserbarbrant(valfritagg)", "passerbarbrant/skrent", "avlångpunkthöjd",
+        "storstig", "litenstig", "litenotydligstig", "passerbartlitetvattendrag", "mindredike", "störrebäck", "storbäck",
+        "smalväg", "mindreväg0.30", "störreväg0.5", "körväg", "cykelväg", "cykelväg,sidlinje", "väg:sidlinje",
+        "motorväg", "rågång/drivningsväg", "järnväg", "beståndsgräns"
+    };
+
+    // Contour lines only count for the miss logic when they are short (small knolls); long ones do nothing
+    private const int LongestUsefulContour = 100;
+
+    private static bool KeepLine(string layerName, int pointCount)
+    {
+        int space = layerName.IndexOf(' ');
+        string name = (space >= 0 ? layerName.Substring(space + 1) : layerName).Replace(" ", "").Trim().ToLowerInvariant();
+        if (!UsedLineNames.Contains(name)) return false;
+        return name != "höjdkurva" || pointCount < LongestUsefulContour;
+    }
+
+    // Drops points that lie within 'tolerance' of the straight line between their neighbours (Douglas-Peucker).
+    // The points are already snapped to grid cells, so a tolerance of one cell keeps the line on the same cells.
+    private static Vector3[] Simplify(Vector3[] points, float tolerance)
+    {
+        if (points.Length <= 2) return points;
+        var keep = new bool[points.Length];
+        keep[0] = keep[points.Length - 1] = true;
+        var stack = new Stack<(int, int)>();
+        stack.Push((0, points.Length - 1));
+        float tol2 = tolerance * tolerance;
+        while (stack.Count > 0)
+        {
+            var (a, b) = stack.Pop();
+            Vector2 pa = points[a], pb = points[b];
+            Vector2 ab = pb - pa;
+            float len2 = ab.sqrMagnitude;
+            int worst = -1;
+            float worstDist = tol2;
+            for (int i = a + 1; i < b; i++)
+            {
+                Vector2 ap = (Vector2)points[i] - pa;
+                float d2;
+                if (len2 < 1e-12f) d2 = ap.sqrMagnitude;
+                else
+                {
+                    float cross = ab.x * ap.y - ab.y * ap.x;
+                    d2 = cross * cross / len2;
+                }
+                if (d2 > worstDist) { worstDist = d2; worst = i; }
+            }
+            if (worst < 0) continue;
+            keep[worst] = true;
+            stack.Push((a, worst));
+            stack.Push((worst, b));
+        }
+        var result = new List<Vector3>();
+        for (int i = 0; i < points.Length; i++)
+            if (keep[i]) result.Add(points[i]);
+        return result.ToArray();
     }
 
     // Allt som behövs för att räkna om lon/lat till världskoordinater, så att det kan göras i en bakgrundstråd
@@ -153,7 +217,7 @@ public class GeoJsonSpawner : MonoBehaviour
                         SpawnPoint(feature.points[0], feature.layerName);
                         break;
                     case FeatureKind.Line:
-                        SpawnLine(feature.points, feature.layerName);
+                        SpawnLine(feature.points, feature.layerName, feature.pointCount);
                         break;
                     case FeatureKind.Polygon:
                         SpawnPolygon(feature.points, feature.layerName);
@@ -200,11 +264,13 @@ public class GeoJsonSpawner : MonoBehaviour
                     });
                     break;
                 case "LineString":
+                    if (!KeepLine(layerName, coords.Count)) break;
                     result.Add(new ParsedFeature
                     {
                         kind = FeatureKind.Line,
                         layerName = layerName,
-                        points = ToWorldPoints(coords, mapping)
+                        points = Simplify(ToWorldPoints(coords, mapping), mapping.cellSize),
+                        pointCount = coords.Count
                     });
                     break;
                 case "Polygon":
@@ -260,7 +326,7 @@ public class GeoJsonSpawner : MonoBehaviour
     }
 
 
-    private void SpawnLine(Vector3[] points, string featureType)
+    private void SpawnLine(Vector3[] points, string featureType, int pointCount)
     {
         GameObject obj = new GameObject(featureType);
         obj.transform.SetParent(parentContainer);
@@ -286,7 +352,7 @@ public class GeoJsonSpawner : MonoBehaviour
         // Sätt layer till "LineLayer" (lägg till i Unity Editor om du inte har det)
         obj.layer = lineLayer;
 
-        SetupFeature(obj, featureType, 0f, points.Length, 0f);
+        SetupFeature(obj, featureType, 0f, pointCount, 0f);
     }
 
     private void SpawnPolygon(Vector3[] ring, string featureType)
