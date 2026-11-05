@@ -53,6 +53,12 @@ public class CourseLoader : MonoBehaviour
         }
         pathfindingManager.jsonFileName = map.gridName + ".json";
 
+        // Out-of-bounds areas are drawn for every kind of course, also on pictures with the course printed in them
+        if (ForbiddenAreas.Any(course))
+        {
+            new GameObject("Out-of-bounds areas").AddComponent<ForbiddenAreaRenderer>().Draw(map, course.forbidden);
+        }
+
         // Relays set up their own points, leg by leg and with this team's fork variants
         if (course.IsRelay())
         {

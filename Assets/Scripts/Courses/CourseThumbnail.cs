@@ -110,6 +110,24 @@ public static class CourseThumbnail
         float width = Mathf.Max(4.5f * pixelsPerMeter, 2.4f * Scale);
         Color32 purple = CourseRenderer.CoursePurple;
 
+        // Out-of-bounds areas: vertical purple stripes and a border, under the course
+        if (ForbiddenAreas.Any(course))
+        {
+            float spacing = Mathf.Max((map.IsSprint ? 3.2f : 12f) * pixelsPerMeter, 4f * Scale);
+            float stripe = Mathf.Max(spacing * 0.3f, 1.2f * Scale);
+            foreach (ForbiddenArea zone in course.forbidden)
+            {
+                if (zone == null || zone.corners == null || zone.corners.Count < 3) continue;
+                List<Vector2> poly = zone.corners.ConvertAll(point =>
+                {
+                    Vector2 uv = background.WorldToUV(map.ToWorld(point));
+                    return new Vector2((uv.x - area.xMin) / area.width * texture.width, (uv.y - area.yMin) / area.height * texture.height);
+                });
+                DrawStripes(texture, poly, spacing, stripe, purple);
+                for (int k = 0; k < poly.Count; k++) DrawLine(texture, poly[k], poly[(k + 1) % poly.Count], width * 0.8f, purple);
+            }
+        }
+
         for (int i = 0; i < pixels.Count; i++)
         {
             if (i > 0)
@@ -165,6 +183,35 @@ public static class CourseThumbnail
                 if ((a + ab * t - p).sqrMagnitude <= half * half)
                 {
                     texture.SetPixel(x, y, color);
+                }
+            }
+        }
+    }
+
+    // Vertical stripes inside a polygon: every few pixels a column, cut where it crosses the outline (even-odd)
+    static void DrawStripes(Texture2D texture, List<Vector2> poly, float spacing, float stripe, Color32 color)
+    {
+        float minX = float.MaxValue, maxX = float.MinValue;
+        foreach (Vector2 p in poly) { minX = Mathf.Min(minX, p.x); maxX = Mathf.Max(maxX, p.x); }
+        List<float> crossings = new List<float>();
+        for (float x0 = Mathf.Floor(minX / spacing) * spacing; x0 <= maxX; x0 += spacing)
+        {
+            for (int x = Mathf.Max(0, Mathf.FloorToInt(x0)); x < Mathf.Min(texture.width, Mathf.CeilToInt(x0 + stripe)); x++)
+            {
+                float cx = x + 0.5f;
+                crossings.Clear();
+                for (int k = 0; k < poly.Count; k++)
+                {
+                    Vector2 a = poly[k], b = poly[(k + 1) % poly.Count];
+                    if ((a.x <= cx && cx < b.x) || (b.x <= cx && cx < a.x)) crossings.Add(a.y + (cx - a.x) * (b.y - a.y) / (b.x - a.x));
+                }
+                crossings.Sort();
+                for (int k = 0; k + 1 < crossings.Count; k += 2)
+                {
+                    for (int y = Mathf.Max(0, Mathf.CeilToInt(crossings[k] - 0.5f)); y <= Mathf.Min(texture.height - 1, Mathf.FloorToInt(crossings[k + 1] - 0.5f)); y++)
+                    {
+                        texture.SetPixel(x, y, color);
+                    }
                 }
             }
         }

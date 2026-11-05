@@ -45,6 +45,8 @@ public class PathfindingManager : MonoBehaviour
         startPoint = controlPoints[0].transform.position;
         
         LoadGridData();
+        // The course's out-of-bounds areas are closed cells for every runner, the A* routes and the drawn routes
+        ForbiddenAreas.ApplyToCompetition(this);
 
 
     }

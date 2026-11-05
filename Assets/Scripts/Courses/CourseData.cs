@@ -40,6 +40,8 @@ public class CourseData
     public CoursePoint start;
     public List<CoursePoint> controls = new List<CoursePoint>();
     public CoursePoint finish;
+    // Out-of-bounds areas (purple stripes) the runners must not enter; they count for every leg of a relay
+    public List<ForbiddenArea> forbidden = new List<ForbiddenArea>();
 
     // ---- Relay ----
     // A relay is run by teams: every team member runs one leg, and every leg has its own course (relayCourses; legs can
@@ -177,7 +179,7 @@ public class CourseData
         CourseData result = new CourseData
         {
             id = id, name = name, author = author, authorId = authorId, mapId = mapId, background = background,
-            builtIn = builtIn, createdAt = createdAt, terrain = terrain
+            builtIn = builtIn, createdAt = createdAt, terrain = terrain, forbidden = forbidden
         };
         route.course = result;
         if (relayCourse == null) return route;
@@ -338,6 +340,8 @@ public class CourseData
     // branches, then the number of controls on each branch).
     // (v3 and v4 were earlier relay formats; they are still read.)
     // Last comes the course type when it is set: "s" sprint, "f" forest (older versions of the game ignore it).
+    // Out-of-bounds areas come after that as a field starting with "z": for every area the number of corners (one
+    // digit), then its corners, written like the points above (the very first corner in full, then steps).
 
     const string Digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     const int StepOffset = 131072; // 64^3 / 2
@@ -403,7 +407,71 @@ public class CourseData
             }
         }
         if (!string.IsNullOrEmpty(terrain)) sb.Append('|').Append(terrain == Sprint ? 's' : 'f');
+        AppendForbidden(sb);
         return sb.ToString();
+    }
+
+    void AppendForbidden(StringBuilder sb)
+    {
+        if (!ForbiddenAreas.Any(this)) return;
+        sb.Append("|z");
+        bool first = true;
+        long lastE = 0, lastN = 0;
+        foreach (ForbiddenArea area in forbidden)
+        {
+            if (area == null || area.corners == null || area.corners.Count < 3) continue;
+            int count = Math.Min(area.corners.Count, Digits.Length - 1);
+            sb.Append(Digits[count]);
+            for (int k = 0; k < count; k++)
+            {
+                long e = (long)Math.Round(area.corners[k].e);
+                long n = (long)Math.Round(area.corners[k].n);
+                if (first)
+                {
+                    AppendDigits(sb, e, 4);
+                    AppendDigits(sb, n, 4);
+                    first = false;
+                }
+                else
+                {
+                    AppendDigits(sb, e - lastE + StepOffset, 3);
+                    AppendDigits(sb, n - lastN + StepOffset, 3);
+                }
+                lastE = e;
+                lastN = n;
+            }
+        }
+    }
+
+    static List<ForbiddenArea> ReadForbidden(string text)
+    {
+        List<ForbiddenArea> areas = new List<ForbiddenArea>();
+        int index = 1;   // after the "z"
+        bool first = true;
+        long e = 0, n = 0;
+        while (index < text.Length)
+        {
+            int count = Digits.IndexOf(text[index++]);
+            if (count < 0) throw new FormatException("bad area");
+            ForbiddenArea area = new ForbiddenArea();
+            for (int k = 0; k < count; k++)
+            {
+                if (first)
+                {
+                    e = ReadDigits(text, ref index, 4);
+                    n = ReadDigits(text, ref index, 4);
+                    first = false;
+                }
+                else
+                {
+                    e += ReadDigits(text, ref index, 3) - StepOffset;
+                    n += ReadDigits(text, ref index, 3) - StepOffset;
+                }
+                area.corners.Add(new CoursePoint(e, n));
+            }
+            areas.Add(area);
+        }
+        return areas;
     }
 
     static void AppendDigits(StringBuilder sb, long value, int count)
@@ -473,6 +541,10 @@ public class CourseData
             // The course type comes after the points (v2) or after the relay field (v3 to v5)
             int terrainPart = parts[0] == "v2" ? 9 : 10;
             if (parts.Length > terrainPart) course.terrain = parts[terrainPart] == "s" ? Sprint : parts[terrainPart] == "f" ? Forest : null;
+            for (int p = terrainPart; p < parts.Length; p++)
+            {
+                if (parts[p].StartsWith("z")) course.forbidden = ReadForbidden(parts[p]);
+            }
             string coords = parts[8];
             if (coords.Length < 14 || (coords.Length - 8) % 6 != 0)
             {
