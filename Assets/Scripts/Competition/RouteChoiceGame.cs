@@ -25,6 +25,53 @@ public static class RouteChoiceGame
     };
     public static readonly string[] ColourNames = { "Red", "Blue", "Green", "Yellow" };
 
+    // Each colour always sits in the same place, left to right blue, green, yellow, red, and has its own key
+    // (1 to 4 at first, changeable with the Keys button; saved per computer)
+    public static readonly int[] LeftToRight = { 1, 2, 3, 0 };
+    static readonly KeyCode[] DefaultKeys = { KeyCode.Alpha4, KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3 };
+
+    public static KeyCode Key(int colour)
+    {
+        string saved = PlayerPrefs.GetString("RouteChoice.Key." + ColourNames[colour], "");
+        if (saved.Length > 0 && System.Enum.TryParse(saved, out KeyCode key)) return key;
+        return DefaultKeys[colour];
+    }
+
+    public static void SetKey(int colour, KeyCode key)
+    {
+        // A key can only answer one colour: the colour that had it gets this colour's old key
+        KeyCode old = Key(colour);
+        for (int c = 0; c < ColourNames.Length; c++)
+        {
+            if (c != colour && Key(c) == key) PlayerPrefs.SetString("RouteChoice.Key." + ColourNames[c], old.ToString());
+        }
+        PlayerPrefs.SetString("RouteChoice.Key." + ColourNames[colour], key.ToString());
+        PlayerPrefs.Save();
+    }
+
+    // True when the colour's key was pressed this frame (the number keys also work on the number pad)
+    public static bool Pressed(int colour)
+    {
+        KeyCode key = Key(colour);
+        if (Input.GetKeyDown(key)) return true;
+        if (key >= KeyCode.Alpha0 && key <= KeyCode.Alpha9) return Input.GetKeyDown(KeyCode.Keypad0 + (key - KeyCode.Alpha0));
+        return false;
+    }
+
+    public static string KeyName(KeyCode key)
+    {
+        if (key >= KeyCode.Alpha0 && key <= KeyCode.Alpha9) return ((int)(key - KeyCode.Alpha0)).ToString();
+        if (key >= KeyCode.Keypad0 && key <= KeyCode.Keypad9) return "Num " + (int)(key - KeyCode.Keypad0);
+        switch (key)
+        {
+            case KeyCode.LeftArrow: return "Left";
+            case KeyCode.RightArrow: return "Right";
+            case KeyCode.UpArrow: return "Up";
+            case KeyCode.DownArrow: return "Down";
+        }
+        return key.ToString();
+    }
+
     public static bool On => ExtraModes.Is(ExtraMode.RouteChoice) && RelayRace.Active == null;
 
     // Instead of the choose-a-runner screen: everyone is ready at once, with the same speed-100 runner
@@ -100,6 +147,9 @@ public class RouteChoiceView : MonoBehaviour
     TextMeshProUGUI scoreText;
     Button nextButton;
     readonly List<Button> choiceButtons = new List<Button>();
+    GameObject keysPanel;
+    readonly List<Button> keyButtons = new List<Button>();
+    int rebinding = -1; // the colour waiting for a new key, or -1
     readonly List<GameObject> drawn = new List<GameObject>();
     readonly List<LineRenderer> lines = new List<LineRenderer>();
     float nextRefresh;
@@ -186,6 +236,9 @@ public class RouteChoiceView : MonoBehaviour
         timerText = CourseUI.Text("Seconds", card.transform, "", 22, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
         CourseUI.Place(timerText.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28, 92), new Vector2(100, 34));
 
+        Button keys = CourseUI.Button("Keys", card.transform, "Keys", CourseUI.ButtonKind.Light, ToggleKeys, 20);
+        CourseUI.Place((RectTransform)keys.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-28, -66), new Vector2(110, 40));
+
         nextButton = CourseUI.Button("Next", card.transform, "Next leg", CourseUI.ButtonKind.Primary, OnNext, 24);
         CourseUI.Place((RectTransform)nextButton.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(28, 22), new Vector2(504, 60));
         ShowTimer(false);
@@ -245,6 +298,8 @@ public class RouteChoiceView : MonoBehaviour
     void Update()
     {
         if (failed) return;
+        if (rebinding >= 0) ListenForKey();
+        bool keysOpen = keysPanel != null; // while the keys are being changed, key presses do not answer
         switch (step)
         {
             case Step.Loading:
@@ -264,15 +319,16 @@ public class RouteChoiceView : MonoBehaviour
                 float left = RouteChoiceGame.AnswerSeconds - (Time.unscaledTime - askedAt);
                 if (timerFill != null) timerFill.anchorMax = new Vector2(Mathf.Clamp01(left / RouteChoiceGame.AnswerSeconds), 1f);
                 if (timerText != null) timerText.text = Mathf.CeilToInt(Mathf.Max(0f, left)) + " s";
-                for (int i = 0; i < choiceButtons.Count && i < 4; i++)
+                List<RouteChoice> asked = results[leg].choices;
+                for (int i = 0; i < asked.Count && step == Step.Asking && !keysOpen; i++)
                 {
-                    if (Input.GetKeyDown(KeyCode.Alpha1 + i) || Input.GetKeyDown(KeyCode.Keypad1 + i)) Answer(i);
+                    if (RouteChoiceGame.Pressed(asked[i].colour)) Answer(i);
                 }
                 if (step == Step.Asking && left <= 0f) Answer(-1);
                 break;
 
             case Step.Answered:
-                if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.RightArrow)) OnNext();
+                if (!keysOpen && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.RightArrow))) OnNext();
                 break;
 
             case Step.Done:
@@ -300,18 +356,23 @@ public class RouteChoiceView : MonoBehaviour
         DrawRoutes(current, -1);
 
         ClearBody();
-        for (int i = 0; i < current.choices.Count; i++)
+        // One coloured box per route, in the colours' fixed order from left to right; click it or press its key
+        RectTransform row = CourseUI.Rect("Choices", body);
+        CourseUI.Row(row.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(row, 150);
+        foreach (int colour in RouteChoiceGame.LeftToRight)
         {
-            int index = i;
-            RouteChoice choice = current.choices[i];
-            Button button = CourseUI.Button("Choice " + i, body, "", CourseUI.ButtonKind.Light, () => Answer(index), 24);
-            CourseUI.Size(button, 72);
-            Image swatch = CourseUI.Panel("Colour", button.transform, RouteChoiceGame.Colours[choice.colour]);
-            CourseUI.Place(swatch.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(54, 16));
+            int index = current.choices.FindIndex(c => c.colour == colour);
+            if (index < 0) continue;
+            RouteChoice choice = current.choices[index];
+            Button button = CourseUI.Button("Choice " + RouteChoiceGame.ColourNames[colour], row, "", CourseUI.ButtonKind.Light, () => Answer(index), 24);
+            button.GetComponent<Image>().color = RouteChoiceGame.Colours[colour];
+            CourseUI.Size(button, 150, -1, 1);
             TextMeshProUGUI label = button.GetComponentInChildren<TextMeshProUGUI>();
-            label.text = "<b>" + RouteChoiceGame.ColourNames[choice.colour] + "</b>  <size=75%><color=#5B7563>" + Mathf.RoundToInt(choice.meters) + " m   (key " + (i + 1) + ")</color></size>";
-            label.alignment = TextAlignmentOptions.MidlineLeft;
-            CourseUI.Stretch(label.rectTransform, 90, 12, 0, 0);
+            label.color = colour == 3 ? CourseUI.Ink : Color.white; // dark text on yellow
+            label.text = "<size=150%><b>" + RouteChoiceGame.KeyName(RouteChoiceGame.Key(colour)) + "</b></size>\n<b>"
+                + RouteChoiceGame.ColourNames[colour] + "</b>\n<size=75%>" + Mathf.RoundToInt(choice.meters) + " m</size>";
+            label.enableWordWrapping = false;
             choiceButtons.Add(button);
         }
         TextMeshProUGUI note = CourseUI.Text("Note", body, "A runner with speed 100 runs every route. Ground, slope and turns all count, so the shortest route is not always the fastest.", 18, CourseUI.InkMuted);
@@ -379,6 +440,94 @@ public class RouteChoiceView : MonoBehaviour
         }
         CourseUI.SetButtonText(nextButton, last ? "See the results" : "Next leg");
         nextButton.gameObject.SetActive(true);
+    }
+
+    // ---- Changing the keys ----
+
+    void ToggleKeys()
+    {
+        if (keysPanel != null)
+        {
+            Destroy(keysPanel);
+            keysPanel = null;
+            rebinding = -1;
+            return;
+        }
+        Image sheet = CourseUI.CardPanel("Keys", panel.transform);
+        keysPanel = sheet.gameObject;
+        CourseUI.Place(sheet.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -116), new Vector2(504, 420));
+        TextMeshProUGUI title = CourseUI.Text("Title", sheet.transform, "Keys for the routes", 26, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -18), new Vector2(456, 40));
+        keyButtons.Clear();
+        int k = 0;
+        foreach (int colour in RouteChoiceGame.LeftToRight)
+        {
+            int c = colour;
+            Image swatch = CourseUI.Panel("Colour", sheet.transform, RouteChoiceGame.Colours[c]);
+            CourseUI.Place(swatch.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(24, -96 - k * 64), new Vector2(44, 20));
+            TextMeshProUGUI name = CourseUI.Text("Name", sheet.transform, RouteChoiceGame.ColourNames[c], 22, CourseUI.Ink);
+            CourseUI.Place(name.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(84, -96 - k * 64), new Vector2(180, 40));
+            name.alignment = TextAlignmentOptions.MidlineLeft;
+            Button button = CourseUI.Button("Key " + c, sheet.transform, "", CourseUI.ButtonKind.Light, () => StartRebind(c), 22);
+            CourseUI.Place((RectTransform)button.transform, new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(-24, -96 - k * 64), new Vector2(200, 52));
+            keyButtons.Add(button);
+            k++;
+        }
+        Button done = CourseUI.Button("Done", sheet.transform, "Done", CourseUI.ButtonKind.Primary, ToggleKeys, 22);
+        CourseUI.Place((RectTransform)done.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 20), new Vector2(456, 52));
+        ShowKeys();
+    }
+
+    void ShowKeys()
+    {
+        for (int k = 0; k < keyButtons.Count; k++)
+        {
+            int c = RouteChoiceGame.LeftToRight[k];
+            CourseUI.SetButtonText(keyButtons[k], rebinding == c ? "Press a key..." : RouteChoiceGame.KeyName(RouteChoiceGame.Key(c)));
+        }
+        RefreshChoiceKeys();
+    }
+
+    void StartRebind(int colour)
+    {
+        rebinding = colour;
+        ShowKeys();
+    }
+
+    // Waiting for the new key: the first key pressed is it (Escape keeps the old one)
+    void ListenForKey()
+    {
+        if (!Input.anyKeyDown) return;
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            rebinding = -1;
+            ShowKeys();
+            return;
+        }
+        foreach (KeyCode key in System.Enum.GetValues(typeof(KeyCode)))
+        {
+            if (key == KeyCode.None || key >= KeyCode.Mouse0) continue; // no mouse or joystick buttons
+            if (!Input.GetKeyDown(key)) continue;
+            RouteChoiceGame.SetKey(rebinding, key);
+            rebinding = -1;
+            ShowKeys();
+            return;
+        }
+    }
+
+    // The key shown on the route boxes, after a change
+    void RefreshChoiceKeys()
+    {
+        if (step != Step.Asking || results == null || leg < 1 || leg > legs || results[leg] == null) return;
+        foreach (Button button in choiceButtons)
+        {
+            foreach (RouteChoice choice in results[leg].choices)
+            {
+                if (button.name != "Choice " + RouteChoiceGame.ColourNames[choice.colour]) continue;
+                button.GetComponentInChildren<TextMeshProUGUI>().text = "<size=150%><b>" + RouteChoiceGame.KeyName(RouteChoiceGame.Key(choice.colour))
+                    + "</b></size>\n<b>" + RouteChoiceGame.ColourNames[choice.colour] + "</b>\n<size=75%>" + Mathf.RoundToInt(choice.meters) + " m</size>";
+            }
+        }
     }
 
     void OnNext()

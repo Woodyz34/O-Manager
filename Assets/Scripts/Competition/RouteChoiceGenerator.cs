@@ -50,7 +50,7 @@ public class RouteChoiceGenerator
     // Choices slower than this x the fastest are too easy to rule out. In the forest a slow choice is usually a
     // long way round that nobody would take, so there the cap is tighter (two good choices are enough)
     const float MaxSlowerSprint = 1.3f;
-    const float MaxSlowerForest = 1.1f;
+    const float MaxSlowerForest = 1.07f;
     const float ViaReach = 0.75f;          // route choices split in the first 75 % of the leg; after that, the fastest way in
     const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
     const float MaxSameShare = 0.5f;       // at most half of a route's middle may run next to another route
@@ -272,20 +272,12 @@ public class RouteChoiceGenerator
             return result;
         }
 
-        // Two choices are red and blue, three add green, four add yellow. Which route gets which colour is shuffled
-        // (the same way for every player, from the seed), and the buttons are in colour order.
+        // Choices are in order from left to right (as seen running the leg), and the colours always go the same way:
+        // left is blue, right is red, green and then yellow in between. So key 1 is always the left one.
         Vector2 along = ((Vector2)(to - from)).normalized;
         picked.Sort((a, b) => Side(a.cells, from, along).CompareTo(Side(b.cells, from, along)));
-        System.Random rng = new System.Random(seed);
-        List<int> colours = new List<int>();
-        for (int i = 0; i < picked.Count; i++) colours.Add(i);
-        for (int i = colours.Count - 1; i > 0; i--)
-        {
-            int j = rng.Next(i + 1);
-            int t = colours[i]; colours[i] = colours[j]; colours[j] = t;
-        }
-        for (int i = 0; i < picked.Count; i++) picked[i].colour = colours[i];
-        picked.Sort((a, b) => a.colour.CompareTo(b.colour));
+        int[] order = picked.Count == 2 ? new[] { 1, 0 } : picked.Count == 3 ? new[] { 1, 2, 0 } : new[] { 1, 2, 3, 0 };
+        for (int i = 0; i < picked.Count; i++) picked[i].colour = order[i];
         result.choices = picked;
         return result;
     }
