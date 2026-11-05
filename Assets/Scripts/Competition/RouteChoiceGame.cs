@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 // Route choice game, on sprint and forest courses. Nobody picks a runner and nobody runs. Leg by leg, the game shows
@@ -150,6 +151,10 @@ public class RouteChoiceView : MonoBehaviour
     GameObject keysPanel;
     readonly List<Button> keyButtons = new List<Button>();
     int rebinding = -1; // the colour waiting for a new key, or -1
+    // The Esc menu leaves Escape alone while the keys are being changed (and on the frame the panel closes)
+    public static bool KeysOpen;
+    public static int KeysClosedFrame = -1;
+    readonly List<GameObject> hiddenHud = new List<GameObject>();
     readonly List<GameObject> drawn = new List<GameObject>();
     readonly List<LineRenderer> lines = new List<LineRenderer>();
     float nextRefresh;
@@ -299,6 +304,7 @@ public class RouteChoiceView : MonoBehaviour
     {
         if (failed) return;
         if (rebinding >= 0) ListenForKey();
+        else if (keysPanel != null && Input.GetKeyDown(KeyCode.Escape)) ToggleKeys();
         bool keysOpen = keysPanel != null; // while the keys are being changed, key presses do not answer
         switch (step)
         {
@@ -354,6 +360,7 @@ public class RouteChoiceView : MonoBehaviour
 
         FitCamera(current);
         DrawRoutes(current, -1);
+        HideHud();
 
         ClearBody();
         // One coloured box per route, in the colours' fixed order from left to right; click it or press its key
@@ -446,15 +453,23 @@ public class RouteChoiceView : MonoBehaviour
 
     void ToggleKeys()
     {
+        // A clicked button stays selected, and Enter or Space would press it again
+        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
         if (keysPanel != null)
         {
             Destroy(keysPanel);
             keysPanel = null;
             rebinding = -1;
+            KeysOpen = false;
+            KeysClosedFrame = Time.frameCount;
             return;
         }
+        KeysOpen = true;
         Image sheet = CourseUI.CardPanel("Keys", panel.transform);
         keysPanel = sheet.gameObject;
+        Color solid = sheet.color;
+        solid.a = 1f;
+        sheet.color = solid;
         CourseUI.Place(sheet.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -116), new Vector2(504, 420));
         TextMeshProUGUI title = CourseUI.Text("Title", sheet.transform, "Keys for the routes", 26, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -18), new Vector2(456, 40));
@@ -500,6 +515,7 @@ public class RouteChoiceView : MonoBehaviour
         if (!Input.anyKeyDown) return;
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            KeysClosedFrame = Time.frameCount;
             rebinding = -1;
             ShowKeys();
             return;
@@ -576,7 +592,7 @@ public class RouteChoiceView : MonoBehaviour
         else
         {
             info.text = "You got <b>" + right + " of " + question + "</b> right: <b>" + RouteChoiceGame.Points(score) + " points</b>."
-                + (skipped > 0 ? "\n<size=85%>" + skipped + (skipped == 1 ? " leg had" : " legs had") + " no clear route choice and was left out.</size>" : "");
+                + (skipped > 0 ? "\n<size=85%>" + skipped + (skipped == 1 ? " leg had" : " legs had") + " no clear route choice and " + (skipped == 1 ? "was" : "were") + " left out.</size>" : "");
         }
         FillStandings();
         ShowBackButton();
@@ -707,8 +723,25 @@ public class RouteChoiceView : MonoBehaviour
         lines.Clear();
     }
 
+    // The drawing screen's Undo button and the race clock mean nothing here
+    void HideHud()
+    {
+        GameObject undo = GameObject.Find("UndoButton");
+        if (undo != null) { undo.SetActive(false); hiddenHud.Add(undo); }
+        foreach (Text box in FindObjectsByType<Text>(FindObjectsSortMode.None))
+        {
+            if (box.name != "Sekunder" || box.transform.parent == null) continue;
+            GameObject clock = box.transform.parent.gameObject;
+            if (!clock.activeSelf) continue;
+            clock.SetActive(false);
+            hiddenHud.Add(clock);
+        }
+    }
+
     void OnDestroy()
     {
+        foreach (GameObject hidden in hiddenHud) if (hidden != null) hidden.SetActive(true);
+        KeysOpen = false;
         RouteCompareView.HideRunners(false);
         ClearDrawn();
         if (panel != null) Destroy(panel);
