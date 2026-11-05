@@ -129,7 +129,8 @@ public class RouteChoiceView : MonoBehaviour
         Vector2Int[] cells = new Vector2Int[legs + 1];
         for (int k = 0; k <= legs; k++) cells[k] = manager.WorldToGridPositionCentered(manager.controlPoints[k].position);
         RouteChoiceGenerator generator = new RouteChoiceGenerator(manager.speedGrid2D, manager.slopeFactors, manager.cellSize,
-            agent.originalBaseSpeed, PackRunning.GameSecondsPerSecond);
+            agent.originalBaseSpeed, PackRunning.GameSecondsPerSecond,
+            CourseLoader.LoadedMap != null ? CourseLoader.LoadedMap.IsSprint : manager.cellSize / MapDefinition.WorldUnitsPerMeter < 5f);
         RouteChoiceLeg[] target = results;
         Task.Run(() =>
         {

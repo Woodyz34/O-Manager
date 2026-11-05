@@ -47,7 +47,10 @@ public class RouteChoiceGenerator
     const int MaxTries = 600;              // points tried per leg
     const float MinGapSeconds = 2f;        // two choices must differ at least this much (race seconds)...
     const float MinGapShare = 0.02f;       // ...and at least this share of the fastest time
-    const float MaxSlower = 1.3f;         // choices slower than this x the fastest are too easy to rule out
+    // Choices slower than this x the fastest are too easy to rule out. In the forest a slow choice is usually a
+    // long way round that nobody would take, so there the cap is tighter (two good choices are enough)
+    const float MaxSlowerSprint = 1.3f;
+    const float MaxSlowerForest = 1.1f;
     const float ViaReach = 0.75f;          // route choices split in the first 75 % of the leg; after that, the fastest way in
     const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
     const float MaxSameShare = 0.5f;       // at most half of a route's middle may run next to another route
@@ -68,10 +71,12 @@ public class RouteChoiceGenerator
     readonly float baseSpeed;    // world units per real second for the speed-100 runner
     readonly float gameSecondsPerSecond;
     readonly int width, height;
+    readonly float MaxSlower;
 
     public RouteChoiceGenerator(float[,] speedGrid, Dictionary<string, float[,]> slopeFactors, float cellSize,
-                                float baseSpeed, float gameSecondsPerSecond)
+                                float baseSpeed, float gameSecondsPerSecond, bool sprint)
     {
+        MaxSlower = sprint ? MaxSlowerSprint : MaxSlowerForest;
         speed = speedGrid;
         height = speedGrid.GetLength(0);
         width = speedGrid.GetLength(1);
@@ -116,6 +121,7 @@ public class RouteChoiceGenerator
         cellMeters = full.cellMeters;
         baseSpeed = full.baseSpeed;
         gameSecondsPerSecond = full.gameSecondsPerSecond;
+        MaxSlower = full.MaxSlower;
     }
 
     static float[,] Cut(float[,] grid, int x0, int y0, int w, int h)
