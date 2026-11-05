@@ -20,6 +20,48 @@ public class AStarPathfinder
         this.height = speedGrid.GetLength(0);
         this.width = speedGrid.GetLength(1);
         this.slopeFactors = slopeFactors;
+
+        // The estimate of the cost left must never be higher than the real cost, or A* reopens cells over and over
+        // (one search on the 2 m sprint grid took 10 s). The cheapest step is the fastest cell on the best slope.
+        // Worked out once per grid (the same grids are searched many times)
+        lock (scaleCache)
+        {
+            if (!scaleCache.TryGetValue(speedGrid, out heuristicScale))
+            {
+                float fastest = 0.01f;
+                foreach (float s in speedGrid) if (s > fastest) fastest = s;
+                float bestSlope = 1f;
+                if (slopeFactors != null)
+                    foreach (float[,] factors in slopeFactors.Values)
+                        if (factors != null)
+                            foreach (float f in factors) if (f > bestSlope) bestSlope = f;
+                heuristicScale = 1f / (fastest * bestSlope);
+                if (speedGrid.Length > 100000)   // small cut-outs are quick anyway
+                {
+                    if (scaleCache.Count > 8) scaleCache.Clear();   // grids of maps played earlier
+                    scaleCache[speedGrid] = heuristicScale;
+                }
+            }
+        }
+    }
+
+    private static readonly Dictionary<float[,], float> scaleCache = new Dictionary<float[,], float>(new ReferenceComparer());
+
+    private class ReferenceComparer : IEqualityComparer<float[,]>
+    {
+        public bool Equals(float[,] a, float[,] b) => ReferenceEquals(a, b);
+        public int GetHashCode(float[,] a) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(a);
+    }
+
+    private float heuristicScale;
+
+    // Octile distance (diagonal steps cost 1.414) at the fastest possible speed
+    private float Estimate(int x, int y, Vector2Int goal)
+    {
+        int dx = x > goal.x ? x - goal.x : goal.x - x;
+        int dy = y > goal.y ? y - goal.y : goal.y - y;
+        int lo = dx < dy ? dx : dy, hi = dx < dy ? dy : dx;
+        return (hi + 0.414f * lo) * heuristicScale;
     }
 
 
@@ -197,7 +239,7 @@ public class AStarPathfinder
             float currentG = gScore[current];
 
             // En cell kan ligga flera gånger i kön. Hoppa över poster som har blivit omsprungna av en billigare väg.
-            if (currentF > currentG + Mathf.Max(Mathf.Abs(cx - goal.x), Mathf.Abs(cy - goal.y)) + 0.0001f && current != startIndex)
+            if (currentF > currentG + Estimate(cx, cy, goal) + 0.0001f && current != startIndex)
                 continue;
 
             if (current == goalIndex) return ReconstructPath(current);
@@ -210,6 +252,8 @@ public class AStarPathfinder
 
                 float cellSpeed = grid[ny, nx];
                 if (cellSpeed <= 0.01f) continue;
+                // No cutting a corner between two closed cells (a fence drawn diagonally across the grid)
+                if (dirX[d] != 0 && dirY[d] != 0 && (grid[cy, nx] <= 0.01f || grid[ny, cx] <= 0.01f)) continue;
 
                 if (blockedEdges != null && blockedEdges.Contains((new Vector2Int(cx, cy), new Vector2Int(nx, ny))))
                     continue;
@@ -229,7 +273,7 @@ public class AStarPathfinder
                 {
                     cameFrom[neighbor] = current;
                     gScore[neighbor] = tentativeGScore;
-                    HeapPush(neighbor, tentativeGScore + Mathf.Max(Mathf.Abs(nx - goal.x), Mathf.Abs(ny - goal.y)));
+                    HeapPush(neighbor, tentativeGScore + Estimate(nx, ny, goal));
                 }
             }
         }

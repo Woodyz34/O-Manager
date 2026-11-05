@@ -7,6 +7,7 @@ using UnityEngine.SceneManagement;
 //  - a name tag that always sits straight above the runner on screen, however the runner or the camera turns
 //  - circle and name keep a readable size when the camera is zoomed far out
 //  - no trail streak when the runner is moved to a new place (joining the lobby, starting a competition)
+//  - hidden while the player draws the route, so it does not cover the start of the line
 // The ring, the copy and the name tag are objects in NetworkPlayerPF. Tools > O-Manager > Apply Runner Marker builds them.
 public class RunnerMarker : MonoBehaviour
 {
@@ -41,6 +42,9 @@ public class RunnerMarker : MonoBehaviour
     Vector3 lastPosition;
     Vector3 nameStartScale;
     bool ready;
+    ManualPathDrawer drawer;
+    bool lookedForDrawer;
+    bool drawing;
 
     void Awake()
     {
@@ -83,6 +87,15 @@ public class RunnerMarker : MonoBehaviour
         Camera cam = Camera.main;
         if (cam == null) return;
 
+        if (!lookedForDrawer)
+        {
+            drawer = GetComponentInParent<ManualPathDrawer>();
+            lookedForDrawer = true;
+        }
+        drawing = drawer != null && drawer.timeToDraw;
+        if (circle != null) circle.forceRenderingOff = drawing;
+        if (nameCanvas != null && nameCanvas.gameObject.activeSelf == drawing) nameCanvas.gameObject.SetActive(!drawing);
+
         float screenHeight = cam.orthographic ? cam.orthographicSize * 2f : 0f;   // in world units
         float growth = Growth(screenHeight);
         UpdateCircle(growth);
@@ -117,9 +130,10 @@ public class RunnerMarker : MonoBehaviour
         {
             dot.sharedMaterial = circle.sharedMaterial;
         }
-        if (marker.gameObject.activeSelf != circle.enabled)
+        bool show = circle.enabled && !drawing;
+        if (marker.gameObject.activeSelf != show)
         {
-            marker.gameObject.SetActive(circle.enabled);
+            marker.gameObject.SetActive(show);
         }
     }
 

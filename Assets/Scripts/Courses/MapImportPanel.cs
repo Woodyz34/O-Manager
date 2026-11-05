@@ -9,8 +9,10 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // The "Import map" pop-up in the course builder. The player picks a map file (OCAD .ocd or OpenOrienteering Mapper
-// .omap/.xmap) on their computer, names the map, says if it is a forest or a sprint map, and may give a PNG of the
-// map instead of the picture the game draws. They have to confirm that the club that owns the map allows it.
+// .omap/.xmap) on their computer (the computer's own file window, dragging the file onto the game, or pasting its
+// path), names the map, says if it is a forest map, a sprint map or both, and may give a PNG of the map instead of
+// the picture the game draws. They have to confirm that the club that owns the map allows it. Every imported map
+// is also sent in, so it can be built into the game for everyone.
 // The map is built on a background thread and saved in <persistent data>/Maps/<id>/ (see MapPackages).
 public class MapImportPanel : MonoBehaviour
 {
@@ -19,30 +21,25 @@ public class MapImportPanel : MonoBehaviour
     const double PixelsPerMm = 16;          // about 400 dpi: sharp, and the picture stays a manageable size
     const int MaxPictureSide = 16384;       // the largest texture Unity can make
 
-    enum Browse { MapFile, Picture }
+    static readonly string[] MapExtensions = { "ocd", "omap", "xmap" };
+    static readonly string[] MapTypes = { "forest", "sprint", "both" };
 
     Action<MapDefinition> onImported;
-    Browse browsing = Browse.MapFile;
-    string folder;
     string mapPath, picturePath;
     MapFile mapFile;
     string version;
-    bool sprint;
+    string mapType = "forest";
     bool permission;
-    bool sendIn = true;
     bool working;
 
     // Written by the background thread, shown in Update
     volatile string progressStep;
     volatile float progressShare;
 
-    TextMeshProUGUI folderText, fileText, statusText, browseTitle;
-    RectTransform list;
-    ScrollRect listScroll;
-    TMP_InputField nameField;
+    TextMeshProUGUI fileText, statusText;
+    TMP_InputField pathField, pictureField, nameField, contourField;
     TMP_InputField senderField, clubField, contactField;   // who sends the map in, so the game's owner can reach them
-    GameObject contactRow;
-    Button typeButton, pictureButton, permissionButton, sendButton, importButton, cancelButton;
+    Button typeButton, pictureButton, permissionButton, importButton, cancelButton;
     Image permissionBox;
 
     public static MapImportPanel Open(Transform canvas, Action<MapDefinition> onImported)
@@ -59,6 +56,7 @@ public class MapImportPanel : MonoBehaviour
     void OnDestroy()
     {
         IsOpen = false;
+        NativeFiles.StopDrop();
     }
 
     // ---- Layout ----
@@ -75,26 +73,20 @@ public class MapImportPanel : MonoBehaviour
             "The game makes the grid, the heights and the map picture from it. The map is kept on this computer until it is built into the game.",
             20, CourseUI.InkMuted), 56);
 
-        browseTitle = CourseUI.Text("Browse title", card.transform, "", 22, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Size(browseTitle, 30);
-
-        RectTransform folderRow = CourseUI.Rect("Folder row", card.transform);
-        CourseUI.Row(folderRow.gameObject, 8, new RectOffset(0, 0, 0, 0));
-        CourseUI.Size(folderRow, 44);
-        CourseUI.Size(CourseUI.Button("Up", folderRow, "Up", CourseUI.ButtonKind.Light, GoUp, 20), -1, 80);
-        foreach (var place in Places())
-        {
-            string target = place.Value;
-            CourseUI.Size(CourseUI.Button(place.Key, folderRow, place.Key, CourseUI.ButtonKind.Light, () => ShowFolder(target), 18), -1, 130);
-        }
-        folderText = CourseUI.Text("Folder", folderRow, "", 18, CourseUI.InkMuted);
-        folderText.alignment = TextAlignmentOptions.MidlineLeft;
-        folderText.textWrappingMode = TextWrappingModes.NoWrap;
-        CourseUI.Size(folderText, -1, -1, 1);
-
-        list = CourseUI.ScrollList("Files", card.transform, out listScroll);
-        CourseUI.Column(list.gameObject, 4, new RectOffset(0, 8, 0, 0));
-        CourseUI.Size(list.parent.GetComponent<Image>(), 210);
+        // The map file: the computer's own file window, dragging it onto the game, or its path pasted in
+        CourseUI.Size(CourseUI.Text("File title", card.transform, NativeFiles.CanDrop
+            ? "Drag the map file onto the game window, choose it, or paste its path"
+            : NativeFiles.CanBrowse ? "Choose the map file, or paste its path" : "Paste the map file's path (in Finder: right-click, hold Option, Copy as pathname)",
+            22, CourseUI.Ink, FontStyles.Bold), 30);
+        RectTransform fileRow = CourseUI.Rect("File row", card.transform);
+        CourseUI.Row(fileRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(fileRow, 52);
+        pathField = CourseUI.Input("Path", fileRow, "C:\\Users\\...\\map.ocd", 400, null);
+        CourseUI.Size(pathField, -1, -1, 1);
+        pathField.onEndEdit.AddListener(p => Choose(p));
+        if (NativeFiles.CanBrowse)
+            CourseUI.Size(CourseUI.Button("Browse", fileRow, "Choose file...", CourseUI.ButtonKind.Secondary, BrowseMapFile, 20), -1, 220);
+        NativeFiles.StartDrop(OnDropped);
 
         fileText = CourseUI.Text("File", card.transform, "No map file chosen yet.", 21, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(fileText, 32);
@@ -104,10 +96,24 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.Size(optionRow, 52);
         nameField = CourseUI.Input("Map name", optionRow, "Map name", 32, null);
         CourseUI.Size(nameField, -1, 380);
-        typeButton = CourseUI.Button("Type", optionRow, "", CourseUI.ButtonKind.Light, () => { sprint = !sprint; Refresh(); }, 20);
-        CourseUI.Size(typeButton, -1, 250);
-        pictureButton = CourseUI.Button("Picture", optionRow, "", CourseUI.ButtonKind.Light, OnPictureButton, 20);
-        CourseUI.Size(pictureButton, -1, 460);
+        typeButton = CourseUI.Button("Type", optionRow, "", CourseUI.ButtonKind.Light, NextType, 20);
+        CourseUI.Size(typeButton, -1, 300);
+        TextMeshProUGUI contourLabel = CourseUI.Text("Contour label", optionRow, "Contour interval (m):", 20, CourseUI.Ink, FontStyles.Bold);
+        contourLabel.alignment = TextAlignmentOptions.MidlineRight;
+        CourseUI.Size(contourLabel, -1, 230);
+        contourField = CourseUI.Input("Contour interval", optionRow, "5", 5, null);
+        contourField.contentType = TMP_InputField.ContentType.DecimalNumber;
+        CourseUI.Size(contourField, -1, 110);
+
+        // An own picture instead of the one the game draws (optional)
+        RectTransform pictureRow = CourseUI.Rect("Picture row", card.transform);
+        CourseUI.Row(pictureRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(pictureRow, 52);
+        pictureField = CourseUI.Input("Picture path", pictureRow, "Own map picture (PNG of the whole map), optional: path", 400, null);
+        CourseUI.Size(pictureField, -1, -1, 1);
+        pictureField.onEndEdit.AddListener(p => ChoosePicture(p));
+        pictureButton = CourseUI.Button("Picture", pictureRow, "", CourseUI.ButtonKind.Light, OnPictureButton, 20);
+        CourseUI.Size(pictureButton, -1, 300);
 
         // The permission checkbox: a box that fills orange, and the text
         permissionButton = CourseUI.Button("Permission", card.transform, "", CourseUI.ButtonKind.Light, () => { permission = !permission; Refresh(); }, 18);
@@ -126,14 +132,10 @@ public class MapImportPanel : MonoBehaviour
         permissionBox = CourseUI.Panel("Tick", box.transform, CourseUI.Accent);
         CourseUI.Stretch(permissionBox.rectTransform, 6, 6, 6, 6);
 
-        sendButton = CourseUI.Button("Send in", card.transform, "", CourseUI.ButtonKind.Light, () => { sendIn = !sendIn; Refresh(); }, 18);
-        CourseUI.Size(sendButton, 44);
-
-        // Needed when the map is sent in: if a club asks about its map, the game's owner knows who to ask
+        // Every map is sent in: if a club asks about its map, the game's owner knows who to ask
         RectTransform contact = CourseUI.Rect("Contact", card.transform);
         CourseUI.Row(contact.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(contact, 52);
-        contactRow = contact.gameObject;
         senderField = CourseUI.Input("Your name", contact, "Your full name", 40, _ => Refresh());
         clubField = CourseUI.Input("Club", contact, "Club that owns the map", 60, _ => Refresh());
         contactField = CourseUI.Input("Contact", contact, "E-mail or phone", 60, _ => Refresh());
@@ -149,114 +151,69 @@ public class MapImportPanel : MonoBehaviour
         cancelButton = CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, Close, 24);
         importButton = CourseUI.Button("Import", buttons, "Import map", CourseUI.ButtonKind.Primary, () => StartCoroutine(Import()), 24);
 
-        folder = PlayerPrefs.GetString("MapImport.Folder", "");
-        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) folder = DefaultFolder();
-        ShowFolder(folder);
         Refresh();
     }
 
-    static string DefaultFolder()
+    // ---- Choosing files ----
+
+    static string LastFolder()
     {
+        string folder = PlayerPrefs.GetString("MapImport.Folder", "");
+        if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder)) return folder;
         string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-        if (Directory.Exists(downloads)) return downloads;
-        return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        return Directory.Exists(downloads) ? downloads : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
     }
 
-    static List<KeyValuePair<string, string>> Places()
+    void BrowseMapFile()
     {
-        var places = new List<KeyValuePair<string, string>>();
-        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        void Add(string label, string path)
-        {
-            if (!string.IsNullOrEmpty(path) && Directory.Exists(path)) places.Add(new KeyValuePair<string, string>(label, path));
-        }
-        Add("Downloads", Path.Combine(home, "Downloads"));
-        Add("Documents", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
-        Add("Desktop", Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
-        return places;
+        if (working) return;
+        string path = NativeFiles.OpenFile("Choose the map file", "Map files (OCAD, OOM)", MapExtensions, LastFolder());
+        if (path != null) Choose(path);
     }
 
-    // ---- Browsing ----
-
-    void GoUp()
+    // A file dragged onto the game window: a PNG is the picture, anything else the map file
+    void OnDropped(string path)
     {
-        DirectoryInfo parent = string.IsNullOrEmpty(folder) ? null : Directory.GetParent(folder);
-        ShowFolder(parent != null ? parent.FullName : null);
+        if (working || string.IsNullOrEmpty(path)) return;
+        if (Path.GetExtension(path).ToLowerInvariant() == ".png") ChoosePicture(path);
+        else Choose(path);
     }
 
-    // null shows the drives
-    void ShowFolder(string path)
+    static string CleanPath(string path)
     {
-        folder = path;
-        for (int i = list.childCount - 1; i >= 0; i--) Destroy(list.GetChild(i).gameObject);
-        browseTitle.text = browsing == Browse.MapFile ? "Choose the map file" : "Choose a PNG of the whole map (exported with all objects)";
-        folderText.text = path ?? "This computer";
-
-        try
-        {
-            if (path == null)
-            {
-                foreach (string drive in Directory.GetLogicalDrives()) AddEntry(drive, drive, true);
-                return;
-            }
-            var folders = new List<string>(Directory.GetDirectories(path));
-            folders.Sort(StringComparer.OrdinalIgnoreCase);
-            foreach (string f in folders)
-            {
-                string name = Path.GetFileName(f);
-                if (name.StartsWith(".") || name.StartsWith("$")) continue;
-                if ((File.GetAttributes(f) & FileAttributes.Hidden) != 0) continue;
-                AddEntry(name, f, true);
-            }
-            var files = new List<string>(Directory.GetFiles(path));
-            files.Sort(StringComparer.OrdinalIgnoreCase);
-            int shown = 0;
-            foreach (string f in files)
-            {
-                string ext = Path.GetExtension(f).ToLowerInvariant();
-                bool wanted = browsing == Browse.MapFile ? ext == ".ocd" || ext == ".omap" || ext == ".xmap" : ext == ".png";
-                if (!wanted) continue;
-                AddEntry(Path.GetFileName(f), f, false);
-                shown++;
-            }
-            if (shown == 0)
-            {
-                TextMeshProUGUI none = CourseUI.Text("None", list, browsing == Browse.MapFile ? "No map files in this folder." : "No PNG files in this folder.", 19, CourseUI.InkMuted, FontStyles.Italic);
-                CourseUI.Size(none, 34);
-            }
-            PlayerPrefs.SetString("MapImport.Folder", path);
-        }
-        catch (Exception e)
-        {
-            TextMeshProUGUI error = CourseUI.Text("Error", list, "Could not open this folder: " + e.Message, 19, CourseUI.Danger);
-            CourseUI.Size(error, 34);
-        }
-        listScroll.verticalNormalizedPosition = 1f;
+        return string.IsNullOrWhiteSpace(path) ? "" : path.Trim().Trim('"', '\'');
     }
 
-    void AddEntry(string label, string path, bool isFolder)
+    void ChoosePicture(string path)
     {
-        bool chosen = path == mapPath || path == picturePath;
-        Button button = CourseUI.Button(label, list, (isFolder ? "[ ]  " : "") + label,
-            chosen ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light,
-            () => { if (isFolder) ShowFolder(path); else Choose(path); }, 19);
-        TextMeshProUGUI text = button.GetComponentInChildren<TextMeshProUGUI>();
-        text.alignment = TextAlignmentOptions.MidlineLeft;
-        text.fontStyle = isFolder ? FontStyles.Bold : FontStyles.Normal;
-        CourseUI.Size(button, 40);
+        if (working) return;
+        path = CleanPath(path);
+        pictureField.SetTextWithoutNotify(path);
+        if (path.Length == 0) { picturePath = null; Refresh(); return; }
+        if (!File.Exists(path)) { SetStatus("There is no file at " + path, true); return; }
+        if (Path.GetExtension(path).ToLowerInvariant() != ".png") { SetStatus("The picture has to be a PNG file.", true); return; }
+        picturePath = path;
+        Refresh();
     }
 
     void Choose(string path)
     {
         if (working) return;
-        if (browsing == Browse.Picture)
+        path = CleanPath(path);
+        pathField.SetTextWithoutNotify(path);
+        if (path.Length == 0 || path == mapPath) return;
+        if (!File.Exists(path))
         {
-            picturePath = path;
-            browsing = Browse.MapFile;
-            ShowFolder(Path.GetDirectoryName(mapPath ?? path));
-            Refresh();
+            SetStatus("There is no file at " + path, true);
             return;
         }
+        string ext = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+        if (Array.IndexOf(MapExtensions, ext) < 0)
+        {
+            SetStatus("That is not a map file. The game reads OCAD (.ocd) and OpenOrienteering Mapper (.omap, .xmap) files.", true);
+            return;
+        }
+        PlayerPrefs.SetString("MapImport.Folder", Path.GetDirectoryName(path));
         mapPath = path;
         mapFile = null;
         version = null;
@@ -275,7 +232,6 @@ public class MapImportPanel : MonoBehaviour
             // Picked up on the main thread in Update; a file chosen after this one wins
             if (reading == mapPath) pendingRead = t;
         });
-        ShowFolder(folder);
         Refresh();
     }
 
@@ -296,9 +252,10 @@ public class MapImportPanel : MonoBehaviour
             {
                 version = t.Result.Item1;
                 mapFile = t.Result.Item2;
-                sprint = SymbolRules.LooksLikeSprint(mapFile);
+                mapType = SymbolRules.LooksLikeSprint(mapFile) ? "sprint" : "forest";
+                contourField.SetTextWithoutNotify(SymbolRules.Equidistance(mapFile).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
                 string warnings = mapFile.warnings.Count > 0 ? "  (" + mapFile.warnings.Count + " things in the file were skipped)" : "";
-                SetStatus($"{version}, 1:{mapFile.scale:0}, {mapFile.objects.Count} objects. Looks like a {(sprint ? "sprint" : "forest")} map." + warnings, false);
+                SetStatus($"{version}, 1:{mapFile.scale:0}, {mapFile.objects.Count} objects. Looks like a {mapType} map." + warnings, false);
             }
             Refresh();
         }
@@ -313,28 +270,33 @@ public class MapImportPanel : MonoBehaviour
         if (working) return;
         if (!string.IsNullOrEmpty(picturePath))
         {
-            picturePath = null;      // back to the picture the game draws
-            Refresh();
+            ChoosePicture("");      // back to the picture the game draws
             return;
         }
-        browsing = browsing == Browse.Picture ? Browse.MapFile : Browse.Picture;
-        ShowFolder(folder);
+        if (!NativeFiles.CanBrowse)
+        {
+            SetStatus("Paste the PNG's path in the field to the left.", false);
+            return;
+        }
+        string path = NativeFiles.OpenFile("Choose a PNG of the whole map", "PNG pictures", new[] { "png" },
+            mapPath != null ? Path.GetDirectoryName(mapPath) : LastFolder());
+        if (path != null) ChoosePicture(path);
+    }
+
+    void NextType()
+    {
+        mapType = MapTypes[(Array.IndexOf(MapTypes, mapType) + 1) % MapTypes.Length];
         Refresh();
     }
 
     void Refresh()
     {
         fileText.text = mapPath == null ? "No map file chosen yet." : "Map file: " + Path.GetFileName(mapPath) + (version != null ? "  (" + version + ")" : "");
-        CourseUI.SetButtonText(typeButton, sprint ? "Type: Sprint (2 m)" : "Type: Forest (10 m)");
-        CourseUI.SetButtonText(pictureButton, browsing == Browse.Picture ? "Picture: choose a PNG above"
-            : string.IsNullOrEmpty(picturePath) ? "Picture: drawn by the game" : "Picture: " + Path.GetFileName(picturePath) + "  (remove)");
+        CourseUI.SetButtonText(typeButton, mapType == "sprint" ? "Type: Sprint map" : mapType == "both" ? "Type: Forest and sprint" : "Type: Forest map");
+        CourseUI.SetButtonText(pictureButton, string.IsNullOrEmpty(picturePath)
+            ? (NativeFiles.CanBrowse ? "Choose picture..." : "Drawn by the game") : "Remove picture");
         permissionBox.enabled = permission;
-        CourseUI.SetButtonText(sendButton, sendIn
-            ? "Send the map in too, so it can be built into the game for everyone  (on)"
-            : "Keep the map on this computer only  (sending it in is off)");
-        sendButton.interactable = !working;
-        contactRow.SetActive(sendIn);
-        bool ready = mapFile != null && permission && !working && browsing == Browse.MapFile && (!sendIn || ContactGiven());
+        bool ready = mapFile != null && permission && !working && ContactGiven();
         importButton.interactable = ready;
         cancelButton.interactable = !working;
         typeButton.interactable = !working;
@@ -382,17 +344,20 @@ public class MapImportPanel : MonoBehaviour
             SetStatus("Give the map a name.", true);
             yield break;
         }
-        if (sendIn && !ContactGiven())
+        if (!ContactGiven())
         {
-            SetStatus("To send the map in, write your name, the club that owns the map and your e-mail or phone.", true);
+            SetStatus("Write your name, the club that owns the map and your e-mail or phone, so the club can be asked about the map.", true);
+            yield break;
+        }
+        if (!double.TryParse(contourField.text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double contours)
+            || contours < 0.5 || contours > 50)
+        {
+            SetStatus("Write the contour interval in metres, for instance 5 or 2.5.", true);
             yield break;
         }
         string sender = senderField.text.Trim(), club = clubField.text.Trim(), contactInfo = contactField.text.Trim();
-        if (sendIn)
-        {
-            PlayerPrefs.SetString("MapImport.Sender", sender);
-            PlayerPrefs.SetString("MapImport.Contact", contactInfo);
-        }
+        PlayerPrefs.SetString("MapImport.Sender", sender);
+        PlayerPrefs.SetString("MapImport.Contact", contactInfo);
         working = true;
         Refresh();
 
@@ -402,7 +367,9 @@ public class MapImportPanel : MonoBehaviour
         string author = PlayerPrefs.GetString("PlayerNickName", "");
         string picture = picturePath;
         MapFile source = mapFile;
-        bool isSprint = sprint;
+        bool sprintCells = mapType != "forest";   // sprint maps and maps that are both get 2 m cells
+        string type = mapType;
+        source.contourInterval = contours;
         string sourceName = Path.GetFileName(mapPath);
         MapPackage package = null;
         byte[] ownPng = null;
@@ -417,7 +384,7 @@ public class MapImportPanel : MonoBehaviour
                 if (w > MaxPictureSide || h > MaxPictureSide)
                     throw new InvalidDataException($"The picture is {w} x {h} pixels; the game can show at most {MaxPictureSide} pixels each way. Export it at a lower resolution.");
             }
-            package = MapPackageBuilder.Build(source, name, isSprint, PixelsPerMm, MaxPictureSide, ownPng == null,
+            package = MapPackageBuilder.Build(source, name, sprintCells, PixelsPerMm, MaxPictureSide, ownPng == null,
                 (step, share) => { progressShare = share; progressStep = step; });
             if (ownPng != null)
             {
@@ -427,12 +394,10 @@ public class MapImportPanel : MonoBehaviour
             package.info.id = id;
             package.info.sourceFile = sourceName;
             package.info.author = author;
+            package.info.mapType = type;
             package.info.ownerClub = club;
-            if (sendIn)
-            {
-                package.info.sender = sender;
-                package.info.contact = contactInfo;
-            }
+            package.info.sender = sender;
+            package.info.contact = contactInfo;
             package.info.permissionConfirmed = true;
             MapPackageBuilder.WriteFolder(target, package, ownPng, (step, share) => { progressShare = share; progressStep = step; });
         });
@@ -462,8 +427,7 @@ public class MapImportPanel : MonoBehaviour
         foreach (string line in package.log) Debug.Log("MapImportPanel: " + line);
 
         // Send it in: the map file goes to the game's owner (see CloudMaps); the map is already usable here
-        string sentNote = "";
-        if (sendIn)
+        string sentNote;
         {
             progressStep = null;
             SetStatus("Sending the map in ...", false);

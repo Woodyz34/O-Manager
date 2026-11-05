@@ -120,13 +120,21 @@ public class ManualPathDrawer : MonoBehaviour
             }
             if (!overUI && canDraw) // Endast rita om vi inte trycker på UI
             {
-                if (Input.GetMouseButtonDown(0) && Vector3.Distance(worldPos, ThisControll.position) < manager.cellSize * 3f)
+                float grab = Mathf.Max(manager.cellSize * 3f, 0.12f);   // at least 12 m, so the start is easy to hit
+                if (Input.GetMouseButtonDown(0))
                 {
-                    isDrawing = true;
-                    gridPath.Clear();
-                    smoothPath.Clear();
-                    line.positionCount = 0;
+                    // A line that was stopped (it could not get past something) is carried on from its end
+                    if (smoothPath.Count > 0 && Vector3.Distance(worldPos, smoothPath[smoothPath.Count - 1]) < grab)
+                    {
+                        isDrawing = true;
+                    }
+                    else if (Vector3.Distance(worldPos, ThisControll.position) < grab)
+                    {
+                        isDrawing = true;
+                        ClearLine();
+                    }
                 }
+                if (Input.GetMouseButtonUp(0)) isDrawing = false;
 
                 if (isDrawing && Input.GetMouseButton(0))
                 {
@@ -134,10 +142,7 @@ public class ManualPathDrawer : MonoBehaviour
                     if (smoothPath.Count == 0 ||
                         Vector3.Distance(smoothPath[smoothPath.Count - 1], worldPos) > Mathf.Min(minPointDistance, manager.cellSize))
                     {
-                        smoothPath.Add(worldPos);
-
-                        line.positionCount = smoothPath.Count;
-                        line.SetPosition(smoothPath.Count - 1, worldPos);
+                        if (!AddPoint(worldPos)) return;   // stopped where the line can not get on
                     }
 
                     // Check reach target
@@ -147,7 +152,7 @@ public class ManualPathDrawer : MonoBehaviour
                         isDrawing = false;
                         timeToDraw = false;
                         OnPathFinished();
-                        line.positionCount = 0;
+                        ClearLine();   // the next stretch starts from its own control
                     }
                 }
             }
@@ -230,40 +235,22 @@ public class ManualPathDrawer : MonoBehaviour
             return;
         }
 
-        // Every cell the line goes through, also between the points (they can be several cells apart on a sprint map)
-        for (int p = 0; p < smoothPath.Count; p++)
+        // The runner follows the drawn line; where it crossed ground nobody can run on (a building, private land,
+        // a lake ...) it takes the way round that was found while drawing. Route analysis keeps such lines as they
+        // are (that ground then counts as very slow).
+        var route = new List<Vector2Int>();
+        foreach (Vector2Int c in gridPath) if (RouteAnalysis.On || Passable(c)) route.Add(c);
+        foreach (List<Vector2Int> d in detours) route.AddRange(d);
+        List<Vector2Int> corridorPath = CorridorPath(route, gridPath[0], gridPath[gridPath.Count - 1], 1);
+        if ((corridorPath == null || corridorPath.Count == 0) && CrossesBlocked(gridPath) && !RouteAnalysis.On)
         {
-            Vector3 from = p == 0 ? smoothPath[0] : smoothPath[p - 1];
-            Vector3 to = smoothPath[p];
-            int steps = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(from, to) / (manager.cellSize * 0.5f)));
-            for (int s = p == 0 ? 0 : 1; s <= steps; s++)
-            {
-                Vector2Int g = WorldToGrid(Vector3.Lerp(from, to, s / (float)steps));
-                if (gridPath.Count == 0 || gridPath[gridPath.Count - 1] != g)
-                {
-                    gridPath.Add(g);
-                }
-            }
+            corridorPath = FindOptimizedPathInCorridor(gridPath, CorrectionCells);
         }
-
-        // Skapa korridor runt pathen
-        List<Vector2Int> corridorPath = FindOptimizedPathInCorridor(gridPath, 1);
-
-        // A line over ground nobody can run on (a building, private land, a lake ...) is moved round it when the way
-        // round stays within 20 m of the line; otherwise the stretch has to be drawn again.
-        // Route analysis keeps such lines as they are (that ground then counts as very slow).
-        if (CrossesBlocked(gridPath) && !RouteAnalysis.On)
+        if (!RouteAnalysis.On && corridorPath != null && corridorPath.Count > 0)
         {
-            if (corridorPath == null || corridorPath.Count == 0)
-            {
-                corridorPath = FindOptimizedPathInCorridor(gridPath, CorrectionCells);
-            }
-            if (corridorPath == null || corridorPath.Count == 0)
-            {
-                RejectLine();
-                return;
-            }
-            ShowCorrection(corridorPath);
+            // Keep the route that will be run on the map (relays keep the drawn stretches)
+            smoothPath.Clear();
+            foreach (Vector2Int c in corridorPath) smoothPath.Add(manager.GridToWorldPosition(c.y, c.x));
         }
         if (relayMode)
         {
@@ -360,42 +347,190 @@ public class ManualPathDrawer : MonoBehaviour
     }
 
     // ---- Lines over ground nobody can run on ----
+    // While the line is drawn, each piece that goes over ground nobody can run on (a building, a fence, a lake ...)
+    // is checked as soon as the line is out on the other side: when there is a way round within 100 m of it, the
+    // runner takes that way, without a word. Otherwise the line stops just before the piece, and the player carries on
+    // drawing from the end of the line (a piece longer than 200 m stops it at once).
 
-    const float CorrectionMeters = 20f;
+    const float CorrectionMeters = 100f;
 
-    // How many cells 20 m is (2 cells on a forest map, 10 on a sprint map)
+    // How many cells 100 m is (10 cells on a forest map, 50 on a sprint map)
     int CorrectionCells => Mathf.Max(1, Mathf.CeilToInt(CorrectionMeters * MapDefinition.WorldUnitsPerMeter / manager.cellSize));
+
+    readonly List<int> cellPoint = new List<int>();                    // for each cell of gridPath: the smoothPath point that added it
+    readonly List<List<Vector2Int>> detours = new List<List<Vector2Int>>();
+    readonly List<int> detourFrom = new List<int>();                  // the gridPath index each detour starts at
+    int blockedFrom = -1;                                             // gridPath index of the last good cell before a closed piece
+
+    bool Passable(Vector2Int c) => manager.speedGrid2D[c.y, c.x] > 0.01f;
 
     bool CrossesBlocked(List<Vector2Int> cells)
     {
         foreach (Vector2Int c in cells)
         {
-            if (manager.speedGrid2D[c.y, c.x] <= 0.01f) return true;
+            if (!Passable(c)) return true;
         }
         return false;
     }
 
-    void RejectLine()
+    void ClearLine()
     {
-        UIToast.Show("You can't run there: buildings, private land, lakes and other closed areas are in the way. Draw the stretch again, round them.", 5f);
-        FlashLine(new List<Vector3>(smoothPath), new Color(0.85f, 0.15f, 0.1f), 1.5f);
         gridPath.Clear();
         smoothPath.Clear();
-        line.positionCount = 0;
-        isDrawing = false;
-        timeToDraw = true;
+        cellPoint.Clear();
+        detours.Clear();
+        detourFrom.Clear();
+        blockedFrom = -1;
+        if (line != null) line.positionCount = 0;
     }
 
-    // Shows the route the runner will take instead, in orange for a moment
-    void ShowCorrection(List<Vector2Int> cells)
+    // Adds a drawn point and the cells up to it. Returns false when the line was stopped.
+    bool AddPoint(Vector3 point)
     {
-        UIToast.Show("Your line went through a closed area, so the route was moved round it.", 3f);
-        var points = new List<Vector3>(cells.Count);
-        foreach (Vector2Int c in cells) points.Add(manager.GridToWorldPosition(c.y, c.x));
-        FlashLine(points, new Color(0.91f, 0.45f, 0.16f), 2f);
-        // A relay keeps the drawn stretches on the map: keep the route that will be run
-        smoothPath.Clear();
-        smoothPath.AddRange(points);
+        smoothPath.Add(point);
+        line.positionCount = smoothPath.Count;
+        line.SetPosition(smoothPath.Count - 1, point);
+        int pointIndex = smoothPath.Count - 1;
+        Vector3 from = pointIndex == 0 ? point : smoothPath[pointIndex - 1];
+        int steps = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(from, point) / (manager.cellSize * 0.5f)));
+        for (int s = pointIndex == 0 ? 0 : 1; s <= steps; s++)
+        {
+            Vector2Int g = WorldToGrid(Vector3.Lerp(from, point, s / (float)steps));
+            if (gridPath.Count > 0 && gridPath[gridPath.Count - 1] == g) continue;
+            // A diagonal step goes through a cell beside it too: otherwise the line could slip between two closed
+            // cells that only touch at a corner (a fence across the grid)
+            if (gridPath.Count > 0)
+            {
+                Vector2Int last = gridPath[gridPath.Count - 1];
+                if (last.x != g.x && last.y != g.y && !AddCell(new Vector2Int(last.x, g.y), pointIndex)) return false;
+            }
+            if (!AddCell(g, pointIndex)) return false;
+        }
+        return true;
+    }
+
+    // Adds one cell of the drawn line and checks closed ground. Returns false when the line was stopped.
+    bool AddCell(Vector2Int g, int pointIndex)
+    {
+        {
+            gridPath.Add(g);
+            cellPoint.Add(pointIndex);
+            if (RouteAnalysis.On) return true;
+            bool open = Passable(g);
+            if (!open && blockedFrom < 0)
+            {
+                blockedFrom = gridPath.Count - 2;   // the last good cell (-1 when the line starts on closed ground)
+            }
+            else if (!open && blockedFrom >= 0 && (gridPath.Count - 1 - blockedFrom) * manager.cellSize > 2f * CorrectionMeters * MapDefinition.WorldUnitsPerMeter)
+            {
+                StopLine();
+                return false;
+            }
+            else if (open && blockedFrom >= 0)
+            {
+                List<Vector2Int> way = blockedFrom < 0 ? null : SearchInBox(gridPath[blockedFrom], g, CorrectionCells, null);
+                if (way == null || way.Count == 0)
+                {
+                    StopLine();
+                    return false;
+                }
+                detours.Add(way);
+                detourFrom.Add(blockedFrom);
+                blockedFrom = -1;
+            }
+        }
+        return true;
+    }
+
+    // Cuts the line back to just before the closed piece and stops drawing; the player carries on from there
+    void StopLine()
+    {
+        int keepCells = Mathf.Max(1, blockedFrom + 1);
+        int keepPoints = Mathf.Max(1, cellPoint[keepCells - 1]);
+        var removed = smoothPath.GetRange(keepPoints, smoothPath.Count - keepPoints);
+        FlashLine(removed, new Color(0.85f, 0.15f, 0.1f), 1.2f);
+        TrimTo(keepPoints);
+        isDrawing = false;
+        UIToast.Show("You can't get past there. Carry on drawing from the end of your line, round it.", 3f);
+    }
+
+    // Keeps the first count drawn points and the cells and detours that belong to them
+    void TrimTo(int count)
+    {
+        count = Mathf.Clamp(count, 0, smoothPath.Count);
+        smoothPath.RemoveRange(count, smoothPath.Count - count);
+        int cells = 0;
+        while (cells < cellPoint.Count && cellPoint[cells] < count) cells++;
+        gridPath.RemoveRange(cells, gridPath.Count - cells);
+        cellPoint.RemoveRange(cells, cellPoint.Count - cells);
+        for (int d = detours.Count - 1; d >= 0; d--)
+        {
+            if (detourFrom[d] + 1 < cells && DetourEnds(d) < cells) continue;
+            detours.RemoveAt(d);
+            detourFrom.RemoveAt(d);
+        }
+        blockedFrom = -1;
+        for (int i = cells - 1; i >= 0 && !RouteAnalysis.On; i--)
+        {
+            if (Passable(gridPath[i])) break;
+            blockedFrom = i - 1;
+        }
+        if (line != null)
+        {
+            line.positionCount = smoothPath.Count;
+            if (smoothPath.Count > 0) line.SetPositions(smoothPath.ToArray());
+        }
+    }
+
+    // The gridPath index where detour d comes out on good ground again
+    int DetourEnds(int d)
+    {
+        Vector2Int end = detours[d][detours[d].Count - 1];
+        for (int i = detourFrom[d] + 1; i < gridPath.Count; i++) if (gridPath[i] == end) return i;
+        return int.MaxValue;
+    }
+
+    // The fastest way from a to b inside a box round them (margin cells on each side), only over the allowed cells
+    // when a set is given. Works on a small copy of that part of the grid, so it is quick even on a 2 m grid.
+    List<Vector2Int> SearchInBox(Vector2Int a, Vector2Int b, int margin, HashSet<Vector2Int> allowed)
+    {
+        return SearchInBox(new List<Vector2Int> { a, b }, a, b, margin, allowed);
+    }
+
+    List<Vector2Int> SearchInBox(List<Vector2Int> around, Vector2Int a, Vector2Int b, int margin, HashSet<Vector2Int> allowed)
+    {
+        int rows = manager.speedGrid2D.GetLength(0), cols = manager.speedGrid2D.GetLength(1);
+        int x0 = int.MaxValue, y0 = int.MaxValue, x1 = int.MinValue, y1 = int.MinValue;
+        foreach (Vector2Int c in around)
+        {
+            x0 = Mathf.Min(x0, c.x); y0 = Mathf.Min(y0, c.y); x1 = Mathf.Max(x1, c.x); y1 = Mathf.Max(y1, c.y);
+        }
+        x0 = Mathf.Max(0, x0 - margin); y0 = Mathf.Max(0, y0 - margin);
+        x1 = Mathf.Min(cols - 1, x1 + margin); y1 = Mathf.Min(rows - 1, y1 + margin);
+        int w = x1 - x0 + 1, h = y1 - y0 + 1;
+        var speed = new float[h, w];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                speed[y, x] = allowed == null || allowed.Contains(new Vector2Int(x + x0, y + y0)) ? manager.speedGrid2D[y + y0, x + x0] : 0f;
+        Dictionary<string, float[,]> slopes = null;
+        if (manager.slopeFactors != null)
+        {
+            slopes = new Dictionary<string, float[,]>();
+            foreach (var pair in manager.slopeFactors)
+            {
+                if (pair.Value == null) continue;
+                var part = new float[h, w];
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                        part[y, x] = pair.Value[y + y0, x + x0];
+                slopes[pair.Key] = part;
+            }
+        }
+        var offset = new Vector2Int(x0, y0);
+        List<Vector2Int> path = new AStarPathfinder(speed, slopes).FindPath(a - offset, b - offset, 1);
+        if (path == null) return null;
+        for (int i = 0; i < path.Count; i++) path[i] += offset;
+        return path;
     }
 
     void FlashLine(List<Vector3> points, Color color, float seconds)
@@ -447,14 +582,7 @@ public class ManualPathDrawer : MonoBehaviour
         if (smoothPath.Count == 0 || line.positionCount == 0) return;
 
         
-        // Begränsa count till antalet punkter vi faktiskt har
-        int removeCount = Mathf.Min(count, smoothPath.Count);
-
-        // Ta bort från listan
-        smoothPath.RemoveRange(smoothPath.Count - removeCount, removeCount);
-
-        // Ta bort från LineRenderer
-        line.positionCount -= removeCount;
+        TrimTo(smoothPath.Count - Mathf.Min(count, smoothPath.Count));
     }
     public void usingMoveTool()
     {
@@ -470,51 +598,34 @@ public class ManualPathDrawer : MonoBehaviour
     {
         if (relayMode) return;
         isDrawing = false;
-        gridPath.Clear();
-        smoothPath.Clear();
-        if (line != null) line.positionCount = 0;
+        ClearLine();
     }
 
-    // Only reads the grid, so it can also be run on a background thread
+    // The fastest way from the first to the last cell that stays within corridorRadius cells of the drawn cells.
+    // Only reads the grid, so it can also be run on a background thread.
     public List<Vector2Int> FindOptimizedPathInCorridor(List<Vector2Int> drawnPath, int corridorRadius)
+    {
+        if (drawnPath == null || drawnPath.Count == 0) return null;
+        return CorridorPath(drawnPath, drawnPath[0], drawnPath[drawnPath.Count - 1], corridorRadius);
+    }
+
+    List<Vector2Int> CorridorPath(List<Vector2Int> cells, Vector2Int start, Vector2Int end, int corridorRadius)
     {
         int rows = manager.speedGrid2D.GetLength(0);
         int cols = manager.speedGrid2D.GetLength(1);
-
-        // Gör en kopia av grid
-        float[,] corridorGrid = new float[rows, cols];
-        for (int i = 0; i < rows; i++)
-        {
-            for (int j = 0; j < cols; j++)
-            {
-                corridorGrid[i, j] = 0f; // default: blockerat
-            }
-        }
-
-        // Tillåt celler inom korridoren
-        foreach (var p in drawnPath)
+        var allowed = new HashSet<Vector2Int>();
+        foreach (Vector2Int p in cells)
         {
             for (int dy = -corridorRadius; dy <= corridorRadius; dy++)
             {
                 for (int dx = -corridorRadius; dx <= corridorRadius; dx++)
                 {
-                    int nx = p.x + dx;
-                    int ny = p.y + dy;
-
-                    if (nx >= 0 && nx < cols && ny >= 0 && ny < rows)
-                    {
-                        corridorGrid[ny, nx] = manager.speedGrid2D[ny, nx];
-                    }
+                    int nx = p.x + dx, ny = p.y + dy;
+                    if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) allowed.Add(new Vector2Int(nx, ny));
                 }
             }
         }
-
-        // Kör A* i korridoren
-        var pathfinder = new AStarPathfinder(corridorGrid, manager.slopeFactors);
-        Vector2Int start = drawnPath[0];
-        Vector2Int end = drawnPath[drawnPath.Count-1];
-        List<Vector2Int> optimizedPath = pathfinder.FindPath(start, end, 1);
-
-        return optimizedPath;
+        var around = new List<Vector2Int>(cells) { start, end };
+        return SearchInBox(around, start, end, corridorRadius + 1, allowed);
     }
 }

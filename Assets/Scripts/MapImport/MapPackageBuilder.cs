@@ -13,7 +13,7 @@ namespace MapImport
     {
         public string id;
         public string name;
-        public string mapType = "forest";     // "forest" or "sprint"
+        public string mapType = "forest";     // "forest", "sprint" or "both"
         public string sourceFile;
         public string sourceFormat;           // "OCAD 12.4", "OpenOrienteering Mapper 9"
         public float scale;
@@ -28,6 +28,7 @@ namespace MapImport
         public float pivotX, pivotY;
         public bool ownPicture;               // the player gave a PNG instead of the drawn one
         public bool hasHeights;
+        public float contourInterval;         // metres, used for the heights
         // Where the map lies in the national grid, when the file says so
         public bool georeferenced;
         public double refEast, refNorth;
@@ -121,6 +122,7 @@ namespace MapImport
                 maxx = (float)(grid.minE + offE + (grid.cols - 0.5) * cell),
                 maxy = (float)(grid.minN + offN + (grid.rows - 0.5) * cell),
                 hasHeights = grid.hasHeights,
+                contourInterval = (float)SymbolRules.Equidistance(map),
                 georeferenced = map.georeferenced,
                 refEast = map.refEast,
                 refNorth = map.refNorth,
@@ -225,7 +227,7 @@ namespace MapImport
             N("scale", i.scale); N("cellSize", i.cellSize); N("rows", i.rows); N("cols", i.cols);
             N("minx", i.minx); N("miny", i.miny); N("maxx", i.maxx); N("maxy", i.maxy);
             N("pictureWidth", i.pictureWidth); N("pictureHeight", i.pictureHeight); N("pixelsPerMeter", i.pixelsPerMeter);
-            N("pivotX", i.pivotX); N("pivotY", i.pivotY); B("ownPicture", i.ownPicture); B("hasHeights", i.hasHeights);
+            N("pivotX", i.pivotX); N("pivotY", i.pivotY); B("ownPicture", i.ownPicture); B("hasHeights", i.hasHeights); N("contourInterval", i.contourInterval);
             B("georeferenced", i.georeferenced); N("refEast", i.refEast); N("refNorth", i.refNorth); N("gridAngle", i.gridAngle); N("crs", i.crs);
             N("offsetEast", i.offsetEast); N("offsetNorth", i.offsetNorth);
             S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created);
