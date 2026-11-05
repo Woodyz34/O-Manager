@@ -65,6 +65,15 @@ public class ModesPopup : MonoBehaviour
         {
             ExtraMode captured = mode;
             string description = ExtraModes.Description(mode);
+            // Bears and Move a control cannot be ticked on a sprint course (nor the modes for individual courses on a relay)
+            string notHere = ExtraModes.NotOn(mode, CourseLibrary.Current);
+            if (notHere != null)
+            {
+                modes &= ~mode;
+                AddTile(ExtraModes.Title(mode) + "  <size=20><color=#C0392B>" + notHere + " (this course)</color></size>", description, false,
+                    () => UIToast.Show(ExtraModes.Title(captured) + ": " + notHere.ToLowerInvariant() + ". Choose another course to play it."));
+                continue;
+            }
             AddTile(ExtraModes.Title(mode), description, (modes & mode) != 0, () => modes = ExtraModes.Toggle(modes, captured));
         }
     }
