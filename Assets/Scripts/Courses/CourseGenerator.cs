@@ -240,7 +240,7 @@ public static class CourseGenerator
     const float MinLegMeters = 60f;
     const float SprintMinLegMeters = 40f;
     const float MinControlSpacing = 60f;        // two controls never closer than this
-    const float SprintMinControlSpacing = 30f;
+    const float SprintMinControlSpacing = 45f;   // closer controls overlap on the map
     const float MaxDetour = 2.0f;               // a leg's shortest route at most this many times the straight line
     const float SprintMaxDetour = 2.5f;         // houses and fences make sprint routes wind more
     const int Attempts = 60;

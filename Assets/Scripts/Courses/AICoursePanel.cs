@@ -272,7 +272,8 @@ public class AICoursePanel : MonoBehaviour
             string type = m.mapType == "both" ? "Forest and sprint" : m.mapType == "sprint" ? "Sprint" : "Forest";
             if (search.Length > 0 && !(m.displayName + " " + type).ToLowerInvariant().Contains(search)) continue;
             MapDefinition chosen = m;
-            Button button = CourseUI.Button(m.displayName, mapPickerList, m.displayName + "   <size=18><color=#5B7563>" + type + "</color></size>",
+            string typeColor = m == map ? "#D8E6DC" : "#5B7563";   // readable on the dark green of the chosen map too
+            Button button = CourseUI.Button(m.displayName, mapPickerList, m.displayName + "   <size=18><color=" + typeColor + ">" + type + "</color></size>",
                 m == map ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light, () => { CloseMapPicker(); if (chosen != map) SetMap(chosen); }, 22);
             button.GetComponentInChildren<TextMeshProUGUI>().alignment = TextAlignmentOptions.MidlineLeft;
             CourseUI.Size(button, 52);
