@@ -648,7 +648,15 @@ public class RouteChoiceGenerator
         }
         // The cost along the cell route, from its start
         float[] along = new float[n];
-        for (int i = 1; i < n; i++) along[i] = along[i - 1] + LineCost(cells[i - 1], cells[i], out _);
+        // How many steps of the cell route touch impassable ground, up to each cell. A route the player drew over
+        // such ground (route analysis keeps a line over a lake or a garden as it is) may be made straight over it
+        // too, as long as that is no slower; otherwise every wobble of the hand there would stay.
+        int[] blockedSteps = new int[n];
+        for (int i = 1; i < n; i++)
+        {
+            along[i] = along[i - 1] + LineCost(cells[i - 1], cells[i], out bool stepBlocked);
+            blockedSteps[i] = blockedSteps[i - 1] + (stepBlocked ? 1 : 0);
+        }
 
         // Straight pieces, as long as they are no slower than the cells they replace
         int reach = Mathf.Clamp(Mathf.RoundToInt(LookAheadMeters / cellMeters), 8, 80);
@@ -660,7 +668,8 @@ public class RouteChoiceGenerator
             for (int j = at + 2; j < n && j <= at + reach; j++)
             {
                 float cost = LineCost(cells[at], cells[j], out bool blocked);
-                if (!blocked && cost <= (along[j] - along[at]) * 1.01f + 0.0001f) { best = j; misses = 0; }
+                bool allowed = !blocked || blockedSteps[j] > blockedSteps[at];
+                if (allowed && cost <= (along[j] - along[at]) * 1.01f + 0.0001f) { best = j; misses = 0; }
                 else if (++misses > 6) break;
             }
             line.Add(cells[best]);
