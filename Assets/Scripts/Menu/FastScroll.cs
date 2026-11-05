@@ -4,13 +4,17 @@ using UnityEngine.UI;
 // Makes a long list of cards quick to get through: a scrollbar next to the list that can be dragged
 // (or clicked) to jump anywhere, a mouse wheel that speeds up when it is spun fast, and the keys
 // Page Up, Page Down, Home and End. Added from code, so the saved scenes need no rebuild.
+[DefaultExecutionOrder(1000)]   // after ScrollRect, which sets the handle size in its LateUpdate
 public class FastScroll : MonoBehaviour
 {
+    const float MinHandle = 40f;      // the handle is never shorter than this, so it can be grabbed
     const float WheelStep = 180f;     // pixels per wheel notch, about half a row of cards
     const float MaxBoost = 5f;        // a fast spin moves up to this many times further per notch
     const float SpinGap = 0.14f;      // notches closer than this count as one fast spin
 
     ScrollRect scroll;
+    RectTransform bar;
+    bool besideList;
     float boost = 1f;
     float lastNotch = -10f;
 
@@ -36,16 +40,13 @@ public class FastScroll : MonoBehaviour
         Transform parent = stretched ? list.parent : list;
 
         GameObject barObject = new GameObject("Fast scrollbar", typeof(RectTransform));
-        RectTransform bar = (RectTransform)barObject.transform;
+        bar = (RectTransform)barObject.transform;
+        besideList = stretched;
         bar.SetParent(parent, false);
         bar.SetSiblingIndex(stretched ? list.GetSiblingIndex() + 1 : list.childCount - 1);
         if (stretched)
         {
-            bar.anchorMin = new Vector2(1, list.anchorMin.y);
-            bar.anchorMax = new Vector2(1, list.anchorMax.y);
-            bar.pivot = new Vector2(0, 0.5f);
-            bar.offsetMin = new Vector2(list.offsetMax.x + 16f, list.offsetMin.y + 8f);
-            bar.offsetMax = new Vector2(list.offsetMax.x + 34f, list.offsetMax.y - 8f);
+            FollowList();
         }
         else
         {
@@ -86,6 +87,30 @@ public class FastScroll : MonoBehaviour
         scroll.verticalScrollbar = scrollbar;
         scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
         scroll.scrollSensitivity = WheelStep;
+    }
+
+    // The list can move or change height after the bar is made (Choose a runner raises its bottom
+    // edge for the course info), so the bar follows it
+    void FollowList()
+    {
+        RectTransform list = (RectTransform)scroll.transform;
+        bar.anchorMin = new Vector2(1, list.anchorMin.y);
+        bar.anchorMax = new Vector2(1, list.anchorMax.y);
+        bar.pivot = new Vector2(0, 0.5f);
+        bar.offsetMin = new Vector2(list.offsetMax.x + 16f, list.offsetMin.y + 8f);
+        bar.offsetMax = new Vector2(list.offsetMax.x + 34f, list.offsetMax.y - 8f);
+    }
+
+    void LateUpdate()
+    {
+        if (scroll == null || bar == null) return;
+        if (besideList) FollowList();
+        Scrollbar scrollbar = scroll.verticalScrollbar;
+        float height = bar.rect.height;
+        if (scrollbar != null && height > 0f && scrollbar.size < MinHandle / height)
+        {
+            scrollbar.size = Mathf.Min(1f, MinHandle / height);
+        }
     }
 
     static RectTransform NewRect(string name, Transform parent)
