@@ -51,6 +51,8 @@ public class RouteChoiceGenerator
     const float ViaReach = 0.75f;          // route choices split in the first 75 % of the leg; after that, the fastest way in
     const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
     const float MaxSameShare = 0.5f;       // at most half of a route's middle may run next to another route
+    const float LocalShare = 0.15f;        // round its point, a route must be the fastest way over this share of the leg's time
+    const float LocalSlack = 1.05f;        // (5 % slower still counts as the fastest way)
     const float TurnAcceleration = 2f;     // as AgentMovement.TurnAcceleration (world units per second²)
     const float TurnWindowMeters = 20f;    // as AgentMovement.TurnWindowMeters
 
@@ -215,9 +217,11 @@ public class RouteChoiceGenerator
             // (A point just beside a good route gives a route with a spike out to the point and back: the sharp
             // turn rules it out below.)
             covered[via.Value] = true;
-            Cover(covered, route, corridor);
             if (route.Count < 2) continue;
             if (++tried > MaxTries) break;
+            // A route bent to touch its point is no real choice: round the point it must be the fastest way itself
+            if (!Natural(route, via.Value, bestCost * LocalShare)) continue;
+            Cover(covered, route, corridor);
             // Only routes that run somewhere else than every route found so far
             bool fresh = true;
             foreach (RouteChoice c in candidates)
@@ -423,6 +427,39 @@ public class RouteChoiceGenerator
                 Push(other, total);
             }
         }
+    }
+
+    // True when the route, from a bit before the point to a bit after it (together about 'reach' seconds), is the
+    // fastest way between those two places. A route that only goes out of its way to pass the point fails this:
+    // the fastest way between them cuts the corner. A real route choice passes, as it is fastest all along.
+    bool Natural(List<Vector2Int> route, int via, float reach)
+    {
+        Vector2Int v = new Vector2Int(via % width, via / width);
+        int at = route.IndexOf(v);
+        if (at < 0) return true;
+        int a = at, b = at;
+        float own = 0f;
+        while (a > 0 && own < reach / 2f) { own += StepCost(route[a - 1], route[a]); a--; }
+        float back = own;
+        while (b < route.Count - 1 && own - back < reach / 2f) { own += StepCost(route[b], route[b + 1]); b++; }
+        if (b - a < 2) return true;
+        List<Vector2Int> shortcut = Path(route[a], route[b]);
+        if (shortcut == null) return true;
+        float fastest = 0f;
+        for (int i = 0; i + 1 < shortcut.Count; i++) fastest += StepCost(shortcut[i], shortcut[i + 1]);
+        return own <= fastest * LocalSlack + 0.0001f;
+    }
+
+    // The cost of one step between two neighbouring cells, as in Tree
+    float StepCost(Vector2Int p, Vector2Int q)
+    {
+        int dx = q.x - p.x, dy = q.y - p.y;
+        int d = 0;
+        for (int k = 0; k < 8; k++) if (DirX[k] == dx && DirY[k] == dy) { d = k; break; }
+        float step = (dx != 0 && dy != 0) ? 1.414f : 1f;
+        float slope = slopes[d] != null ? slopes[d][p.y, p.x] : 1f;
+        if (slope <= 0f || speed[q.y, q.x] <= 0.01f) return 1000f;
+        return step / speed[q.y, q.x] / slope;
     }
 
     // The fastest route from the start through a cell to the goal, without loops
