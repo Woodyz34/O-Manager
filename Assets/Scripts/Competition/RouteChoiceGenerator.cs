@@ -160,6 +160,34 @@ public class RouteChoiceGenerator
         return result;
     }
 
+    // Route analysis: the computer's fastest route on a leg, as the fastest choice in the route choice game (the same
+    // search in a window round the leg, made smooth and timed the same way). Null when there is no way through.
+    public RouteChoice Fastest(Vector2Int from, Vector2Int to)
+    {
+        float straightMeters = Vector2.Distance(from, to) * cellMeters;
+        int margin = Mathf.CeilToInt(Mathf.Max(0.6f * straightMeters, 80f) / cellMeters);
+        int x0 = Mathf.Max(0, Mathf.Min(from.x, to.x) - margin);
+        int y0 = Mathf.Max(0, Mathf.Min(from.y, to.y) - margin);
+        int x1 = Mathf.Min(width - 1, Mathf.Max(from.x, to.x) + margin);
+        int y1 = Mathf.Min(height - 1, Mathf.Max(from.y, to.y) + margin);
+        Vector2Int offset = new Vector2Int(x0, y0);
+        RouteChoiceGenerator window = new RouteChoiceGenerator(this, x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+        List<Vector2Int> best = window.Path(from - offset, to - offset);
+        if (best == null || best.Count < 2) return null;
+        for (int i = 0; i < best.Count; i++) best[i] += offset;
+        return Timed(best);
+    }
+
+    // Route analysis: a route the player drew (already made into grid cells) as a smooth line, timed. Unlike
+    // Evaluate, the ends are left as drawn.
+    public RouteChoice Timed(List<Vector2Int> route)
+    {
+        if (route == null || route.Count == 0) return null;
+        List<Vector2> line = Smooth(route);
+        float seconds = Seconds(line, out float sharpest);
+        return new RouteChoice { cells = route, points = line, seconds = seconds, meters = Meters(line), sharpestTurn = sharpest };
+    }
+
     RouteChoiceLeg MakeHere(int leg, Vector2Int from, Vector2Int to, int seed, float straightMeters)
     {
         RouteChoiceLeg result = new RouteChoiceLeg { leg = leg };

@@ -50,7 +50,9 @@ public static class RouteAnalysis
         agent.startView();
     }
 
-    // The last stretch is drawn: work out the times and share the routes
+    // The last stretch is drawn: work out the times and share the routes. Each route is the drawn line made into
+    // grid cells (A* close to the line, as in a race), then made smooth the way the route choice game does it:
+    // straight wherever that is no slower, with rounded corners. That smooth line is what is timed and shown.
     public static void OnCourseDrawn(AgentMovement agent)
     {
         NetworkPlayer np = agent.GetComponent<NetworkPlayer>();
@@ -61,19 +63,28 @@ public static class RouteAnalysis
         if (np == null || manager == null) return;
 
         List<List<Vector2Int>> legs = agent.relaySegments;
-        int cols = manager.speedGrid2D.GetLength(1);
         int count = Mathf.Min(legs.Count, np.analysisLegTimes.Length);
-
-        // The routes, made simpler until they fit in what is shared
-        float tolerance = 0.8f;
-        List<List<Vector2Int>> simple = null;
-        for (int attempt = 0; attempt < 12; attempt++)
+        RouteChoiceGenerator generator = Generator(manager, agent.originalBaseSpeed);
+        List<List<Vector2>> lines = new List<List<Vector2>>();
+        for (int k = 0; k < count; k++)
         {
-            simple = new List<List<Vector2Int>>();
+            RouteChoice timed = generator.Timed(legs[k]);
+            lines.Add(timed != null ? timed.points : new List<Vector2>());
+            np.analysisLegTimes.Set(k, timed != null ? Mathf.RoundToInt(timed.seconds) : 0);
+        }
+
+        // The lines, made simpler until they fit in what is shared
+        int scale = Scale(manager);
+        int cols = manager.speedGrid2D.GetLength(1) * scale;
+        float tolerance = 0.15f;
+        List<List<Vector2>> simple = null;
+        for (int attempt = 0; attempt < 14; attempt++)
+        {
+            simple = new List<List<Vector2>>();
             int total = 0;
             for (int k = 0; k < count; k++)
             {
-                List<Vector2Int> s = Simplify(legs[k], tolerance);
+                List<Vector2> s = Simplify(lines[k], tolerance);
                 simple.Add(s);
                 total += s.Count;
             }
@@ -83,70 +94,65 @@ public static class RouteAnalysis
         int at = 0;
         for (int k = 0; k < count; k++)
         {
-            foreach (Vector2Int cell in simple[k])
+            foreach (Vector2 p in simple[k])
             {
                 if (at >= np.analysisPoints.Length) break;
-                np.analysisPoints.Set(at++, cell.y * cols + cell.x);
+                np.analysisPoints.Set(at++, Mathf.RoundToInt(p.y * scale) * cols + Mathf.RoundToInt(p.x * scale));
             }
             np.analysisLegEnds.Set(k, at);
-            np.analysisLegTimes.Set(k, Seconds(legs[k], manager, agent.originalBaseSpeed));
         }
         np.analysisLegCount = count;
         np.analysisDone = true;
     }
 
-    // The time the standard runner needs on a route, from the same speeds the runners use in a race
-    // (speed = base speed x ground x slope; the competition clock runs GameSecondsPerSecond)
-    public static int Seconds(List<Vector2Int> route, PathfindingManager manager, float baseSpeed)
+    // The shared points are grid coordinates in quarter cells (whole cells on a very big grid, so they fit in an int)
+    static int Scale(PathfindingManager manager)
     {
-        if (route == null || route.Count < 2 || baseSpeed <= 0f) return 0;
-        float cost = PathCost(manager.speedGrid2D, manager.slopeFactors, route);
-        if (cost <= 0f) return 0;
-        float realSeconds = cost * manager.cellSize / baseSpeed;
-        return Mathf.RoundToInt(realSeconds * PackRunning.GameSecondsPerSecond);
+        long cells = (long)manager.speedGrid2D.GetLength(0) * manager.speedGrid2D.GetLength(1);
+        return cells * 16 < int.MaxValue ? 4 : 1;
     }
 
-    // The same cost as A* uses: distance / ground speed / slope, step by step. Cells that are not next to each other
-    // are filled in with a straight line.
-    static float PathCost(float[,] speed, Dictionary<string, float[,]> slopes, List<Vector2Int> route)
+    public static bool IsSprint(PathfindingManager manager)
     {
-        float cost = 0f;
-        for (int i = 0; i < route.Count - 1; i++)
+        return CourseLoader.LoadedMap != null ? CourseLoader.LoadedMap.IsSprint : manager.cellSize / MapDefinition.WorldUnitsPerMeter < 5f;
+    }
+
+    // The same smoothing and timing as the route choice game, with this runner's speed
+    public static RouteChoiceGenerator Generator(PathfindingManager manager, float baseSpeed)
+    {
+        return new RouteChoiceGenerator(manager.speedGrid2D, manager.slopeFactors, manager.cellSize,
+            baseSpeed, PackRunning.GameSecondsPerSecond, IsSprint(manager));
+    }
+
+    // A point in grid coordinates (cell centres on whole numbers) on the map
+    public static Vector3 GridToWorld(PathfindingManager manager, Vector2 p)
+    {
+        Vector3 origin = manager.GridToWorldPosition(0, 0);
+        return new Vector3(origin.x + p.x * manager.cellSize, origin.y + p.y * manager.cellSize, origin.z);
+    }
+
+    // While drawing: a stretch just drawn, as the smooth line it is timed on, so what is left on the map is the
+    // route and not every wobble of the hand
+    public static List<Vector3> SmoothWorld(PathfindingManager manager, List<Vector2Int> cells, float z)
+    {
+        List<Vector3> points = new List<Vector3>();
+        if (manager == null || cells == null || cells.Count == 0) return points;
+        RouteChoice timed = Generator(manager, 1f).Timed(cells);
+        if (timed == null) return points;
+        foreach (Vector2 p in timed.points)
         {
-            Vector2Int a = route[i];
-            Vector2Int b = route[i + 1];
-            int steps = Mathf.Max(Mathf.Abs(b.x - a.x), Mathf.Abs(b.y - a.y));
-            Vector2Int from = a;
-            for (int s = 1; s <= steps; s++)
-            {
-                Vector2Int to = new Vector2Int(
-                    Mathf.RoundToInt(Mathf.Lerp(a.x, b.x, (float)s / steps)),
-                    Mathf.RoundToInt(Mathf.Lerp(a.y, b.y, (float)s / steps)));
-                float cellSpeed = speed[to.y, to.x];
-                if (cellSpeed <= 0.01f) cellSpeed = 0.05f;
-                float slope = 1f;
-                string dir = Direction(from, to);
-                if (slopes != null && slopes.TryGetValue(dir, out float[,] grid)) slope = Mathf.Max(0.05f, grid[from.y, from.x]);
-                float distance = (to.x != from.x && to.y != from.y) ? 1.414f : 1f;
-                cost += distance / cellSpeed / slope;
-                from = to;
-            }
+            Vector3 w = GridToWorld(manager, p);
+            points.Add(new Vector3(w.x, w.y, z));
         }
-        return cost;
+        return points;
     }
 
-    static string Direction(Vector2Int from, Vector2Int to)
+    // How far from the drawn line its route may run: about 4 m, so a line drawn roughly along a road or a path
+    // follows it (one cell on a forest map, two on a sprint map)
+    public static int CorridorCells(PathfindingManager manager)
     {
-        int dx = to.x - from.x;
-        int dy = to.y - from.y;
-        if (dx == 0 && dy > 0) return "N";
-        if (dx > 0 && dy > 0) return "NE";
-        if (dx > 0 && dy == 0) return "E";
-        if (dx > 0 && dy < 0) return "SE";
-        if (dx == 0 && dy < 0) return "S";
-        if (dx < 0 && dy < 0) return "SW";
-        if (dx < 0 && dy == 0) return "W";
-        return "NW";
+        float cellMeters = manager.cellSize / MapDefinition.WorldUnitsPerMeter;
+        return Mathf.Clamp(Mathf.CeilToInt(4f / Mathf.Max(0.1f, cellMeters)), 1, 3);
     }
 
     // Douglas-Peucker: keeps the corners of a route, drops the cells in between
@@ -181,6 +187,35 @@ public static class RouteAnalysis
         return result;
     }
 
+    public static List<Vector2> Simplify(List<Vector2> route, float tolerance)
+    {
+        if (route == null || route.Count <= 2) return route != null ? new List<Vector2>(route) : new List<Vector2>();
+        bool[] keep = new bool[route.Count];
+        keep[0] = keep[route.Count - 1] = true;
+        Stack<Vector2Int> spans = new Stack<Vector2Int>();
+        spans.Push(new Vector2Int(0, route.Count - 1));
+        while (spans.Count > 0)
+        {
+            Vector2Int span = spans.Pop();
+            float worst = 0f;
+            int index = -1;
+            for (int i = span.x + 1; i < span.y; i++)
+            {
+                float d = DistanceToSegment(route[i], route[span.x], route[span.y]);
+                if (d > worst) { worst = d; index = i; }
+            }
+            if (index >= 0 && worst > tolerance)
+            {
+                keep[index] = true;
+                spans.Push(new Vector2Int(span.x, index));
+                spans.Push(new Vector2Int(index, span.y));
+            }
+        }
+        List<Vector2> result = new List<Vector2>();
+        for (int i = 0; i < route.Count; i++) if (keep[i]) result.Add(route[i]);
+        return result;
+    }
+
     static float DistanceToSegment(Vector2 p, Vector2 a, Vector2 b)
     {
         Vector2 ab = b - a;
@@ -194,8 +229,10 @@ public static class RouteAnalysis
         List<RouteEntry> entries = new List<RouteEntry>();
         PathfindingManager manager = Object.FindObjectOfType<PathfindingManager>();
         if (manager == null || manager.speedGrid2D == null) return entries;
-        int cols = manager.speedGrid2D.GetLength(1);
+        int scale = Scale(manager);
+        int cols = manager.speedGrid2D.GetLength(1) * scale;
         int legs = manager.controlPoints.Count - 1;
+        List<Color> used = new List<Color>();
         foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
             if (player.Object == null || !player.Object.IsValid || !player.analysisDone) continue;
@@ -203,7 +240,7 @@ public static class RouteAnalysis
             {
                 label = BearMode.Name(player),
                 isLocal = player.Object.HasStateAuthority,
-                color = RouteEntry.ColorOf(player, entries.Count),
+                color = RouteEntry.Distinct(RouteEntry.ColorOf(player, entries.Count), used),
                 legs = new List<Vector3>[legs + 1],
                 times = new int[legs + 1],
                 estimated = true
@@ -216,7 +253,7 @@ public static class RouteAnalysis
                 for (int i = start; i < end; i++)
                 {
                     int packed = player.analysisPoints[i];
-                    points.Add(manager.GridToWorldPosition(packed / cols, packed % cols));
+                    points.Add(GridToWorld(manager, new Vector2((float)(packed % cols) / scale, (float)(packed / cols) / scale)));
                 }
                 // Every route starts and ends on the controls
                 if (points.Count > 0)
@@ -274,6 +311,35 @@ public class RouteEntry
             return own;
         }
         return Palette[index % Palette.Length];
+    }
+
+    // Two players can have (nearly) the same colour, and a very dark one looks like the computer's route: then the
+    // next free colour of the palette is taken, so every route can be told apart. The colour is added to used.
+    public static Color Distinct(Color wanted, List<Color> used)
+    {
+        Color pick = wanted;
+        bool dark = wanted.r + wanted.g + wanted.b < 0.6f;
+        if (dark || Taken(wanted, used))
+        {
+            foreach (Color c in Palette)
+            {
+                if (Taken(c, used)) continue;
+                pick = c;
+                break;
+            }
+        }
+        used.Add(pick);
+        return pick;
+    }
+
+    static bool Taken(Color c, List<Color> used)
+    {
+        foreach (Color u in used)
+        {
+            float d = Mathf.Abs(c.r - u.r) + Mathf.Abs(c.g - u.g) + Mathf.Abs(c.b - u.b);
+            if (d < 0.35f) return true;
+        }
+        return false;
     }
 
     public int Total
@@ -365,9 +431,12 @@ public class RouteCompareView : MonoBehaviour
     Button previous;
     Button next;
     Button back;
-    Task<List<Vector2Int>> bestTask;
-    int bestLeg = -1;
-    bool bestShown;
+    // The computer's fastest route on every leg (index 1 = start to control 1), worked out in the background one leg
+    // after the other, and the leg shown when it was last drawn
+    RouteChoice[] computer;
+    volatile bool stopWorking;
+    int computerShown = -1;
+    int focus = -2;         // the route shown clearly, the others faded: -2 = all, -1 = the computer's, else a player
     float nextPoll;
     static Material material;
 
@@ -384,6 +453,7 @@ public class RouteCompareView : MonoBehaviour
         view.onClose = onClose;
         view.entries = FromTracks(race, tracks ?? new List<RelayTrack>(), view.Legs);
         view.Build("Back to statistics");
+        view.StartComputer();
         view.Show(Mathf.Max(1, leg));
         return view;
     }
@@ -396,6 +466,7 @@ public class RouteCompareView : MonoBehaviour
         view.source = RouteAnalysis.SharedRoutes;
         view.entries = view.source();
         view.Build(CompetitionFlow.LocalIsHost() ? "Back to the lobby" : "The host takes everyone back to the lobby");
+        view.StartComputer();
         view.Show(0);
         return view;
     }
@@ -456,13 +527,14 @@ public class RouteCompareView : MonoBehaviour
         List<RouteEntry> entries = new List<RouteEntry>();
         if (manager == null) return entries;
         List<Transform> points = manager.controlPoints;
+        List<Color> used = new List<Color>();
         foreach (RelayTrack track in tracks)
         {
             RouteEntry entry = new RouteEntry
             {
                 label = track.label,
                 isLocal = track.isLocal,
-                color = track.color,
+                color = RouteEntry.Distinct(track.color, used),
                 legs = new List<Vector3>[legs + 1],
                 times = new int[legs + 1]
             };
@@ -497,15 +569,73 @@ public class RouteCompareView : MonoBehaviour
         return entries;
     }
 
+    // ---- The computer's routes ----
+
+    // The same fastest route the route choice game finds (a search in a window round each leg), made smooth and timed
+    // the same way as the players' routes, with the local runner (in route analysis the standard runner)
+    void StartComputer()
+    {
+        PathfindingManager manager = Manager;
+        AgentMovement agent = NetworkPlayer.Local != null ? NetworkPlayer.Local.agentMovement : null;
+        int legs = Legs;
+        computer = new RouteChoice[legs + 1];
+        if (manager == null || manager.speedGrid2D == null || agent == null || legs <= 0) return;
+        Vector2Int[] cells = new Vector2Int[legs + 1];
+        for (int k = 0; k <= legs; k++) cells[k] = manager.WorldToGridPositionCentered(manager.controlPoints[k].position);
+        RouteChoiceGenerator generator = RouteAnalysis.Generator(manager, agent.originalBaseSpeed);
+        RouteChoice[] target = computer;
+        Task.Run(() =>
+        {
+            for (int k = 1; k <= legs && !stopWorking; k++)
+            {
+                try
+                {
+                    target[k] = generator.Fastest(cells[k - 1], cells[k]) ?? new RouteChoice { points = new List<Vector2>() };
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning("Route choices: no computer route on leg " + k + ": " + e.Message);
+                    target[k] = new RouteChoice { points = new List<Vector2>() };
+                }
+            }
+        });
+    }
+
+    RouteChoice Computer(int k) => computer != null && k > 0 && k < computer.Length ? computer[k] : null;
+
+    // The computer's routes of the legs shown are all worked out
+    bool ComputerReady()
+    {
+        if (leg > 0) return Computer(leg) != null;
+        for (int k = 1; k <= Legs; k++) if (Computer(k) == null) return false;
+        return true;
+    }
+
+    int ComputerTime()
+    {
+        if (leg > 0)
+        {
+            RouteChoice c = Computer(leg);
+            return c != null && c.points.Count > 1 ? Mathf.RoundToInt(c.seconds) : 0;
+        }
+        int sum = 0;
+        for (int k = 1; k <= Legs; k++)
+        {
+            RouteChoice c = Computer(k);
+            if (c == null || c.points.Count < 2) return 0;
+            sum += Mathf.RoundToInt(c.seconds);
+        }
+        return sum;
+    }
+
     // ---- Showing a leg ----
 
     void Show(int k)
     {
         int legs = Legs;
         if (legs <= 0) return;
+        if (k != leg) focus = -2;
         leg = Mathf.Clamp(k, 0, legs);
-        foreach (GameObject go in drawn) if (go != null) Destroy(go);
-        drawn.Clear();
         PathfindingManager manager = Manager;
         int first = leg == 0 ? 1 : leg;
         int last = leg == 0 ? legs : leg;
@@ -521,39 +651,12 @@ public class RouteCompareView : MonoBehaviour
             }
         }
         // The panel covers the left of the screen, so the leg is shown to the right of it
-        float size = Mathf.Max(bounds.extents.y, bounds.extents.x / Mathf.Max(0.1f, cam.aspect * 0.62f)) * 1.25f + 0.25f;
+        float size = Mathf.Max(bounds.extents.y, bounds.extents.x / Mathf.Max(0.1f, cam.aspect * 0.62f)) * 1.25f
+            + 40f * MapDefinition.WorldUnitsPerMeter;
         cam.transform.rotation = Quaternion.identity;
         cam.orthographicSize = size;
         float shift = size * cam.aspect * 0.32f;
         cam.transform.position = new Vector3(bounds.center.x - shift, bounds.center.y, -10f);
-
-        float width = size * (leg == 0 ? 0.007f : 0.011f);
-        foreach (RouteEntry entry in entries)
-        {
-            for (int i = first; i <= last; i++)
-            {
-                List<Vector3> points = entry.legs[i];
-                if (points == null || points.Count < 2) continue;
-                drawn.Add(Line("Route " + entry.label + " leg " + i, points, entry.color, width, entry.isLocal ? 41 : 40));
-            }
-        }
-
-        // The computer's fastest route on the leg, worked out in the background
-        bestShown = false;
-        bestLeg = leg;
-        bestTask = null;
-        if (leg > 0)
-        {
-            Vector2Int from = manager.WorldToGridPositionCentered(manager.controlPoints[leg - 1].position);
-            Vector2Int to = manager.WorldToGridPositionCentered(manager.controlPoints[leg].position);
-            float[,] speed = manager.speedGrid2D;
-            Dictionary<string, float[,]> slopes = manager.slopeFactors;
-            bestTask = Task.Run(() =>
-            {
-                List<List<Vector2Int>> paths = new AStarPathfinder(speed, slopes).GetAllPaths(from, to, 1);
-                return paths.Count > 0 ? paths[0] : null;
-            });
-        }
 
         previous.interactable = leg > 0;
         next.interactable = leg < legs;
@@ -568,24 +671,63 @@ public class RouteCompareView : MonoBehaviour
             float straight = Vector2.Distance(manager.controlPoints[leg - 1].position, manager.controlPoints[leg].position) / MapDefinition.WorldUnitsPerMeter;
             heading.text = "Leg " + leg + " of " + legs + "\n<size=60%><color=#5B7563>" + fromName + " to " + toName + ", " + Mathf.RoundToInt(straight) + " m straight</color></size>";
         }
-        FillList(null);
+        Redraw();
+    }
+
+    // The routes on the map and the list, as far as the computer's routes are worked out
+    void Redraw()
+    {
+        foreach (GameObject go in drawn) if (go != null) Destroy(go);
+        drawn.Clear();
+        PathfindingManager manager = Manager;
+        int legs = Legs;
+        int first = leg == 0 ? 1 : leg;
+        int last = leg == 0 ? legs : leg;
+        bool ready = ComputerReady();
+        computerShown = ready ? leg : -1;
+
+        // As thick as the route choice game's lines, with a dark edge so they show on every kind of ground
+        float width = cam.orthographicSize * (leg == 0 ? 0.008f : 0.011f);
+        for (int e = 0; e < entries.Count; e++)
+        {
+            RouteEntry entry = entries[e];
+            bool clear = focus == -2 || focus == e;
+            Color colour = entry.color;
+            colour.a = clear ? 1f : 0.25f;
+            int order = 50 + 2 * e + (entry.isLocal ? 30 : 0) + (focus == e ? 60 : 0);
+            for (int i = first; i <= last; i++)
+            {
+                List<Vector3> points = entry.legs[i];
+                if (points == null || points.Count < 2) continue;
+                drawn.Add(Line("Route edge " + entry.label + " leg " + i, points, new Color(0.08f, 0.08f, 0.08f, clear ? 0.75f : 0.2f), width * 1.6f, order));
+                drawn.Add(Line("Route " + entry.label + " leg " + i, points, colour, width, order + 1));
+            }
+        }
+
+        // The computer's route: black with a white edge, wider than the players' lines and under them, so where a
+        // player ran the same way it shows as a black band round that player's line
+        if (ready)
+        {
+            bool clear = focus == -2 || focus == -1;
+            int order = focus == -1 ? 200 : 30;
+            for (int i = first; i <= last; i++)
+            {
+                RouteChoice c = Computer(i);
+                if (c == null || c.points.Count < 2) continue;
+                List<Vector3> points = new List<Vector3> { manager.controlPoints[i - 1].position };
+                foreach (Vector2 p in c.points) points.Add(RouteAnalysis.GridToWorld(manager, p));
+                points.Add(manager.controlPoints[i].position);
+                drawn.Add(Line("Computer's route edge leg " + i, points, new Color(1f, 1f, 1f, clear ? 0.95f : 0.3f), width * 2.9f, order));
+                drawn.Add(Line("Computer's route leg " + i, points, new Color(0.08f, 0.08f, 0.08f, clear ? 1f : 0.3f), width * 1.9f, order + 1));
+            }
+        }
+        FillList(ready);
     }
 
     void Update()
     {
-        if (bestTask != null && !bestShown && bestTask.IsCompleted && bestLeg == leg)
-        {
-            bestShown = true;
-            List<Vector2Int> best = bestTask.IsFaulted ? null : bestTask.Result;
-            if (best != null && best.Count > 1)
-            {
-                PathfindingManager manager = Manager;
-                List<Vector3> points = new List<Vector3>();
-                foreach (Vector2Int cell in best) points.Add(manager.GridToWorldPosition(cell.y, cell.x));
-                drawn.Add(Line("Computer's route", points, new Color(0.1f, 0.1f, 0.1f, 0.85f), cam.orthographicSize * 0.006f, 39));
-            }
-            FillList(best);
-        }
+        // The computer's route is drawn as soon as it is worked out
+        if (computerShown != leg && ComputerReady()) Redraw();
         // Route analysis: players who finish drawing later are added
         if (source != null && Time.unscaledTime > nextPoll)
         {
@@ -594,6 +736,7 @@ public class RouteCompareView : MonoBehaviour
             if (fresh.Count != entries.Count)
             {
                 entries = fresh;
+                focus = -2;
                 Show(leg);
             }
         }
@@ -607,18 +750,27 @@ public class RouteCompareView : MonoBehaviour
         return t > 0 ? t : int.MaxValue;
     }
 
-    // The players, fastest first, and on a leg the computer's route last
-    void FillList(List<Vector2Int> best)
+    // Click a row to see that route clearly (the others fade); click it again to see all
+    void Focus(int index)
+    {
+        focus = focus == index ? -2 : index;
+        Redraw();
+    }
+
+    // The players, fastest first, and the computer's route last
+    void FillList(bool ready)
     {
         foreach (Transform child in list) Destroy(child.gameObject);
-        List<RouteEntry> rows = new List<RouteEntry>(entries);
-        rows.Sort((x, y) => TimeOf(x).CompareTo(TimeOf(y)));
-        int fastest = rows.Count > 0 ? TimeOf(rows[0]) : int.MaxValue;
+        List<int> rows = new List<int>();
+        for (int e = 0; e < entries.Count; e++) rows.Add(e);
+        rows.Sort((x, y) => TimeOf(entries[x]).CompareTo(TimeOf(entries[y])));
+        int fastest = rows.Count > 0 ? TimeOf(entries[rows[0]]) : int.MaxValue;
         string approx = shared ? "~" : "";
 
         int place = 0, shownPlace = 0, previousTime = -1;
-        foreach (RouteEntry row in rows)
+        foreach (int e in rows)
         {
+            RouteEntry row = entries[e];
             int t = TimeOf(row);
             place++;
             if (t != previousTime) shownPlace = place;
@@ -626,44 +778,53 @@ public class RouteCompareView : MonoBehaviour
             string time = t < int.MaxValue ? approx + RelayStats.Time(t) : "-";
             string behind = t < int.MaxValue && t > fastest ? "  <color=#C0392B>+" + RelayStats.Time(t - fastest) + "</color>" : "";
             string number = t < int.MaxValue ? shownPlace + ". " : "";
-            AddRow(row.color, number + "<b>" + row.label + "</b>" + (row.isLocal ? " (you)" : ""), time + behind, row.isLocal);
+            int index = e;
+            AddRow(row.color, number + "<b>" + row.label + "</b>" + (row.isLocal ? " (you)" : ""), time + behind, row.isLocal, focus == e, () => Focus(index));
         }
 
-        if (leg > 0)
+        if (ready)
         {
-            if (best != null)
+            int estimate = ComputerTime();
+            string text = estimate > 0 ? "~" + RelayStats.Time(estimate) : "-";
+            if (estimate > 0 && fastest < int.MaxValue && fastest > estimate)
             {
-                int estimate = EstimateSeconds(best);
-                string text = estimate > 0 ? "~" + RelayStats.Time(estimate) : "";
-                if (estimate > 0 && fastest < int.MaxValue && fastest > estimate)
-                {
-                    text += "  <color=#3F7D54>-" + RelayStats.Time(fastest - estimate) + "</color>";
-                }
-                AddRow(new Color(0.1f, 0.1f, 0.1f), "<b>Computer's route</b>", text, false);
+                text += "  <color=#3F7D54>-" + RelayStats.Time(fastest - estimate) + "</color>";
             }
-            else if (!bestShown)
-            {
-                AddRow(new Color(0.6f, 0.6f, 0.6f), "<color=#5B7563>Working out the computer's route...</color>", "", false);
-            }
+            AddRow(new Color(0.08f, 0.08f, 0.08f), "<b>Computer's route</b>", text, false, focus == -1, () => Focus(-1));
+        }
+        else
+        {
+            AddRow(new Color(0.6f, 0.6f, 0.6f), "<color=#5B7563>Working out the computer's route...</color>", "", false, false, null);
         }
 
-        string note = shared
+        string note = (shared
             ? "Times are what the same standard runner would need on each drawn route, so only the route choice counts."
-            : "The runners have different speed and technique, so compare the lines more than the times.";
+            : "The runners have different speed and technique, so compare the lines more than the times.")
+            + " Click a route to see it on its own.";
         TextMeshProUGUI noteText = CourseUI.Text("Note", list, note, 18, CourseUI.InkMuted);
-        CourseUI.Size(noteText, 70);
+        CourseUI.Size(noteText, 80);
     }
 
-    void AddRow(Color color, string name, string time, bool local)
+    void AddRow(Color color, string name, string time, bool local, bool focused, System.Action onClick)
     {
-        Image row = CourseUI.Panel("Row", list, local ? new Color(0.91f, 0.45f, 0.16f, 0.16f) : new Color(1f, 1f, 1f, 0.5f));
+        Color background = focused ? new Color(0.13f, 0.30f, 0.20f, 0.22f)
+            : local ? new Color(0.91f, 0.45f, 0.16f, 0.16f) : new Color(1f, 1f, 1f, 0.5f);
+        Image row = CourseUI.Panel("Row", list, background);
         CourseUI.Size(row, 54);
+        if (onClick != null)
+        {
+            Button button = row.gameObject.AddComponent<Button>();
+            button.targetGraphic = row;
+            button.onClick.AddListener(() => onClick());
+        }
         Image swatch = CourseUI.Panel("Colour", row.transform, color);
         CourseUI.Place(swatch.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(12, 0), new Vector2(34, 10));
+        swatch.raycastTarget = false;
         TextMeshProUGUI label = CourseUI.Text("Name", row.transform, name, 21, CourseUI.Ink);
         CourseUI.Stretch(label.rectTransform, 58, 200, 4, 4);
         label.alignment = TextAlignmentOptions.MidlineLeft;
         label.enableWordWrapping = false;
+        label.raycastTarget = false;
         TextMeshProUGUI value = CourseUI.Text("Time", row.transform, time, 21, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
         CourseUI.Place(value.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-10, 0), new Vector2(190, 50));
         value.enableWordWrapping = false;
@@ -671,15 +832,7 @@ public class RouteCompareView : MonoBehaviour
         value.enableAutoSizing = true;
         value.fontSizeMin = 14;
         value.fontSizeMax = 21;
-    }
-
-    // The time the local runner would need on the route
-    int EstimateSeconds(List<Vector2Int> route)
-    {
-        PathfindingManager manager = Manager;
-        AgentMovement agent = NetworkPlayer.Local != null ? NetworkPlayer.Local.agentMovement : null;
-        if (manager == null || agent == null) return 0;
-        return RouteAnalysis.Seconds(route, manager, agent.originalBaseSpeed);
+        value.raycastTarget = false;
     }
 
     GameObject Line(string name, List<Vector3> points, Color color, float width, int order)
@@ -689,8 +842,8 @@ public class RouteCompareView : MonoBehaviour
         line.useWorldSpace = true;
         line.widthMultiplier = width;
         line.startColor = line.endColor = color;
-        line.numCapVertices = 2;
-        line.numCornerVertices = 2;
+        line.numCapVertices = 3;
+        line.numCornerVertices = 3;
         line.sortingOrder = order;
         line.positionCount = points.Count;
         for (int i = 0; i < points.Count; i++) line.SetPosition(i, new Vector3(points[i].x, points[i].y, -1.3f));
@@ -724,6 +877,7 @@ public class RouteCompareView : MonoBehaviour
 
     void OnDestroy()
     {
+        stopWorking = true;
         HideRunners(false);
         foreach (GameObject go in drawn) if (go != null) Destroy(go);
         if (panel != null) Destroy(panel);
