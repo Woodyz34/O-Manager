@@ -19,6 +19,7 @@
   "pivotY": 8190,
   "ownPicture": false,
   "hasHeights": true,
+  "contourInterval": 2.5,
   "georeferenced": true,
   "refEast": 497813,
   "refNorth": 6435214,
@@ -30,6 +31,6 @@
   "sender": "",
   "ownerClub": "",
   "contact": "",
-  "created": "2026-11-04",
+  "created": "2026-11-05",
   "permissionConfirmed": true
 }
