@@ -35,6 +35,15 @@ public class CardData
         man = Man;
         RunnerPicture = Profile;
     }
+
+    // The same runner with other values ("Same stats" in the lobby)
+    public CardData WithStats(float newSpeed, float newTechnique)
+    {
+        CardData copy = (CardData)MemberwiseClone();
+        copy.speed = newSpeed;
+        copy.technique = newTechnique;
+        return copy;
+    }
 }
 
 // One of a runner's best races of the year. The score is 100 * (time a 100-rated runner would

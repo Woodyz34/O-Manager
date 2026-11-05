@@ -40,7 +40,7 @@ public class CardManager : MonoBehaviour
         {
             AllCards.getInstance().SetAllCards();
         }
-        foreach (CardData card in RunnerCards.InPacks())
+        foreach (CardData card in GameModes.WithSameStats(RunnerCards.InPacks()))
         {
 
             GameObject cardInstance = Instantiate(CardPrefab, parent.transform);

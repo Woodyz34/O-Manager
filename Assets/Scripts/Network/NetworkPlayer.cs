@@ -528,11 +528,24 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             GameModeRuntime.StartIfNeeded(this);
         }
 
+        GameModes.SameStats = null;
+
         // Route analysis: nobody picks a runner, everyone runs with the same one
         if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteAnalysis) && RelayRace.Active == null)
         {
             RouteAnalysis.Begin(this);
             return;
+        }
+
+        // "Same stats": everyone picks any runner, and all of them run with the host's speed and technique
+        bool sameStats = GameModes.TryGetSameStats(effectiveGameMode, out int sameSpeed, out int sameTechnique);
+        GameModes.SameStats = sameStats ? new Vector2(sameSpeed, sameTechnique) : (Vector2?)null;
+        if (Object.HasStateAuthority && sameStats)
+        {
+            manager.ChooseWhomeverYouWantMode = true;
+            manager.ChooseRunnerPanel.SetActive(true);
+            UIToast.Show("Same stats: every runner has speed " + sameSpeed + " and technique " + sameTechnique
+                + ". Pick whoever you like.", 8f);
         }
 
         if (Object.HasStateAuthority && effectiveGameMode.Contains("Choose a runner"))
