@@ -47,6 +47,15 @@ namespace MapImport
         public int midCount = 1;
         public double midDistance;  // mm between symbols in a group
         public double midSpacing;   // mm between groups (0 = use mainLength)
+        // OpenOrienteering Mapper places symbols along a solid line its own way: from midEnd at each end, evenly,
+        // about midSpacing apart (stair steps, fence ticks). A line too short for that gets none, or one in the
+        // middle when midAtLeastOne is set.
+        public bool oomMid;
+        public double midEnd;
+        public bool midAtLeastOne;
+        public int midMinCount;
+        // Dashed borders (unpaved paths): dash and gap in mm, 0 = solid
+        public double borderDash, borderGap;
     }
 
     public class AreaStyle
