@@ -155,6 +155,9 @@ public class RouteChoiceView : MonoBehaviour
     public static bool KeysOpen;
     public static int KeysClosedFrame = -1;
     readonly List<GameObject> hiddenHud = new List<GameObject>();
+    bool fitted;
+    float fittedSize;
+    Vector3 fittedPosition;
     readonly List<GameObject> drawn = new List<GameObject>();
     readonly List<LineRenderer> lines = new List<LineRenderer>();
     float nextRefresh;
@@ -298,6 +301,11 @@ public class RouteChoiceView : MonoBehaviour
         heading.text = "Leg " + leg + " of " + legs;
         info.text = "Finding the route choices...";
         FitCamera(null);
+    }
+
+    void LateUpdate()
+    {
+        KeepFit();
     }
 
     void Update()
@@ -694,10 +702,24 @@ public class RouteChoiceView : MonoBehaviour
     {
         // The panel covers the left of the screen (about a third), so the map is shown in the rest
         float size = Mathf.Max(bounds.extents.y, bounds.extents.x / Mathf.Max(0.1f, cam.aspect * 0.62f)) * 1.08f + margin;
+        float shift = size * cam.aspect * 0.32f;
+        fittedSize = size;
+        fittedPosition = new Vector3(bounds.center.x - shift, bounds.center.y, -10f);
+        fitted = true;
         cam.transform.rotation = Quaternion.identity;
         cam.orthographicSize = size;
-        float shift = size * cam.aspect * 0.32f;
-        cam.transform.position = new Vector3(bounds.center.x - shift, bounds.center.y, -10f);
+        cam.transform.position = fittedPosition;
+    }
+
+    // The race start view can still turn the camera to the leg after the first fit (it runs once the network game
+    // starts): the map is always shown north up, as fitted
+    void KeepFit()
+    {
+        if (!fitted || cam == null) return;
+        if (cam.transform.rotation == Quaternion.identity) return; // (zooming and moving the map yourself is fine)
+        cam.transform.rotation = Quaternion.identity;
+        cam.orthographicSize = fittedSize;
+        cam.transform.position = fittedPosition;
     }
 
     void Line(string name, List<Vector3> points, Color color, float width, int order)
