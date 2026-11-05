@@ -43,6 +43,8 @@ namespace MapImport
         }
 
         // The guessed edge, x,y pairs in paper mm, or null when the whole map looks finished (or it can't tell)
+        public const int MaxCorners = 30;
+
         public static double[] Guess(MapFile map, MapPreview preview)
         {
             double blockMm = BlockMeters / map.MetersPerMm;
@@ -125,7 +127,11 @@ namespace MapImport
             List<(int x, int y)> outline = Outline(finished, bw, bh);
             if (outline == null || outline.Count < 3) return null;
             var poly = new List<double>();
-            foreach ((int x, int y) in Simplify(outline, 2.5))
+            // Few enough corners to move by hand: loosen the fit until there are at most MaxCorners
+            List<(int x, int y)> corners = Simplify(outline, 2.5);
+            for (double tolerance = 3; corners.Count > MaxCorners && tolerance < 40; tolerance *= 1.25)
+                corners = Simplify(outline, tolerance);
+            foreach ((int x, int y) in corners)
             {
                 poly.Add(Math.Min(e.maxX, e.minX + x * blockMm));
                 poly.Add(Math.Max(e.minY, e.maxY - y * blockMm));
