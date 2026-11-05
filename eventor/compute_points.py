@@ -59,6 +59,7 @@ GAME_JSON = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Runners"
 RESULTS_DIR = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Runners", "Results")
 EMBLEM_DIR = os.path.join(os.path.dirname(HERE), "Assets", "Resources", "Emblem")
 CLUBS_TXT = os.path.join(HERE, "klubbar.txt")
+COUNTRY_TXT = os.path.join(HERE, "nationalitet.txt")
 
 COUNTRIES = {
     "SWE": "SWEDEN", "NOR": "NORWAY", "FIN": "FINLAND", "DEN": "DENMARK", "SUI": "SWITZERLAND",
@@ -97,6 +98,13 @@ def norm_name(name):
     return re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", s.lower())).strip()
 
 
+def short_name(name):
+    """First and last name only, from match_name: "Tuva Enlund Östangård" and "Tuva Ostangard"
+    are both "tuva ostangard". Only used when the whole name finds nobody."""
+    parts = match_name(name).split()
+    return f"{parts[0]} {parts[-1]}" if len(parts) > 1 else ""
+
+
 def match_name(name):
     """Looser than norm_name, only for finding the same person under two spellings:
     WinSplits writes Ødum as Oedum, Nørgård as Noergaard and Örnhagen as Ornhagen.
@@ -118,8 +126,10 @@ class Identities:
     def __init__(self):
         self.by_name = collections.defaultdict(set)      # (match name, sex) -> eventor keys
         self.person_ids = collections.defaultdict(set)   # (match name, sex) -> e-keys, from all Eventor races
+        self.by_short = collections.defaultdict(set)     # (first + last name, sex) -> eventor keys
         self.info = {}                                   # key -> dict
         self.ambiguous = []
+        self.merged = {}                                 # WinSplits id it would have had -> Eventor key
 
     def prescan(self, races):
         """Notes every Eventor person id first, so a result without an id can join the person
@@ -140,11 +150,15 @@ class Identities:
         else:
             key = f"n:{norm_name(r['name'])}:{r.get('sex')}"
         self.by_name[name_key].add(key)
+        if short_name(r["name"]):
+            self.by_short[(short_name(r["name"]), r.get("sex"))].add(key)
         inf = self.info.setdefault(key, {"name": r["name"], "sex": r.get("sex"), "birth_year": r.get("birth_year"),
-                                         "club": None, "country": None})
+                                         "club": None, "country": None, "country_sure": False})
         if r.get("club"):
             inf["club"] = r["club"]
-        if r.get("country"):
+        # Eventor gives the country of the club, not of the runner: a guess, which a country
+        # from VM, EM or the World Cup (WinSplits) replaces
+        if r.get("country") and not inf["country_sure"]:
             inf["country"] = r["country"]
         return key
 
@@ -161,6 +175,12 @@ class Identities:
 
     def match_winsplits(self, r, source):
         cands = self.by_name.get((match_name(r["name"]), r.get("sex")), set())
+        if not cands and short_name(r["name"]):
+            # Eventor may have a middle name that WinSplits leaves out ("Tuva Enlund Östangård")
+            short = self.by_short.get((short_name(r["name"]), r.get("sex")), set())
+            if len(short) == 1:
+                cands = short
+                self.merged[f"w:{norm_name(r['name'])}:{r.get('sex')}"] = next(iter(short))
         if len(cands) == 1:
             key = next(iter(cands))
         else:
@@ -168,9 +188,11 @@ class Identities:
                 self.ambiguous.append((r["name"], r.get("country") or r.get("club"), source, sorted(cands)))
             key = f"w:{norm_name(r['name'])}:{r.get('sex')}"
         inf = self.info.setdefault(key, {"name": r["name"], "sex": r.get("sex"), "birth_year": None,
-                                         "club": None, "country": None})
+                                         "club": None, "country": None, "country_sure": False})
         if r.get("country"):
+            # VM, EM and the World Cup are run for a country, so this one is sure
             inf["country"] = r["country"]
+            inf["country_sure"] = True
         if r.get("club") and not inf["club"]:
             inf["club"] = r["club"]
         return key
@@ -508,7 +530,53 @@ def game_class(r, today):
     return prefix + ("18" if age <= 18 else "20" if age <= 20 else "21")
 
 
-def write_game_file(runners, today, groups):
+def country_by_hand():
+    """eventor/nationalitet.txt: "Namn = Land" for runners whose country is only guessed from the
+    club. The country may be in Swedish (Storbritannien), English (Great Britain) or a code (GBR)."""
+    given = {}
+    if os.path.exists(COUNTRY_TXT):
+        with open(COUNTRY_TXT, encoding="utf-8") as f:
+            for line in f:
+                line = line.split("#", 1)[0]
+                if "=" in line:
+                    name, land = (s.strip() for s in line.split("=", 1))
+                    if name and land:
+                        given[match_name(name)] = (name, land)
+    return given
+
+
+def english_country(land):
+    up = land.strip().upper()
+    return COUNTRIES.get(up) or SWEDISH_COUNTRY.get(land.strip().lower()) or up
+
+
+def countries_by_hand(cards):
+    """Sets the countries from eventor/nationalitet.txt, and writes the file again: filled lines first,
+    then every card whose country is a guess from a club outside Sweden, with an empty right side."""
+    given = country_by_hand()
+    for c in cards:
+        hand = given.get(match_name(c["name"].split(" (")[0]))
+        if hand:
+            c["country"] = english_country(hand[1])
+            c.pop("countryGuessed", None)
+    filled = sorted(given.values(), key=lambda nl: nl[0])
+    unsure = sorted((c["name"], c["country"], c["club"]) for c in cards
+                    if c.get("countryGuessed") and c["country"] not in ("SWEDEN", ""))
+    lines = ["# Nationalitet för löpare där landet bara är gissat från klubben (Eventor ger klubbens land).",
+             "# Skriv landet efter likhetstecknet, t.ex.  Förnamn Efternamn = Storbritannien  (eller GBR).",
+             "# Alla löpare går att skriva här, även de som inte står i listan (t.ex. en britt i en svensk klubb).",
+             "# Rader utan land gör ingenting. Filen skrivs om när poängen räknas: ifyllda rader står kvar överst.",
+             ""]
+    lines += [f"{n} = {l}" for n, l in filled]
+    if filled:
+        lines.append("")
+    lines.append("# Gissat från en klubb utanför Sverige:")
+    lines += [f"{n} =    # gissat {l.title()} ({club})" for n, l, club in unsure]
+    with open(COUNTRY_TXT, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def write_game_file(runners, today, groups, merged_ids=None):
     """Cards for the game. Runners in packs get today's numbers. A runner who was a card
     before but is no longer eligible keeps the last numbers and leaves the packs (frozen)."""
     previous = {}
@@ -525,11 +593,15 @@ def write_game_file(runners, today, groups):
         cards.append({
             "id": r["id"], "name": r["name"], "man": r["sex"] == "M", "klass": game_class(r, today),
             "country": country_name(r), "club": r.get("club") or "",
+            **({} if r.get("country_sure") else {"countryGuessed": True}),
             "speed": round(r["physic"], 2), "technique": round(r["technique"], 2), "inPacks": True,
             "merits": r.get("merits", []),
         })
     clubs_by_hand(cards)
+    countries_by_hand(cards)
     now = {c["id"] for c in cards}
+    by_id = {c["id"]: c for c in cards}
+    merged_ids = merged_ids or {}
     by_match = {(match_name(c["name"]), c["man"]): c for c in cards}
     merged = []
     frozen = 0
@@ -537,7 +609,7 @@ def write_game_file(runners, today, groups):
         if cid not in now:
             # The same person found under another spelling is now one card: the old card goes,
             # and the game moves it in players' collections to the new name ("renamed" below)
-            same = by_match.get((match_name(old["name"].split(" (")[0]), old["man"]))
+            same = by_id.get(merged_ids.get(cid)) or by_match.get((match_name(old["name"].split(" (")[0]), old["man"]))
             if same is not None and not cid.startswith("e"):
                 merged.append((old["name"], same))
                 continue
@@ -700,7 +772,7 @@ def main():
         visible = bool(rt) and (rt[2] >= MIN_RACES_VISIBLE or key in anchored_keys)
         runners.append({
             "id": key, "name": inf["name"], "sex": inf["sex"], "birth_year": inf["birth_year"],
-            "club": inf["club"], "country": inf["country"],
+            "club": inf["club"], "country": inf["country"], "country_sure": inf["country_sure"],
             "physic": round(rt[0], 2) if rt else None,
             "technique": round(rt[1], 2) if rt else None,
             "adjusted_races": rt[2] if rt else 0,
@@ -712,7 +784,9 @@ def main():
     runners.sort(key=lambda r: (r["sex"] or "", -(r["physic"] or 0)))
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump({"computed": today.isoformat(), "runners": runners}, f, ensure_ascii=False, indent=0)
-    frozen = write_game_file(runners, today, groups)
+    frozen = write_game_file(runners, today, groups, ids.merged)
+    for ws_id, key in sorted(ids.merged.items()):
+        print(f"Samma löpare utan mellannamn: {ws_id} -> {ids.info[key]['name']}")
 
     # report
     vis = [r for r in runners if r["visible"]]
