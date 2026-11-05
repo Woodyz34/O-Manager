@@ -277,7 +277,16 @@ public class RouteChoiceView : MonoBehaviour
 
         // Like "End competition for everyone" in a race: when someone has crashed or takes too long
         endButton = CourseUI.Button("End for all", card.transform, "End for all", CourseUI.ButtonKind.Danger, OnEndForAll, 18);
-        CourseUI.Place((RectTransform)endButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-148, -66), new Vector2(150, 40));
+        CourseUI.Place((RectTransform)endButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-148, -66), new Vector2(176, 40));
+        // "Sure? Click again" is longer than "End for all": shrink the text to fit rather than cut it off
+        TextMeshProUGUI endLabel = endButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (endLabel != null)
+        {
+            endLabel.enableWordWrapping = false;
+            endLabel.enableAutoSizing = true;
+            endLabel.fontSizeMin = 12;
+            endLabel.fontSizeMax = 18;
+        }
         endButton.gameObject.SetActive(CompetitionFlow.LocalIsHost());
 
         nextButton = CourseUI.Button("Next", card.transform, "Next leg", CourseUI.ButtonKind.Primary, OnNext, 24);
