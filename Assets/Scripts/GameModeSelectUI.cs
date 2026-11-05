@@ -67,22 +67,32 @@ public class GameModeSelect : MonoBehaviour
 
     public void SelectGameMode(string gameModeName)
     {
+        // "Same stats": the host sets the values first (the mode only changes when they press "Use these values")
+        if (gameModeName == GameModes.SameStatsMode)
+        {
+            SameStatsPopup.Open(gameModeHandler.gameMode, mode => gameModeHandler.gameMode = mode);
+            return;
+        }
         gameModeHandler.gameMode = gameModeName;
         Debug.Log($"GameMode selected: {gameModeName}");
         gameModeSelectPanel.SetActive(false);
     }
 
-    // "Runner pool" in the lobby: your own runners, or any runner in the game.
-    // A small pop-up with the two choices replaced the old panel of pictures (kept in the scene, unused).
+    // "Runner pool" in the lobby: your own runners, any runner in the game, or any runner with the host's values.
+    // A small pop-up with the choices replaced the old panel of pictures (kept in the scene, unused).
     public void OpenPanel()
     {
-        ChoicePopup.Option[] options = new ChoicePopup.Option[GameModes.Pools.Length];
-        for (int i = 0; i < GameModes.Pools.Length; i++)
+        string[] pools = GameModes.LobbyPools;
+        ChoicePopup.Option[] options = new ChoicePopup.Option[pools.Length];
+        for (int i = 0; i < pools.Length; i++)
         {
-            string pool = GameModes.Pools[i];
-            options[i] = new ChoicePopup.Option { id = pool, title = GameModes.PoolName(pool), description = GameModes.PoolDescription(pool) };
+            string pool = pools[i];
+            // The chosen "Same stats" shows its values
+            string title = pool == GameModes.SameStatsMode && GameModes.IsSameStats(gameModeHandler.gameMode)
+                ? GameModes.PoolName(gameModeHandler.gameMode) : GameModes.PoolName(pool);
+            options[i] = new ChoicePopup.Option { id = pool, title = title, description = GameModes.PoolDescription(pool) };
         }
-        ChoicePopup.Open("Runner pool", options, gameModeHandler.gameMode, SelectGameMode);
+        ChoicePopup.Open("Runner pool", options, GameModes.PoolId(gameModeHandler.gameMode), SelectGameMode);
     }
 
     public void ClosePanel()
