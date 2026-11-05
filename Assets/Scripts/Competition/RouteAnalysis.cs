@@ -150,7 +150,7 @@ public static class RouteAnalysis
     }
 
     // Douglas-Peucker: keeps the corners of a route, drops the cells in between
-    static List<Vector2Int> Simplify(List<Vector2Int> route, float tolerance)
+    public static List<Vector2Int> Simplify(List<Vector2Int> route, float tolerance)
     {
         if (route == null || route.Count <= 2) return route != null ? new List<Vector2Int>(route) : new List<Vector2Int>();
         bool[] keep = new bool[route.Count];
@@ -698,7 +698,7 @@ public class RouteCompareView : MonoBehaviour
     }
 
     // The runners stand on the map; they are hidden so the routes can be seen
-    static void HideRunners(bool hide)
+    public static void HideRunners(bool hide)
     {
         if (!hide)
         {

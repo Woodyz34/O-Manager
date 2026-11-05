@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 // The game modes the host can turn on in the lobby, on top of the runner pool. Several can be used together,
-// except Route analysis, which is always played on its own.
+// except Route analysis and the Route choice game, which are always played on their own.
 [Flags]
 public enum ExtraMode
 {
@@ -14,17 +14,21 @@ public enum ExtraMode
     Bears = 2,
     MoveControl = 4,
     RouteAnalysis = 8,
+    RouteChoice = 16,
 }
 
 public static class ExtraModes
 {
-    public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis };
+    public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis, ExtraMode.RouteChoice };
 
     // Modes that cannot be combined with any other mode
-    public const ExtraMode Alone = ExtraMode.RouteAnalysis;
+    public const ExtraMode Alone = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+
+    // Modes where nobody picks a runner (everyone gets the same one), so the runner pool does not matter
+    public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
     // Modes that only work on individual courses, not relays
-    public const ExtraMode IndividualOnly = ExtraMode.Bears | ExtraMode.MoveControl | ExtraMode.RouteAnalysis;
+    public const ExtraMode IndividualOnly = ExtraMode.Bears | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
     // Set on the value the host shares, so "nothing turned on" can be told apart from "not arrived yet"
     public const int KnownBit = 1 << 30;
@@ -37,6 +41,7 @@ public static class ExtraModes
             case ExtraMode.Bears: return "Bears";
             case ExtraMode.MoveControl: return "Move a control";
             case ExtraMode.RouteAnalysis: return "Route analysis";
+            case ExtraMode.RouteChoice: return "Route choice game";
             default: return mode.ToString();
         }
     }
@@ -49,6 +54,7 @@ public static class ExtraModes
             case ExtraMode.Bears: return "Everyone hides one bear while drawing. Runners who find it get scared and run round it.";
             case ExtraMode.MoveControl: return "Everyone may move one control up to 100 m while drawing. Good routes can turn bad.";
             case ExtraMode.RouteAnalysis: return "Nobody runs: everyone draws the whole course the way they would run it, then you compare the route choices. Played on its own.";
+            case ExtraMode.RouteChoice: return "Nobody runs: on each leg, pick the fastest of 2 to 4 routes. Points for right answers, more the quicker you are. Played on its own.";
             default: return "";
         }
     }

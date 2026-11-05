@@ -70,6 +70,11 @@ public class EscMenu : MonoBehaviour
         {
             return;
         }
+        // Escape belongs to the route choice game's keys panel while it is open
+        if (RouteChoiceView.KeysOpen || RouteChoiceView.KeysClosedFrame == Time.frameCount)
+        {
+            return;
+        }
         if (IsOpen)
         {
             Close();
