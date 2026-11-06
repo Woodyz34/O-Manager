@@ -111,8 +111,7 @@ public class CourseBuilder : MonoBehaviour
     TextMeshProUGUI statusText;
     TextMeshProUGUI summaryText;
     RectTransform pointList;
-    RectTransform myCourseList;
-    TextMeshProUGUI myCoursesTitle;
+    Button myCoursesButton;
     Button saveButton;
     Button mapButton;
     Button typeButton;
@@ -282,7 +281,7 @@ public class CourseBuilder : MonoBehaviour
 
     void Update()
     {
-        if (map == null || busy || forkPopup != null || MapImportPanel.IsOpen || mapPicker != null) return;
+        if (map == null || busy || forkPopup != null || MapImportPanel.IsOpen || mapPicker != null || coursesPopup != null) return;
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
         bool typing = EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null
                       && EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>() != null;
@@ -1770,11 +1769,9 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Size(actionRow, 58);
         saveButton = CourseUI.Button("Save", actionRow, "Save & publish", CourseUI.ButtonKind.Primary, OnSave, 24);
 
-        myCoursesTitle = CourseUI.Text("My courses title", panel.transform, "My courses", 26, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Size(myCoursesTitle, 34);
-        myCourseList = CourseUI.ScrollList("My courses", panel.transform, out _);
-        CourseUI.Column(myCourseList.gameObject, 4, new RectOffset(0, 8, 0, 0));
-        CourseUI.Size(myCourseList.parent.GetComponent<Image>(), 90).minHeight = 52;
+        // My courses: a button that opens a big pop-up with search and filters (the list in the panel was too small)
+        myCoursesButton = CourseUI.Button("My courses", panel.transform, "My courses", CourseUI.ButtonKind.Secondary, OpenMyCourses, 22);
+        CourseUI.Size(myCoursesButton, 50);
 
         RectTransform bottomRow = CourseUI.Rect("Bottom", panel.transform);
         CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
@@ -1943,35 +1940,149 @@ public class CourseBuilder : MonoBehaviour
         }
     }
 
+    // ---- My courses: a big pop-up with search, forest/sprint filters, Edit and Delete ----
+
+    GameObject coursesPopup;
+    RectTransform coursesList;
+    TMP_InputField coursesSearch;
+    TextMeshProUGUI coursesInfo;
+    string coursesFilter = "all";
+    string pendingDelete;          // id of the course whose Delete was pressed once; the second press deletes it
+    readonly Dictionary<string, Button> coursesFilterButtons = new Dictionary<string, Button>();
+
+    // The button text, and the pop-up's list if it is open
     void RefreshMyCourses()
     {
-        if (myCourseList == null) return;
-        foreach (Transform child in myCourseList) Destroy(child.gameObject);
+        List<CourseData> mine = CourseLibrary.Mine();
+        if (myCoursesButton != null) CourseUI.SetButtonText(myCoursesButton, "My courses  <size=80%>(" + mine.Count + " saved)</size>");
+        FillMyCourses();
+    }
+
+    void OpenMyCourses()
+    {
+        if (busy || MapImportPanel.IsOpen || mapPicker != null || coursesPopup != null) return;
+        pendingDelete = null;
+        Image dim = CourseUI.Panel("My courses", canvasObject.transform, new Color(0.08f, 0.14f, 0.1f, 0.55f), false);
+        CourseUI.Stretch(dim.rectTransform);
+        coursesPopup = dim.gameObject;
+        Image card = CourseUI.CardPanel("Card", dim.transform);
+        CourseUI.Stretch(card.rectTransform, 120, 120, 60, 60);
+        CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 28, 28));
+
+        RectTransform head = CourseUI.Rect("Head", card.transform);
+        CourseUI.Row(head.gameObject, 16, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(head, 50);
+        TextMeshProUGUI title = CourseUI.Text("Title", head, "My courses", 38, CourseUI.Ink, FontStyles.Bold);
+        title.alignment = TextAlignmentOptions.MidlineLeft;
+        CourseUI.Size(title, 50, 260);
+        coursesInfo = CourseUI.Text("Info", head, "", 20, CourseUI.InkMuted);
+        coursesInfo.alignment = TextAlignmentOptions.MidlineLeft;
+        CourseUI.Size(coursesInfo, 50, -1, 1);
+        CourseUI.Size(CourseUI.Button("Close", head, "Close", CourseUI.ButtonKind.Light, CloseMyCourses, 22), 46, 150);
+
+        RectTransform tools = CourseUI.Rect("Search and filters", card.transform);
+        CourseUI.Row(tools.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(tools, 52);
+        coursesSearch = CourseUI.Input("Search", tools, "Search name, map or author", 40, _ => FillMyCourses());
+        CourseUI.Size(coursesSearch, 52, -1, 1);
+        coursesFilterButtons.Clear();
+        foreach (var f in new[] { ("all", "All"), ("forest", "Forest"), ("sprint", "Sprint"), ("relay", "Relays") })
+        {
+            string key = f.Item1;
+            Button filter = CourseUI.Button(f.Item2, tools, f.Item2, CourseUI.ButtonKind.Light, () => { coursesFilter = key; pendingDelete = null; FillMyCourses(); }, 20);
+            CourseUI.Size(filter, 52, 130);
+            coursesFilterButtons[key] = filter;
+        }
+
+        coursesList = CourseUI.ScrollList("Courses", card.transform, out ScrollRect scroll);
+        scroll.scrollSensitivity = 60f;
+        CourseUI.Column(coursesList.gameObject, 6, new RectOffset(0, 12, 0, 0));
+        CourseUI.Size(coursesList.parent.GetComponent<Image>(), 400).flexibleHeight = 1;
+        FillMyCourses();
+    }
+
+    void FillMyCourses()
+    {
+        if (coursesList == null) return;
+        foreach (var pair in coursesFilterButtons)
+            CourseUI.SetButtonColor(pair.Value, pair.Key == coursesFilter ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light);
+        for (int i = coursesList.childCount - 1; i >= 0; i--) Destroy(coursesList.GetChild(i).gameObject);
+
         List<CourseData> mine = CourseLibrary.Mine();
         // How much of Unity Cloud's 5 MB the published courses use
         float usedKb = CloudCourses.PublishedBytes(mine) / 1024f;
-        myCoursesTitle.text = "My courses  <size=75%><color=#5B7563>" + mine.Count + " saved  ·  "
-            + (usedKb < 1024f ? Mathf.CeilToInt(usedKb) + " kB" : (usedKb / 1024f).ToString("0.0") + " MB") + " of 5 MB used</color></size>";
-        if (mine.Count == 0)
-        {
-            TextMeshProUGUI empty = CourseUI.Text("Empty", myCourseList, "Nothing saved yet.", 21, CourseUI.InkMuted, FontStyles.Italic);
-            CourseUI.Size(empty, 34);
-            return;
-        }
+        coursesInfo.text = mine.Count + " saved  ·  " + (usedKb < 1024f ? Mathf.CeilToInt(usedKb) + " kB" : (usedKb / 1024f).ToString("0.0") + " MB") + " of 5 MB used";
+
+        mine.Sort((a, b) => b.createdAt.CompareTo(a.createdAt));   // newest first
+        string search = coursesSearch != null ? coursesSearch.text.Trim().ToLowerInvariant() : "";
+        int shown = 0;
         foreach (CourseData course in mine)
         {
-            CourseData captured = course;
-            RectTransform row = CourseUI.Rect("Course " + course.name, myCourseList);
-            CourseUI.Row(row.gameObject, 8, new RectOffset(6, 0, 0, 0)).childForceExpandWidth = false;
-            CourseUI.Size(row, 40);
-            string facts = course.IsRelay() ? "relay, " + course.legs + " legs" : course.controls.Count + " controls";
-            TextMeshProUGUI label = CourseUI.Text("Label", row, course.name + "  <color=#5B7563>" + facts + "</color>", 22, CourseUI.Ink);
-            label.alignment = TextAlignmentOptions.MidlineLeft;
-            CourseUI.Size(label, 40, -1, 1);
-            Button edit = CourseUI.Button("Edit", row, "Edit", CourseUI.ButtonKind.Secondary, () => Edit(captured), 18);
-            CourseUI.Size(edit, 36, 90);
-            Button delete = CourseUI.Button("Delete", row, "Delete", CourseUI.ButtonKind.Danger, () => Delete(captured), 18);
-            CourseUI.Size(delete, 36, 100);
+            bool sprint = course.IsSprint();
+            if (coursesFilter == "forest" && sprint) continue;
+            if (coursesFilter == "sprint" && !sprint) continue;
+            if (coursesFilter == "relay" && !course.IsRelay()) continue;
+            MapDefinition courseMap = MapDefinition.All.Find(m => m.id == course.mapId);
+            string mapName = courseMap != null ? courseMap.displayName : "map not on this computer";
+            if (search.Length > 0 && !((course.name ?? "") + " " + mapName + " " + (course.author ?? "")).ToLowerInvariant().Contains(search)) continue;
+            AddCourseRow(course, mapName, sprint);
+            shown++;
         }
+        if (shown == 0)
+        {
+            string none = mine.Count == 0 ? "Nothing saved yet. Lay a course and press Save & publish." : "No courses match.";
+            CourseUI.Size(CourseUI.Text("None", coursesList, none, 22, CourseUI.InkMuted, FontStyles.Italic), 44);
+        }
+    }
+
+    void AddCourseRow(CourseData course, string mapName, bool sprint)
+    {
+        CourseData captured = course;
+        Image row = CourseUI.Panel("Course " + course.name, coursesList, CourseUI.Soft);
+        CourseUI.Row(row.gameObject, 12, new RectOffset(18, 12, 6, 6)).childForceExpandWidth = false;
+        CourseUI.Size(row, 70);
+
+        string facts = course.IsRelay() ? "Relay, " + course.legs + " legs" : course.controls.Count + " controls  ·  " + course.LengthText();
+        string date = course.createdAt > 0 ? DateTimeOffset.FromUnixTimeSeconds(course.createdAt).LocalDateTime.ToString("yyyy-MM-dd") : "";
+        TextMeshProUGUI label = CourseUI.Text("Label", row.transform,
+            "<b>" + course.name + "</b>\n<size=78%><color=#5B7563>" + mapName + "  ·  " + facts + (date.Length > 0 ? "  ·  " + date : "") + "</color></size>",
+            22, CourseUI.Ink);
+        label.alignment = TextAlignmentOptions.MidlineLeft;
+        label.enableWordWrapping = false;
+        label.overflowMode = TextOverflowModes.Ellipsis;
+        CourseUI.Size(label, 58, -1, 1);
+
+        // Forest or sprint as a coloured tag
+        Image tag = CourseUI.Panel("Type", row.transform, sprint ? CourseUI.Hex("E8742A", 0.18f) : CourseUI.Hex("3F7D54", 0.18f));
+        CourseUI.Size(tag, 36, 100);
+        TextMeshProUGUI tagText = CourseUI.Text("Text", tag.transform, sprint ? "Sprint" : "Forest", 18, sprint ? CourseUI.Accent : CourseUI.Forest, FontStyles.Bold);
+        tagText.alignment = TextAlignmentOptions.Center;
+        CourseUI.Stretch(tagText.rectTransform);
+
+        Button edit = CourseUI.Button("Edit", row.transform, "Edit", CourseUI.ButtonKind.Secondary, () => { CloseMyCourses(); Edit(captured); }, 20);
+        CourseUI.Size(edit, 46, 110);
+        bool confirming = pendingDelete == course.id;
+        Button delete = CourseUI.Button("Delete", row.transform, confirming ? "Sure? Delete" : "Delete", CourseUI.ButtonKind.Danger, () =>
+        {
+            if (pendingDelete != captured.id)
+            {
+                pendingDelete = captured.id;
+                FillMyCourses();
+                return;
+            }
+            pendingDelete = null;
+            Delete(captured);
+        }, 20);
+        CourseUI.Size(delete, 46, confirming ? 150 : 110);
+    }
+
+    void CloseMyCourses()
+    {
+        if (coursesPopup != null) Destroy(coursesPopup);
+        coursesPopup = null;
+        coursesList = null;
+        coursesSearch = null;
+        coursesInfo = null;
+        pendingDelete = null;
     }
 }
