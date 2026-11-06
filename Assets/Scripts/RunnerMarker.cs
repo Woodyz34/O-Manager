@@ -7,7 +7,8 @@ using UnityEngine.SceneManagement;
 //  - a name tag that always sits straight above the runner on screen, however the runner or the camera turns
 //  - circle and name keep a readable size when the camera is zoomed far out
 //  - no trail streak when the runner is moved to a new place (joining the lobby, starting a competition)
-//  - hidden while the player draws the route, so it does not cover the start of the line
+//  - hidden while the player draws the route (circle, name and trail), so it does not cover the start of the line
+//  - smaller on sprint maps, which are drawn at a larger scale (1:4000), so it looks as big on the picture as in the forest
 // The ring, the copy and the name tag are objects in NetworkPlayerPF. Tools > O-Manager > Apply Runner Marker builds them.
 public class RunnerMarker : MonoBehaviour
 {
@@ -20,6 +21,8 @@ public class RunnerMarker : MonoBehaviour
     public float minCircleShare = 0.02f;
     [Tooltip("How many times its real size the circle may grow at most.")]
     public float maxGrowth = 5f;
+    [Tooltip("Size of the circle on sprint maps, compared with forest maps.")]
+    public float sprintSize = 0.4f;
 
     [Header("Name")]
     public RectTransform nameCanvas;
@@ -45,6 +48,7 @@ public class RunnerMarker : MonoBehaviour
     ManualPathDrawer drawer;
     bool lookedForDrawer;
     bool drawing;
+    float sizeFactor = 1f;
 
     void Awake()
     {
@@ -58,6 +62,14 @@ public class RunnerMarker : MonoBehaviour
         SceneManager.sceneLoaded += OnSceneLoaded;
         lastPosition = transform.position;
         QuietTrail(quietAfterSceneLoad);
+        UpdateSizeFactor();
+    }
+
+    // Sprint size only in a competition on a sprint map (the scene has a CourseLoader that has loaded the map)
+    void UpdateSizeFactor()
+    {
+        bool sprint = CourseLoader.LoadedMap != null && CourseLoader.LoadedMap.IsSprint && FindAnyObjectByType<CourseLoader>() != null;
+        sizeFactor = sprint ? Mathf.Clamp(sprintSize, 0.05f, 1f) : 1f;
     }
 
     void OnDisable()
@@ -76,6 +88,7 @@ public class RunnerMarker : MonoBehaviour
         }
         // Everyone is put in a new place when a scene starts
         QuietTrail(quietAfterSceneLoad);
+        UpdateSizeFactor();
     }
 
     // Runs after the runner has moved and turned this frame
@@ -93,8 +106,11 @@ public class RunnerMarker : MonoBehaviour
             lookedForDrawer = true;
         }
         drawing = drawer != null && drawer.timeToDraw;
-        if (circle != null) circle.forceRenderingOff = drawing;
+        // On sprint maps only the smaller copy shows; the full-size circle would stick out under it
+        if (circle != null) circle.forceRenderingOff = drawing || sizeFactor < 1f;
         if (nameCanvas != null && nameCanvas.gameObject.activeSelf == drawing) nameCanvas.gameObject.SetActive(!drawing);
+        // No trail either while drawing, and none drawn from where the runner stood when drawing ends
+        if (drawing) QuietTrail(0.3f);
 
         float screenHeight = cam.orthographic ? cam.orthographicSize * 2f : 0f;   // in world units
         float growth = Growth(screenHeight);
@@ -110,7 +126,7 @@ public class RunnerMarker : MonoBehaviour
         {
             return 1f;
         }
-        float diameter = circle.sprite.bounds.size.x * transform.lossyScale.x;
+        float diameter = circle.sprite.bounds.size.x * transform.lossyScale.x * sizeFactor;
         if (diameter <= 0f)
         {
             return 1f;
@@ -121,8 +137,9 @@ public class RunnerMarker : MonoBehaviour
     void UpdateCircle(float growth)
     {
         if (marker == null) return;
-        marker.localScale = new Vector3(growth, growth, 1f);
-        if (trail != null) trail.widthMultiplier = baseTrailWidth * growth;
+        float size = growth * sizeFactor;
+        marker.localScale = new Vector3(size, size, 1f);
+        if (trail != null) trail.widthMultiplier = baseTrailWidth * size;
         if (circle == null) return;
 
         // The copy follows the colour the player picked, and hides when the circle is hidden

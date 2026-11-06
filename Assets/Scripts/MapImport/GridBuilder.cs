@@ -30,6 +30,29 @@ namespace MapImport
     {
         public static MapGrid2 Build(MapFile map, MapExtent extent, bool sprint, float cellSize, Action<string> log = null)
         {
+            MapGrid2 g = BuildSpeed(map, extent, sprint, cellSize, log);
+
+            // 7. Narrow passages: on sprint maps a gap between two walls, or a strip between a building and a fence,
+            //    is often narrower than a cell, so every cell across it touches a wall and the way is shut. A grid
+            //    with cells half the size sees the gap; where it does, the cells of this grid are opened along it.
+            if (sprint)
+            {
+                var passSw = System.Diagnostics.Stopwatch.StartNew();
+                MapGrid2 fine = BuildSpeed(map, extent, sprint, cellSize / 2f, null);
+                int opened = OpenNarrowPassages(g, fine);
+                log?.Invoke($"Narrow passages: {opened} cells opened in {passSw.ElapsedMilliseconds} ms");
+            }
+
+            // Heights from the contour lines
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            g.height = ContourHeights.Build(map, extent, g.rows, g.cols, cellSize, out g.hasHeights, log);
+            log?.Invoke($"Heights from contours: {(g.hasHeights ? "done" : "no contours found")} in {sw.ElapsedMilliseconds} ms");
+            return g;
+        }
+
+        // Steps 1 to 6: the speed of every cell
+        public static MapGrid2 BuildSpeed(MapFile map, MapExtent extent, bool sprint, float cellSize, Action<string> log)
+        {
             double mpm = map.MetersPerMm;
             var g = new MapGrid2
             {
@@ -125,13 +148,123 @@ namespace MapImport
 
             // 6. Outside the map
             int closed = MarkOutside(map, g, ox, oy, scale, sprint);
+            // The parts of the map the player left out (not finished)
+            if (map.boundary != null && map.boundary.Length >= 6)
+            {
+                for (int r = 0; r < g.rows; r++)
+                {
+                    double y = oy + (r + 0.5) / scale;
+                    for (int c = 0; c < g.cols; c++)
+                    {
+                        int idx = r * g.cols + c;
+                        if (g.speed[idx] > 0f && !MapBoundary.Inside(map.boundary, ox + (c + 0.5) / scale, y))
+                        {
+                            g.speed[idx] = 0f;
+                            closed++;
+                        }
+                    }
+                }
+            }
             log?.Invoke($"Outside the map: {closed} of {n} cells closed");
-
-            // Heights from the contour lines
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            g.height = ContourHeights.Build(map, extent, g.rows, g.cols, cellSize, out g.hasHeights, log);
-            log?.Invoke($"Heights from contours: {(g.hasHeights ? "done" : "no contours found")} in {sw.ElapsedMilliseconds} ms");
             return g;
+        }
+
+        // Opens closed cells of g where the grid with half-size cells (fine, same corner) has a way through.
+        // A closed cell is opened only when, inside the 3 x 3 cells around it, the open fine cells of it and of
+        // every open neighbour are all joined up in the fine grid. So the opened cell joins only ground that really
+        // is joined there, and a fence or wall through the middle of a cell (open fine cells on both sides, but not
+        // joined) stays shut. Opening one cell can make its neighbour openable too, so it repeats until nothing changes.
+        public static int OpenNarrowPassages(MapGrid2 g, MapGrid2 fine)
+        {
+            int rows = g.rows, cols = g.cols, fr = fine.rows, fc = fine.cols;
+            bool FineOpen(int r, int c) => r >= 0 && c >= 0 && r < fr && c < fc && fine.speed[r * fc + c] > 0f;
+
+            // Closed cells with at least one open fine cell are the ones that can be opened
+            var candidates = new List<int>();
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++)
+                {
+                    if (g.speed[r * cols + c] > 0f) continue;
+                    if (FineOpen(2 * r, 2 * c) || FineOpen(2 * r + 1, 2 * c) || FineOpen(2 * r, 2 * c + 1) || FineOpen(2 * r + 1, 2 * c + 1))
+                        candidates.Add(r * cols + c);
+                }
+
+            // Window: 6 x 6 fine cells = the 3 x 3 cells around the candidate
+            var label = new int[36];
+            var stack = new int[36];
+            int opened = 0;
+            for (int pass = 0; pass < 6; pass++)
+            {
+                int openedThisPass = 0;
+                foreach (int idx in candidates)
+                {
+                    if (g.speed[idx] > 0f) continue;
+                    int r = idx / cols, c = idx % cols;
+                    int fr0 = 2 * r - 2, fc0 = 2 * c - 2;
+                    // Fine cells that take part: open ones inside the candidate or inside an open neighbour
+                    for (int k = 0; k < 36; k++)
+                    {
+                        int wr = k / 6, wc = k % 6;
+                        int cr = r - 1 + wr / 2, cc = c - 1 + wc / 2;
+                        bool inCell = cr == r && cc == c;
+                        bool inOpenNeighbour = !inCell && cr >= 0 && cc >= 0 && cr < rows && cc < cols && g.speed[cr * cols + cc] > 0f;
+                        label[k] = (inCell || inOpenNeighbour) && FineOpen(fr0 + wr, fc0 + wc) ? 0 : -1;
+                    }
+                    // Every open neighbour must have open fine cells of its own, or the step into it is not seen here
+                    bool ok = true;
+                    int openNeighbours = 0;
+                    for (int dr = -1; dr <= 1 && ok; dr++)
+                        for (int dc = -1; dc <= 1 && ok; dc++)
+                        {
+                            if (dr == 0 && dc == 0) continue;
+                            int cr = r + dr, cc = c + dc;
+                            if (cr < 0 || cc < 0 || cr >= rows || cc >= cols || g.speed[cr * cols + cc] <= 0f) continue;
+                            openNeighbours++;
+                            bool any = false;
+                            for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++)
+                                    if (label[(2 * (dr + 1) + i) * 6 + 2 * (dc + 1) + j] == 0) any = true;
+                            if (!any) ok = false;
+                        }
+                    if (!ok || openNeighbours == 0) continue;
+                    // Flood the fine cells (8 directions, no cutting between two closed cells)
+                    int components = 0;
+                    for (int k = 0; k < 36 && components <= 1; k++)
+                    {
+                        if (label[k] != 0) continue;
+                        components++;
+                        int top = 0;
+                        stack[top++] = k;
+                        label[k] = components;
+                        while (top > 0)
+                        {
+                            int q = stack[--top];
+                            int qr = q / 6, qc = q % 6;
+                            for (int dr = -1; dr <= 1; dr++)
+                                for (int dc = -1; dc <= 1; dc++)
+                                {
+                                    if (dr == 0 && dc == 0) continue;
+                                    int nr = qr + dr, nc = qc + dc;
+                                    if (nr < 0 || nc < 0 || nr >= 6 || nc >= 6) continue;
+                                    int nk = nr * 6 + nc;
+                                    if (label[nk] != 0) continue;
+                                    if (dr != 0 && dc != 0 && label[qr * 6 + nc] == -1 && label[nr * 6 + qc] == -1) continue;
+                                    label[nk] = components;
+                                    stack[top++] = nk;
+                                }
+                        }
+                    }
+                    if (components != 1) continue;
+                    // The speed of the open fine cells inside it
+                    float best = 0f;
+                    for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++)
+                            if (FineOpen(2 * r + i, 2 * c + j)) best = Math.Max(best, fine.speed[(2 * r + i) * fc + 2 * c + j]);
+                    g.speed[idx] = best;
+                    openedThisPass++;
+                }
+                opened += openedThisPass;
+                if (openedThisPass == 0) break;
+            }
+            return opened;
         }
 
         // The colour of a symbol that is highest up in the drawing order (smallest index)

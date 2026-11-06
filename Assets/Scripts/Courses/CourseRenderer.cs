@@ -18,11 +18,18 @@ public class CourseRenderer : MonoBehaviour
     public float lineWidthMeters = 4.5f;
     public float numberSizeMeters = 45f;
     public int sortingOrder = 4;
+    // Sprint maps are drawn at 1:4000 instead of 1:10000-1:15000, so the same metres are much bigger on the picture.
+    // All marks are multiplied by this, so they look as big on the picture as on a forest map.
+    public float sizeFactor = 1f;
+    public const float SprintSize = 0.3f;
+
+    public static float SizeFor(MapDefinition map) => map != null && map.IsSprint ? SprintSize : 1f;
 
     readonly List<GameObject> marks = new List<GameObject>();
     static Material lineMaterial;
 
-    float Scale => MapDefinition.WorldUnitsPerMeter;
+    float Scale => MapDefinition.WorldUnitsPerMeter * sizeFactor;
+    public float ControlRadiusWorld => controlRadiusMeters * Scale;
 
     public void Clear()
     {
@@ -41,6 +48,7 @@ public class CourseRenderer : MonoBehaviour
         {
             return;
         }
+        sizeFactor = SizeFor(map);
         List<Vector3> points = new List<Vector3>();
         foreach (CoursePoint point in course.AllPoints())
         {
