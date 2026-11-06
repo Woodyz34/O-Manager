@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 //  - a name tag that always sits straight above the runner on screen, however the runner or the camera turns
 //  - circle and name keep a readable size when the camera is zoomed far out
 //  - no trail streak when the runner is moved to a new place (joining the lobby, starting a competition)
-//  - hidden while the player draws the route, so it does not cover the start of the line
+//  - hidden while the player draws the route (circle, name and trail), so it does not cover the start of the line
 //  - smaller on sprint maps, which are drawn at a larger scale (1:4000), so it looks as big on the picture as in the forest
 // The ring, the copy and the name tag are objects in NetworkPlayerPF. Tools > O-Manager > Apply Runner Marker builds them.
 public class RunnerMarker : MonoBehaviour
@@ -109,6 +109,8 @@ public class RunnerMarker : MonoBehaviour
         // On sprint maps only the smaller copy shows; the full-size circle would stick out under it
         if (circle != null) circle.forceRenderingOff = drawing || sizeFactor < 1f;
         if (nameCanvas != null && nameCanvas.gameObject.activeSelf == drawing) nameCanvas.gameObject.SetActive(!drawing);
+        // No trail either while drawing, and none drawn from where the runner stood when drawing ends
+        if (drawing) QuietTrail(0.3f);
 
         float screenHeight = cam.orthographic ? cam.orthographicSize * 2f : 0f;   // in world units
         float growth = Growth(screenHeight);

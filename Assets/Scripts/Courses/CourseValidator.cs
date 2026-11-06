@@ -116,9 +116,16 @@ public static class CourseValidator
 
     public static Result Check(MapDefinition map, MapGrid grid, CourseData course)
     {
+        // The runners can not go into the course's out-of-bounds areas, and no control may be in one
+        grid = ForbiddenAreas.WithAreas(map, grid, course);
         if (!course.IsRelay())
         {
-            return CheckIndividual(map, grid, course);
+            Result individual = CheckIndividual(map, grid, course);
+            if (individual.ok && course.ToLobbyString().Length > CourseData.MaxLobbyChars)
+            {
+                individual = Fail(new Result(), -1, "The course is too big to send to the other players. Use fewer corners on the out-of-bounds areas.");
+            }
+            return individual;
         }
 
         string relayProblem = CheckRelaySettings(course, out int badLeg);
@@ -365,7 +372,7 @@ public static class CourseValidator
         badLeg = -1;
         if (course.ToLobbyString().Length > CourseData.MaxLobbyChars)
         {
-            return "The relay is too big to send to the other players. Use fewer legs, controls or branches.";
+            return "The relay is too big to send to the other players. Use fewer legs, controls, branches or out-of-bounds corners.";
         }
         return null;
     }

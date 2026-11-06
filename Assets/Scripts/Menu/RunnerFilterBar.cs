@@ -8,10 +8,10 @@ using UnityEngine.UI;
 // Choose a runner) asks it which runners to show and in what order.
 public class RunnerFilterBar : MonoBehaviour
 {
-    public enum SortBy { Overall, Speed, Technique, Name }
+    public enum SortBy { Overall, Speed, Technique, Name, Club, Country }
 
     public TMP_InputField search;
-    public Button[] sortButtons;          // in the order of SortBy
+    public Button[] sortButtons;          // in the order of SortBy (the scenes have the first four, Club and Country are made here)
     public Button[] tierButtons;          // All, Elite, Gold, Silver, Bronze
     public Slider minSpeed;
     public Slider minTechnique;
@@ -27,7 +27,14 @@ public class RunnerFilterBar : MonoBehaviour
     public event Action Changed;
 
     SortBy sortBy = SortBy.Overall;
+    bool reversed;                        // lowest rating first, or Z to A
+    Button orderChip;
     int tierFilter = -1;                  // -1 = all tiers
+    int classFilter;                      // index in ClassChoices
+    Button classChip;
+
+    // The class chip goes round these: every class, 21, 20, 18, and the two junior classes together
+    static readonly string[][] ClassChoices = { null, new[] { "21" }, new[] { "20" }, new[] { "18" }, new[] { "18", "20" } };
     bool wired;
 
     // Women and men are never shown together. The choice is shared by My Runners and Choose a runner,
@@ -67,11 +74,13 @@ public class RunnerFilterBar : MonoBehaviour
     {
         if (wired) return;
         wired = true;
+        MakeSortChips();
         for (int i = 0; i < sortButtons.Length; i++)
         {
             SortBy choice = (SortBy)i;
-            sortButtons[i].onClick.AddListener(() => { sortBy = choice; Notify(); });
+            sortButtons[i].onClick.AddListener(() => ChooseSort(choice));
         }
+        if (orderChip != null) orderChip.onClick.AddListener(() => { reversed = !reversed; Notify(); });
         for (int i = 0; i < tierButtons.Length; i++)
         {
             int choice = TierOfButton(i);
@@ -82,6 +91,7 @@ public class RunnerFilterBar : MonoBehaviour
         minTechnique.onValueChanged.AddListener(_ => Notify());
         if (clearButton != null) clearButton.onClick.AddListener(Clear);
         MakeGenderChips();
+        MakeClassChip();
     }
 
     // Two chips, Women and Men, made from a tier chip and put between the search field and "Sort by".
@@ -103,9 +113,101 @@ public class RunnerFilterBar : MonoBehaviour
         menChip.onClick.AddListener(() => { ShowWomen = false; Notify(); });
     }
 
-    Button CopyChip(string label, float x, float y, float width)
+    // Club and Country are added after Name, and a last chip turns the order round (best or worst first).
+    // The sort chips get a little narrower so all of them fit before "Clear filters".
+    void MakeSortChips()
     {
-        Button chip = Instantiate(tierButtons[0], tierButtons[0].transform.parent);
+        if (sortButtons.Length < 4) return;
+        RectTransform first = (RectTransform)sortButtons[0].transform;
+        float y = first.anchoredPosition.y;
+        float left = first.anchoredPosition.x - first.sizeDelta.x / 2f;
+        Button[] all = new Button[6];
+        for (int i = 0; i < 4; i++) all[i] = sortButtons[i];
+        all[4] = CopyChip("Club", 0, y, 80, sortButtons[0]);
+        all[5] = CopyChip("Country", 0, y, 116, sortButtons[0]);
+        sortButtons = all;
+        orderChip = CopyChip("Best first", 0, y, 150, sortButtons[0]);
+        orderChip.name = "Sort order";
+
+        float[] widths = { 112, 92, 136, 88, 80, 116 };
+        float x = left;
+        for (int i = 0; i < sortButtons.Length; i++)
+        {
+            Place(sortButtons[i], x, y, widths[i]);
+            x += widths[i] + 8f;
+        }
+        Place(orderChip, x, y, 150f);
+    }
+
+    static void Place(Button chip, float left, float y, float width)
+    {
+        RectTransform rect = (RectTransform)chip.transform;
+        rect.sizeDelta = new Vector2(width, rect.sizeDelta.y);
+        rect.anchoredPosition = new Vector2(left + width / 2f, y);
+        TextMeshProUGUI text = chip.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (text != null) text.fontSize = Mathf.Min(text.fontSize, 21f);
+    }
+
+    // Picking the chip that is already on turns the order round, like the order chip
+    void ChooseSort(SortBy choice)
+    {
+        if (choice == sortBy) reversed = !reversed;
+        else
+        {
+            sortBy = choice;
+            reversed = false;
+        }
+        Notify();
+    }
+
+    bool ByText
+    {
+        get { return sortBy == SortBy.Name || sortBy == SortBy.Club || sortBy == SortBy.Country; }
+    }
+
+    // One chip after the tiers that goes round the classes (All classes, H21, H20, H18, H18 + H20).
+    // The tier chips get a little narrower to make room before the sliders.
+    void MakeClassChip()
+    {
+        if (tierButtons == null || tierButtons.Length == 0) return;
+        RectTransform first = (RectTransform)tierButtons[0].transform;
+        float y = first.anchoredPosition.y;
+        float x = first.anchoredPosition.x - first.sizeDelta.x / 2f;
+        for (int i = 0; i < tierButtons.Length; i++)
+        {
+            Place(tierButtons[i], x, y, 98f);
+            x += 106f;
+        }
+        classChip = CopyChip("All classes", 0, y, 136f, tierButtons[0]);
+        classChip.name = "Class";
+        Place(classChip, x + 4f, y, 136f);
+        classChip.onClick.AddListener(() => { classFilter = (classFilter + 1) % ClassChoices.Length; Notify(); });
+    }
+
+    string ClassLabel()
+    {
+        string[] ages = ClassChoices[classFilter];
+        if (ages == null) return "All classes";
+        string sex = ShowWomen ? "D" : "H";
+        return string.Join(" + ", Array.ConvertAll(ages, age => sex + age));
+    }
+
+    bool ClassMatches(CardData card)
+    {
+        string[] ages = ClassChoices[classFilter];
+        if (ages == null) return true;
+        string klass = card.klass ?? "";
+        foreach (string age in ages)
+        {
+            if (klass.EndsWith(age, StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    Button CopyChip(string label, float x, float y, float width, Button from = null)
+    {
+        if (from == null) from = tierButtons[0];
+        Button chip = Instantiate(from, from.transform.parent);
         chip.name = "Gender " + label;
         chip.onClick = new Button.ButtonClickedEvent();
         RectTransform rect = (RectTransform)chip.transform;
@@ -132,7 +234,7 @@ public class RunnerFilterBar : MonoBehaviour
     {
         get
         {
-            return tierFilter >= 0 || !string.IsNullOrWhiteSpace(search.text)
+            return tierFilter >= 0 || classFilter != 0 || !string.IsNullOrWhiteSpace(search.text)
                 || minSpeed.value > minSpeed.minValue || minTechnique.value > minTechnique.minValue;
         }
     }
@@ -141,14 +243,23 @@ public class RunnerFilterBar : MonoBehaviour
     {
         string wanted = search.text == null ? "" : search.text.Trim();
         if (card.man == ShowWomen) return false;
-        if (wanted.Length > 0 && (card.RunnerName == null || card.RunnerName.IndexOf(wanted, StringComparison.OrdinalIgnoreCase) < 0)) return false;
+        if (wanted.Length > 0 && !Contains(card.RunnerName, wanted) && !Contains(card.clubName, wanted)
+            && !Contains(RunnerCards.CountryName(card), wanted)) return false;
         if (tierFilter >= 0 && (int)RunnerCards.Tier(card) != tierFilter) return false;
+        if (!ClassMatches(card)) return false;
         if (Mathf.RoundToInt(card.speed) < minSpeed.value) return false;
         if (Mathf.RoundToInt(card.technique) < minTechnique.value) return false;
         return true;
     }
 
-    // Best first for the three numbers, A to Z for names
+    // The search finds runners by name, club or country
+    static bool Contains(string text, string wanted)
+    {
+        return text != null && text.IndexOf(wanted, StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    // Best first for the three numbers, A to Z for names, clubs and countries, or the other way
+    // round. Runners in the same club or country come best first, and runners without a club last.
     public int Compare(CardData a, CardData b)
     {
         int result = 0;
@@ -157,13 +268,32 @@ public class RunnerFilterBar : MonoBehaviour
             case SortBy.Overall: result = RunnerCards.Overall(b).CompareTo(RunnerCards.Overall(a)); break;
             case SortBy.Speed: result = b.speed.CompareTo(a.speed); break;
             case SortBy.Technique: result = b.technique.CompareTo(a.technique); break;
+            case SortBy.Name: result = string.Compare(a.RunnerName, b.RunnerName, StringComparison.OrdinalIgnoreCase); break;
+            case SortBy.Club: result = CompareText(a.clubName, b.clubName); break;
+            case SortBy.Country: result = CompareText(RunnerCards.CountryName(a), RunnerCards.CountryName(b)); break;
+        }
+        if (result == int.MaxValue || result == int.MinValue) return result > 0 ? 1 : -1;   // an empty club stays last
+        if (reversed) result = -result;
+        if (result == 0 && (sortBy == SortBy.Club || sortBy == SortBy.Country))
+        {
+            result = (b.speed + b.technique).CompareTo(a.speed + a.technique);
         }
         return result != 0 ? result : string.Compare(a.RunnerName, b.RunnerName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // A to Z, with an empty text after everything (int.MaxValue / MinValue so the order chip leaves it last)
+    static int CompareText(string a, string b)
+    {
+        bool noA = string.IsNullOrWhiteSpace(a);
+        bool noB = string.IsNullOrWhiteSpace(b);
+        if (noA || noB) return noA == noB ? 0 : noA ? int.MaxValue : int.MinValue;
+        return string.Compare(a, b, StringComparison.CurrentCultureIgnoreCase);
     }
 
     public void Clear()
     {
         tierFilter = -1;
+        classFilter = 0;
         search.SetTextWithoutNotify("");
         minSpeed.SetValueWithoutNotify(minSpeed.minValue);
         minTechnique.SetValueWithoutNotify(minTechnique.minValue);
@@ -176,7 +306,19 @@ public class RunnerFilterBar : MonoBehaviour
         minTechniqueLabel.text = "Min technique  <b>" + Mathf.RoundToInt(minTechnique.value) + "</b>";
         if (clearButton != null) clearButton.gameObject.SetActive(Filtering);
         for (int i = 0; i < sortButtons.Length; i++) PaintChip(sortButtons[i], i == (int)sortBy);
+        if (orderChip != null)
+        {
+            PaintChip(orderChip, reversed);
+            TextMeshProUGUI order = orderChip.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (order != null) order.text = ByText ? (reversed ? "Z to A" : "A to Z") : (reversed ? "Worst first" : "Best first");
+        }
         for (int i = 0; i < tierButtons.Length; i++) PaintChip(tierButtons[i], TierOfButton(i) == tierFilter);
+        if (classChip != null)
+        {
+            PaintChip(classChip, classFilter != 0);
+            TextMeshProUGUI label = classChip.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (label != null) label.text = ClassLabel();
+        }
         if (womenChip != null) PaintChip(womenChip, ShowWomen);
         if (menChip != null) PaintChip(menChip, !ShowWomen);
     }
