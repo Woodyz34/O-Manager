@@ -10,6 +10,7 @@ public class RouteChoice
     public float seconds;   // race time (game seconds) for the speed-100 runner
     public float meters;    // length of the route
     public int colour;      // index into RouteChoiceGame.Colours
+    public float side;      // average distance left (-) or right (+) of the straight line, in cells
 }
 
 // The route choices of one leg (index 1 = start to control 1), in the order they are shown: from left to right
@@ -43,13 +44,13 @@ public class RouteChoiceLeg
 // already picked, are left out, so the choices are spread out and worth thinking about.
 public class RouteChoiceGenerator
 {
-    const int MaxCandidates = 12;          // different routes timed per leg before picking
+    const int MaxCandidates = 20;          // different routes timed per leg before picking
     const int MaxTries = 600;              // points tried per leg
     const float MinGapSeconds = 2f;        // two choices must differ at least this much (race seconds)...
     const float MinGapShare = 0.02f;       // ...and at least this share of the fastest time
     // Choices slower than this x the fastest are too easy to rule out. In the forest a slow choice is usually a
     // long way round that nobody would take, so there the cap is tighter (two good choices are enough)
-    const float MaxSlowerSprint = 1.3f;
+    const float MaxSlowerSprint = 1.2f;
     const float MaxSlowerForest = 1.07f;
     const float ViaReach = 0.95f;          // a route may go its own way anywhere from 5 % to 95 % along the leg
     const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
@@ -274,32 +275,54 @@ public class RouteChoiceGenerator
             if (candidates.Count >= MaxCandidates) break;
         }
 
-        // Fastest first; take every route that is clearly different from the ones already taken
+        // The fastest first. Then, again and again, the route that runs furthest from the ones already taken
+        // (and is not much slower), so the choices spread out: one far to the left, one far to the right, rather
+        // than four ways down the same side
         candidates.Sort((a, b) => a.seconds.CompareTo(b.seconds));
         float fastest = candidates[0].seconds;
         float gap = Mathf.Max(MinGapSeconds, fastest * MinGapShare);
         // Up to 4 choices, as many as there are clearly different ones; on short legs at most 3, as more would not fit
         int most = straightMeters < 100f ? 3 : 4;
         float sameCells = sameMeters / cellMeters;
-        List<RouteChoice> picked = new List<RouteChoice>();
+        Vector2 along = ((Vector2)(to - from)).normalized;
+        List<RouteChoice> usable = new List<RouteChoice>();
         foreach (RouteChoice c in candidates)
         {
             if (c.seconds > fastest * MaxSlower + 3f) break;
             // Turning right round (out and back) is never a route anyone would choose
             // (unless the fastest route has to turn as sharply too, e.g. on a zigzag path up a hill)
             if (c.sharpestTurn > Mathf.Max(MaxTurn, candidates[0].sharpestTurn + 10f)) continue;
-            bool ok = true;
-            foreach (RouteChoice p in picked)
+            c.side = Side(c.cells, from, along);
+            usable.Add(c);
+        }
+        List<RouteChoice> picked = new List<RouteChoice>();
+        if (usable.Count > 0) picked.Add(usable[0]);
+        while (picked.Count < most)
+        {
+            RouteChoice next = null;
+            float bestScore = 0f;
+            foreach (RouteChoice c in usable)
             {
-                if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells))
+                if (picked.Contains(c)) continue;
+                bool ok = true;
+                float apart = float.MaxValue;
+                foreach (RouteChoice p in picked)
                 {
-                    ok = false;
-                    break;
+                    if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells))
+                    {
+                        ok = false;
+                        break;
+                    }
+                    apart = Mathf.Min(apart, Mathf.Abs(c.side - p.side));
                 }
+                if (!ok) continue;
+                // How far it runs from the others, less for every bit slower than the fastest
+                float slower = c.seconds / Mathf.Max(0.001f, fastest) - 1f;
+                float score = (apart + spreadCells) / (1f + 6f * slower);
+                if (next == null || score > bestScore) { next = c; bestScore = score; }
             }
-            if (!ok) continue;
-            picked.Add(c);
-            if (picked.Count >= most) break;
+            if (next == null) break;
+            picked.Add(next);
         }
         if (picked.Count < 2)
         {
@@ -309,8 +332,7 @@ public class RouteChoiceGenerator
 
         // Choices are in order from left to right (as seen running the leg), and the colours always go the same way:
         // left is blue, right is red, green and then yellow in between. So key 1 is always the left one.
-        Vector2 along = ((Vector2)(to - from)).normalized;
-        picked.Sort((a, b) => Side(a.cells, from, along).CompareTo(Side(b.cells, from, along)));
+        picked.Sort((a, b) => a.side.CompareTo(b.side));
         int[] order = picked.Count == 2 ? new[] { 1, 0 } : picked.Count == 3 ? new[] { 1, 2, 0 } : new[] { 1, 2, 3, 0 };
         for (int i = 0; i < picked.Count; i++) picked[i].colour = order[i];
         result.choices = picked;
