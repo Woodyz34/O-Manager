@@ -1,0 +1,62 @@
+{
+  "id": "e3532d1bb10f",
+  "name": "A walk down memory lane",
+  "author": "Woody",
+  "authorId": "3Kqr8zxeknQG7MYXq1R4bVIbeev4",
+  "mapId": "angaryd-sprint",
+  "background": "",
+  "builtIn": false,
+  "createdAt": 1793803298,
+  "terrain": "sprint",
+  "start": {
+    "e": 1761.0,
+    "n": 2506.0
+  },
+  "controls": [
+    {
+      "e": 1554.0,
+      "n": 2073.0
+    },
+    {
+      "e": 1441.0,
+      "n": 2148.0
+    },
+    {
+      "e": 1681.0,
+      "n": 2872.0
+    },
+    {
+      "e": 1487.0,
+      "n": 2965.0
+    },
+    {
+      "e": 1259.0,
+      "n": 3039.0
+    },
+    {
+      "e": 1563.0,
+      "n": 3059.0
+    },
+    {
+      "e": 1728.0,
+      "n": 3007.0
+    },
+    {
+      "e": 1805.0,
+      "n": 3188.0
+    }
+  ],
+  "finish": {
+    "e": 1915.0,
+    "n": 3163.0
+  },
+  "kind": null,
+  "legs": 0,
+  "legCourse": [],
+  "relayCourses": [],
+  "relayForks": [],
+  "forkEveryVariant": true,
+  "forks": [],
+  "extraCourses": [],
+  "forkedLegs": []
+}
