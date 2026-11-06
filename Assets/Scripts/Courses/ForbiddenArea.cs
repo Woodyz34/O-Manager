@@ -2,17 +2,22 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// An out-of-bounds area (ISOM / ISSprOM 709) the course setter draws on the map: purple vertical stripes the runners
-// must not enter. It is a polygon of corners in the map's own coordinates, like the controls, and belongs to the
-// whole course (every leg of a relay).
+// Something the course setter draws on the map that the runners must keep out of, in the map's own coordinates like
+// the controls. It belongs to the whole course (every leg of a relay). Two kinds, as in ISOM / ISSprOM:
+// - an out-of-bounds area (709): a polygon with purple vertical stripes the runners must not enter
+// - an uncrossable boundary (707): a thick purple line the runners must not cross (line = true; its ends are not joined)
 [Serializable]
 public class ForbiddenArea
 {
-    public const int MaxCorners = 40;       // per area
-    public const int MaxAreas = 20;
+    public const int MaxCorners = 40;       // per area or line
+    public const int MaxAreas = 20;         // areas and lines together
     public const int MaxCornersTotal = 150; // keeps the course small enough to send in the lobby (6 characters a corner)
 
     public List<CoursePoint> corners = new List<CoursePoint>();
+    public bool line;                       // an uncrossable boundary instead of an area
+
+    public int MinCorners => line ? 2 : 3;
+    public bool IsValid => corners != null && corners.Count >= MinCorners;
 }
 
 // Turning out-of-bounds areas into closed grid cells, and other geometry for them
@@ -23,7 +28,7 @@ public static class ForbiddenAreas
         if (course == null || course.forbidden == null) return false;
         foreach (ForbiddenArea area in course.forbidden)
         {
-            if (area != null && area.corners != null && area.corners.Count >= 3) return true;
+            if (area != null && area.IsValid) return true;
         }
         return false;
     }
@@ -38,7 +43,7 @@ public static class ForbiddenAreas
         int closed = 0;
         foreach (ForbiddenArea area in areas)
         {
-            if (area == null || area.corners == null || area.corners.Count < 3) continue;
+            if (area == null || !area.IsValid) continue;
             // Corners in grid cells (x = column, y = row), the same way MapDefinition.ToCell works
             List<Vector2> poly = new List<Vector2>(area.corners.Count);
             foreach (CoursePoint corner in area.corners)
@@ -47,34 +52,38 @@ public static class ForbiddenAreas
                 poly.Add(new Vector2(world.x / cell + cols / 2f, world.y / cell + rows / 2f));
             }
 
-            // Inside: one scanline through the middle of every row
-            float minY = float.MaxValue, maxY = float.MinValue;
-            foreach (Vector2 p in poly) { minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y); }
-            int firstRow = Mathf.Max(0, Mathf.FloorToInt(minY)), lastRow = Mathf.Min(rows - 1, Mathf.CeilToInt(maxY));
-            List<float> crossings = new List<float>();
-            for (int i = firstRow; i <= lastRow; i++)
+            // Inside, for an area (a boundary line is only its sides): one scanline through the middle of every row
+            if (!area.line)
             {
-                float y = i + 0.5f;
-                crossings.Clear();
-                for (int k = 0; k < poly.Count; k++)
+                float minY = float.MaxValue, maxY = float.MinValue;
+                foreach (Vector2 p in poly) { minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y); }
+                int firstRow = Mathf.Max(0, Mathf.FloorToInt(minY)), lastRow = Mathf.Min(rows - 1, Mathf.CeilToInt(maxY));
+                List<float> crossings = new List<float>();
+                for (int i = firstRow; i <= lastRow; i++)
                 {
-                    Vector2 a = poly[k], b = poly[(k + 1) % poly.Count];
-                    if ((a.y <= y && y < b.y) || (b.y <= y && y < a.y))
+                    float y = i + 0.5f;
+                    crossings.Clear();
+                    for (int k = 0; k < poly.Count; k++)
                     {
-                        crossings.Add(a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y));
+                        Vector2 a = poly[k], b = poly[(k + 1) % poly.Count];
+                        if ((a.y <= y && y < b.y) || (b.y <= y && y < a.y))
+                        {
+                            crossings.Add(a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y));
+                        }
                     }
-                }
-                crossings.Sort();
-                for (int k = 0; k + 1 < crossings.Count; k += 2)
-                {
-                    int from = Mathf.Max(0, Mathf.CeilToInt(crossings[k] - 0.5f));
-                    int to = Mathf.Min(cols - 1, Mathf.FloorToInt(crossings[k + 1] - 0.5f));
-                    for (int j = from; j <= to; j++) closed += Close(speed, i, j);
+                    crossings.Sort();
+                    for (int k = 0; k + 1 < crossings.Count; k += 2)
+                    {
+                        int from = Mathf.Max(0, Mathf.CeilToInt(crossings[k] - 0.5f));
+                        int to = Mathf.Min(cols - 1, Mathf.FloorToInt(crossings[k + 1] - 0.5f));
+                        for (int j = from; j <= to; j++) closed += Close(speed, i, j);
+                    }
                 }
             }
 
-            // The border: walk along every side in quarter cells
-            for (int k = 0; k < poly.Count; k++)
+            // The border: walk along every side in quarter cells (a line's last corner is not joined to its first)
+            int sides = area.line ? poly.Count - 1 : poly.Count;
+            for (int k = 0; k < sides; k++)
             {
                 Vector2 a = poly[k], b = poly[(k + 1) % poly.Count];
                 int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(a, b) * 4f));
@@ -115,7 +124,22 @@ public static class ForbiddenAreas
         if (gridName.EndsWith(".json")) gridName = gridName.Substring(0, gridName.Length - 5);
         if (gridName != map.gridName) return;   // a scene that runs another map
         int closed = Block(manager.speedGrid2D, map, course.forbidden);
-        Debug.Log("ForbiddenAreas: closed " + closed + " grid cells for " + course.forbidden.Count + " out-of-bounds areas");
+        Debug.Log("ForbiddenAreas: closed " + closed + " grid cells for " + course.forbidden.Count + " out-of-bounds areas and uncrossable boundaries");
+    }
+
+    // How far a point is from a polyline (closed = the last corner joins the first), in the same units as the points
+    public static float DistanceToLine(IList<Vector3> corners, Vector3 point, bool closed)
+    {
+        float best = float.MaxValue;
+        int sides = closed ? corners.Count : corners.Count - 1;
+        for (int k = 0; k < sides; k++)
+        {
+            Vector2 a = corners[k], b = corners[(k + 1) % corners.Count], p = point;
+            Vector2 ab = b - a;
+            float t = ab.sqrMagnitude > 0f ? Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude) : 0f;
+            best = Mathf.Min(best, Vector2.Distance(p, a + ab * t));
+        }
+        return best;
     }
 
     // Even-odd rule, so it works for any outline the course setter clicks, also one that crosses itself

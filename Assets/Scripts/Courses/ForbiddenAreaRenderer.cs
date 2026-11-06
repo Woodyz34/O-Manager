@@ -2,7 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Draws out-of-bounds areas the way ISOM / ISSprOM symbol 709 looks: purple vertical stripes (north-south on the map)
-// with a purple border line. In the course builder it also draws the corner handles and the area being drawn.
+// with a purple border line, and uncrossable boundaries (707) as a thick purple line. In the course builder it also
+// draws the corner handles and the area or line being drawn.
 public class ForbiddenAreaRenderer : MonoBehaviour
 {
     public int sortingOrder = 3;    // under the course lines (CourseRenderer uses 4)
@@ -11,9 +12,11 @@ public class ForbiddenAreaRenderer : MonoBehaviour
     float stripeSpacingMeters = 12f;
     float stripeShare = 0.32f;
     float borderMeters = 3.5f;
+    float boundaryMeters = 7f;      // 707: 0.7 mm, a little thinner than that at 1:15 000 so it does not hide the map
 
     readonly List<GameObject> parts = new List<GameObject>();
     readonly List<LineRenderer> lines = new List<LineRenderer>();
+    readonly List<float> lineMeters = new List<float>();     // each line's real width on the ground
     readonly List<Transform> handles = new List<Transform>();
     readonly List<float> handleScale = new List<float>();
     readonly List<Mesh> meshes = new List<Mesh>();
@@ -33,6 +36,7 @@ public class ForbiddenAreaRenderer : MonoBehaviour
     {
         stripeSpacingMeters = sprint ? 3.2f : 12f;
         borderMeters = sprint ? 1f : 3.5f;
+        boundaryMeters = sprint ? 2.4f : 7f;
     }
 
     public void Clear()
@@ -42,6 +46,7 @@ public class ForbiddenAreaRenderer : MonoBehaviour
         foreach (Mesh mesh in meshes) if (mesh != null) Destroy(mesh);
         meshes.Clear();
         lines.Clear();
+        lineMeters.Clear();
         handles.Clear();
         handleScale.Clear();
         rubber = null;
@@ -56,33 +61,41 @@ public class ForbiddenAreaRenderer : MonoBehaviour
         SetMapType(map.IsSprint);
         foreach (ForbiddenArea area in areas)
         {
-            if (area == null || area.corners == null || area.corners.Count < 3) continue;
-            AddArea(area.corners.ConvertAll(c => map.ToWorld(c)), false, Purple);
+            if (area == null || !area.IsValid) continue;
+            List<Vector3> corners = area.corners.ConvertAll(c => map.ToWorld(c));
+            if (area.line) AddBoundary(corners, false, Purple);
+            else AddArea(corners, false, Purple);
         }
     }
 
-    // The course builder: finished areas, the one being drawn (open), and handles on every corner when editing
-    public void DrawEditing(List<List<Vector3>> areas, List<Vector3> open, bool showHandles, int badArea = -1)
+    // The course builder: finished areas and boundary lines, the one being drawn (open), and handles on every corner
+    // when editing. badArea counts the areas first, then the lines.
+    public void DrawEditing(List<List<Vector3>> areas, List<List<Vector3>> boundaries, List<Vector3> open, bool openIsLine, bool showHandles, int badArea = -1)
     {
         Clear();
         for (int a = 0; a < areas.Count; a++)
         {
             AddArea(areas[a], showHandles, a == badArea ? CourseRenderer.ErrorRed : Purple);
         }
+        for (int b = 0; b < boundaries.Count; b++)
+        {
+            AddBoundary(boundaries[b], showHandles, areas.Count + b == badArea ? CourseRenderer.ErrorRed : Purple);
+        }
         if (open != null && open.Count > 0)
         {
             openCorners = open;
             if (open.Count >= 2)
             {
-                LineRenderer line = NewLine("Area being drawn", false);
+                LineRenderer line = NewLine(openIsLine ? "Line being drawn" : "Area being drawn", false, openIsLine ? boundaryMeters : borderMeters);
                 line.positionCount = open.Count;
                 for (int k = 0; k < open.Count; k++) line.SetPosition(k, Flat(open[k], -1.15f));
             }
-            rubber = NewLine("To the mouse", false);
+            rubber = NewLine("To the mouse", false, openIsLine ? boundaryMeters : borderMeters);
             rubber.startColor = rubber.endColor = new Color(Purple.r, Purple.g, Purple.b, 0.55f);
             rubber.positionCount = 2;
             UpdateRubber();
-            for (int k = 0; k < open.Count; k++) AddHandle(open[k], k == 0 && open.Count >= 3);
+            // An area is closed by clicking its first corner, so that one is bigger; a line has no such corner
+            for (int k = 0; k < open.Count; k++) AddHandle(open[k], !openIsLine && k == 0 && open.Count >= 3);
         }
     }
 
@@ -132,11 +145,23 @@ public class ForbiddenAreaRenderer : MonoBehaviour
         meshes.Add(mesh);
         parts.Add(fill);
 
-        LineRenderer border = NewLine("Out-of-bounds border", true);
+        LineRenderer border = NewLine("Out-of-bounds border", true, borderMeters);
         border.startColor = border.endColor = color;
         border.positionCount = corners.Count;
         for (int k = 0; k < corners.Count; k++) border.SetPosition(k, Flat(corners[k], -1.12f));
 
+        if (showHandles) foreach (Vector3 corner in corners) AddHandle(corner, false);
+    }
+
+    // An uncrossable boundary: one thick purple line through the corners, its ends not joined
+    void AddBoundary(List<Vector3> corners, bool showHandles, Color color)
+    {
+        if (corners.Count < 2) return;
+        LineRenderer line = NewLine("Uncrossable boundary", false, boundaryMeters);
+        line.startColor = line.endColor = color;
+        line.numCapVertices = 0;
+        line.positionCount = corners.Count;
+        for (int k = 0; k < corners.Count; k++) line.SetPosition(k, Flat(corners[k], -1.12f));
         if (showHandles) foreach (Vector3 corner in corners) AddHandle(corner, false);
     }
 
@@ -169,8 +194,14 @@ public class ForbiddenAreaRenderer : MonoBehaviour
     {
         Camera camera = Camera.main;
         if (camera == null) return;
-        float width = Mathf.Max(borderMeters * Scale, camera.orthographicSize * 0.004f);
-        foreach (LineRenderer line in lines) if (line != null) line.widthMultiplier = width;
+        // A border never gets thinner on the screen than a hairline; a boundary keeps its thickness over the border's
+        float hairline = camera.orthographicSize * 0.004f;
+        for (int k = 0; k < lines.Count; k++)
+        {
+            if (lines[k] == null) continue;
+            float meters = lineMeters[k];
+            lines[k].widthMultiplier = Mathf.Max(meters * Scale, hairline * (meters > borderMeters ? 2f : 1f));
+        }
         float size = HandleSize;
         for (int k = 0; k < handles.Count; k++)
         {
@@ -180,7 +211,7 @@ public class ForbiddenAreaRenderer : MonoBehaviour
 
     static Vector3 Flat(Vector3 p, float z) => new Vector3(p.x, p.y, z);
 
-    LineRenderer NewLine(string label, bool loop)
+    LineRenderer NewLine(string label, bool loop, float meters)
     {
         GameObject go = new GameObject(label);
         go.transform.SetParent(transform, false);
@@ -188,13 +219,14 @@ public class ForbiddenAreaRenderer : MonoBehaviour
         line.sharedMaterial = PlainMaterial();
         line.useWorldSpace = true;
         line.loop = loop;
-        line.widthMultiplier = borderMeters * Scale;
+        line.widthMultiplier = meters * Scale;
         line.startColor = line.endColor = Purple;
         line.numCornerVertices = 2;
         line.numCapVertices = 2;
         line.sortingOrder = sortingOrder + 1;
         parts.Add(go);
         lines.Add(line);
+        lineMeters.Add(meters);
         return line;
     }
 
