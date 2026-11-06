@@ -21,6 +21,7 @@ public class RunnerPickerUI : MonoBehaviour
     {
         filters.Changed += Apply;
         seenCards = -1;
+        FastScroll.Add(scroll);
     }
 
     void OnDisable()

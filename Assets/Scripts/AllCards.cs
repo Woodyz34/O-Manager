@@ -56,6 +56,7 @@ public class AllCards : MonoBehaviour
             CardData card = new CardData(r.name, r.speed, r.technique, Emblems.Flag(r.country), Emblems.Club(r.club), r.klass, r.man, photo);
             card.id = r.id;
             card.countryName = r.country;
+            card.countryGuessed = r.countryGuessed;
             card.clubName = r.club;
             card.inPacks = r.inPacks;
             if (r.merits != null) card.merits = r.merits;
@@ -86,6 +87,7 @@ public class AllCards : MonoBehaviour
         public bool man;
         public string klass;
         public string country;
+        public bool countryGuessed;
         public string club;
         public float speed;
         public float technique;

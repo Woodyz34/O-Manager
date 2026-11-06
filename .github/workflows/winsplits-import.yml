@@ -1,11 +1,12 @@
 name: WinSplits-import
 
-# Startar av sig själv när txt-filer läggs i eventor/winsplits/ på main,
+# Startar av sig själv när txt-filer läggs i eventor/winsplits/ på main, eller när
+# eventor/klubbar.txt eller eventor/nationalitet.txt ändras,
 # och kan också startas för hand. Gör inga anrop till Eventor.
 on:
   push:
     branches: [main]
-    paths: ["eventor/winsplits/**", "eventor/import_winsplits.py"]
+    paths: ["eventor/winsplits/**", "eventor/import_winsplits.py", "eventor/klubbar.txt", "eventor/nationalitet.txt"]
   workflow_dispatch:
 
 permissions:
@@ -33,7 +34,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add eventor/data Assets/Resources/Runners Assets/Resources/Emblem/Bildlista.txt
+          git add eventor/data eventor/klubbar.txt eventor/nationalitet.txt Assets/Resources/Runners Assets/Resources/Emblem/Bildlista.txt
           if git diff --cached --quiet; then
             echo "Inget nytt att spara."
           else
