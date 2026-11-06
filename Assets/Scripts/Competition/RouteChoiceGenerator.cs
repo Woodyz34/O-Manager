@@ -10,6 +10,7 @@ public class RouteChoice
     public float seconds;   // race time (game seconds) for the speed-100 runner
     public float meters;    // length of the route
     public int colour;      // index into RouteChoiceGame.Colours
+    public float side;      // average distance left (-) or right (+) of the straight line, in cells
     public bool crossesBlocked; // route analysis: the line goes over ground nobody can run on (a building, a fence ...)
 }
 
@@ -44,17 +45,20 @@ public class RouteChoiceLeg
 // already picked, are left out, so the choices are spread out and worth thinking about.
 public class RouteChoiceGenerator
 {
-    const int MaxCandidates = 12;          // different routes timed per leg before picking
+    const int MaxCandidates = 20;          // different routes timed per leg before picking
     const int MaxTries = 600;              // points tried per leg
     const float MinGapSeconds = 2f;        // two choices must differ at least this much (race seconds)...
     const float MinGapShare = 0.02f;       // ...and at least this share of the fastest time
     // Choices slower than this x the fastest are too easy to rule out. In the forest a slow choice is usually a
     // long way round that nobody would take, so there the cap is tighter (two good choices are enough)
-    const float MaxSlowerSprint = 1.3f;
+    const float MaxSlowerSprint = 1.2f;
     const float MaxSlowerForest = 1.07f;
-    const float ViaReach = 0.75f;          // route choices split in the first 75 % of the leg; after that, the fastest way in
+    const float ViaReach = 0.95f;          // a route may go its own way anywhere from 5 % to 95 % along the leg
     const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
-    const float MaxSameShare = 0.5f;       // at most half of a route's middle may run next to another route
+    // Two routes may share most of the leg (everyone runs the same street at first), but somewhere they must part
+    // properly: a stretch at least DivergeShare of the leg long where they are at least SpreadShare of the leg apart
+    const float DivergeShare = 0.15f;
+    const float SpreadShare = 0.10f;
     const float LocalShare = 0.15f;        // round its point, a route must be the fastest way over this share of the leg's time
     const float LocalSlack = 1.05f;        // (5 % slower still counts as the fastest way)
     const float TurnAcceleration = 2f;     // as AgentMovement.TurnAcceleration (world units per second²)
@@ -252,6 +256,7 @@ public class RouteChoiceGenerator
     RouteChoiceLeg MakeHere(int leg, Vector2Int from, Vector2Int to, int seed, float straightMeters)
     {
         RouteChoiceLeg result = new RouteChoiceLeg { leg = leg };
+        bucketed.Clear();
         List<Vector2Int> best = Path(from, to);
         if (best == null || best.Count < 2)
         {
@@ -260,7 +265,10 @@ public class RouteChoiceGenerator
         }
 
         // The corridor round a route, and how close two routes may run and still count as different
-        float corridorMeters = Mathf.Clamp(straightMeters * 0.07f, 2.5f * cellMeters, 60f);
+        divergeCells = Mathf.Max(4f, straightMeters * DivergeShare / cellMeters);
+        spreadCells = Mathf.Max(3f, straightMeters * SpreadShare / cellMeters);
+        // (a little narrower than the spread, so a point on the other side of a house is still tried)
+        float corridorMeters = Mathf.Min(Mathf.Clamp(straightMeters * 0.07f, 2.5f * cellMeters, 60f), Mathf.Max(1.5f * cellMeters, spreadCells * cellMeters * 0.8f));
         int corridor = Mathf.Max(1, Mathf.RoundToInt(corridorMeters / cellMeters));
         float sameMeters = Mathf.Max(1.5f * cellMeters, straightMeters * 0.035f);
         float endMeters = Mathf.Max(corridorMeters, 3f * cellMeters); // near the controls all routes may meet
@@ -328,32 +336,54 @@ public class RouteChoiceGenerator
             if (candidates.Count >= MaxCandidates) break;
         }
 
-        // Fastest first; take every route that is clearly different from the ones already taken
+        // The fastest first. Then, again and again, the route that runs furthest from the ones already taken
+        // (and is not much slower), so the choices spread out: one far to the left, one far to the right, rather
+        // than four ways down the same side
         candidates.Sort((a, b) => a.seconds.CompareTo(b.seconds));
         float fastest = candidates[0].seconds;
         float gap = Mathf.Max(MinGapSeconds, fastest * MinGapShare);
         // Up to 4 choices, as many as there are clearly different ones; on short legs at most 3, as more would not fit
         int most = straightMeters < 100f ? 3 : 4;
         float sameCells = sameMeters / cellMeters;
-        List<RouteChoice> picked = new List<RouteChoice>();
+        Vector2 along = ((Vector2)(to - from)).normalized;
+        List<RouteChoice> usable = new List<RouteChoice>();
         foreach (RouteChoice c in candidates)
         {
             if (c.seconds > fastest * MaxSlower + 3f) break;
             // Turning right round (out and back) is never a route anyone would choose
             // (unless the fastest route has to turn as sharply too, e.g. on a zigzag path up a hill)
             if (c.sharpestTurn > Mathf.Max(MaxTurn, candidates[0].sharpestTurn + 10f)) continue;
-            bool ok = true;
-            foreach (RouteChoice p in picked)
+            c.side = Side(c.cells, from, along);
+            usable.Add(c);
+        }
+        List<RouteChoice> picked = new List<RouteChoice>();
+        if (usable.Count > 0) picked.Add(usable[0]);
+        while (picked.Count < most)
+        {
+            RouteChoice next = null;
+            float bestScore = 0f;
+            foreach (RouteChoice c in usable)
             {
-                if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells))
+                if (picked.Contains(c)) continue;
+                bool ok = true;
+                float apart = float.MaxValue;
+                foreach (RouteChoice p in picked)
                 {
-                    ok = false;
-                    break;
+                    if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells))
+                    {
+                        ok = false;
+                        break;
+                    }
+                    apart = Mathf.Min(apart, Mathf.Abs(c.side - p.side));
                 }
+                if (!ok) continue;
+                // How far it runs from the others, less for every bit slower than the fastest
+                float slower = c.seconds / Mathf.Max(0.001f, fastest) - 1f;
+                float score = (apart + spreadCells) / (1f + 6f * slower);
+                if (next == null || score > bestScore) { next = c; bestScore = score; }
             }
-            if (!ok) continue;
-            picked.Add(c);
-            if (picked.Count >= most) break;
+            if (next == null) break;
+            picked.Add(next);
         }
         if (picked.Count < 2)
         {
@@ -363,8 +393,7 @@ public class RouteChoiceGenerator
 
         // Choices are in order from left to right (as seen running the leg), and the colours always go the same way:
         // left is blue, right is red, green and then yellow in between. So key 1 is always the left one.
-        Vector2 along = ((Vector2)(to - from)).normalized;
-        picked.Sort((a, b) => Side(a.cells, from, along).CompareTo(Side(b.cells, from, along)));
+        picked.Sort((a, b) => a.side.CompareTo(b.side));
         int[] order = picked.Count == 2 ? new[] { 1, 0 } : picked.Count == 3 ? new[] { 1, 2, 0 } : new[] { 1, 2, 3, 0 };
         for (int i = 0; i < picked.Count; i++) picked[i].colour = order[i];
         result.choices = picked;
@@ -391,47 +420,69 @@ public class RouteChoiceGenerator
         return result;
     }
 
-    // True when the middle of each route (away from the controls) mostly runs somewhere else than the other one
-    static bool Different(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
+    float divergeCells;  // see DivergeShare, in cells, for the leg being worked out
+    float spreadCells;   // see SpreadShare
+
+    // True when the two routes part properly somewhere (away from the controls): each has a stretch at least
+    // divergeCells long that runs away from the other one and gets at least spreadCells from it. Sharing the rest of
+    // the leg is fine: a choice of going left or right round a house at the end is a real route choice.
+    bool Different(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
     {
-        return SameShare(a, b, from, to, endCells, sameCells) < MaxSameShare
-            && SameShare(b, a, from, to, endCells, sameCells) < MaxSameShare;
+        return Parts(a, b, from, to, endCells, sameCells) && Parts(b, a, from, to, endCells, sameCells);
     }
 
-    static float SameShare(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
+    bool Parts(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
     {
         int e2 = endCells * endCells;
-        int s2 = Mathf.CeilToInt(sameCells * sameCells);
-        // The cells of b in buckets as big as "the same place", so each cell of a only looks at the buckets round it
-        int bucket = Mathf.Max(1, Mathf.CeilToInt(sameCells));
-        Dictionary<long, List<Vector2Int>> buckets = new Dictionary<long, List<Vector2Int>>();
-        foreach (Vector2Int c in b)
+        float near2 = sameCells * sameCells;
+        float run = 0f, far = 0f;
+        for (int i = 0; i < a.Count; i++)
         {
-            long key = Key(Floor(c.x, bucket), Floor(c.y, bucket));
-            if (!buckets.TryGetValue(key, out List<Vector2Int> list)) buckets[key] = list = new List<Vector2Int>();
-            list.Add(c);
-        }
-        int middle = 0, same = 0;
-        foreach (Vector2Int c in a)
-        {
-            if ((c - from).sqrMagnitude <= e2 || (c - to).sqrMagnitude <= e2) continue;
-            middle++;
-            int bx = Floor(c.x, bucket), by = Floor(c.y, bucket);
-            bool near = false;
-            for (int dy = -1; dy <= 1 && !near; dy++)
+            Vector2Int c = a[i];
+            bool end = (c - from).sqrMagnitude <= e2 || (c - to).sqrMagnitude <= e2;
+            float d2 = end ? 0f : NearbySquared(c, b);
+            if (d2 <= near2)
             {
-                for (int dx = -1; dx <= 1 && !near; dx++)
-                {
-                    if (!buckets.TryGetValue(Key(bx + dx, by + dy), out List<Vector2Int> list)) continue;
-                    foreach (Vector2Int o in list)
-                    {
-                        if ((o - c).sqrMagnitude <= s2) { near = true; break; }
-                    }
-                }
+                run = 0f;
+                far = 0f;
+                continue;
             }
-            if (near) same++;
+            if (i > 0) run += (a[i] - a[i - 1]).magnitude;
+            far = Mathf.Max(far, d2);
+            if (run >= divergeCells && far >= spreadCells * spreadCells) return true;
         }
-        return middle == 0 ? 1f : (float)same / middle;
+        return false;
+    }
+
+    // Squared distance from a cell to the nearest cell of a route, looked up in buckets as big as spreadCells
+    // (anything further than that is "far enough", float.MaxValue)
+    readonly Dictionary<List<Vector2Int>, Dictionary<long, List<Vector2Int>>> bucketed = new Dictionary<List<Vector2Int>, Dictionary<long, List<Vector2Int>>>();
+
+    float NearbySquared(Vector2Int c, List<Vector2Int> route)
+    {
+        int size = Mathf.Max(1, Mathf.CeilToInt(spreadCells));
+        if (!bucketed.TryGetValue(route, out Dictionary<long, List<Vector2Int>> buckets))
+        {
+            buckets = new Dictionary<long, List<Vector2Int>>();
+            foreach (Vector2Int r in route)
+            {
+                long key = Key(Floor(r.x, size), Floor(r.y, size));
+                if (!buckets.TryGetValue(key, out List<Vector2Int> list)) buckets[key] = list = new List<Vector2Int>();
+                list.Add(r);
+            }
+            bucketed[route] = buckets;
+        }
+        int bx = Floor(c.x, size), by = Floor(c.y, size);
+        float best = float.MaxValue;
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                if (!buckets.TryGetValue(Key(bx + dx, by + dy), out List<Vector2Int> list)) continue;
+                foreach (Vector2Int o in list) best = Mathf.Min(best, (o - c).sqrMagnitude);
+            }
+        }
+        return best;
     }
 
     static int Floor(int v, int size) => v >= 0 ? v / size : (v - size + 1) / size;
@@ -763,10 +814,10 @@ public class RouteChoiceGenerator
                 bool clear = true;
                 for (int s = 0; s < pts.Count - 1 && clear; s++)
                 {
-                    LineCost(pts[s], pts[s + 1], out bool blocked);
+                    LineCost(pts[s], pts[s + 1], out bool blocked, EdgeMargin);
                     if (blocked) clear = false;
                 }
-                LineCost(round[round.Count - 1], pts[0], out bool blockedIn);
+                LineCost(round[round.Count - 1], pts[0], out bool blockedIn, EdgeMargin);
                 if (clear && !blockedIn) curve = pts;
             }
             if (curve != null) round.AddRange(curve);
@@ -776,9 +827,14 @@ public class RouteChoiceGenerator
         return round;
     }
 
+    // How far (in cells) a rounded corner keeps from impassable ground. A cell is open or blocked as a whole, so a
+    // curve that only keeps its points on open cells can still run up to half a cell into a garden or a house where
+    // it cuts a corner. With the margin it stays about a third of a cell inside the open cells.
+    const float EdgeMargin = 0.35f;
+
     // The A* cost (distance / ground speed / slope) of a straight line between two points, sampled about every
-    // third of a cell; blocked when it touches impassable ground
-    float LineCost(Vector2 a, Vector2 b, out bool blocked)
+    // third of a cell; blocked when it touches impassable ground (or comes within margin cells of it)
+    float LineCost(Vector2 a, Vector2 b, out bool blocked, float margin = 0f)
     {
         blocked = false;
         Vector2 ab = b - a;
@@ -795,10 +851,23 @@ public class RouteChoiceGenerator
             if (x < 0 || y < 0 || x >= width || y >= height) { blocked = true; return float.MaxValue; }
             float cellSpeed = speed[y, x];
             if (cellSpeed <= 0.01f) { blocked = true; cellSpeed = BlockedSpeed; }
+            else if (margin > 0f && !blocked && NearBlocked(p, margin)) blocked = true;
             float slope = slopes[d] != null ? Mathf.Max(0.05f, slopes[d][y, x]) : 1f;
             cost += step / cellSpeed / slope;
         }
         return cost;
+    }
+
+    // Whether a blocked (or outside) cell lies within margin cells of the point, along x and y
+    bool NearBlocked(Vector2 p, float margin)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            int x = Mathf.RoundToInt(p.x + ((i & 1) == 0 ? -margin : margin));
+            int y = Mathf.RoundToInt(p.y + ((i & 2) == 0 ? -margin : margin));
+            if (x < 0 || y < 0 || x >= width || y >= height || speed[y, x] <= 0.01f) return true;
+        }
+        return false;
     }
 
     // The nearest of the 8 grid directions
