@@ -69,8 +69,24 @@ public class LobbySettingsUI : MonoBehaviour
             mapText.fontSizeMax = mapText.fontSize;
             mapText.fontSizeMin = Mathf.Min(14f, mapText.fontSize);
         }
+        MoveHeaderUp();
         Show("...", ExtraMode.None, "...");
         LobbyVisit.AddButtons();
+    }
+
+    // The strip with runner pool, game mode and course sat so low that the Runner setup and Players panels
+    // covered its ends. It goes up to the top row, between the money pill and Leave lobby.
+    void MoveHeaderUp()
+    {
+        if (mapText == null) return;
+        Transform card = mapText.transform;
+        while (card != null && card.name != "Game setup card") card = card.parent;
+        RectTransform rect = card as RectTransform;
+        if (rect == null) return;
+        rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, -30f);
+        // Long course names must not reach the money pill or the Leave lobby button
+        LayoutElement limit = rect.GetComponent<LayoutElement>();
+        if (limit == null) rect.SetAsLastSibling();
     }
 
     void Rename()
