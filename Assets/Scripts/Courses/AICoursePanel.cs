@@ -331,7 +331,7 @@ public class AICoursePanel : MonoBehaviour
         generateButton.interactable = false;
         useButton.interactable = false;
         resultText.color = CourseUI.Ink;
-        resultText.text = "Laying the course and checking every leg...";
+        resultText.text = kind == CourseGenerator.Kind.Sprint ? "Laying the course and looking for legs with good route choices..." : "Laying the course and checking every leg...";
 
         MapGrid grid = MapGrid.Load(map.gridName); // Resources has to be used on the main thread
         CourseGenerator.Settings settings = new CourseGenerator.Settings
@@ -358,7 +358,8 @@ public class AICoursePanel : MonoBehaviour
         generated = result.course;
         preview.texture = CourseThumbnail.Get(generated);
         preview.enabled = preview.texture != null;
-        resultText.text = $"<b>{generated.name}</b>\n{generated.controls.Count} controls  ·  {generated.LengthText()}  ·  legs {Mathf.RoundToInt(result.shortestLeg)} to {Mathf.RoundToInt(result.longestLeg)} m\nEvery control can be reached.";
+        resultText.text = $"<b>{generated.name}</b>\n{generated.controls.Count} controls  ·  {generated.LengthText()}  ·  legs {Mathf.RoundToInt(result.shortestLeg)} to {Mathf.RoundToInt(result.longestLeg)} m\nEvery control can be reached."
+                          + (result.routeChoiceLegs >= 0 ? $" {result.routeChoiceLegs} of {result.legCount} legs have a close route choice." : "");
         useButton.interactable = true;
     }
 

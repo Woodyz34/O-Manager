@@ -259,6 +259,24 @@ public static class CourseGenerator
         public CourseData course;
         public string error;
         public float shortestLeg, longestLeg;
+        public int routeChoiceLegs = -1;   // sprint: legs with two or more close route choices (-1: not checked)
+        public int legCount;
+    }
+
+    // Sprint: a leg is fun when it has at least two route choices and the second fastest is at most this much
+    // slower than the fastest (about 60-40 to 45-55: both are worth thinking about)
+    public const float CloseChoice = 1.10f;
+    const int ChoiceTriesPerLeg = 8;            // places for a control checked for route choices on each leg
+    const float GoodShare = 0.6f;               // a sprint course is good enough when this share of its legs is fun
+    const double ChoiceBudgetSeconds = 12.0;    // all route choice checks of one course together
+
+    // What PlacePoints needs to check route choices on sprint legs
+    class ChoiceCheck
+    {
+        public RouteChoiceGenerator generator;
+        public DateTime started;
+        public int goodLegs;
+        public bool OutOfTime => (DateTime.UtcNow - started).TotalSeconds > ChoiceBudgetSeconds;
     }
 
     public static float MinLengthFor(Kind kind) => kind == Kind.Sprint ? SprintMinLengthKm : MinLengthKm;
@@ -306,10 +324,23 @@ public static class CourseGenerator
         System.Random random = new System.Random(settings.seed);
         AStarPathfinder pathfinder = new AStarPathfinder(grid.speed, grid.slopes);
         DateTime started = DateTime.UtcNow;
+        ChoiceCheck choices = null;
+        if (settings.kind == Kind.Sprint)
+        {
+            // The same route choices as the route choice game (speed and clock do not matter: only how much slower
+            // one choice is than the other)
+            choices = new ChoiceCheck
+            {
+                generator = new RouteChoiceGenerator(grid.speed, grid.slopes, map.CellSize, 1f, 20f, true),
+                started = DateTime.UtcNow
+            };
+        }
+        Result best = null;
         for (int attempt = 0; attempt < Attempts && (DateTime.UtcNow - started).TotalSeconds < TimeBudgetSeconds; attempt++)
         {
             List<float> legs = PlanLegs(settings.kind, length, controls + 1, random);
-            List<CoursePoint> points = PlacePoints(map, area, pathfinder, legs, settings.kind == Kind.Sprint, random);
+            if (choices != null) choices.goodLegs = 0;
+            List<CoursePoint> points = PlacePoints(map, area, pathfinder, legs, settings.kind == Kind.Sprint, choices, random);
             if (points == null)
             {
                 continue;
@@ -337,7 +368,8 @@ public static class CourseGenerator
             {
                 continue;
             }
-            Result result = new Result { course = course, shortestLeg = float.MaxValue };
+            Result result = new Result { course = course, shortestLeg = float.MaxValue, legCount = legs.Count,
+                                         routeChoiceLegs = choices != null ? choices.goodLegs : -1 };
             List<CoursePoint> all = course.AllPoints();
             for (int i = 1; i < all.Count; i++)
             {
@@ -345,8 +377,12 @@ public static class CourseGenerator
                 result.shortestLeg = Mathf.Min(result.shortestLeg, leg);
                 result.longestLeg = Mathf.Max(result.longestLeg, leg);
             }
-            return result;
+            if (choices == null) return result;
+            // Sprint: keep the course with the most fun legs; try again while too few are fun and there is time
+            if (best == null || result.routeChoiceLegs > best.routeChoiceLegs) best = result;
+            if (best.routeChoiceLegs >= Mathf.CeilToInt(GoodShare * best.legCount) || choices.OutOfTime) return best;
         }
+        if (best != null) return best;
         return new Result { error = "Could not make a course with these settings. Try a shorter course or fewer controls." };
     }
 
@@ -408,7 +444,10 @@ public static class CourseGenerator
     // Walks the legs across the map: each control at the planned distance from the one before, in a direction
     // that stays inside the map, keeps away from earlier controls and, in the second half, turns back towards the start.
     // All distances are in metres, so the same rules work on 10 m forest grids and 2 m sprint grids.
-    static List<CoursePoint> PlacePoints(MapDefinition map, MapPlayArea area, AStarPathfinder pathfinder, List<float> legs, bool sprint, System.Random random)
+    // On sprint each leg is also checked for route choices: of the best few places for the control, the first that
+    // gives a close route choice is taken (else the best place), so most legs are fun and a few may be plain.
+    static List<CoursePoint> PlacePoints(MapDefinition map, MapPlayArea area, AStarPathfinder pathfinder, List<float> legs, bool sprint,
+                                         ChoiceCheck choices, System.Random random)
     {
         float startRoom = sprint ? 40f : 150f;        // the start this far inside the map edge
         float roomWanted = sprint ? 60f : 250f;       // controls further inside than this score no better
@@ -475,9 +514,11 @@ public static class CourseGenerator
             if (options.Count == 0) return null;
             options.Sort((a, b) => b.score.CompareTo(a.score));
 
-            // Take the best option whose shortest route is not a big detour (e.g. round a lake)
-            bool placed = false;
-            for (int k = 0; k < Math.Min(4, options.Count) && !placed; k++)
+            // The best options whose shortest route is not a big detour (e.g. round a lake)
+            bool checkChoices = choices != null && !choices.OutOfTime;
+            int wanted = checkChoices ? ChoiceTriesPerLeg : 1;
+            List<CoursePoint> usable = new List<CoursePoint>();
+            for (int k = 0; k < Math.Min(checkChoices ? 16 : 4, options.Count) && usable.Count < wanted; k++)
             {
                 CoursePoint p = options[k].point;
                 List<List<Vector2Int>> paths = pathfinder.FindKShortestPaths(map.ToCell(from), map.ToCell(p), 1);
@@ -487,15 +528,51 @@ public static class CourseGenerator
                 List<Vector2Int> path = paths[0];
                 for (int i = 1; i < path.Count; i++) route += Vector2Int.Distance(path[i - 1], path[i]) * map.gridSize;
                 if (route > leg * maxDetour + 2f * map.gridSize) continue;
-
-                p = new CoursePoint(Math.Round(p.e), Math.Round(p.n)); // whole metres, like saved courses
-                heading = Math.Atan2(p.n - from.n, p.e - from.e);
-                points.Add(p);
-                placed = true;
+                usable.Add(new CoursePoint(Math.Round(p.e), Math.Round(p.n))); // whole metres, like saved courses
             }
-            if (!placed) return null;
+            if (usable.Count == 0) return null;
+
+            CoursePoint chosen = usable[0];
+            if (checkChoices)
+            {
+                // The first place (best score first) with a close route choice; else the place whose choices are closest
+                float bestRatio = float.MaxValue;
+                foreach (CoursePoint p in usable)
+                {
+                    if (choices.OutOfTime) break;
+                    float ratio = ChoiceRatio(choices.generator, map.ToCell(from), map.ToCell(p), legIndex);
+                    if (ratio < bestRatio) { bestRatio = ratio; chosen = p; }
+                    if (ratio <= CloseChoice) break;
+                }
+                if (bestRatio <= CloseChoice) choices.goodLegs++;
+            }
+            heading = Math.Atan2(chosen.n - from.n, chosen.e - from.e);
+            points.Add(chosen);
         }
         return points;
+    }
+
+    // How much slower the second fastest route choice is than the fastest (1.05 = 5 % slower).
+    // Max value when the leg has fewer than two clear route choices.
+    static float ChoiceRatio(RouteChoiceGenerator generator, Vector2Int from, Vector2Int to, int leg)
+    {
+        RouteChoiceLeg made;
+        try
+        {
+            made = generator.Make(leg, from, to, leg * 7919 + from.x * 31 + to.y);
+        }
+        catch (Exception)
+        {
+            return float.MaxValue;
+        }
+        if (made == null || made.choices.Count < 2) return float.MaxValue;
+        float fastest = float.MaxValue, second = float.MaxValue;
+        foreach (RouteChoice c in made.choices)
+        {
+            if (c.seconds < fastest) { second = fastest; fastest = c.seconds; }
+            else if (c.seconds < second) second = c.seconds;
+        }
+        return fastest > 0f && second < float.MaxValue ? second / fastest : float.MaxValue;
     }
 
     // How many earlier legs the new leg from 'from' to 'to' crosses
