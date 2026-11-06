@@ -1693,10 +1693,12 @@ public class CourseBuilder : MonoBehaviour
         panelRect.pivot = new Vector2(1, 0.5f);
         panelRect.sizeDelta = new Vector2(PanelWidth, -48);
         panelRect.anchoredPosition = new Vector2(-24, 0);
-        CourseUI.Column(panel.gameObject, 12, new RectOffset(28, 28, 26, 26));
+        // Everything must fit in the panel's height (1080 - 48 on the reference screen), with the buttons at the bottom
+        // always visible: the two lists give up room first (down to their minimum heights) when space runs short
+        CourseUI.Column(panel.gameObject, 8, new RectOffset(28, 28, 20, 20));
 
-        TextMeshProUGUI title = CourseUI.Text("Title", panel.transform, "Course builder", 40, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Size(title, 50);
+        TextMeshProUGUI title = CourseUI.Text("Title", panel.transform, "Course builder", 38, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Size(title, 44);
 
         RectTransform mapRow = CourseUI.Rect("Map row", panel.transform);
         CourseUI.Row(mapRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
@@ -1735,10 +1737,15 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Column(pointList.gameObject, 4, new RectOffset(0, 8, 0, 0));
         LayoutElement pointsLayout = CourseUI.Size(pointList.parent.GetComponent<Image>(), 110);
         pointsLayout.flexibleHeight = 1;
+        pointsLayout.minHeight = 40;
 
         statusText = CourseUI.Text("Status", panel.transform, "", 19, CourseUI.Forest, FontStyles.Bold);
-        CourseUI.Size(statusText, 76);
+        CourseUI.Size(statusText, 56);
         statusText.overflowMode = TextOverflowModes.Overflow;
+        // Long messages shrink to fit the smaller box instead of running over the buttons under it
+        statusText.enableAutoSizing = true;
+        statusText.fontSizeMin = 14;
+        statusText.fontSizeMax = 19;
 
         // Forest or sprint course: chosen after the course is laid; the map's type is the default
         RectTransform terrainRow = CourseUI.Rect("Course type", panel.transform);
@@ -1759,7 +1766,7 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Size(myCoursesTitle, 34);
         myCourseList = CourseUI.ScrollList("My courses", panel.transform, out _);
         CourseUI.Column(myCourseList.gameObject, 4, new RectOffset(0, 8, 0, 0));
-        CourseUI.Size(myCourseList.parent.GetComponent<Image>(), 90);
+        CourseUI.Size(myCourseList.parent.GetComponent<Image>(), 90).minHeight = 52;
 
         RectTransform bottomRow = CourseUI.Rect("Bottom", panel.transform);
         CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
