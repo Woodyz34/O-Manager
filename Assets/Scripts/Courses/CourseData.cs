@@ -407,19 +407,21 @@ public class CourseData
             }
         }
         if (!string.IsNullOrEmpty(terrain)) sb.Append('|').Append(terrain == Sprint ? 's' : 'f');
-        AppendForbidden(sb);
+        // Areas in a "z" field, uncrossable boundary lines in a "y" field (versions before the lines skip it)
+        AppendForbidden(sb, false);
+        AppendForbidden(sb, true);
         return sb.ToString();
     }
 
-    void AppendForbidden(StringBuilder sb)
+    void AppendForbidden(StringBuilder sb, bool lines)
     {
-        if (!ForbiddenAreas.Any(this)) return;
-        sb.Append("|z");
+        if (forbidden == null || !forbidden.Exists(a => a != null && a.line == lines && a.IsValid)) return;
+        sb.Append(lines ? "|y" : "|z");
         bool first = true;
         long lastE = 0, lastN = 0;
         foreach (ForbiddenArea area in forbidden)
         {
-            if (area == null || area.corners == null || area.corners.Count < 3) continue;
+            if (area == null || area.line != lines || !area.IsValid) continue;
             int count = Math.Min(area.corners.Count, Digits.Length - 1);
             sb.Append(Digits[count]);
             for (int k = 0; k < count; k++)
@@ -443,17 +445,17 @@ public class CourseData
         }
     }
 
-    static List<ForbiddenArea> ReadForbidden(string text)
+    static List<ForbiddenArea> ReadForbidden(string text, bool lines)
     {
         List<ForbiddenArea> areas = new List<ForbiddenArea>();
-        int index = 1;   // after the "z"
+        int index = 1;   // after the "z" or "y"
         bool first = true;
         long e = 0, n = 0;
         while (index < text.Length)
         {
             int count = Digits.IndexOf(text[index++]);
             if (count < 0) throw new FormatException("bad area");
-            ForbiddenArea area = new ForbiddenArea();
+            ForbiddenArea area = new ForbiddenArea { line = lines };
             for (int k = 0; k < count; k++)
             {
                 if (first)
@@ -543,7 +545,8 @@ public class CourseData
             if (parts.Length > terrainPart) course.terrain = parts[terrainPart] == "s" ? Sprint : parts[terrainPart] == "f" ? Forest : null;
             for (int p = terrainPart; p < parts.Length; p++)
             {
-                if (parts[p].StartsWith("z")) course.forbidden = ReadForbidden(parts[p]);
+                if (parts[p].StartsWith("z")) course.forbidden.AddRange(ReadForbidden(parts[p], false));
+                if (parts[p].StartsWith("y")) course.forbidden.AddRange(ReadForbidden(parts[p], true));
             }
             string coords = parts[8];
             if (coords.Length < 14 || (coords.Length - 8) % 6 != 0)

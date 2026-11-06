@@ -118,12 +118,18 @@ public static class CourseThumbnail
             float stripe = Mathf.Max(spacing * 0.3f, 1.2f * Scale);
             foreach (ForbiddenArea zone in course.forbidden)
             {
-                if (zone == null || zone.corners == null || zone.corners.Count < 3) continue;
+                if (zone == null || !zone.IsValid) continue;
                 List<Vector2> poly = zone.corners.ConvertAll(point =>
                 {
                     Vector2 uv = background.WorldToUV(map.ToWorld(point));
                     return new Vector2((uv.x - area.xMin) / area.width * texture.width, (uv.y - area.yMin) / area.height * texture.height);
                 });
+                if (zone.line)
+                {
+                    // An uncrossable boundary: a thick purple line
+                    for (int k = 0; k + 1 < poly.Count; k++) DrawLine(texture, poly[k], poly[k + 1], width * 1.6f, purple);
+                    continue;
+                }
                 DrawStripes(texture, poly, spacing, stripe, purple);
                 for (int k = 0; k < poly.Count; k++) DrawLine(texture, poly[k], poly[(k + 1) % poly.Count], width * 0.8f, purple);
             }
