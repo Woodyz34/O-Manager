@@ -241,7 +241,9 @@ public class ManualPathDrawer : MonoBehaviour
         var route = new List<Vector2Int>();
         foreach (Vector2Int c in gridPath) if (RouteAnalysis.On || Passable(c)) route.Add(c);
         foreach (List<Vector2Int> d in detours) route.AddRange(d);
-        List<Vector2Int> corridorPath = CorridorPath(route, gridPath[0], gridPath[gridPath.Count - 1], 1);
+        // (Route analysis lets the route run a few metres from the line, so a line drawn roughly along a road follows it)
+        int corridor = RouteAnalysis.On ? RouteAnalysis.CorridorCells(manager) : 1;
+        List<Vector2Int> corridorPath = CorridorPath(route, gridPath[0], gridPath[gridPath.Count - 1], corridor);
         if ((corridorPath == null || corridorPath.Count == 0) && CrossesBlocked(gridPath) && !RouteAnalysis.On)
         {
             corridorPath = FindOptimizedPathInCorridor(gridPath, CorrectionCells);
@@ -265,6 +267,19 @@ public class ManualPathDrawer : MonoBehaviour
                 corridorPath = new List<Vector2Int>(gridPath);
             }
             agent.relaySegments.Add(corridorPath);
+            // Route analysis: what stays on the map is the smooth route it is timed on, not every wobble of the hand
+            if (RouteAnalysis.On && RelayRace.Active == null)
+            {
+                float z = smoothPath.Count > 0 ? smoothPath[0].z : -1f;
+                List<Vector3> smooth = RouteAnalysis.SmoothWorld(manager, corridorPath, z);
+                if (smooth.Count > 1)
+                {
+                    smooth[0] = new Vector3(ThisControll.position.x, ThisControll.position.y, z);
+                    smooth[smooth.Count - 1] = new Vector3(targetControl.position.x, targetControl.position.y, z);
+                    smoothPath.Clear();
+                    smoothPath.AddRange(smooth);
+                }
+            }
             KeepLine();
             // The next stretch starts from scratch
             gridPath.Clear();
