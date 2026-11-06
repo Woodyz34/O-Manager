@@ -153,7 +153,11 @@ namespace MapImport
             return map.scale <= 5000;
         }
 
-        // Contour interval in metres
-        public static double Equidistance(MapFile map) => map.contourInterval > 0 ? map.contourInterval : map.scale <= 5000 ? 2.5 : 5.0;
+        // Contour interval in metres: the one the player gave, otherwise the usual one for the scale
+        public static double Equidistance(MapFile map) => map.contourInterval > 0 ? map.contourInterval : TypicalInterval(LooksLikeSprint(map) ? "sprint" : "forest");
+
+        // The most usual contour interval for a map type: sprint maps (ISSprOM) 2 m, forest maps (ISOM) 5 m.
+        // Maps that are both are mostly park and town maps at 1:5000-1:10000 with 2.5 m.
+        public static double TypicalInterval(string mapType) => mapType == "sprint" ? 2.0 : mapType == "both" ? 2.5 : 5.0;
     }
 }
