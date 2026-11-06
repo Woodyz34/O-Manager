@@ -30,6 +30,9 @@ public static class ExtraModes
     // Modes that only work on individual courses, not relays
     public const ExtraMode IndividualOnly = ExtraMode.Bears | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
+    // Modes that only work in the forest, not on sprint courses (Imposter works on both)
+    public const ExtraMode ForestOnly = ExtraMode.Bears | ExtraMode.MoveControl;
+
     // Set on the value the host shares, so "nothing turned on" can be told apart from "not arrived yet"
     public const int KnownBit = 1 << 30;
 
@@ -51,8 +54,8 @@ public static class ExtraModes
         switch (mode)
         {
             case ExtraMode.Imposter: return "One random player secretly has to finish last. Can you spot who?";
-            case ExtraMode.Bears: return "Everyone hides one bear while drawing. Runners who find it get scared and run round it.";
-            case ExtraMode.MoveControl: return "Everyone may move one control up to 100 m while drawing. Good routes can turn bad.";
+            case ExtraMode.Bears: return "Everyone hides one bear while drawing. Runners who find it get scared and run round it. Forest only.";
+            case ExtraMode.MoveControl: return "Everyone may move one control up to 100 m while drawing. Good routes can turn bad. Forest only.";
             case ExtraMode.RouteAnalysis: return "Nobody runs: everyone draws the whole course the way they would run it, then you compare the route choices. Played on its own.";
             case ExtraMode.RouteChoice: return "Nobody runs: on each leg, pick the fastest of 2 to 4 routes. Points for right answers, more the quicker you are. Played on its own.";
             default: return "";
@@ -82,10 +85,27 @@ public static class ExtraModes
     // Why the modes cannot be played on this course, or null when they can
     public static string CourseProblem(ExtraMode modes, CourseData course)
     {
-        if (course == null || !course.IsRelay()) return null;
-        ExtraMode bad = modes & IndividualOnly;
-        if (bad == ExtraMode.None) return null;
-        return "\"" + Describe(bad) + "\" only works on individual courses, not relays. Choose another course or game mode.";
+        if (course == null) return null;
+        if (course.IsRelay())
+        {
+            ExtraMode notRelay = modes & IndividualOnly;
+            if (notRelay != ExtraMode.None) return "\"" + Describe(notRelay) + "\" only works on individual courses, not relays. Choose another course or game mode.";
+        }
+        if (course.IsSprint())
+        {
+            ExtraMode notSprint = modes & ForestOnly;
+            if (notSprint != ExtraMode.None) return "\"" + Describe(notSprint) + "\" only works on forest courses, not sprint. Choose another course or game mode.";
+        }
+        return null;
+    }
+
+    // Why this mode cannot be ticked for the course chosen in the lobby, or null when it can
+    public static string NotOn(ExtraMode mode, CourseData course)
+    {
+        if (course == null) return null;
+        if ((mode & IndividualOnly) != 0 && course.IsRelay()) return "Not on relays";
+        if ((mode & ForestOnly) != 0 && course.IsSprint()) return "Not on sprint";
+        return null;
     }
 
     // ---- In the competition ----
@@ -152,6 +172,7 @@ public static class ExtraModes
                 active = (ExtraMode)(value & ~KnownBit);
                 // The relay check is done in the lobby; this is only a guard
                 if (RelayRace.Active != null) active &= ~IndividualOnly;
+                if (CourseLoader.Loaded != null && CourseLoader.Loaded.IsSprint()) active &= ~ForestOnly;
                 Debug.Log("Game modes in this competition: " + Describe(active));
                 return;
             }

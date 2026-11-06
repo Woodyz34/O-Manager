@@ -118,12 +118,24 @@ public static class RouteChoiceGame
     }
 
     public static string Points(int points) => points.ToString("N0", System.Globalization.CultureInfo.InvariantCulture).Replace(",", " ");
+
+    // ---- Prize money ----
+    // Everyone who takes part gets a little, and a good place among the others gives more (as in a race)
+    public const int TookPart = CompetitionRewards.FinishBase;
+
+    public static int ForPlace(int place, int players)
+    {
+        int reward = CompetitionRewards.PerRunnerBeaten * Mathf.Max(0, players - place);
+        if (place == 1 && players >= 2) reward += CompetitionRewards.WinnerBonus;
+        return reward;
+    }
 }
 
 // The questions, the answers and the results, on the map with a panel to the left
 public class RouteChoiceView : MonoBehaviour
 {
     enum Step { Loading, Asking, Answered, Done }
+    enum Page { Routes, Players, Money }
 
     PathfindingManager manager;
     Camera cam;
@@ -138,6 +150,15 @@ public class RouteChoiceView : MonoBehaviour
     int score;
     int right;
     bool failed;
+    float answeredAt;
+    int[] picks;       // per leg: the route picked, -1 time ran out, -2 no question
+    Page page;
+    readonly List<Button> tabButtons = new List<Button>();
+    Button endButton;  // the host sends everyone back to the lobby, at any time
+    float endConfirmUntil;
+    bool paid;
+    int lastPlace;     // the place among the others the last time the standings were looked at (0 = unknown)
+    int lastPlayers;
 
     GameObject panel;
     TextMeshProUGUI heading;
@@ -158,6 +179,7 @@ public class RouteChoiceView : MonoBehaviour
     bool fitted;
     float fittedSize;
     Vector3 fittedPosition;
+    Quaternion fittedRotation = Quaternion.identity;
     readonly List<GameObject> drawn = new List<GameObject>();
     readonly List<LineRenderer> lines = new List<LineRenderer>();
     float nextRefresh;
@@ -184,6 +206,8 @@ public class RouteChoiceView : MonoBehaviour
         // Work out every leg in the background, in order, so the first question comes as soon as it is ready
         legs = manager.controlPoints.Count - 1;
         results = new RouteChoiceLeg[legs + 1];
+        picks = new int[legs + 1];
+        for (int k = 0; k <= legs; k++) picks[k] = -2;
         Vector2Int[] cells = new Vector2Int[legs + 1];
         for (int k = 0; k <= legs; k++) cells[k] = manager.WorldToGridPositionCentered(manager.controlPoints[k].position);
         RouteChoiceGenerator generator = new RouteChoiceGenerator(manager.speedGrid2D, manager.slopeFactors, manager.cellSize,
@@ -223,7 +247,11 @@ public class RouteChoiceView : MonoBehaviour
         CourseUI.Place(card.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(24, 0), new Vector2(560, 940));
 
         heading = CourseUI.Text("Heading", card.transform, "Route choice game", 34, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Place(heading.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28, -20), new Vector2(504, 90));
+        CourseUI.Place(heading.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28, -20), new Vector2(226, 90));
+        heading.enableAutoSizing = true;
+        heading.fontSizeMin = 22;
+        heading.fontSizeMax = 34;
+        heading.enableWordWrapping = false;
         scoreText = CourseUI.Text("Score", card.transform, "", 22, CourseUI.Forest, FontStyles.Bold, TextAlignmentOptions.TopRight);
         CourseUI.Place(scoreText.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-28, -26), new Vector2(220, 36));
         info = CourseUI.Text("Info", card.transform, "", 22, CourseUI.InkMuted);
@@ -246,6 +274,20 @@ public class RouteChoiceView : MonoBehaviour
 
         Button keys = CourseUI.Button("Keys", card.transform, "Keys", CourseUI.ButtonKind.Light, ToggleKeys, 20);
         CourseUI.Place((RectTransform)keys.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-28, -66), new Vector2(110, 40));
+
+        // Like "End competition for everyone" in a race: when someone has crashed or takes too long
+        endButton = CourseUI.Button("End for all", card.transform, "End for all", CourseUI.ButtonKind.Danger, OnEndForAll, 18);
+        CourseUI.Place((RectTransform)endButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-148, -66), new Vector2(176, 40));
+        // "Sure? Click again" is longer than "End for all": shrink the text to fit rather than cut it off
+        TextMeshProUGUI endLabel = endButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (endLabel != null)
+        {
+            endLabel.enableWordWrapping = false;
+            endLabel.enableAutoSizing = true;
+            endLabel.fontSizeMin = 12;
+            endLabel.fontSizeMax = 18;
+        }
+        endButton.gameObject.SetActive(CompetitionFlow.LocalIsHost());
 
         nextButton = CourseUI.Button("Next", card.transform, "Next leg", CourseUI.ButtonKind.Primary, OnNext, 24);
         CourseUI.Place((RectTransform)nextButton.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(28, 22), new Vector2(504, 60));
@@ -276,6 +318,7 @@ public class RouteChoiceView : MonoBehaviour
     {
         failed = true;
         step = Step.Done;
+        if (endButton != null) endButton.gameObject.SetActive(false);
         ClearBody();
         if (heading != null) heading.text = "Route choice game";
         if (info != null) info.text = message;
@@ -342,17 +385,54 @@ public class RouteChoiceView : MonoBehaviour
                 break;
 
             case Step.Answered:
-                if (!keysOpen && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.RightArrow))) OnNext();
+                // Any key goes on (the answer key again too), so the game can be played fast. A short pause first,
+                // so a key held a moment too long does not skip the answer.
+                if (!keysOpen && Time.unscaledTime - answeredAt > 0.25f && AnyKeyForNext()) OnNext();
                 break;
 
             case Step.Done:
                 if (Time.unscaledTime > nextRefresh)
                 {
                     nextRefresh = Time.unscaledTime + 0.5f;
-                    FillStandings();
+                    if (page == Page.Players) FillStandings();
+                    else if (page == Page.Money && !paid) FillMoney();
+                    else ReadStandings();
                 }
                 break;
         }
+        RefreshEndButton();
+    }
+
+    // A key on the keyboard, not a mouse button (clicks are for the buttons) and not Escape (the menu)
+    static bool AnyKeyForNext()
+    {
+        if (!Input.anyKeyDown) return false;
+        if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2)) return false;
+        return !Input.GetKeyDown(KeyCode.Escape);
+    }
+
+    // ---- The host ends the game for everyone ----
+
+    void OnEndForAll()
+    {
+        if (!CompetitionFlow.LocalIsHost()) return;
+        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        // A big step, so the button asks once more
+        if (Time.unscaledTime >= endConfirmUntil)
+        {
+            endConfirmUntil = Time.unscaledTime + 5f;
+            RefreshEndButton();
+            return;
+        }
+        CompetitionFlow.HostReturnToLobby();
+    }
+
+    void RefreshEndButton()
+    {
+        if (endButton == null) return;
+        bool show = step != Step.Done && !failed && CompetitionFlow.LocalIsHost();
+        if (endButton.gameObject.activeSelf != show) endButton.gameObject.SetActive(show);
+        if (show) CourseUI.SetButtonText(endButton, Time.unscaledTime < endConfirmUntil ? "Sure? Click again" : "End for all");
     }
 
     void Ask(RouteChoiceLeg current)
@@ -362,9 +442,9 @@ public class RouteChoiceView : MonoBehaviour
         askedAt = Time.unscaledTime;
         string fromName = leg - 1 == 0 ? "Start" : "Control " + (leg - 1);
         string toName = leg == legs ? "finish" : "control " + leg;
-        float straight = Vector2.Distance(manager.controlPoints[leg - 1].position, manager.controlPoints[leg].position) / MapDefinition.WorldUnitsPerMeter;
         heading.text = "Leg " + leg + " of " + legs;
-        info.text = fromName + " to " + toName + ", " + Mathf.RoundToInt(straight) + " m straight.\n<color=#1F3D2B><b>Which route is fastest?</b></color>";
+        // No lengths while guessing: only the routes on the map
+        info.text = fromName + " to " + toName + ".\n<color=#1F3D2B><b>Which route is fastest?</b></color>";
 
         FitCamera(current);
         DrawRoutes(current, -1);
@@ -379,14 +459,12 @@ public class RouteChoiceView : MonoBehaviour
         {
             int index = current.choices.FindIndex(c => c.colour == colour);
             if (index < 0) continue;
-            RouteChoice choice = current.choices[index];
             Button button = CourseUI.Button("Choice " + RouteChoiceGame.ColourNames[colour], row, "", CourseUI.ButtonKind.Light, () => Answer(index), 24);
             button.GetComponent<Image>().color = RouteChoiceGame.Colours[colour];
             CourseUI.Size(button, 150, -1, 1);
             TextMeshProUGUI label = button.GetComponentInChildren<TextMeshProUGUI>();
             label.color = colour == 3 ? CourseUI.Ink : Color.white; // dark text on yellow
-            label.text = "<size=150%><b>" + RouteChoiceGame.KeyName(RouteChoiceGame.Key(colour)) + "</b></size>\n<b>"
-                + RouteChoiceGame.ColourNames[colour] + "</b>\n<size=75%>" + Mathf.RoundToInt(choice.meters) + " m</size>";
+            label.text = ChoiceLabel(colour);
             label.enableWordWrapping = false;
             choiceButtons.Add(button);
         }
@@ -404,9 +482,11 @@ public class RouteChoiceView : MonoBehaviour
         bool correct = choice == fastest;
         int points = RouteChoiceGame.Points(correct, left);
         picked = choice;
+        picks[leg] = choice;
         score += points;
         if (correct) right++;
         step = Step.Answered;
+        answeredAt = Time.unscaledTime;
         ShowTimer(false);
 
         NetworkPlayer local = NetworkPlayer.Local;
@@ -453,7 +533,7 @@ public class RouteChoiceView : MonoBehaviour
             RouteChoiceLeg later = Volatile.Read(ref results[k]);
             if (later == null || (later.skipped == null && later.choices.Count >= 2)) { last = false; break; }
         }
-        CourseUI.SetButtonText(nextButton, last ? "See the results" : "Next leg");
+        CourseUI.SetButtonText(nextButton, last ? "See the results  <size=70%>(any key)</size>" : "Next leg  <size=70%>(any key)</size>");
         nextButton.gameObject.SetActive(true);
     }
 
@@ -548,10 +628,15 @@ public class RouteChoiceView : MonoBehaviour
             foreach (RouteChoice choice in results[leg].choices)
             {
                 if (button.name != "Choice " + RouteChoiceGame.ColourNames[choice.colour]) continue;
-                button.GetComponentInChildren<TextMeshProUGUI>().text = "<size=150%><b>" + RouteChoiceGame.KeyName(RouteChoiceGame.Key(choice.colour))
-                    + "</b></size>\n<b>" + RouteChoiceGame.ColourNames[choice.colour] + "</b>\n<size=75%>" + Mathf.RoundToInt(choice.meters) + " m</size>";
+                button.GetComponentInChildren<TextMeshProUGUI>().text = ChoiceLabel(choice.colour);
             }
         }
+    }
+
+    // The key and the colour on a route box
+    static string ChoiceLabel(int colour)
+    {
+        return "<size=150%><b>" + RouteChoiceGame.KeyName(RouteChoiceGame.Key(colour)) + "</b></size>\n<b>" + RouteChoiceGame.ColourNames[colour] + "</b>";
     }
 
     void OnNext()
@@ -575,14 +660,14 @@ public class RouteChoiceView : MonoBehaviour
     }
 
     // ---- The end ----
+    // Three tabs: your routes on the whole course, the other players' points, and the prize money
 
     void Finish()
     {
         step = Step.Done;
         ShowTimer(false);
         nextButton.gameObject.SetActive(false);
-        ClearDrawn();
-        FitWholeCourse();
+        RefreshEndButton();
         NetworkPlayer local = NetworkPlayer.Local;
         if (local != null && local.Object != null && local.Object.IsValid)
         {
@@ -592,38 +677,239 @@ public class RouteChoiceView : MonoBehaviour
             local.choiceQuestions = question;
             local.choiceDone = true;
         }
-        heading.text = "Results";
-        if (question == 0)
-        {
-            info.text = "This course has no legs with a clear route choice. Try another course or a longer one.";
-        }
-        else
-        {
-            info.text = "You got <b>" + right + " of " + question + "</b> right: <b>" + RouteChoiceGame.Points(score) + " points</b>."
-                + (skipped > 0 ? "\n<size=85%>" + skipped + (skipped == 1 ? " leg had" : " legs had") + " no clear route choice and " + (skipped == 1 ? "was" : "were") + " left out.</size>" : "");
-        }
-        FillStandings();
+        BuildTabs();
+        ShowPage(Page.Routes);
         ShowBackButton();
     }
 
+    void BuildTabs()
+    {
+        if (panel == null) return;
+        RectTransform tabs = CourseUI.Rect("Tabs", panel.transform);
+        CourseUI.Place(tabs, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28, -112), new Vector2(504, 50));
+        CourseUI.Row(tabs.gameObject, 8, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        tabButtons.Clear();
+        string[] names = { "Your routes", "Players", "Prize money" };
+        for (int i = 0; i < names.Length; i++)
+        {
+            Page target = (Page)i;
+            Button tab = CourseUI.Button("Tab " + names[i], tabs, names[i], CourseUI.ButtonKind.Light, () => ShowPage(target), 20);
+            CourseUI.Size(tab, 50, -1, 1);
+            tabButtons.Add(tab);
+        }
+        // The text goes under the tabs
+        CourseUI.Place(info.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28, -174), new Vector2(504, 90));
+        CourseUI.Place(body, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28, -272), new Vector2(504, 520));
+    }
+
+    void ShowPage(Page show)
+    {
+        if (failed) return;
+        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        page = show;
+        for (int i = 0; i < tabButtons.Count; i++) CourseUI.SetButtonColor(tabButtons[i], i == (int)show ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        switch (show)
+        {
+            case Page.Routes: ShowRoutesPage(); break;
+            case Page.Players: FillStandings(); break;
+            case Page.Money: FillMoney(); break;
+        }
+    }
+
+    // Your pick on every leg on the whole course, and the fastest route where you missed
+    void ShowRoutesPage()
+    {
+        heading.text = "Results";
+        ClearBody();
+        if (question == 0)
+        {
+            info.text = "This course has no legs with a clear route choice. Try another course or a longer one.";
+            ClearDrawn();
+            FitWholeCourse();
+            return;
+        }
+        info.text = "You got <b>" + right + " of " + question + "</b> right: <b>" + RouteChoiceGame.Points(score) + " points</b>."
+            + (skipped > 0 ? "\n<size=85%>" + skipped + (skipped == 1 ? " leg had" : " legs had") + " no clear route choice and " + (skipped == 1 ? "was" : "were") + " left out.</size>" : "");
+
+        DrawMyRoutes();
+
+        TextMeshProUGUI legend = CourseUI.Text("Legend", body, "On the map: the route you picked on each leg, in its colour. "
+            + "Where you missed, the fastest route is the thin black line.", 18, CourseUI.InkMuted);
+        CourseUI.Size(legend, 52);
+
+        // One short line per leg, in two columns when the course is long
+        List<string> rows = new List<string>();
+        for (int k = 1; k <= legs; k++)
+        {
+            if (picks[k] == -2) continue;
+            RouteChoiceLeg r = results[k];
+            int fastest = r.Fastest;
+            string line = "Leg " + k + ": ";
+            if (picks[k] < 0) line += "<color=#C0392B>time up</color>";
+            else
+            {
+                RouteChoice mine = r.choices[picks[k]];
+                line += RouteChoiceGame.ColourNames[mine.colour] + " " + (picks[k] == fastest
+                    ? "<color=#3F7D54><b>right</b></color>"
+                    : "<color=#C0392B>+" + Mathf.RoundToInt(mine.seconds - r.choices[fastest].seconds) + " s</color>");
+            }
+            rows.Add(line);
+        }
+        int perColumn = rows.Count > 18 ? (rows.Count + 1) / 2 : rows.Count;
+        RectTransform columns = CourseUI.Rect("Legs", body);
+        CourseUI.Row(columns.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(columns, 450);
+        for (int start = 0; start < rows.Count; start += Mathf.Max(1, perColumn))
+        {
+            int count = Mathf.Min(perColumn, rows.Count - start);
+            TextMeshProUGUI column = CourseUI.Text("Column", columns, string.Join("\n", rows.GetRange(start, count)), rows.Count > 18 ? 17 : 19, CourseUI.Ink);
+            column.alignment = TextAlignmentOptions.TopLeft;
+            column.enableAutoSizing = true;
+            column.fontSizeMin = 12;
+            column.fontSizeMax = rows.Count > 18 ? 17 : 19;
+            CourseUI.Size(column, 450, -1, 1);
+        }
+    }
+
+    void DrawMyRoutes()
+    {
+        ClearDrawn();
+        List<Vector3> all = new List<Vector3>();
+        for (int k = 1; k <= legs; k++)
+        {
+            all.Add(manager.controlPoints[k - 1].position);
+            all.Add(manager.controlPoints[k].position);
+            if (picks[k] == -2) continue;
+            foreach (RouteChoice c in results[k].choices) all.AddRange(WorldPoints(k, c.points));
+        }
+        Fit(all, Quaternion.identity, 50f * MapDefinition.WorldUnitsPerMeter);
+        float width = cam.orthographicSize * 0.006f;
+        for (int k = 1; k <= legs; k++)
+        {
+            if (picks[k] == -2) continue;
+            RouteChoiceLeg r = results[k];
+            int fastest = r.Fastest;
+            if (picks[k] >= 0)
+            {
+                RouteChoice mine = r.choices[picks[k]];
+                List<Vector3> points = WorldPoints(k, mine.points);
+                Line("My route edge " + k, points, new Color(0.08f, 0.08f, 0.08f, 0.7f), width * 1.6f, 40);
+                Line("My route " + k, points, RouteChoiceGame.Colours[mine.colour], width, 41);
+            }
+            if (picks[k] != fastest)
+            {
+                Line("Fastest " + k, WorldPoints(k, r.choices[fastest].points), new Color(0.05f, 0.05f, 0.05f, 0.9f), width * 0.55f, 45);
+            }
+        }
+    }
+
+    // Everyone's points, best first, updated while the others are still playing
     void FillStandings()
     {
         if (failed || body == null) return;
         ClearBody();
+        List<NetworkPlayer> players = ReadStandings();
+        int waiting = 0;
+        foreach (NetworkPlayer p in players) if (!p.choiceDone) waiting++;
+        heading.text = "Players";
+        info.text = waiting == 0 ? "Everyone is done." : waiting + (waiting == 1 ? " player is" : " players are") + " still playing.";
+        foreach (NetworkPlayer p in players)
+        {
+            int place = PlaceOf(p, players);
+            bool me = p.Object.HasStateAuthority;
+            string name = place + ". <b>" + BearMode.Name(p) + "</b>" + (me ? " (you)" : "")
+                + "\n<size=75%><color=#5B7563>" + (p.choiceDone ? p.choiceRight + " of " + p.choiceQuestions + " right" : "Still playing, " + p.choiceAnswered + " answered") + "</color></size>";
+            AddRow(RouteEntry.ColorOf(p, players.IndexOf(p)), name, RouteChoiceGame.Points(p.choiceScore), me);
+        }
+    }
+
+    // The players in the game, best score first; also notes your place for the prize money
+    List<NetworkPlayer> ReadStandings()
+    {
         List<NetworkPlayer> players = new List<NetworkPlayer>();
         foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
             if (p.Object != null && p.Object.IsValid) players.Add(p);
         }
         players.Sort((a, b) => b.choiceScore.CompareTo(a.choiceScore));
-        int place = 0;
         foreach (NetworkPlayer p in players)
         {
-            place++;
-            bool me = p.Object.HasStateAuthority;
-            string name = place + ". <b>" + BearMode.Name(p) + "</b>" + (me ? " (you)" : "")
-                + "\n<size=75%><color=#5B7563>" + (p.choiceDone ? p.choiceRight + " of " + p.choiceQuestions + " right" : "Still playing, " + p.choiceAnswered + " answered") + "</color></size>";
-            AddRow(RouteEntry.ColorOf(p, place - 1), name, RouteChoiceGame.Points(p.choiceScore), me);
+            if (!p.Object.HasStateAuthority) continue;
+            lastPlace = PlaceOf(p, players);
+            lastPlayers = players.Count;
+        }
+        return players;
+    }
+
+    // Same points, same place
+    static int PlaceOf(NetworkPlayer player, List<NetworkPlayer> players)
+    {
+        int place = 1;
+        foreach (NetworkPlayer p in players) if (p.choiceScore > player.choiceScore) place++;
+        return place;
+    }
+
+    // The prize money is paid once everyone is done, so the places are final
+    void FillMoney()
+    {
+        if (failed || body == null) return;
+        heading.text = "Prize money";
+        if (paid)
+        {
+            ShowPaid();
+            return;
+        }
+        ClearBody();
+        List<NetworkPlayer> players = ReadStandings();
+        List<string> waiting = new List<string>();
+        foreach (NetworkPlayer p in players) if (!p.choiceDone) waiting.Add(BearMode.Name(p));
+        if (waiting.Count > 0)
+        {
+            info.text = "Waiting for " + string.Join(", ", waiting) + " to finish. The money is paid when everyone is done.";
+            TextMeshProUGUI note = CourseUI.Text("Note", body, "Everyone gets " + RouteChoiceGame.TookPart + " kr for taking part, and more for a good place among the others.", 20, CourseUI.InkMuted);
+            CourseUI.Size(note, 60);
+            return;
+        }
+        Pay(lastPlace, lastPlayers, true);
+        ShowPaid();
+    }
+
+    int paidTookPart;
+    int paidPlace;
+    int paidPlaceOf;
+    int paidForPlace;
+    bool paidTrophy;
+
+    // Money for taking part, and for the place when the game was played to the end
+    void Pay(int place, int players, bool finished)
+    {
+        if (paid) return;
+        paid = true;
+        paidTookPart = RouteChoiceGame.TookPart;
+        paidPlace = finished ? place : 0;
+        paidPlaceOf = players;
+        paidForPlace = finished && place > 0 ? RouteChoiceGame.ForPlace(place, players) : 0;
+        paidTrophy = finished && place == 1 && players >= 2;
+        if (Money.Instance != null)
+        {
+            Money.Instance.AddMoney(paidTookPart + paidForPlace);
+            if (paidTrophy) Money.Instance.AddTrophy(1);
+        }
+    }
+
+    void ShowPaid()
+    {
+        ClearBody();
+        info.text = paidPlace > 0
+            ? "You came <b>" + CompetitionFlow.Ordinal(paidPlace) + " of " + paidPlaceOf + "</b>."
+            : "Thanks for taking part.";
+        AddRow(CourseUI.Accent, "Took part", "+" + paidTookPart + " kr", false);
+        if (paidPlace > 0) AddRow(CourseUI.Accent, CompetitionFlow.Ordinal(paidPlace) + " place of " + paidPlaceOf, "+" + paidForPlace + " kr", false);
+        AddRow(CourseUI.Forest, "<b>Total</b>" + (paidTrophy ? "\n<size=75%><color=#5B7563>+1 trophy for the win</color></size>" : ""), "+" + (paidTookPart + paidForPlace) + " kr", true);
+        if (Money.Instance != null)
+        {
+            TextMeshProUGUI balance = CourseUI.Text("Balance", body, "You now have " + Money.Instance.GetMoney() + " kr", 20, CourseUI.InkMuted);
+            CourseUI.Size(balance, 34);
         }
     }
 
@@ -647,7 +933,7 @@ public class RouteChoiceView : MonoBehaviour
         for (int i = 0; i < current.choices.Count; i++)
         {
             RouteChoice c = current.choices[i];
-            List<Vector3> points = WorldPoints(c.points);
+            List<Vector3> points = WorldPoints(leg, c.points);
             bool highlight = fastest < 0 || i == fastest;
             float w = fastest >= 0 && i == fastest ? width * 1.5f : width;
             Color colour = RouteChoiceGame.Colours[c.colour];
@@ -659,12 +945,12 @@ public class RouteChoiceView : MonoBehaviour
     }
 
     // The smooth line (grid coordinates, cell centres on whole numbers) on the map, from control to control
-    List<Vector3> WorldPoints(List<Vector2> line)
+    List<Vector3> WorldPoints(int onLeg, List<Vector2> line)
     {
         List<Vector3> points = new List<Vector3>(line.Count + 2);
-        points.Add(manager.controlPoints[leg - 1].position);
+        points.Add(manager.controlPoints[onLeg - 1].position);
         foreach (Vector2 p in line) points.Add(GridToWorld(p));
-        points.Add(manager.controlPoints[leg].position);
+        points.Add(manager.controlPoints[onLeg].position);
         return points;
     }
 
@@ -674,50 +960,88 @@ public class RouteChoiceView : MonoBehaviour
         return new Vector3(origin.x + p.x * manager.cellSize, origin.y + p.y * manager.cellSize, origin.z);
     }
 
-    // Both controls and every route on the screen, to the right of the panel, with half a control circle to spare
+    // The leg turned so the start is at the bottom and the control at the top, with both controls and every route
+    // on the screen to the right of the panel, and half a control circle to spare
     void FitCamera(RouteChoiceLeg current)
     {
         if (manager == null || cam == null || leg < 1 || leg > legs) return;
-        Bounds bounds = new Bounds(manager.controlPoints[leg - 1].position, Vector3.zero);
-        bounds.Encapsulate(manager.controlPoints[leg].position);
+        Vector3 from = manager.controlPoints[leg - 1].position;
+        Vector3 to = manager.controlPoints[leg].position;
+        List<Vector3> points = new List<Vector3> { from, to };
         if (current != null)
         {
             foreach (RouteChoice c in current.choices)
             {
-                foreach (Vector2 p in c.points) bounds.Encapsulate(GridToWorld(p));
+                foreach (Vector2 p in c.points) points.Add(GridToWorld(p));
             }
         }
-        Fit(bounds, 60f * MapDefinition.WorldUnitsPerMeter);
+        Vector2 d = to - from;
+        float angle = d.sqrMagnitude > 1e-6f ? Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg : 90f;
+        Fit(points, Quaternion.Euler(0f, 0f, angle - 90f), 60f * MapDefinition.WorldUnitsPerMeter);
     }
 
     void FitWholeCourse()
     {
         if (manager == null || cam == null || manager.controlPoints.Count == 0) return;
-        Bounds bounds = new Bounds(manager.controlPoints[0].position, Vector3.zero);
-        foreach (Transform t in manager.controlPoints) bounds.Encapsulate(t.position);
-        Fit(bounds, 80f * MapDefinition.WorldUnitsPerMeter);
+        List<Vector3> points = new List<Vector3>();
+        foreach (Transform t in manager.controlPoints) points.Add(t.position);
+        Fit(points, Quaternion.identity, 80f * MapDefinition.WorldUnitsPerMeter);
     }
 
-    void Fit(Bounds bounds, float margin)
+    // How much of the screen's width the panel covers, from the left edge
+    float PanelShare()
     {
-        // The panel covers the left of the screen (about a third), so the map is shown in the rest
-        float size = Mathf.Max(bounds.extents.y, bounds.extents.x / Mathf.Max(0.1f, cam.aspect * 0.62f)) * 1.08f + margin;
-        float shift = size * cam.aspect * 0.32f;
+        RectTransform rect = panel != null ? (RectTransform)panel.transform : null;
+        if (rect == null || Screen.width <= 0) return 0.35f;
+        Canvas canvas = rect.GetComponentInParent<Canvas>();
+        Camera ui = canvas != null && canvas.rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.rootCanvas.worldCamera : null;
+        Vector3[] corners = new Vector3[4];
+        rect.GetWorldCorners(corners);
+        float right = 0f;
+        foreach (Vector3 c in corners) right = Mathf.Max(right, RectTransformUtility.WorldToScreenPoint(ui, c).x);
+        return Mathf.Clamp(right / Screen.width, 0f, 0.7f);
+    }
+
+    void Fit(List<Vector3> points, Quaternion rotation, float margin)
+    {
+        // Measured along the turned screen's axes
+        Vector3 across = rotation * Vector3.right;
+        Vector3 along = rotation * Vector3.up;
+        float minX = float.MaxValue, maxX = float.MinValue, minY = float.MaxValue, maxY = float.MinValue;
+        foreach (Vector3 p in points)
+        {
+            float x = Vector3.Dot(p, across), y = Vector3.Dot(p, along);
+            minX = Mathf.Min(minX, x); maxX = Mathf.Max(maxX, x);
+            minY = Mathf.Min(minY, y); maxY = Mathf.Max(maxY, y);
+        }
+        // The map is shown in the part of the screen right of the panel, with a small gap on both sides
+        float left = PanelShare() + 0.02f;
+        float usable = Mathf.Max(0.2f, 1f - left - 0.02f);
+        float aspect = Mathf.Max(0.1f, cam.aspect);
+        float halfWidth = (maxX - minX) * 0.5f * 1.05f + margin;
+        float halfHeight = (maxY - minY) * 0.5f * 1.05f + margin;
+        float size = Mathf.Max(halfHeight, halfWidth / (aspect * usable));
+        // The middle of the free part, from the middle of the screen, in world units
+        float shift = (left + usable * 0.5f - 0.5f) * 2f * size * aspect;
+        float cx = (minX + maxX) * 0.5f - shift;
+        float cy = (minY + maxY) * 0.5f;
+        Vector3 centre = across * cx + along * cy;
         fittedSize = size;
-        fittedPosition = new Vector3(bounds.center.x - shift, bounds.center.y, -10f);
+        fittedRotation = rotation;
+        fittedPosition = new Vector3(centre.x, centre.y, -10f);
         fitted = true;
-        cam.transform.rotation = Quaternion.identity;
+        cam.transform.rotation = rotation;
         cam.orthographicSize = size;
         cam.transform.position = fittedPosition;
     }
 
     // The race start view can still turn the camera to the leg after the first fit (it runs once the network game
-    // starts): the map is always shown north up, as fitted
+    // starts): the map is always shown as fitted
     void KeepFit()
     {
         if (!fitted || cam == null) return;
-        if (cam.transform.rotation == Quaternion.identity) return; // (zooming and moving the map yourself is fine)
-        cam.transform.rotation = Quaternion.identity;
+        if (Quaternion.Angle(cam.transform.rotation, fittedRotation) < 0.01f) return;
+        cam.transform.rotation = fittedRotation;
         cam.orthographicSize = fittedSize;
         cam.transform.position = fittedPosition;
     }
@@ -762,6 +1086,9 @@ public class RouteChoiceView : MonoBehaviour
 
     void OnDestroy()
     {
+        // The host took everyone back to the lobby before the money was paid: you still get paid for taking part,
+        // and for your place if you had played to the end
+        if (!paid && !failed && question > 0) Pay(lastPlace, lastPlayers, step == Step.Done && lastPlace > 0);
         foreach (GameObject hidden in hiddenHud) if (hidden != null) hidden.SetActive(true);
         KeysOpen = false;
         RouteCompareView.HideRunners(false);
