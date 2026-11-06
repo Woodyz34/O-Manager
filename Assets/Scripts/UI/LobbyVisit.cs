@@ -28,7 +28,7 @@ public static class LobbyVisit
     static Scene lobby;
     static string visitScene;
     static bool loading;
-    static readonly List<Behaviour> offBehaviours = new List<Behaviour>();
+    static readonly List<UnityEngine.Behaviour> offBehaviours = new List<UnityEngine.Behaviour>();
     static readonly List<Renderer> offRenderers = new List<Renderer>();
     static readonly HashSet<GameObject> lobbyRoots = new HashSet<GameObject>();
 
@@ -180,7 +180,7 @@ public static class LobbyVisit
         }
     }
 
-    static void HideAll<T>(GameObject root) where T : Behaviour
+    static void HideAll<T>(GameObject root) where T : UnityEngine.Behaviour
     {
         foreach (T b in root.GetComponentsInChildren<T>())
         {
@@ -192,7 +192,7 @@ public static class LobbyVisit
 
     static void ShowLobby()
     {
-        foreach (Behaviour b in offBehaviours)
+        foreach (UnityEngine.Behaviour b in offBehaviours)
         {
             if (b != null) b.enabled = true;
         }
