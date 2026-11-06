@@ -67,7 +67,16 @@ public class CourseBuilder : MonoBehaviour
 
     // Out-of-bounds areas, for the whole course (every leg of a relay): finished ones, and the one being clicked out
     readonly List<List<Vector3>> areas = new List<List<Vector3>>();
+    readonly List<List<Vector3>> boundaries = new List<List<Vector3>>();   // uncrossable boundary lines
     List<Vector3> openArea;
+    bool openIsLine;          // the open shape is a boundary line
+    bool drawLine;            // the Forbidden tool draws boundary lines, not areas
+    Button boundaryButton;
+
+    // The Move button: the next click on the map puts this start, control or finish there
+    MarkType? moveType;
+    int moveItem = -1;
+    string moveName;
     ForbiddenAreaRenderer areaRenderer;
     int dragArea = -1, dragCorner = -1;     // the corner being dragged (dragArea -1 = the open area)
     bool draggingCorner;
@@ -321,6 +330,13 @@ public class CourseBuilder : MonoBehaviour
             return;
         }
 
+        if (moveType.HasValue)
+        {
+            if (Input.GetMouseButtonDown(0) && !overUI) FinishMove(mouseWorld);
+            else if (Input.GetMouseButtonUp(1) && !panning && !overUI) CancelMove();
+            return;
+        }
+
         // Right click (without dragging) on a mark removes it
         if (Input.GetMouseButtonUp(1) && !panning && !overUI)
         {
@@ -401,9 +417,23 @@ public class CourseBuilder : MonoBehaviour
         return null;
     }
 
-    // ---- Out-of-bounds areas ----
-    // Click corner after corner; click the first corner again (or press Enter, or pick another tool) to close the area.
-    // Drag a corner to move it; right-click a corner to remove it, right-click inside an area to remove the area.
+    // ---- Out-of-bounds areas and uncrossable boundaries ----
+    // Click corner after corner. An area is closed by clicking its first corner again; a boundary line is finished by
+    // clicking its last corner again. Enter, or picking another tool, finishes either.
+    // Drag a corner to move it; right-click a corner to remove it, right-click inside an area (or on a line) to remove it.
+    // The shapes are numbered areas first, then lines.
+
+    int ShapeCount => areas.Count + boundaries.Count;
+    List<Vector3> Shape(int i) => i < areas.Count ? areas[i] : boundaries[i - areas.Count];
+    bool ShapeIsLine(int i) => i >= areas.Count;
+
+    void RemoveShape(int i)
+    {
+        if (i < areas.Count) areas.RemoveAt(i);
+        else boundaries.RemoveAt(i - areas.Count);
+    }
+
+    string OpenName => openIsLine ? "uncrossable boundary" : "out-of-bounds area";
 
     void UpdateForbidden(Vector3 mouseWorld, bool overUI, bool typing)
     {
@@ -427,7 +457,8 @@ public class CourseBuilder : MonoBehaviour
         {
             if (HitCorner(mouseWorld, out int a, out int c))
             {
-                if (a < 0 && c == 0 && openArea.Count >= 3)
+                bool closes = a < 0 && (openIsLine ? c == openArea.Count - 1 && openArea.Count >= 2 : c == 0 && openArea.Count >= 3);
+                if (closes)
                 {
                     CloseOpenArea();
                     Redraw();
@@ -445,8 +476,8 @@ public class CourseBuilder : MonoBehaviour
         {
             if (Input.GetMouseButton(0))
             {
-                List<Vector3> area = dragArea < 0 ? openArea : areas[dragArea];
-                if (area != null && dragCorner < area.Count) area[dragCorner] = ClampToMap(mouseWorld);
+                List<Vector3> shape = dragArea < 0 ? openArea : dragArea < ShapeCount ? Shape(dragArea) : null;
+                if (shape != null && dragCorner < shape.Count) shape[dragCorner] = ClampToMap(mouseWorld);
                 RedrawAreas();
             }
             else
@@ -461,19 +492,29 @@ public class CourseBuilder : MonoBehaviour
         {
             if (HitCorner(mouseWorld, out int a, out int c))
             {
-                List<Vector3> area = a < 0 ? openArea : areas[a];
-                area.RemoveAt(c);
-                if (a < 0 && area.Count == 0) openArea = null;
-                if (a >= 0 && area.Count < 3) areas.RemoveAt(a);
+                List<Vector3> shape = a < 0 ? openArea : Shape(a);
+                shape.RemoveAt(c);
+                if (a < 0 && shape.Count == 0) openArea = null;
+                if (a >= 0 && shape.Count < (ShapeIsLine(a) ? 2 : 3)) RemoveShape(a);
                 SetStatus("", false);
             }
             else
             {
-                int inside = areas.FindLastIndex(area => ForbiddenAreas.Contains(area, mouseWorld));
-                if (inside >= 0)
+                float reach = areaRenderer.HandleSize;
+                int hit = boundaries.FindLastIndex(line => ForbiddenAreas.DistanceToLine(line, mouseWorld, false) < reach);
+                if (hit >= 0)
                 {
-                    areas.RemoveAt(inside);
-                    SetStatus("The out-of-bounds area was removed.", false);
+                    boundaries.RemoveAt(hit);
+                    SetStatus("The uncrossable boundary was removed.", false);
+                }
+                else
+                {
+                    int inside = areas.FindLastIndex(area => ForbiddenAreas.Contains(area, mouseWorld));
+                    if (inside >= 0)
+                    {
+                        areas.RemoveAt(inside);
+                        SetStatus("The out-of-bounds area was removed.", false);
+                    }
                 }
             }
             Redraw();
@@ -490,21 +531,23 @@ public class CourseBuilder : MonoBehaviour
         }
         if (openArea == null)
         {
-            if (areas.Count >= ForbiddenArea.MaxAreas)
+            if (ShapeCount >= ForbiddenArea.MaxAreas)
             {
-                SetStatus("A course can have at most " + ForbiddenArea.MaxAreas + " out-of-bounds areas.", true);
+                SetStatus("A course can have at most " + ForbiddenArea.MaxAreas + " out-of-bounds areas and boundaries together.", true);
                 return;
             }
             openArea = new List<Vector3>();
+            openIsLine = drawLine;
         }
         if (openArea.Count >= ForbiddenArea.MaxCorners)
         {
-            SetStatus("An out-of-bounds area can have at most " + ForbiddenArea.MaxCorners + " corners. Click the first corner to close it.", true);
+            SetStatus("An " + OpenName + " can have at most " + ForbiddenArea.MaxCorners + " corners. "
+                + (openIsLine ? "Click the last corner again to finish it." : "Click the first corner to close it."), true);
             return;
         }
         if (CornerCount() >= ForbiddenArea.MaxCornersTotal)
         {
-            SetStatus("All out-of-bounds areas together can have at most " + ForbiddenArea.MaxCornersTotal + " corners.", true);
+            SetStatus("All out-of-bounds areas and boundaries together can have at most " + ForbiddenArea.MaxCornersTotal + " corners.", true);
             return;
         }
         world.z = -1f;
@@ -513,11 +556,23 @@ public class CourseBuilder : MonoBehaviour
         Redraw();
     }
 
-    // The open area becomes a finished one if it has at least three corners
+    // The open area or line becomes a finished one if it has enough corners (three for an area, two for a line)
     void CloseOpenArea()
     {
         if (openArea == null) return;
-        if (openArea.Count >= 3)
+        if (openIsLine)
+        {
+            if (openArea.Count >= 2)
+            {
+                boundaries.Add(openArea);
+                SetStatus("Uncrossable boundary added. The runners can not cross it.", false);
+            }
+            else
+            {
+                SetStatus("An uncrossable boundary needs at least two corners.", true);
+            }
+        }
+        else if (openArea.Count >= 3)
         {
             areas.Add(openArea);
             string inside = MarksInside(openArea);
@@ -545,6 +600,7 @@ public class CourseBuilder : MonoBehaviour
     {
         int count = openArea != null ? openArea.Count : 0;
         foreach (List<Vector3> area in areas) count += area.Count;
+        foreach (List<Vector3> line in boundaries) count += line.Count;
         return count;
     }
 
@@ -556,7 +612,7 @@ public class CourseBuilder : MonoBehaviour
         return map.ToWorld(point);
     }
 
-    // The corner under the mouse: area -1 is the open area
+    // The corner under the mouse: area -1 is the open shape, otherwise a shape number (areas, then lines)
     bool HitCorner(Vector3 world, out int area, out int corner)
     {
         float best = areaRenderer.HandleSize * 1.2f;
@@ -567,16 +623,18 @@ public class CourseBuilder : MonoBehaviour
             for (int c = 0; c < openArea.Count; c++)
             {
                 float d = Vector2.Distance(openArea[c], world);
-                // The first corner closes the area, so it is easier to hit
-                float reach = c == 0 && openArea.Count >= 3 ? best * 1.6f : best;
+                // The corner that finishes the shape is easier to hit
+                bool finishing = openIsLine ? c == openArea.Count - 1 && openArea.Count >= 2 : c == 0 && openArea.Count >= 3;
+                float reach = finishing ? best * 1.6f : best;
                 if (d < reach) { best = d; area = -1; corner = c; }
             }
         }
-        for (int a = 0; a < areas.Count; a++)
+        for (int a = 0; a < ShapeCount; a++)
         {
-            for (int c = 0; c < areas[a].Count; c++)
+            List<Vector3> shape = Shape(a);
+            for (int c = 0; c < shape.Count; c++)
             {
-                float d = Vector2.Distance(areas[a][c], world);
+                float d = Vector2.Distance(shape[c], world);
                 if (d < best) { best = d; area = a; corner = c; }
             }
         }
@@ -587,7 +645,49 @@ public class CourseBuilder : MonoBehaviour
     {
         if (areaRenderer == null) return;
         int bad = errorPoint.HasValue ? areas.FindIndex(area => ForbiddenAreas.Contains(area, errorPoint.Value)) : -1;
-        areaRenderer.DrawEditing(areas, openArea, tool == Tool.Forbidden, bad);
+        areaRenderer.DrawEditing(areas, boundaries, openArea, openIsLine, tool == Tool.Forbidden, bad);
+    }
+
+    // ---- Moving a start, control or finish with the Move button in the list ----
+
+    void StartMove(MarkType type, int item, string name)
+    {
+        if (tool == Tool.Forbidden || tool == Tool.Branch) SetTool(Tool.Control);
+        moveType = type;
+        moveItem = item;
+        moveName = name;
+        SetStatus("Click on the map where " + name.ToLower() + " should go. Right-click to cancel.", false);
+        RefreshHint();
+        RefreshPointList();
+    }
+
+    void CancelMove()
+    {
+        if (!moveType.HasValue) return;
+        moveType = null;
+        SetStatus("", false);
+        RefreshHint();
+        RefreshPointList();
+    }
+
+    void FinishMove(Vector3 world)
+    {
+        string problem = CheckPlace(world);
+        if (problem != null)
+        {
+            SetStatus(moveName + ": " + problem, true);
+            return;
+        }
+        world.z = -1f;
+        EditCourse course = Cur;
+        bool gone = moveType == MarkType.Start ? !course.start.HasValue
+            : moveType == MarkType.Finish ? !course.finish.HasValue
+            : moveItem < 0 || moveItem >= course.items.Count || course.items[moveItem].fork >= 0;
+        if (!gone) SetMarkPosition(new Mark { type = moveType.Value, item = moveItem }, world);
+        moveType = null;
+        errorPoint = null;
+        SetStatus(gone ? "" : moveName + " was moved.", false);
+        Redraw();
     }
 
     void Place(Vector3 world)
@@ -1132,8 +1232,10 @@ public class CourseBuilder : MonoBehaviour
         forks.Clear();
         legCourse.Clear();
         areas.Clear();
+        boundaries.Clear();
         openArea = null;
         draggingCorner = false;
+        moveType = null;
         courses.Add(new EditCourse());
         legCourse.Add(0);
         if (relay)
@@ -1171,6 +1273,10 @@ public class CourseBuilder : MonoBehaviour
         foreach (List<Vector3> area in areas)
         {
             if (area.Count >= 3) course.forbidden.Add(new ForbiddenArea { corners = area.ConvertAll(WholeMeters) });
+        }
+        foreach (List<Vector3> line in boundaries)
+        {
+            if (line.Count >= 2) course.forbidden.Add(new ForbiddenArea { line = true, corners = line.ConvertAll(WholeMeters) });
         }
         if (!relay)
         {
@@ -1437,7 +1543,8 @@ public class CourseBuilder : MonoBehaviour
         {
             foreach (ForbiddenArea area in course.forbidden)
             {
-                if (area != null && area.corners != null && area.corners.Count >= 3) areas.Add(area.corners.ConvertAll(p => map.ToWorld(p)));
+                if (area == null || !area.IsValid) continue;
+                (area.line ? boundaries : areas).Add(area.corners.ConvertAll(p => map.ToWorld(p)));
             }
         }
         if (relay)
@@ -1492,17 +1599,33 @@ public class CourseBuilder : MonoBehaviour
 
     // ---- UI ----
 
+    // The out-of-bounds area and boundary line buttons: pick that kind, or go back to laying the course
+    void ToggleForbidden(bool line)
+    {
+        if (tool == Tool.Forbidden && drawLine == line)
+        {
+            SetTool(Cur.start.HasValue ? Tool.Control : Tool.Start);
+            return;
+        }
+        if (tool == Tool.Forbidden) CloseOpenArea();
+        drawLine = line;
+        SetTool(Tool.Forbidden);
+        Redraw();
+    }
+
     void SetTool(Tool chosen)
     {
         bool wasForbidden = tool == Tool.Forbidden;
         if (wasForbidden && chosen != Tool.Forbidden) CloseOpenArea();
         draggingCorner = false;
+        moveType = null;
         tool = chosen;
         foreach (var pair in toolButtons)
         {
             CourseUI.SetButtonColor(pair.Value, pair.Key == tool ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
         }
-        if (forbiddenButton != null) CourseUI.SetButtonColor(forbiddenButton, tool == Tool.Forbidden ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        if (forbiddenButton != null) CourseUI.SetButtonColor(forbiddenButton, tool == Tool.Forbidden && !drawLine ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        if (boundaryButton != null) CourseUI.SetButtonColor(boundaryButton, tool == Tool.Forbidden && drawLine ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
         if (areaRenderer != null && (wasForbidden || tool == Tool.Forbidden)) RedrawAreas();
         if (wasForbidden && tool != Tool.Forbidden) RefreshPointList();
         RefreshHint();
@@ -1513,18 +1636,23 @@ public class CourseBuilder : MonoBehaviour
         if (hintText == null) return;
         EditCourse course = Cur;
         string text;
-        if (tool == Tool.Start) text = "Click on the map where the start should be.";
+        if (moveType.HasValue) text = "Click on the map where " + moveName.ToLower() + " should go. Right-click to cancel.";
+        else if (tool == Tool.Start) text = "Click on the map where the start should be.";
         else if (tool == Tool.Control) text = "Click on the map to add control " + (course.items.Count + 1) + ". Choose Finish when you are done.";
         else if (tool == Tool.Branch && branchFork >= 0 && branchFork < forks.Count && branchIndex < forks[branchFork].branches.Count)
             text = "Click to add control " + (forks[branchFork].branches[branchIndex].Count + 1) + " of fork " + (branchFork + 1) + ", branch "
                 + CourseData.BranchLetter(branchIndex) + ". Choose Controls when the branch is done.";
+        else if (tool == Tool.Forbidden && drawLine)
+            text = openArea == null ? "Click the corners of an uncrossable boundary (a thick purple line, like a fence or wall the runners must not cross)."
+                : openArea.Count < 2 ? "Click corner " + (openArea.Count + 1) + ". Backspace takes the last corner back."
+                : "Click corner " + (openArea.Count + 1) + ", or click the last corner again (or press Enter) to finish the line.";
         else if (tool == Tool.Forbidden)
             text = openArea == null ? "Click the corners of an out-of-bounds area (purple stripes). The runners can not go in it."
                 : openArea.Count < 3 ? "Click corner " + (openArea.Count + 1) + ". Backspace takes the last corner back."
                 : "Click corner " + (openArea.Count + 1) + ", or click the first corner (or press Enter) to close the area.";
         else text = "Click on the map where the finish should be.";
         hintText.text = text + (tool == Tool.Forbidden
-            ? "\nDrag a corner to move it, right-click it to remove it, right-click inside an area to remove the area."
+            ? "\nDrag a corner to move it, right-click it to remove it, right-click inside an area or on a line to remove it."
             : "\nDrag a mark to move it, right-click it to remove it. Right-drag moves the map, the wheel zooms.");
 
         if (summaryText != null)
@@ -1535,6 +1663,7 @@ public class CourseBuilder : MonoBehaviour
                 ? "Leg " + (selectedLeg + 1) + "  ·  " + ControlCount(course) + " controls" + (forkCount > 0 ? ", " + forkCount + (forkCount == 1 ? " fork" : " forks") : "")
                 : course.items.Count + " controls" + length;
             if (areas.Count > 0) summaryText.text += "  ·  " + areas.Count + (areas.Count == 1 ? " out-of-bounds area" : " out-of-bounds areas");
+            if (boundaries.Count > 0) summaryText.text += "  ·  " + boundaries.Count + (boundaries.Count == 1 ? " boundary" : " boundaries");
         }
     }
 
@@ -1588,10 +1717,12 @@ public class CourseBuilder : MonoBehaviour
         toolButtons[Tool.Control] = CourseUI.Button("Control", toolRow, "Controls", CourseUI.ButtonKind.Light, () => SetTool(Tool.Control), 24);
         toolButtons[Tool.Finish] = CourseUI.Button("Finish", toolRow, "Finish", CourseUI.ButtonKind.Light, () => SetTool(Tool.Finish), 24);
 
-        // Out-of-bounds areas: a tool of its own, under the course tools
-        forbiddenButton = CourseUI.Button("Out of bounds", panel.transform, "Draw out-of-bounds area", CourseUI.ButtonKind.Light,
-            () => SetTool(tool == Tool.Forbidden ? (Cur.start.HasValue ? Tool.Control : Tool.Start) : Tool.Forbidden), 21);
-        CourseUI.Size(forbiddenButton, 44);
+        // Out-of-bounds areas and uncrossable boundaries: tools of their own, under the course tools
+        RectTransform forbiddenRow = CourseUI.Rect("Out of bounds", panel.transform);
+        CourseUI.Row(forbiddenRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(forbiddenRow, 44);
+        forbiddenButton = CourseUI.Button("Out of bounds", forbiddenRow, "Out-of-bounds area", CourseUI.ButtonKind.Light, () => ToggleForbidden(false), 20);
+        boundaryButton = CourseUI.Button("Boundary", forbiddenRow, "Uncrossable line", CourseUI.ButtonKind.Light, () => ToggleForbidden(true), 20);
 
         // Room for four lines: the tool's own hint can take two, the mouse help after it two more
         hintText = CourseUI.Text("Hint", panel.transform, "", 19, CourseUI.InkMuted);
@@ -1635,7 +1766,9 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Size(bottomRow, 52);
         CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Light, ClearCourse, 22);
         CourseUI.Button("Import map", bottomRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 22);
-        CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
+        // Opened from the multiplayer lobby: back to the lobby, the network game is still running
+        if (LobbyVisit.Active) CourseUI.Button("Back", bottomRow, "Back to lobby", CourseUI.ButtonKind.Light, LobbyVisit.Close, 22);
+        else CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
 
         BuildRelayPanel(canvasObject.transform);
     }
@@ -1690,7 +1823,9 @@ public class CourseBuilder : MonoBehaviour
         Vector3? previous = course.start;
         if (course.start.HasValue)
         {
-            AddRow("Start", 38, CourseUI.Ink, FontStyles.Normal, 6, ("Remove", CourseUI.ButtonKind.Light, () => { course.start = null; Redraw(); }));
+            AddRow("Start", 38, MovingColor(MarkType.Start, -1), FontStyles.Normal, 6,
+                ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Start, -1, "The start")),
+                ("Remove", CourseUI.ButtonKind.Light, () => { course.start = null; Redraw(); }));
         }
         int number = 0;
         for (int i = 0; i < course.items.Count; i++)
@@ -1702,14 +1837,20 @@ public class CourseBuilder : MonoBehaviour
             {
                 string text = "Control " + number + Meters(previous, item.point);
                 bool bad = errorPoint.HasValue && Vector2.Distance(errorPoint.Value, item.point) < 0.08f;
+                string controlName = "Control " + number;
+                Color rowColor = bad ? CourseUI.Danger : MovingColor(MarkType.Control, index);
                 if (relay)
                 {
-                    AddRow(text, 38, bad ? CourseUI.Danger : CourseUI.Ink, bad ? FontStyles.Bold : FontStyles.Normal, 6,
-                        ("Fork", CourseUI.ButtonKind.Secondary, () => MakeFork(index)), ("Remove", CourseUI.ButtonKind.Light, () => { course.items.RemoveAt(index); Redraw(); }));
+                    AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
+                        ("Fork", CourseUI.ButtonKind.Secondary, () => MakeFork(index)),
+                        ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
+                        ("Remove", CourseUI.ButtonKind.Light, () => { course.items.RemoveAt(index); Redraw(); }));
                 }
                 else
                 {
-                    AddRow(text, 38, bad ? CourseUI.Danger : CourseUI.Ink, bad ? FontStyles.Bold : FontStyles.Normal, 6, ("Remove", CourseUI.ButtonKind.Light, () => { course.items.RemoveAt(index); Redraw(); }));
+                    AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
+                        ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
+                        ("Remove", CourseUI.ButtonKind.Light, () => { course.items.RemoveAt(index); Redraw(); }));
                 }
                 previous = item.point;
                 continue;
@@ -1741,7 +1882,9 @@ public class CourseBuilder : MonoBehaviour
         }
         if (course.finish.HasValue)
         {
-            AddRow("Finish" + Meters(previous, course.finish.Value), 38, CourseUI.Ink, FontStyles.Normal, 6, ("Remove", CourseUI.ButtonKind.Light, () => { course.finish = null; Redraw(); }));
+            AddRow("Finish" + Meters(previous, course.finish.Value), 38, MovingColor(MarkType.Finish, -1), FontStyles.Normal, 6,
+                ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Finish, -1, "The finish")),
+                ("Remove", CourseUI.ButtonKind.Light, () => { course.finish = null; Redraw(); }));
         }
         for (int a = 0; a < areas.Count; a++)
         {
@@ -1749,6 +1892,18 @@ public class CourseBuilder : MonoBehaviour
             AddRow("<color=#8A0A94>Out-of-bounds area " + (a + 1) + "</color>  <color=#5B7563>" + areas[a].Count + " corners</color>", 38, CourseUI.Ink, FontStyles.Normal, 6,
                 ("Remove", CourseUI.ButtonKind.Light, () => { areas.RemoveAt(index); Redraw(); }));
         }
+        for (int b = 0; b < boundaries.Count; b++)
+        {
+            int index = b;
+            AddRow("<color=#8A0A94>Uncrossable boundary " + (b + 1) + "</color>  <color=#5B7563>" + boundaries[b].Count + " corners</color>", 38, CourseUI.Ink, FontStyles.Normal, 6,
+                ("Remove", CourseUI.ButtonKind.Light, () => { boundaries.RemoveAt(index); Redraw(); }));
+        }
+    }
+
+    // The row of the mark being moved is shown in the accent colour
+    Color MovingColor(MarkType type, int item)
+    {
+        return moveType == type && (type != MarkType.Control || moveItem == item) ? CourseUI.Accent : CourseUI.Ink;
     }
 
     static string Meters(Vector3? from, Vector3 to)

@@ -55,6 +55,8 @@ public class ManualPathDrawer : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // The lobby's shop, My Runners and course builder are loaded on top of the lobby (LobbyVisit); not a new race
+        if (mode == LoadSceneMode.Additive) return;
         // The object can be destroyed by another scene-loaded handler earlier in the same call (e.g. when the
         // network session shuts down as the scene changes); Unity then still calls this handler
         if (this == null)
@@ -185,6 +187,7 @@ public class ManualPathDrawer : MonoBehaviour
     // Starts drawing a new relay leg from the start (the leg's points are already in manager.controlPoints)
     public void BeginRelayLeg()
     {
+        FitLineWidth();
         relayMode = true;
         relayStretch = 0;
         ClearKeptLines();
@@ -267,20 +270,9 @@ public class ManualPathDrawer : MonoBehaviour
                 corridorPath = new List<Vector2Int>(gridPath);
             }
             agent.relaySegments.Add(corridorPath);
-            // Route analysis: what stays on the map is the smooth route it is timed on, not every wobble of the hand
-            if (RouteAnalysis.On && RelayRace.Active == null)
-            {
-                float z = smoothPath.Count > 0 ? smoothPath[0].z : -1f;
-                List<Vector3> smooth = RouteAnalysis.SmoothWorld(manager, corridorPath, z);
-                if (smooth.Count > 1)
-                {
-                    smooth[0] = new Vector3(ThisControll.position.x, ThisControll.position.y, z);
-                    smooth[smooth.Count - 1] = new Vector3(targetControl.position.x, targetControl.position.y, z);
-                    smoothPath.Clear();
-                    smoothPath.AddRange(smooth);
-                }
-            }
-            KeepLine();
+            // Route analysis: the stretches drawn before are not left on the map (they were in the way while drawing
+            // the next one); the routes are seen again in the comparison
+            if (!RouteAnalysis.On || RelayRace.Active != null) KeepLine();
             // The next stretch starts from scratch
             gridPath.Clear();
             smoothPath.Clear();
@@ -388,8 +380,27 @@ public class ManualPathDrawer : MonoBehaviour
         return false;
     }
 
+    // The drawn line as wide as the prefab makes it, except in route analysis: there it is thinner (much thinner
+    // on a sprint map, in scale with the smaller controls there), so it does not cover what you want to see
+    float normalLineWidth = -1f;
+
+    void FitLineWidth()
+    {
+        if (line == null) return;
+        if (normalLineWidth < 0f) normalLineWidth = line.widthMultiplier;
+        float share = 1f;
+        if (RouteAnalysis.On && RelayRace.Active == null)
+        {
+            bool sprint = CourseLoader.LoadedMap != null ? CourseLoader.LoadedMap.IsSprint
+                : manager != null && manager.cellSize / MapDefinition.WorldUnitsPerMeter < 5f;
+            share = sprint ? CourseRenderer.SprintSize : 0.6f;
+        }
+        line.widthMultiplier = normalLineWidth * share;
+    }
+
     void ClearLine()
     {
+        FitLineWidth();
         gridPath.Clear();
         smoothPath.Clear();
         cellPoint.Clear();

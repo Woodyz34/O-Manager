@@ -29,6 +29,18 @@ public class MapSelectUI : MonoBehaviour
     {
         BuildChrome();
         mapSelectPanel.SetActive(false);
+        SharedMaps.Changed += OnSharedMapsChanged;
+    }
+
+    void OnDestroy()
+    {
+        SharedMaps.Changed -= OnSharedMapsChanged;
+    }
+
+    // A map another player shared has been downloaded: its courses can be shown now
+    void OnSharedMapsChanged()
+    {
+        if (this != null && mapSelectPanel != null && mapSelectPanel.activeSelf) PopulateMapList();
     }
 
     // Tabs and status line above the list, and a grid sized for course cards
@@ -140,6 +152,8 @@ public class MapSelectUI : MonoBehaviour
             statusText.text = "No courses match the search.";
         else if (shown == 0)
             statusText.text = "No courses here yet.";
+        else if (SharedMaps.Downloading != null)
+            statusText.text = "Downloading the map " + SharedMaps.Downloading + " that a player shared...";
         else
             statusText.text = "";
     }
@@ -196,7 +210,7 @@ public class MapSelectUI : MonoBehaviour
 
         MapDefinition map = MapDefinition.Find(course.mapId);
         string facts = (course.IsRelay() ? "Relay, " + course.legs + " legs  ·  " : course.controls.Count + " controls  ·  ")
-            + course.LengthText() + (course.IsSprint() ? "  ·  Sprint" : "") + (map != null ? "  ·  " + map.displayName : "");
+            + course.LengthText() + (course.IsSprint() ? "  ·  Sprint" : "  ·  Forest") + (map != null ? "  ·  " + map.displayName : "");
         TextMeshProUGUI details = CourseUI.Text("Details", card.transform, facts, 22, CourseUI.Ink);
         CourseUI.Place(details.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -410), new Vector2(360, 30));
         details.enableWordWrapping = false;

@@ -16,6 +16,7 @@ using UnityEngine;
 //   map-<id>-picture.png                  the player's own picture, when they gave one
 //   map-<id>-info.json                    MapPackageInfo, with the permission the player confirmed
 // The player's (private) data key "mapSubmissions" lists what they have sent, newest last.
+// The map is also shared with all players until it is built into the game: see SharedMaps.
 public static class CloudMaps
 {
     const string SubmissionsKey = "mapSubmissions";
@@ -46,7 +47,8 @@ public static class CloudMaps
         await CloudCourses.SignInAsync();
         string prefix = "map-" + info.id + "-";
         string extension = System.IO.Path.GetExtension(sourceName).ToLowerInvariant();
-        await CloudSaveService.Instance.Files.Player.SaveAsync(prefix + "source" + extension, source);
+        string sourceKey = prefix + "source" + extension;
+        await CloudSaveService.Instance.Files.Player.SaveAsync(sourceKey, source);
         if (ownPng != null)
         {
             await CloudSaveService.Instance.Files.Player.SaveAsync(prefix + "picture.png", ownPng);
@@ -84,5 +86,8 @@ public static class CloudMaps
         list.Add(submission);
         await CloudSaveService.Instance.Data.Player.SaveAsync(new Dictionary<string, object> { { SubmissionsKey, JsonConvert.SerializeObject(list) } });
         Debug.Log($"CloudMaps: sent {info.name} ({source.Length / 1024} kB) as {prefix}*");
+
+        // Everyone can use the map straight away, until it is built into the game (see SharedMaps)
+        await SharedMaps.ShareAsync(info, sourceKey, ownPng != null ? prefix + "picture.png" : null, source.Length);
     }
 }

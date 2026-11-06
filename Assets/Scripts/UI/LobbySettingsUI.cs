@@ -62,7 +62,15 @@ public class LobbySettingsUI : MonoBehaviour
             imposterText.fontSizeMax = imposterText.fontSize;
             imposterText.fontSizeMin = Mathf.Min(14f, imposterText.fontSize);
         }
+        // The course line also says Sprint or Forest now, so it may need to shrink a little
+        if (mapText != null && !mapText.enableAutoSizing)
+        {
+            mapText.enableAutoSizing = true;
+            mapText.fontSizeMax = mapText.fontSize;
+            mapText.fontSizeMin = Mathf.Min(14f, mapText.fontSize);
+        }
         Show("...", ExtraMode.None, "...");
+        LobbyVisit.AddButtons();
     }
 
     void Rename()
@@ -175,7 +183,10 @@ public class LobbySettingsUI : MonoBehaviour
     static string CourseTitle(CourseData course)
     {
         if (course == null) return "...";
-        return string.IsNullOrEmpty(course.author) ? course.name : course.name + "  <size=70%>by " + course.author + "</size>";
+        // Everyone sees whether it is a sprint or a forest course, next to the name and who made it
+        string type = course.IsSprint() ? "<color=#E8742A>Sprint</color>" : "<color=#3F7D54>Forest</color>";
+        string by = string.IsNullOrEmpty(course.author) ? "" : "  ·  by " + course.author;
+        return course.name + "  <size=70%><b>" + type + "</b>" + by + "</size>";
     }
 
     void Show(string mode, ExtraMode extra, string map)
