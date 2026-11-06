@@ -246,7 +246,15 @@ public class ManualPathDrawer : MonoBehaviour
         foreach (List<Vector2Int> d in detours) route.AddRange(d);
         // (Route analysis lets the route run a few metres from the line, so a line drawn roughly along a road follows it)
         int corridor = RouteAnalysis.On ? RouteAnalysis.CorridorCells(manager) : 1;
-        List<Vector2Int> corridorPath = CorridorPath(route, gridPath[0], gridPath[gridPath.Count - 1], corridor);
+        // The line may start or end a few metres from the control on closed ground (inside a building or a plot);
+        // the route then starts and ends at the first and last open cells of the line, or no route is found
+        Vector2Int first = gridPath[0], last = gridPath[gridPath.Count - 1];
+        if (!RouteAnalysis.On)
+        {
+            foreach (Vector2Int c in gridPath) if (Passable(c)) { first = c; break; }
+            for (int i = gridPath.Count - 1; i >= 0; i--) if (Passable(gridPath[i])) { last = gridPath[i]; break; }
+        }
+        List<Vector2Int> corridorPath = CorridorPath(route, first, last, corridor);
         if ((corridorPath == null || corridorPath.Count == 0) && CrossesBlocked(gridPath) && !RouteAnalysis.On)
         {
             corridorPath = FindOptimizedPathInCorridor(gridPath, CorrectionCells);

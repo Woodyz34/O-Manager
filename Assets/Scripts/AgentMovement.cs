@@ -345,6 +345,14 @@ public class AgentMovement : NetworkBehaviour
     {
         path.Clear();
         path = newPath;
+        // A route that starts or ends on ground nobody can run on (the line was started a few metres from the control,
+        // inside a building or a plot) would leave the runner standing still for good: its speed there is 0.
+        // Those cells are left out; the runner runs straight from the control to the first open cell.
+        if (path != null && pathfindingManager != null && pathfindingManager.speedGrid2D != null)
+        {
+            while (path.Count > 1 && !OpenCell(path[0])) path.RemoveAt(0);
+            while (path.Count > 1 && !OpenCell(path[path.Count - 1])) path.RemoveAt(path.Count - 1);
+        }
         ComputeTurns();
         currentTargetIndex = 0;
         ApplyTurn(0);   // the turn at a control, from the way the runner came in
@@ -668,6 +676,8 @@ public class AgentMovement : NetworkBehaviour
 
             // Hämta base speed från grid
             float cellSpeed = pathfindingManager.speedGrid2D[lastGridCell.y, lastGridCell.x];
+            // Never stand still for good on a closed cell (speed 0) that slipped into the route: walk off it slowly
+            if (cellSpeed <= 0.01f) cellSpeed = 0.2f;
             // Skala collidern efter cellSpeed2
             if (boxCollider != null && !Mathf.Approximately(cellSpeed, lastColliderCellSpeed))
             {
@@ -787,6 +797,12 @@ public class AgentMovement : NetworkBehaviour
         if (degrees <= 30f) return 1f;
         if (degrees <= 90f) return Mathf.Lerp(1f, 0.55f, (degrees - 30f) / 60f);
         return Mathf.Lerp(0.55f, 0.05f, (Mathf.Min(degrees, 180f) - 90f) / 90f);
+    }
+
+    bool OpenCell(Vector2Int c)
+    {
+        float[,] grid = pathfindingManager.speedGrid2D;
+        return c.y >= 0 && c.x >= 0 && c.y < grid.GetLength(0) && c.x < grid.GetLength(1) && grid[c.y, c.x] > 0.01f;
     }
 
     // The turns along a new path. The direction in and out of each cell is measured over about 20 m, so the zigzag
