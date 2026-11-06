@@ -84,9 +84,6 @@ public class LobbySettingsUI : MonoBehaviour
         RectTransform rect = card as RectTransform;
         if (rect == null) return;
         rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, -30f);
-        // Long course names must not reach the money pill or the Leave lobby button
-        LayoutElement limit = rect.GetComponent<LayoutElement>();
-        if (limit == null) rect.SetAsLastSibling();
     }
 
     void Rename()
