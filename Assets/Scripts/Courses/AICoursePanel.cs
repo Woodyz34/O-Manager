@@ -158,7 +158,7 @@ public class AICoursePanel : MonoBehaviour
         panel.preview.enabled = false;
 
         panel.resultText = CourseUI.Text("Result", card.transform, "Choose the settings and press Make course.", 22, CourseUI.Ink);
-        CourseUI.Place(panel.resultText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -510), new Vector2(560, 100));
+        CourseUI.Place(panel.resultText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -510), new Vector2(560, 150));
 
         RectTransform buttons = CourseUI.Rect("Buttons", card.transform);
         CourseUI.Place(buttons, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 36), new Vector2(560, 60));
