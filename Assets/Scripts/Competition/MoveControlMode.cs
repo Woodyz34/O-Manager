@@ -333,6 +333,7 @@ public static class MoveControlMode
         {
             pictureMarks = new GameObject("Moved controls").AddComponent<CourseRenderer>();
         }
+        pictureMarks.sizeFactor = CourseRenderer.SizeFor(CourseLoader.LoadedMap);
         List<CourseRenderer.Mark> marks = new List<CourseRenderer.Mark>();
         Dictionary<int, Vector3> show = new Dictionary<int, Vector3>(moved);
         if (shadow > 0 && shadow < points.Count) show[shadow] = points[shadow].position;
@@ -348,16 +349,17 @@ public static class MoveControlMode
     public static GameObject ControlMark(string name, string number, Color color, int order)
     {
         GameObject root = new GameObject(name);
+        float size = U * CourseRenderer.SizeFor(CourseLoader.LoadedMap);   // smaller on sprint maps
         LineRenderer circle = root.AddComponent<LineRenderer>();
         circle.sharedMaterial = LineMaterial;
         circle.useWorldSpace = false;
         circle.loop = true;
-        circle.widthMultiplier = 4.5f * U;
+        circle.widthMultiplier = 4.5f * size;
         circle.startColor = circle.endColor = color;
         circle.sortingOrder = order;
         const int segments = 48;
         circle.positionCount = segments;
-        float radius = 37f * U;
+        float radius = 37f * size;
         for (int k = 0; k < segments; k++)
         {
             float a = k * Mathf.PI * 2f / segments;
@@ -367,14 +369,14 @@ public static class MoveControlMode
         {
             TextMeshPro text = new GameObject("Number").AddComponent<TextMeshPro>();
             text.transform.SetParent(root.transform, false);
-            float offset = (37f + 45f * 0.45f) * U;
+            float offset = (37f + 45f * 0.45f) * size;
             text.transform.localPosition = new Vector3(offset, offset, 0f);
             text.text = number;
-            text.fontSize = 45f * U * 10f;
+            text.fontSize = 45f * size * 10f;
             text.color = color;
             text.alignment = TextAlignmentOptions.Center;
             text.enableWordWrapping = false;
-            text.rectTransform.sizeDelta = new Vector2(45f * U * 3f, 45f * U * 1.5f);
+            text.rectTransform.sizeDelta = new Vector2(45f * size * 3f, 45f * size * 1.5f);
             text.sortingOrder = order;
         }
         return root;

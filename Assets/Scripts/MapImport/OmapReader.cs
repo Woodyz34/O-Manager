@@ -309,19 +309,36 @@ namespace MapImport
                     line.midCount = Math.Max(1, (int)Num(l, "mid_symbols_per_spot", 1));
                     line.midDistance = Num(l, "mid_symbol_distance", 0) / 1000.0;
                     line.midSpacing = Num(l, "segment_length", 4000) / 1000.0;
+                    line.oomMid = true;
+                    line.midEnd = Num(l, "end_length", 0) / 1000.0;
+                    line.midAtLeastOne = Bool(l, "show_at_least_one_symbol");
+                    line.midMinCount = (int)Num(l, "minimum_mid_symbol_count", 0);
                 }
             }
             var borders = Child(l, "borders");
             if (borders != null)
             {
-                // A double line: the main line is the fill, the borders sit at +-shift
+                // Border lines along both edges of the main line (paved footprints, stairs). In OOM a border's centre
+                // lies 'shift' outside the edge of the main line; the painter puts a border's centre at
+                // (doubleWidth + borderWidth) / 2 from the middle.
+                double mainWidth = Num(l, "line_width", 0) / 1000.0;
                 int i = 0;
                 foreach (XmlElement border in Children(borders, "border"))
                 {
                     int color = ColorIndex(border, "color", map);
                     double width = Num(border, "width", 0) / 1000.0;
                     double shift = Num(border, "shift", 0) / 1000.0;
-                    if (i == 0) { line.leftColor = width > 0 ? color : -1; line.leftWidth = width; line.doubleWidth = 2 * shift - width; }
+                    if (i == 0)
+                    {
+                        line.leftColor = width > 0 ? color : -1;
+                        line.leftWidth = width;
+                        line.doubleWidth = mainWidth + 2 * shift - width;
+                        if (Bool(border, "dashed"))
+                        {
+                            line.borderDash = Num(border, "dash_length", 2000) / 1000.0;
+                            line.borderGap = Num(border, "break_length", 1000) / 1000.0;
+                        }
+                    }
                     else { line.rightColor = width > 0 ? color : -1; line.rightWidth = width; }
                     i++;
                 }

@@ -148,6 +148,7 @@ public class CourseBuilder : MonoBehaviour
             courseRenderer = new GameObject("Course").AddComponent<CourseRenderer>();
             areaRenderer = new GameObject("Out-of-bounds areas").AddComponent<ForbiddenAreaRenderer>();
         }
+        courseRenderer.sizeFactor = CourseRenderer.SizeFor(map);
         areaRenderer.SetMapType(map.IsSprint);
         MapBackground background = map.GetBackground(map.defaultBackground);
         if (background != null)
@@ -374,7 +375,7 @@ public class CourseBuilder : MonoBehaviour
 
     Mark Hit(List<Mark> list, Vector3 world, float reach = 1.2f)
     {
-        float best = Mathf.Max(courseRenderer.controlRadiusMeters * MapDefinition.WorldUnitsPerMeter * reach, mapCamera.orthographicSize * 0.02f);
+        float best = Mathf.Max(courseRenderer.ControlRadiusWorld * reach, mapCamera.orthographicSize * 0.02f);
         Mark hit = null;
         foreach (Mark mark in list)
         {

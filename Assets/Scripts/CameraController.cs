@@ -340,7 +340,7 @@ public class CameraController : MonoBehaviour
         
         // Zoom so both control circles are wholly on the screen with half a circle more beyond each of them.
         // The leg runs straight up the screen, so only the height matters (a landscape screen is wider than tall).
-        float circle = 37f * MapDefinition.WorldUnitsPerMeter;   // the control circle's radius (CourseRenderer)
+        float circle = 37f * MapDefinition.WorldUnitsPerMeter * CourseRenderer.SizeFor(CourseLoader.LoadedMap);   // the control circle's radius (CourseRenderer)
         legCamSize = distance / 2f + 2f * circle;
         cam.orthographicSize = Mathf.Max(minCamSize, legCamSize);
         cam.transform.position = camPos;

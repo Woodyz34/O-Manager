@@ -44,6 +44,7 @@ namespace MapImport
         public string contact;
         public string created;                // ISO date
         public bool permissionConfirmed;      // the uploader says the map's owner allows it
+        public double[] boundary;             // the edge of the finished map the player chose (paper mm), or empty for all of it
     }
 
     public class MapPackage
@@ -87,7 +88,7 @@ namespace MapImport
             var pkg = new MapPackage();
             void Log(string s) { pkg.log.Add(s); }
             progress?.Invoke("Reading the map", 0.05f);
-            MapExtent extent = MapExtent.Of(map);
+            MapExtent extent = MapBoundary.Clip(MapExtent.Of(map), map.boundary);
             float cell = sprint ? SprintCell : ForestCell;
 
             progress?.Invoke("Building the grid and the heights", 0.15f);
@@ -127,6 +128,7 @@ namespace MapImport
                 refEast = map.refEast,
                 refNorth = map.refNorth,
                 gridAngle = (float)map.gridAngle,
+                boundary = map.boundary != null && map.boundary.Length >= 6 ? map.boundary : null,
                 crs = map.crsCode,
                 created = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
             };
@@ -293,6 +295,8 @@ namespace MapImport
             foreach (MapObject o in map.objects)
             {
                 if (!MapExtent.IsTerrain(o.symbol)) continue;
+                double[] edge = map.boundary != null && map.boundary.Length >= 6 ? map.boundary : null;
+                if (edge != null && o.kind == SymbolKind.Point && !MapBoundary.Inside(edge, o.parts[0][0], o.parts[0][1])) continue;
                 string layer = Escape(LayerName(o.symbol));
                 if (o.kind == SymbolKind.Point)
                 {
@@ -305,7 +309,13 @@ namespace MapImport
                 }
                 else if (o.kind == SymbolKind.Line)
                 {
-                    foreach (double[] p in o.parts)
+                    List<double[]> lineParts = o.parts;
+                    if (edge != null)
+                    {
+                        lineParts = new List<double[]>();
+                        foreach (double[] part in o.parts) lineParts.AddRange(MapBoundary.ClipLine(part, edge));
+                    }
+                    foreach (double[] p in lineParts)
                     {
                         if (p.Length < 4) continue;
                         if (!firstLine) lines.Append(',');
