@@ -45,6 +45,7 @@ public class RunnerCollectionUI : MonoBehaviour
         if (detailClose != null) detailClose.onClick.AddListener(() => detailPanel.SetActive(false));
         cellTemplate.gameObject.SetActive(false);
         MakeMeritsText();
+        FastScroll.Add(scroll);
     }
 
     // The close-up gets a "best races" list under the numbers. Made here so the saved scene needs no rebuild.
@@ -152,7 +153,8 @@ public class RunnerCollectionUI : MonoBehaviour
             Row("Speed", Mathf.RoundToInt(card.speed).ToString()) +
             Row("Technique", Mathf.RoundToInt(card.technique).ToString()) +
             Row("Class", card.klass) +
-            Row("Country", Title(RunnerCards.CountryName(card))) +
+            Row("Country", Title(RunnerCards.CountryName(card)) +
+                (card.countryGuessed ? "  </b><color=#FBF4DABB><size=24>guessed from club</size></color><b>" : "")) +
             Row("Club", string.IsNullOrEmpty(card.clubName) ? "-" : card.clubName);
         if (meritsText != null) meritsText.text = MeritsText(card, -1);
         detailPanel.SetActive(true);

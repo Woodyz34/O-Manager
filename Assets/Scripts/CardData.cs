@@ -20,6 +20,7 @@ public class CardData
     // Set for runners that come from the Eventor points (Resources/Runners/runners.json)
     public string id;
     public string countryName;   // shown when there is no flag picture for the country
+    public bool countryGuessed;  // the country is the club's country (Eventor), not known for the runner
     public string clubName;
     public bool inPacks = true;  // false = frozen: kept by players who own it, no longer in packs
     public List<RunnerMerit> merits = new List<RunnerMerit>();   // best races of the last year, best first

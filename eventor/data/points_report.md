@@ -1,455 +1,455 @@
 # Poäng 2026-11-03
 
-Grupper (klass/bana per lopp): 383, justerade: 368, ojusterade: 15. Varv: 72.
-Löpare: 3073, med betyg: 3039, synliga i spelet: 974 (574 herrar, 400 damer). Frysta kort (inte längre med i paketen): 0.
+Grupper (klass/bana per lopp): 383, justerade: 368, ojusterade: 15. Varv: 106.
+Löpare: 3060, med betyg: 3026, synliga i spelet: 978 (576 herrar, 402 damer). Frysta kort (inte längre med i paketen): 0.
 
 ## Herrar, topp 25 (synliga)
 
 | # | Namn | Klubb/land | Fysik | Teknik | Lopp |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kasper Harlem Fosser | Norway | 97.81 | 97.16 | 7 |
-| 2 | Viktor Svensk | Sweden | 97.14 | 94.33 | 13 |
+| 1 | Kasper Harlem Fosser | Norway | 97.83 | 97.16 | 7 |
+| 2 | Viktor Svensk | Sweden | 97.17 | 94.33 | 13 |
 | 3 | Tomas Krivda | Czechia | 96.78 | 92.06 | 4 |
-| 4 | Miika Kirmula | Finland | 95.29 | 94.19 | 7 |
-| 5 | Anton Johansson | Sweden | 95.26 | 95.18 | 8 |
-| 6 | Emil Svensk | Sweden | 95.25 | 85.65 | 9 |
-| 7 | Axel Elmblad | Sweden | 94.96 | 97.09 | 11 |
+| 4 | Miika Kirmula | Finland | 95.31 | 94.19 | 7 |
+| 5 | Emil Svensk | Sweden | 95.31 | 85.65 | 9 |
+| 6 | Anton Johansson | Sweden | 95.3 | 95.18 | 8 |
+| 7 | Axel Elmblad | Sweden | 95.09 | 97.09 | 11 |
 | 8 | Olli Ojanaho | Finland | 94.88 | 97.08 | 3 |
-| 9 | Gustav Bergman | Sweden | 94.7 | 94.25 | 14 |
-| 10 | Fabian Aebersold | Switzerland | 94.62 | 93.27 | 6 |
-| 11 | Quentin Moulet | France | 94.31 | 96.3 | 13 |
-| 12 | Mathieu Perrin | France | 93.87 | 98.53 | 4 |
-| 13 | Simon Hector | Sweden | 93.74 | 96.02 | 14 |
+| 9 | Gustav Bergman | Sweden | 94.75 | 94.25 | 14 |
+| 10 | Fabian Aebersold | Switzerland | 94.65 | 93.27 | 6 |
+| 11 | Quentin Moulet | France | 94.36 | 96.3 | 13 |
+| 12 | Mathieu Perrin | France | 93.9 | 98.53 | 4 |
+| 13 | Simon Hector | Sweden | 93.81 | 96.02 | 14 |
 | 14 | Topi Syrjalainen | Finland | 93.48 | 96.02 | 3 |
-| 15 | Max Peter Bejmer | SWE | 93.4 | 90.3 | 6 |
-| 16 | Simon Imark | Sweden | 93.1 | 98.7 | 12 |
-| 17 | Akseli Ruohola | Finland | 92.97 | 88.38 | 4 |
-| 18 | Henrik Johannesson | Sweden | 92.91 | 94.72 | 10 |
+| 15 | Max Peter Bejmer | SWE | 93.46 | 90.3 | 6 |
+| 16 | Simon Imark | Sweden | 93.16 | 98.7 | 12 |
+| 17 | Henrik Johannesson | Sweden | 92.98 | 94.72 | 10 |
+| 18 | Akseli Ruohola | Finland | 92.97 | 88.38 | 4 |
 | 19 | Daniel Hubmann | Switzerland | 92.43 | 95.22 | 4 |
-| 20 | Søren Thrane Ødum | DEN | 92.07 | 96.75 | 8 |
-| 21 | Aarni Ronkainen | Finland | 91.76 | 97.04 | 4 |
-| 22 | Matthieu Bührer | Switzerland | 91.73 | 89.23 | 6 |
-| 23 | Jürgen Joonas | Estonia | 91.59 | 76.09 | 4 |
+| 20 | Søren Thrane Ødum | DEN | 92.26 | 96.75 | 8 |
+| 21 | Matthieu Bührer | Switzerland | 91.79 | 89.23 | 6 |
+| 22 | Aarni Ronkainen | Finland | 91.76 | 97.04 | 4 |
+| 23 | Jürgen Joonas | Estonia | 91.62 | 76.09 | 4 |
 | 24 | Tino Polsini | Switzerland | 91.55 | 79.4 | 4 |
-| 25 | Jakub Chaloupsky | Czechia | 91.47 | 94.37 | 4 |
+| 25 | Erik Herne | SWE | 91.47 | 84.91 | 12 |
 
 ## Damer, topp 25 (synliga)
 
 | # | Namn | Klubb/land | Fysik | Teknik | Lopp |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Simona Aebersold | Switzerland | 99.21 | 87.87 | 7 |
-| 2 | Sanna Fast | Sweden | 97.13 | 65.27 | 7 |
-| 3 | Tove Alexandersson | Sweden | 96.75 | 91.02 | 7 |
-| 4 | Pia Young Vik | Norway | 96.08 | 72.66 | 7 |
-| 5 | Hanna Lundberg | Sweden | 93.24 | 84.02 | 8 |
-| 6 | Malin Agervig Kristiansson | Denmark | 92.98 | 58.48 | 2 |
-| 7 | Marie Olaussen | Norway | 92.95 | 88.63 | 13 |
+| 1 | Simona Aebersold | Switzerland | 99.25 | 87.87 | 7 |
+| 2 | Sanna Fast | Sweden | 97.16 | 65.27 | 7 |
+| 3 | Tove Alexandersson | Sweden | 96.84 | 91.02 | 7 |
+| 4 | Pia Young Vik | Norway | 96.15 | 72.66 | 7 |
+| 5 | Hanna Lundberg | Sweden | 93.44 | 84.02 | 8 |
+| 6 | Marie Olaussen | Norway | 93.07 | 88.63 | 13 |
+| 7 | Malin Agervig Kristiansson | Denmark | 92.98 | 58.48 | 2 |
 | 8 | Venla Harju | Finland | 92.02 | 85.09 | 4 |
 | 9 | Ida Haapala | Finland | 91.2 | 75.95 | 4 |
-| 10 | Lucie Dittrichová | Czechia | 90.72 | 81.63 | 7 |
-| 11 | Natalia Gemperle | Switzerland | 90.44 | 82.64 | 1 |
-| 12 | Veronika Kalinina | SWE | 90.33 | 88.36 | 6 |
-| 13 | Aleksandra Hornik | Poland | 89.58 | 77.3 | 3 |
-| 14 | Sara Hagström | Sweden | 89.4 | 95.38 | 5 |
-| 15 | Eeva-Liina Ojanaho | Finland | 89.28 | 92.26 | 8 |
-| 16 | Victoria Hæstad Bjørnstad | Norway | 88.81 | 76.75 | 11 |
-| 17 | Marika Teini | Finland | 88.78 | 91.88 | 5 |
-| 18 | Cecile Calandry | France | 88.67 | 56.43 | 4 |
-| 19 | Frida Vikström | Sweden | 88.57 | 87.82 | 9 |
+| 10 | Lucie Dittrichová | Czechia | 90.79 | 81.63 | 7 |
+| 11 | Veronika Kalinina | SWE | 90.49 | 88.36 | 6 |
+| 12 | Natalia Gemperle | Switzerland | 90.44 | 82.64 | 1 |
+| 13 | Aleksandra Hornik | Poland | 89.69 | 77.3 | 3 |
+| 14 | Sara Hagström | Sweden | 89.49 | 95.38 | 5 |
+| 15 | Eeva-Liina Ojanaho | Finland | 89.43 | 92.26 | 8 |
+| 16 | Victoria Hæstad Bjørnstad | Norway | 88.93 | 76.75 | 11 |
+| 17 | Marika Teini | Finland | 88.81 | 91.88 | 5 |
+| 18 | Frida Vikström | Sweden | 88.78 | 87.82 | 9 |
+| 19 | Cecile Calandry | France | 88.67 | 56.43 | 4 |
 | 20 | Tereza Rauturier | Czechia | 88.5 | 97.48 | 4 |
-| 21 | Alma Svennerud | Sweden | 88.24 | 76.33 | 12 |
-| 22 | Agnes Nørgård Kracht | Denmark | 88.2 | 79.56 | 4 |
+| 21 | Alma Svennerud | Sweden | 88.37 | 76.33 | 12 |
+| 22 | Agnes Nørgård Kracht | Denmark | 88.25 | 79.56 | 4 |
 | 23 | Maija Sianoja | Finland | 87.97 | 94.98 | 4 |
-| 24 | Kristin Melby Jacobsen | Norway | 87.84 | 70.68 | 3 |
+| 24 | Kristin Melby Jacobsen | Norway | 87.87 | 70.68 | 3 |
 | 25 | Inka Nurminen | Finland | 87.73 | 100.0 | 1 |
 
 ## Lopp
 
 | Datum | Tävling | Klass | Löpare | Justerad | c100 |
 | --- | --- | --- | --- | --- | --- |
-| 2026-02-27 | Sverigepremiären, natt | D18 | 10 | ja | 22:47 |
-| 2026-02-27 | Sverigepremiären, natt | D18 | 10 | ja | 23:08 |
-| 2026-02-27 | Sverigepremiären, natt | D20 | 3 | ja | 29:19 |
-| 2026-02-27 | Sverigepremiären, natt | D20 | 5 | ja | 27:15 |
-| 2026-02-27 | Sverigepremiären, natt | D21 | 3 | ja | 42:25 |
-| 2026-02-27 | Sverigepremiären, natt | H18 | 7 | ja | 24:33 |
-| 2026-02-27 | Sverigepremiären, natt | H18 | 6 | ja | 26:42 |
-| 2026-02-27 | Sverigepremiären, natt | H18 | 6 | ja | 26:28 |
-| 2026-02-27 | Sverigepremiären, natt | H18 | 4 | ja | 26:31 |
-| 2026-02-27 | Sverigepremiären, natt | H20 | 3 | ja | 33:59 |
-| 2026-02-27 | Sverigepremiären, natt | H20 | 4 | ja | 31:51 |
-| 2026-02-27 | Sverigepremiären, natt | H21 Kort | 5 | ja | 26:24 |
-| 2026-02-27 | Sverigepremiären, natt | H21 Kort | 5 | ja | 25:36 |
-| 2026-02-28 | Sverigepremiären, medel | D18 | 40 | ja | 18:30 |
-| 2026-02-28 | Sverigepremiären, medel | D20 | 31 | ja | 20:31 |
-| 2026-02-28 | Sverigepremiären, medel | D21 | 35 | ja | 25:50 |
-| 2026-02-28 | Sverigepremiären, medel | H18 | 48 | ja | 19:39 |
-| 2026-02-28 | Sverigepremiären, medel | H20 | 35 | ja | 21:04 |
-| 2026-02-28 | Sverigepremiären, medel | H21 | 66 | ja | 24:14 |
-| 2026-03-01 | Sverigepremiären, lång | D18 | 33 | ja | 28:30 |
-| 2026-03-01 | Sverigepremiären, lång | D20 | 20 | ja | 33:21 |
+| 2026-02-27 | Sverigepremiären, natt | D18 | 10 | ja | 22:39 |
+| 2026-02-27 | Sverigepremiären, natt | D18 | 10 | ja | 23:00 |
+| 2026-02-27 | Sverigepremiären, natt | D20 | 3 | ja | 29:10 |
+| 2026-02-27 | Sverigepremiären, natt | D20 | 5 | ja | 27:05 |
+| 2026-02-27 | Sverigepremiären, natt | D21 | 3 | ja | 42:33 |
+| 2026-02-27 | Sverigepremiären, natt | H18 | 7 | ja | 24:31 |
+| 2026-02-27 | Sverigepremiären, natt | H18 | 6 | ja | 26:38 |
+| 2026-02-27 | Sverigepremiären, natt | H18 | 6 | ja | 26:22 |
+| 2026-02-27 | Sverigepremiären, natt | H18 | 4 | ja | 26:28 |
+| 2026-02-27 | Sverigepremiären, natt | H20 | 3 | ja | 33:46 |
+| 2026-02-27 | Sverigepremiären, natt | H20 | 4 | ja | 31:36 |
+| 2026-02-27 | Sverigepremiären, natt | H21 Kort | 5 | ja | 26:25 |
+| 2026-02-27 | Sverigepremiären, natt | H21 Kort | 5 | ja | 25:47 |
+| 2026-02-28 | Sverigepremiären, medel | D18 | 40 | ja | 18:23 |
+| 2026-02-28 | Sverigepremiären, medel | D20 | 31 | ja | 20:24 |
+| 2026-02-28 | Sverigepremiären, medel | D21 | 35 | ja | 25:59 |
+| 2026-02-28 | Sverigepremiären, medel | H18 | 48 | ja | 19:38 |
+| 2026-02-28 | Sverigepremiären, medel | H20 | 35 | ja | 20:55 |
+| 2026-02-28 | Sverigepremiären, medel | H21 | 66 | ja | 24:15 |
+| 2026-03-01 | Sverigepremiären, lång | D18 | 33 | ja | 28:21 |
+| 2026-03-01 | Sverigepremiären, lång | D20 | 20 | ja | 33:09 |
 | 2026-03-01 | Sverigepremiären, lång | D21 | 15 | ja | 52:00 |
-| 2026-03-01 | Sverigepremiären, lång | D21 Kort | 6 | ja | 31:08 |
-| 2026-03-01 | Sverigepremiären, lång | H18 | 44 | ja | 32:44 |
-| 2026-03-01 | Sverigepremiären, lång | H20 | 27 | ja | 38:57 |
+| 2026-03-01 | Sverigepremiären, lång | D21 Kort | 6 | ja | 31:23 |
+| 2026-03-01 | Sverigepremiären, lång | H18 | 44 | ja | 32:41 |
+| 2026-03-01 | Sverigepremiären, lång | H20 | 27 | ja | 38:41 |
 | 2026-03-01 | Sverigepremiären, lång | H21 | 43 | ja | 55:23 |
-| 2026-03-01 | Sverigepremiären, lång | H21 Kort | 7 | ja | 29:44 |
-| 2026-03-07 | Hallandspremiären, medel | D18 | 23 | ja | 17:53 |
-| 2026-03-07 | Hallandspremiären, medel | D20 | 21 | ja | 20:07 |
-| 2026-03-07 | Hallandspremiären, medel | D21 | 48 | ja | 22:55 |
-| 2026-03-07 | Hallandspremiären, medel | H18 | 31 | ja | 19:50 |
-| 2026-03-07 | Hallandspremiären, medel | H20 | 21 | ja | 18:39 |
+| 2026-03-01 | Sverigepremiären, lång | H21 Kort | 7 | ja | 29:51 |
+| 2026-03-07 | Hallandspremiären, medel | D18 | 23 | ja | 17:51 |
+| 2026-03-07 | Hallandspremiären, medel | D20 | 21 | ja | 20:00 |
+| 2026-03-07 | Hallandspremiären, medel | D21 | 48 | ja | 23:01 |
+| 2026-03-07 | Hallandspremiären, medel | H18 | 31 | ja | 19:47 |
+| 2026-03-07 | Hallandspremiären, medel | H20 | 21 | ja | 18:29 |
 | 2026-03-07 | Hallandspremiären, medel | H21 | 91 | ja | 22:34 |
-| 2026-03-08 | Hallandspremiären, lång | D18 | 19 | ja | 23:24 |
-| 2026-03-08 | Hallandspremiären, lång | D20 | 20 | ja | 27:00 |
-| 2026-03-08 | Hallandspremiären, lång | D21 | 17 | ja | 37:51 |
-| 2026-03-08 | Hallandspremiären, lång | D21 Kort | 12 | ja | 25:01 |
-| 2026-03-08 | Hallandspremiären, lång | H18 | 22 | ja | 24:33 |
-| 2026-03-08 | Hallandspremiären, lång | H20 | 17 | ja | 28:12 |
-| 2026-03-08 | Hallandspremiären, lång | H21 | 53 | ja | 44:03 |
+| 2026-03-08 | Hallandspremiären, lång | D18 | 19 | ja | 23:16 |
+| 2026-03-08 | Hallandspremiären, lång | D20 | 20 | ja | 26:52 |
+| 2026-03-08 | Hallandspremiären, lång | D21 | 17 | ja | 38:04 |
+| 2026-03-08 | Hallandspremiären, lång | D21 Kort | 12 | ja | 25:08 |
+| 2026-03-08 | Hallandspremiären, lång | H18 | 22 | ja | 24:30 |
+| 2026-03-08 | Hallandspremiären, lång | H20 | 17 | ja | 27:57 |
+| 2026-03-08 | Hallandspremiären, lång | H21 | 53 | ja | 44:05 |
 | 2026-03-08 | Hallandspremiären, lång | H21 Kort | 3 | ja | 24:09 |
-| 2026-03-14 | Göteborgspremiären, medel | D18 | 27 | ja | 25:42 |
-| 2026-03-14 | Göteborgspremiären, medel | D18 | 3 | ja | 27:42 |
-| 2026-03-14 | Göteborgspremiären, medel | D20 | 16 | ja | 27:04 |
-| 2026-03-14 | Göteborgspremiären, medel | D21 | 56 | ja | 36:45 |
-| 2026-03-14 | Göteborgspremiären, medel | H18 | 38 | ja | 27:00 |
-| 2026-03-14 | Göteborgspremiären, medel | H18 | 3 | ja | 26:41 |
-| 2026-03-14 | Göteborgspremiären, medel | H20 | 15 | ja | 26:27 |
-| 2026-03-14 | Göteborgspremiären, medel | H21 | 99 | ja | 32:49 |
-| 2026-03-14 | Göteborgspremiären, medel | H21 | 7 | ja | 31:07 |
-| 2026-03-15 | Göteborgspremiären, lång | D18 | 12 | ja | 27:22 |
-| 2026-03-15 | Göteborgspremiären, lång | D20 | 4 | ja | 30:46 |
-| 2026-03-15 | Göteborgspremiären, lång | D21 | 13 | ja | 45:56 |
-| 2026-03-15 | Göteborgspremiären, lång | H18 | 17 | ja | 30:22 |
-| 2026-03-15 | Göteborgspremiären, lång | H18 | 3 | ja | 29:10 |
-| 2026-03-15 | Göteborgspremiären, lång | H18 | 4 | ja | 25:08 |
-| 2026-03-15 | Göteborgspremiären, lång | H20 | 7 | ja | 34:47 |
-| 2026-03-15 | Göteborgspremiären, lång | H21 | 36 | ja | 47:29 |
-| 2026-03-15 | Göteborgspremiären, lång | H21 | 3 | ja | 45:12 |
+| 2026-03-14 | Göteborgspremiären, medel | D18 | 27 | ja | 25:33 |
+| 2026-03-14 | Göteborgspremiären, medel | D18 | 3 | ja | 27:32 |
+| 2026-03-14 | Göteborgspremiären, medel | D20 | 16 | ja | 26:55 |
+| 2026-03-14 | Göteborgspremiären, medel | D21 | 56 | ja | 36:38 |
+| 2026-03-14 | Göteborgspremiären, medel | H18 | 38 | ja | 26:58 |
+| 2026-03-14 | Göteborgspremiären, medel | H18 | 3 | ja | 26:39 |
+| 2026-03-14 | Göteborgspremiären, medel | H20 | 15 | ja | 26:14 |
+| 2026-03-14 | Göteborgspremiären, medel | H21 | 99 | ja | 33:06 |
+| 2026-03-14 | Göteborgspremiären, medel | H21 | 7 | ja | 31:08 |
+| 2026-03-15 | Göteborgspremiären, lång | D18 | 12 | ja | 27:13 |
+| 2026-03-15 | Göteborgspremiären, lång | D20 | 4 | ja | 30:36 |
+| 2026-03-15 | Göteborgspremiären, lång | D21 | 13 | ja | 45:42 |
+| 2026-03-15 | Göteborgspremiären, lång | H18 | 17 | ja | 30:18 |
+| 2026-03-15 | Göteborgspremiären, lång | H18 | 3 | ja | 29:06 |
+| 2026-03-15 | Göteborgspremiären, lång | H18 | 4 | ja | 25:05 |
+| 2026-03-15 | Göteborgspremiären, lång | H20 | 7 | ja | 34:25 |
+| 2026-03-15 | Göteborgspremiären, lång | H21 | 36 | ja | 47:36 |
+| 2026-03-15 | Göteborgspremiären, lång | H21 | 3 | ja | 45:21 |
 | 2026-03-15 | Göteborgspremiären, lång | H21 Kort | 3 | ojusterad | 59:44 |
-| 2026-03-27 | Tibrotrippeln, natt | D18 | 3 | ja | 25:04 |
-| 2026-03-27 | Tibrotrippeln, natt | D20 | 6 | ja | 31:43 |
-| 2026-03-27 | Tibrotrippeln, natt | D21 | 19 | ja | 43:38 |
-| 2026-03-27 | Tibrotrippeln, natt | H18 | 7 | ja | 30:09 |
-| 2026-03-27 | Tibrotrippeln, natt | H20 | 8 | ja | 33:31 |
-| 2026-03-27 | Tibrotrippeln, natt | H21 | 35 | ja | 43:16 |
-| 2026-03-27 | Tibrotrippeln, natt | H21 | 32 | ja | 42:57 |
-| 2026-03-28 | Tibrotrippeln, medel | D18 | 10 | ja | 18:06 |
-| 2026-03-28 | Tibrotrippeln, medel | D20 | 10 | ja | 20:40 |
-| 2026-03-28 | Tibrotrippeln, medel | D21 | 28 | ja | 27:12 |
-| 2026-03-28 | Tibrotrippeln, medel | H18 | 13 | ja | 18:31 |
-| 2026-03-28 | Tibrotrippeln, medel | H20 | 6 | ja | 22:48 |
-| 2026-03-28 | Tibrotrippeln, medel | H21 | 88 | ja | 27:29 |
-| 2026-03-29 | Tibrotrippeln, lång | D18 | 7 | ja | 27:59 |
-| 2026-03-29 | Tibrotrippeln, lång | D20 | 8 | ja | 34:12 |
-| 2026-03-29 | Tibrotrippeln, lång | D21 | 22 | ja | 49:00 |
-| 2026-03-29 | Tibrotrippeln, lång | D21 Kort | 4 | ja | 31:44 |
-| 2026-03-29 | Tibrotrippeln, lång | H18 | 18 | ja | 29:37 |
-| 2026-03-29 | Tibrotrippeln, lång | H20 | 6 | ja | 37:24 |
-| 2026-03-29 | Tibrotrippeln, lång | H21 | 35 | ja | 52:06 |
-| 2026-03-29 | Tibrotrippeln, lång | H21 | 33 | ja | 51:25 |
+| 2026-03-27 | Tibrotrippeln, natt | D18 | 3 | ja | 24:55 |
+| 2026-03-27 | Tibrotrippeln, natt | D20 | 6 | ja | 31:32 |
+| 2026-03-27 | Tibrotrippeln, natt | D21 | 19 | ja | 43:35 |
+| 2026-03-27 | Tibrotrippeln, natt | H18 | 7 | ja | 30:05 |
+| 2026-03-27 | Tibrotrippeln, natt | H20 | 8 | ja | 33:18 |
+| 2026-03-27 | Tibrotrippeln, natt | H21 | 35 | ja | 43:22 |
+| 2026-03-27 | Tibrotrippeln, natt | H21 | 32 | ja | 42:59 |
+| 2026-03-28 | Tibrotrippeln, medel | D18 | 10 | ja | 18:01 |
+| 2026-03-28 | Tibrotrippeln, medel | D20 | 10 | ja | 20:34 |
+| 2026-03-28 | Tibrotrippeln, medel | D21 | 28 | ja | 27:13 |
+| 2026-03-28 | Tibrotrippeln, medel | H18 | 13 | ja | 18:29 |
+| 2026-03-28 | Tibrotrippeln, medel | H20 | 6 | ja | 22:38 |
+| 2026-03-28 | Tibrotrippeln, medel | H21 | 88 | ja | 27:30 |
+| 2026-03-29 | Tibrotrippeln, lång | D18 | 7 | ja | 27:48 |
+| 2026-03-29 | Tibrotrippeln, lång | D20 | 8 | ja | 34:00 |
+| 2026-03-29 | Tibrotrippeln, lång | D21 | 22 | ja | 49:06 |
+| 2026-03-29 | Tibrotrippeln, lång | D21 Kort | 4 | ja | 32:03 |
+| 2026-03-29 | Tibrotrippeln, lång | H18 | 18 | ja | 29:33 |
+| 2026-03-29 | Tibrotrippeln, lång | H20 | 6 | ja | 37:10 |
+| 2026-03-29 | Tibrotrippeln, lång | H21 | 35 | ja | 52:10 |
+| 2026-03-29 | Tibrotrippeln, lång | H21 | 33 | ja | 51:28 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 | 4 | ojusterad | -52:46 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 5 | ja | 19:20 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 36 | ja | 19:00 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 5 | ja | 19:54 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 6 | ja | 19:33 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 5 | ja | 20:09 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit-2 | 4 | ja | 18:10 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 5 | ja | 19:13 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 36 | ja | 18:53 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 5 | ja | 19:46 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 6 | ja | 19:26 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit | 5 | ja | 20:01 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D18 Elit-2 | 4 | ja | 18:03 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D20 Elit | 29 | ja | 23:45 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D20 Elit | 7 | ja | 23:16 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D20 Elit | 3 | ja | 23:19 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D20 Elit | 3 | ja | 25:31 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D20 Elit | 7 | ja | 23:08 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D20 Elit | 3 | ja | 23:11 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D20 Elit | 3 | ja | 25:22 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D21 | 13 | ja | 24:23 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D21 | 10 | ja | 23:50 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H18 Elit | 36 | ja | 20:57 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H18 Elit | 8 | ja | 20:47 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H18 Elit | 4 | ja | 20:23 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | D21 | 10 | ja | 23:45 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H18 Elit | 36 | ja | 20:55 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H18 Elit | 8 | ja | 20:46 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H18 Elit | 4 | ja | 20:21 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H18 Elit-2 | 20 | ja | 19:35 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 3 | ja | 22:15 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 41 | ja | 24:00 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 5 | ja | 24:15 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 7 | ja | 23:40 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 7 | ja | 24:58 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 3 | ja | 22:03 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 41 | ja | 23:52 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 5 | ja | 24:07 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 7 | ja | 23:30 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit | 7 | ja | 24:49 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H20 Elit-2 | 9 | ja | -6:01 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | H21 | 25 | ja | -8:04 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E | 50 | ja | 31:38 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E | 3 | ja | 31:35 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E | 50 | ja | 31:40 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E | 3 | ja | 31:43 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E | 3 | ojusterad | 38:35 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-2 | 18 | ja | 28:25 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-2 | 7 | ja | 28:03 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-2 | 10 | ja | 29:12 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-2 | 3 | ja | 28:06 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-2 | 18 | ja | 28:29 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-2 | 7 | ja | 28:08 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-2 | 10 | ja | 29:15 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-2 | 3 | ja | 28:08 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-2 | 3 | ojusterad | 35:53 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-3 | 25 | ja | 29:28 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-3 | 3 | ja | 29:37 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-3 | 3 | ja | 29:44 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-3 | 3 | ojusterad | 36:49 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-3 | 4 | ja | 30:19 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-3 | 6 | ja | 29:13 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-3 | 4 | ja | 30:35 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-3 | 6 | ja | 29:14 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | M21E-4 | 38 | ja | 29:39 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 5 | ja | 31:33 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 3 | ja | 32:57 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 12 | ja | 33:37 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 7 | ja | 33:48 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 3 | ja | 32:36 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 3 | ja | 35:57 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E-2 | 22 | ja | 28:49 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 5 | ja | 31:35 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 3 | ja | 33:00 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 12 | ja | 33:42 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 7 | ja | 33:49 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 3 | ja | 32:40 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E | 3 | ja | 36:04 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E-2 | 22 | ja | 28:55 |
 | 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E-2 | 16 | ja | 29:59 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E-2 | 3 | ja | 28:18 |
-| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E-2 | 5 | ja | 32:19 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 39 | ja | 34:12 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 4 | ja | 34:28 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 3 | ja | 32:45 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 6 | ja | 35:24 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 5 | ja | 37:01 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D20 | 26 | ja | 49:37 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D20 | 4 | ja | 52:14 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D21 | 20 | ja | 67:52 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D21 | 4 | ja | 69:52 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | D21 | 5 | ja | 67:17 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H18 | 31 | ja | 39:42 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H18 | 35 | ja | 40:01 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H18 | 3 | ja | 35:32 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H18 | 3 | ja | 39:14 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E-2 | 3 | ja | 28:22 |
+| 2026-04-05 | Kolmårdsmedeln (Swedish League, #2, WRE) | W21E-2 | 5 | ja | 32:18 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 39 | ja | 33:59 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 4 | ja | 34:15 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 3 | ja | 32:32 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 6 | ja | 35:14 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D18 | 5 | ja | 36:47 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D20 | 26 | ja | 49:20 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D20 | 4 | ja | 51:56 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D21 | 20 | ja | 68:06 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D21 | 4 | ja | 67:42 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | D21 | 5 | ja | 67:26 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H18 | 31 | ja | 39:38 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H18 | 35 | ja | 39:56 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H18 | 3 | ja | 35:27 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H18 | 3 | ja | 39:09 |
 | 2026-04-10 | SM, natt (Swedish League, #3) | H18 | 3 | ojusterad | 61:41 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H20 | 41 | ja | 52:40 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H20 | 41 | ja | 52:21 |
 | 2026-04-10 | SM, natt (Swedish League, #3) | H20 | 3 | ojusterad | 66:54 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H20 | 3 | ja | 51:36 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 31 | ja | 75:01 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 4 | ja | 72:07 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 39 | ja | 75:24 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 3 | ja | 78:50 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 6 | ja | 76:26 |
-| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 3 | ja | 73:10 |
-| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | D20E SVE | 61 | ja | 19:10 |
-| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | D21 | 25 | ja | 21:42 |
-| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | H20E SVE | 70 | ja | 22:09 |
-| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | H20E SVE | 4 | ja | 21:50 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H20 | 3 | ja | 51:16 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 31 | ja | 75:05 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 4 | ja | 72:11 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 39 | ja | 75:41 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 3 | ja | 78:53 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 6 | ja | 76:28 |
+| 2026-04-10 | SM, natt (Swedish League, #3) | H21 | 3 | ja | 73:14 |
+| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | D20E SVE | 61 | ja | 19:02 |
+| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | D21 | 25 | ja | 21:40 |
+| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | H20E SVE | 70 | ja | 22:00 |
+| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | H20E SVE | 4 | ja | 21:48 |
 | 2026-04-18 | Vilselöpet, medel + JVM-test, medel | H21 | 37 | ja | 23:02 |
-| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | M20E UTL | 26 | ja | 20:58 |
-| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | W20E UTL | 15 | ja | 18:54 |
-| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | D20E SVE | 46 | ja | 49:14 |
-| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | D21 | 8 | ja | 51:32 |
-| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | H20E SVE | 62 | ja | 56:35 |
-| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | H21 | 16 | ja | 58:38 |
-| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | M20E UTL | 21 | ja | 58:44 |
-| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | W20E UTL | 15 | ja | 49:33 |
-| 2026-05-14 | JVM-test, lång (D/H20) + Testtävling, medel (D/H21) | D20 | 57 | ja | 50:03 |
-| 2026-05-14 | JVM-test, lång (D/H20) + Testtävling, medel (D/H21) | D21 | 29 | ja | 30:22 |
-| 2026-05-14 | JVM-test, lång (D/H20) + Testtävling, medel (D/H21) | H20 | 69 | ja | 56:35 |
-| 2026-05-14 | JVM-test, lång (D/H20) + Testtävling, medel (D/H21) | H21 | 59 | ja | 31:18 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | D18E | 14 | ja | 19:55 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | D20E | 3 | ja | 21:23 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | H18E | 16 | ja | 17:53 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | H18E | 3 | ja | 17:22 |
+| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | M20E UTL | 26 | ja | 20:52 |
+| 2026-04-18 | Vilselöpet, medel + JVM-test, medel | W20E UTL | 15 | ja | 18:14 |
+| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | D20E SVE | 46 | ja | 48:57 |
+| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | D21 | 8 | ja | 51:42 |
+| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | H20E SVE | 62 | ja | 56:24 |
+| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | H21 | 16 | ja | 58:43 |
+| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | M20E UTL | 21 | ja | 58:27 |
+| 2026-04-19 | Vilselöpet, lång + JVM-test, lång | W20E UTL | 15 | ja | 47:49 |
+| 2026-05-14 | JVM-test, lång (D/H20) + Testtävling, medel (D/H21) | D20 | 57 | ja | 49:44 |
+| 2026-05-14 | JVM-test, lång (D/H20) + Testtävling, medel (D/H21) | D21 | 29 | ja | 30:24 |
+| 2026-05-14 | JVM-test, lång (D/H20) + Testtävling, medel (D/H21) | H20 | 69 | ja | 56:29 |
+| 2026-05-14 | JVM-test, lång (D/H20) + Testtävling, medel (D/H21) | H21 | 59 | ja | 31:20 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | D18E | 14 | ja | 19:47 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | D20E | 3 | ja | 21:16 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | H18E | 16 | ja | 17:50 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | H18E | 3 | ja | 17:21 |
 | 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | H20E | 7 | ja | 23:07 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E | 4 | ja | 29:53 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E | 38 | ja | 30:28 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E | 3 | ja | 29:55 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E | 4 | ja | 29:55 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E | 38 | ja | 30:30 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E | 3 | ja | 29:57 |
 | 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E | 4 | ojusterad | 35:14 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E-2 | 38 | ja | 27:37 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E-2 | 5 | ja | 28:07 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E-2 | 38 | ja | 27:40 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E-2 | 5 | ja | 28:13 |
 | 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E-2 | 5 | ja | 29:53 |
 | 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | M21E-2 | 3 | ojusterad | 35:01 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | W21E | 30 | ja | 32:03 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | W21E | 30 | ja | 32:04 |
 | 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | W21E | 4 | ojusterad | 37:25 |
-| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | W21E | 5 | ja | 31:24 |
-| 2026-07-20 | O-Ringen E1, Long | D18 | 117 | ja | 36:04 |
-| 2026-07-20 | O-Ringen E1, Long | D20 | 117 | ja | 47:46 |
-| 2026-07-20 | O-Ringen E1, Long | D21 | 135 | ja | 54:26 |
-| 2026-07-20 | O-Ringen E1, Long | D21 Elit | 67 | ja | 84:06 |
-| 2026-07-20 | O-Ringen E1, Long | D21Kort | 108 | ja | 35:38 |
-| 2026-07-20 | O-Ringen E1, Long | D21Kort2 | 105 | ja | 35:15 |
-| 2026-07-20 | O-Ringen E1, Long | D21Lang | 16 | ja | 52:59 |
-| 2026-07-20 | O-Ringen E1, Long | H18 | 116 | ja | 37:55 |
-| 2026-07-20 | O-Ringen E1, Long | H20 | 107 | ja | 57:05 |
-| 2026-07-20 | O-Ringen E1, Long | H21 | 226 | ja | 50:46 |
-| 2026-07-20 | O-Ringen E1, Long | H21 Elit | 73 | ja | 82:53 |
-| 2026-07-20 | O-Ringen E1, Long | H21Kort | 124 | ja | 35:47 |
-| 2026-07-20 | O-Ringen E1, Long | H21Kort2 | 129 | ja | 34:58 |
-| 2026-07-20 | O-Ringen E1, Long | H21Lang | 124 | ja | 70:03 |
-| 2026-07-21 | O-Ringen E2, Long | D18 | 113 | ja | 40:38 |
-| 2026-07-21 | O-Ringen E2, Long | D20 | 106 | ja | 62:05 |
-| 2026-07-21 | O-Ringen E2, Long | D21 | 124 | ja | 66:42 |
-| 2026-07-21 | O-Ringen E2, Long | D21 Elit | 65 | ja | 88:46 |
-| 2026-07-21 | O-Ringen E2, Long | D21Kort | 105 | ja | 41:48 |
-| 2026-07-21 | O-Ringen E2, Long | D21Kort2 | 100 | ja | 41:49 |
-| 2026-07-21 | O-Ringen E2, Long | D21Lang | 16 | ja | 68:47 |
-| 2026-07-21 | O-Ringen E2, Long | H18 | 113 | ja | 46:02 |
-| 2026-07-21 | O-Ringen E2, Long | H20 | 88 | ja | 68:31 |
-| 2026-07-21 | O-Ringen E2, Long | H21 | 207 | ja | 67:07 |
-| 2026-07-21 | O-Ringen E2, Long | H21 Elit | 62 | ja | 89:21 |
-| 2026-07-21 | O-Ringen E2, Long | H21Kort | 122 | ja | 40:50 |
-| 2026-07-21 | O-Ringen E2, Long | H21Kort2 | 122 | ja | 40:02 |
-| 2026-07-21 | O-Ringen E2, Long | H21Lang | 116 | ja | 78:06 |
-| 2026-07-23 | O-Ringen E3, Middle | D21 | 140 | ja | 19:17 |
-| 2026-07-23 | O-Ringen E3, Middle | D21Kort | 111 | ja | 19:11 |
-| 2026-07-23 | O-Ringen E3, Middle | D21Kort2 | 107 | ja | 19:09 |
-| 2026-07-23 | O-Ringen E3, Middle | D21Lang | 19 | ja | 19:35 |
+| 2026-06-06 | Swedish League, #5, medel (WRE) + D/H18-20, medel (ej SL/WRE) | W21E | 5 | ja | 31:30 |
+| 2026-07-20 | O-Ringen E1, Long | D18 | 117 | ja | 35:50 |
+| 2026-07-20 | O-Ringen E1, Long | D20 | 117 | ja | 47:29 |
+| 2026-07-20 | O-Ringen E1, Long | D21 | 135 | ja | 54:38 |
+| 2026-07-20 | O-Ringen E1, Long | D21 Elit | 67 | ja | 84:14 |
+| 2026-07-20 | O-Ringen E1, Long | D21Kort | 108 | ja | 36:02 |
+| 2026-07-20 | O-Ringen E1, Long | D21Kort2 | 105 | ja | 35:37 |
+| 2026-07-20 | O-Ringen E1, Long | D21Lang | 16 | ja | 52:57 |
+| 2026-07-20 | O-Ringen E1, Long | H18 | 116 | ja | 37:51 |
+| 2026-07-20 | O-Ringen E1, Long | H20 | 107 | ja | 56:45 |
+| 2026-07-20 | O-Ringen E1, Long | H21 | 226 | ja | 50:49 |
+| 2026-07-20 | O-Ringen E1, Long | H21 Elit | 73 | ja | 82:55 |
+| 2026-07-20 | O-Ringen E1, Long | H21Kort | 124 | ja | 35:58 |
+| 2026-07-20 | O-Ringen E1, Long | H21Kort2 | 129 | ja | 35:06 |
+| 2026-07-20 | O-Ringen E1, Long | H21Lang | 124 | ja | 70:08 |
+| 2026-07-21 | O-Ringen E2, Long | D18 | 113 | ja | 40:22 |
+| 2026-07-21 | O-Ringen E2, Long | D20 | 106 | ja | 61:45 |
+| 2026-07-21 | O-Ringen E2, Long | D21 | 124 | ja | 66:53 |
+| 2026-07-21 | O-Ringen E2, Long | D21 Elit | 65 | ja | 88:55 |
+| 2026-07-21 | O-Ringen E2, Long | D21Kort | 105 | ja | 42:16 |
+| 2026-07-21 | O-Ringen E2, Long | D21Kort2 | 100 | ja | 42:17 |
+| 2026-07-21 | O-Ringen E2, Long | D21Lang | 16 | ja | 68:46 |
+| 2026-07-21 | O-Ringen E2, Long | H18 | 113 | ja | 45:59 |
+| 2026-07-21 | O-Ringen E2, Long | H20 | 88 | ja | 68:05 |
+| 2026-07-21 | O-Ringen E2, Long | H21 | 207 | ja | 67:09 |
+| 2026-07-21 | O-Ringen E2, Long | H21 Elit | 62 | ja | 89:23 |
+| 2026-07-21 | O-Ringen E2, Long | H21Kort | 122 | ja | 41:03 |
+| 2026-07-21 | O-Ringen E2, Long | H21Kort2 | 122 | ja | 40:09 |
+| 2026-07-21 | O-Ringen E2, Long | H21Lang | 116 | ja | 78:13 |
+| 2026-07-23 | O-Ringen E3, Middle | D21 | 140 | ja | 19:20 |
+| 2026-07-23 | O-Ringen E3, Middle | D21Kort | 111 | ja | 19:24 |
+| 2026-07-23 | O-Ringen E3, Middle | D21Kort2 | 107 | ja | 19:22 |
+| 2026-07-23 | O-Ringen E3, Middle | D21Lang | 19 | ja | 19:34 |
 | 2026-07-23 | O-Ringen E3, Middle | H21 | 222 | ja | 18:56 |
-| 2026-07-23 | O-Ringen E3, Middle | H21Kort | 132 | ja | 18:28 |
-| 2026-07-23 | O-Ringen E3, Middle | H21Kort2 | 126 | ja | 18:25 |
-| 2026-07-23 | O-Ringen E3, Middle | H21Lang | 129 | ja | 20:55 |
-| 2026-07-24 | O-Ringen E4, Middle | D18 | 116 | ja | 21:20 |
-| 2026-07-24 | O-Ringen E4, Middle | D20 | 110 | ja | 23:02 |
-| 2026-07-24 | O-Ringen E4, Middle | D21 | 135 | ja | 26:43 |
-| 2026-07-24 | O-Ringen E4, Middle | D21 Elit | 69 | ja | 30:48 |
-| 2026-07-24 | O-Ringen E4, Middle | D21Kort | 105 | ja | 25:18 |
-| 2026-07-24 | O-Ringen E4, Middle | D21Kort2 | 101 | ja | 25:37 |
-| 2026-07-24 | O-Ringen E4, Middle | D21Lang | 18 | ja | 27:17 |
-| 2026-07-24 | O-Ringen E4, Middle | H18 | 113 | ja | 22:11 |
-| 2026-07-24 | O-Ringen E4, Middle | H20 | 111 | ja | 26:16 |
-| 2026-07-24 | O-Ringen E4, Middle | H21 | 220 | ja | 28:24 |
-| 2026-07-24 | O-Ringen E4, Middle | H21 Elit | 71 | ja | 31:20 |
-| 2026-07-24 | O-Ringen E4, Middle | H21Kort | 130 | ja | 24:51 |
-| 2026-07-24 | O-Ringen E4, Middle | H21Kort2 | 129 | ja | 22:43 |
-| 2026-07-24 | O-Ringen E4, Middle | H21Lang | 126 | ja | 29:36 |
+| 2026-07-23 | O-Ringen E3, Middle | H21Kort | 132 | ja | 18:34 |
+| 2026-07-23 | O-Ringen E3, Middle | H21Kort2 | 126 | ja | 18:29 |
+| 2026-07-23 | O-Ringen E3, Middle | H21Lang | 129 | ja | 20:57 |
+| 2026-07-24 | O-Ringen E4, Middle | D18 | 116 | ja | 21:12 |
+| 2026-07-24 | O-Ringen E4, Middle | D20 | 110 | ja | 22:55 |
+| 2026-07-24 | O-Ringen E4, Middle | D21 | 135 | ja | 26:47 |
+| 2026-07-24 | O-Ringen E4, Middle | D21 Elit | 69 | ja | 30:51 |
+| 2026-07-24 | O-Ringen E4, Middle | D21Kort | 105 | ja | 25:37 |
+| 2026-07-24 | O-Ringen E4, Middle | D21Kort2 | 101 | ja | 25:53 |
+| 2026-07-24 | O-Ringen E4, Middle | D21Lang | 18 | ja | 27:16 |
+| 2026-07-24 | O-Ringen E4, Middle | H18 | 113 | ja | 22:09 |
+| 2026-07-24 | O-Ringen E4, Middle | H20 | 111 | ja | 26:07 |
+| 2026-07-24 | O-Ringen E4, Middle | H21 | 220 | ja | 28:25 |
+| 2026-07-24 | O-Ringen E4, Middle | H21 Elit | 71 | ja | 31:22 |
+| 2026-07-24 | O-Ringen E4, Middle | H21Kort | 130 | ja | 24:59 |
+| 2026-07-24 | O-Ringen E4, Middle | H21Kort2 | 129 | ja | 22:45 |
+| 2026-07-24 | O-Ringen E4, Middle | H21Lang | 126 | ja | 29:39 |
 | 2026-08-06 | World Cup Long | D21 | 59 | ankare | 95:32 |
 | 2026-08-06 | World Cup Long | H21 | 55 | ankare | 94:56 |
-| 2026-08-08 | Götalandsmästerskapen, lång | D18 | 8 | ja | 23:15 |
-| 2026-08-08 | Götalandsmästerskapen, lång | D20 | 3 | ja | 27:14 |
-| 2026-08-08 | Götalandsmästerskapen, lång | H18 | 15 | ja | 21:09 |
-| 2026-08-08 | Götalandsmästerskapen, lång | H18 | 4 | ja | 21:13 |
+| 2026-08-08 | Götalandsmästerskapen, lång | D18 | 8 | ja | 23:06 |
+| 2026-08-08 | Götalandsmästerskapen, lång | D20 | 3 | ja | 27:04 |
+| 2026-08-08 | Götalandsmästerskapen, lång | H18 | 15 | ja | 21:07 |
+| 2026-08-08 | Götalandsmästerskapen, lång | H18 | 4 | ja | 21:10 |
 | 2026-08-08 | Götalandsmästerskapen, lång | H20 | 3 | ojusterad | 36:50 |
-| 2026-08-08 | Norrlandsmästerskapen, lång | D18 | 5 | ja | 33:50 |
-| 2026-08-08 | Norrlandsmästerskapen, lång | D21 | 4 | ja | 58:27 |
-| 2026-08-08 | Norrlandsmästerskapen, lång | H18 | 5 | ja | 36:17 |
-| 2026-08-08 | Norrlandsmästerskapen, lång | H20 | 4 | ja | 48:12 |
-| 2026-08-08 | Norrlandsmästerskapen, lång | H21 | 17 | ja | 66:49 |
+| 2026-08-08 | Norrlandsmästerskapen, lång | D18 | 5 | ja | 33:49 |
+| 2026-08-08 | Norrlandsmästerskapen, lång | D21 | 4 | ja | 58:23 |
+| 2026-08-08 | Norrlandsmästerskapen, lång | H18 | 5 | ja | 36:14 |
+| 2026-08-08 | Norrlandsmästerskapen, lång | H20 | 4 | ja | 47:49 |
+| 2026-08-08 | Norrlandsmästerskapen, lång | H21 | 17 | ja | 66:45 |
 | 2026-08-08 | World Cup Middle | D21 | 70 | ankare | 31:22 |
 | 2026-08-08 | World Cup Middle | H21 | 71 | ankare | 31:51 |
 | 2026-08-09 | Norrlandsmästerskapen, medel | D18 | 7 | ja | 20:31 |
-| 2026-08-09 | Norrlandsmästerskapen, medel | D20 | 3 | ja | 24:34 |
-| 2026-08-09 | Norrlandsmästerskapen, medel | D21 | 10 | ja | 27:54 |
+| 2026-08-09 | Norrlandsmästerskapen, medel | D20 | 3 | ja | 24:26 |
+| 2026-08-09 | Norrlandsmästerskapen, medel | D21 | 10 | ja | 28:07 |
 | 2026-08-09 | Norrlandsmästerskapen, medel | H18 | 11 | ja | 20:31 |
-| 2026-08-09 | Norrlandsmästerskapen, medel | H20 | 3 | ja | 22:54 |
+| 2026-08-09 | Norrlandsmästerskapen, medel | H20 | 3 | ja | 22:44 |
 | 2026-08-09 | Norrlandsmästerskapen, medel | H21 | 20 | ja | 27:53 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D18-1 | 3 | ja | 18:14 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D18-1 | 5 | ja | 17:16 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D18-2 | 16 | ja | 17:32 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D18-3 | 3 | ja | 17:02 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D18-3 | 12 | ja | 17:23 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D18-4 | 13 | ja | 17:35 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D20-1 | 21 | ja | 20:11 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D20-2 | 5 | ja | 18:54 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D20-2 | 14 | ja | 19:15 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D21-1 | 19 | ja | 26:24 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D21-2 | 12 | ja | 25:44 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D21-3 | 17 | ja | 26:05 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | D21-4 | 9 | ja | 26:08 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H18-1 | 6 | ja | 19:29 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H18-2 | 6 | ja | 20:17 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H18-3 | 3 | ja | 20:05 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H18-3 | 9 | ja | 20:21 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H18-3 | 3 | ja | 20:09 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H18-4 | 12 | ja | 19:34 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H18-4 | 4 | ja | 19:25 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H18-5 | 7 | ja | 19:32 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H18-5 | 5 | ja | 18:45 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H20-1 | 12 | ja | 22:43 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H20-2 | 13 | ja | 21:47 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H20-3 | 3 | ja | 22:40 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H20-3 | 9 | ja | 22:10 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-1 | 14 | ja | 26:45 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-1 | 4 | ja | 26:27 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-2 | 5 | ja | 25:55 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-2 | 13 | ja | 25:37 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-2 | 3 | ja | 27:17 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-3 | 22 | ja | 26:26 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-4 | 5 | ja | 19:13 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-4 | 3 | ja | 26:32 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-4 | 16 | ja | 25:55 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-5 | 3 | ja | 27:00 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-5 | 7 | ja | 27:15 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-6 | 21 | ja | 26:39 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-6 | 7 | ja | 26:00 |
-| 2026-08-21 | SM, medel (Swedish League, #6) | H21-6 | 3 | ja | 27:48 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D18 A-Final | 25 | ja | 20:57 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D18 B-Final | 4 | ja | 19:22 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D18 B-Final | 23 | ja | 19:59 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D18 C-Final | 17 | ja | 15:20 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D20 A-Final | 15 | ja | 23:46 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D20 A-Final | 4 | ja | 23:32 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D20 B-Final | 17 | ja | 21:08 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D21 A-Final | 30 | ja | 35:33 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D21 B-Final | 23 | ja | 35:00 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D21 B-Final | 3 | ja | 33:32 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D18-1 | 3 | ja | 18:07 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D18-1 | 5 | ja | 17:09 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D18-2 | 16 | ja | 17:25 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D18-3 | 3 | ja | 16:55 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D18-3 | 12 | ja | 17:16 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D18-4 | 13 | ja | 17:28 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D20-1 | 21 | ja | 20:03 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D20-2 | 5 | ja | 18:48 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D20-2 | 14 | ja | 19:09 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D21-1 | 19 | ja | 26:32 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D21-2 | 12 | ja | 25:47 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D21-3 | 17 | ja | 26:09 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | D21-4 | 9 | ja | 26:11 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H18-1 | 6 | ja | 19:27 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H18-2 | 6 | ja | 20:15 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H18-3 | 3 | ja | 20:03 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H18-3 | 9 | ja | 20:20 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H18-3 | 3 | ja | 20:07 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H18-4 | 12 | ja | 19:33 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H18-4 | 4 | ja | 19:22 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H18-5 | 7 | ja | 19:30 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H18-5 | 5 | ja | 18:43 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H20-1 | 12 | ja | 22:33 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H20-2 | 13 | ja | 21:41 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H20-3 | 3 | ja | 22:31 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H20-3 | 9 | ja | 21:59 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-1 | 14 | ja | 26:47 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-1 | 4 | ja | 26:29 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-2 | 5 | ja | 25:57 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-2 | 13 | ja | 25:40 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-2 | 3 | ja | 27:23 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-3 | 22 | ja | 26:27 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-4 | 5 | ja | 19:15 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-4 | 3 | ja | 26:35 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-4 | 16 | ja | 25:56 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-5 | 3 | ja | 27:01 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-5 | 7 | ja | 27:17 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-6 | 21 | ja | 26:40 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-6 | 7 | ja | 26:03 |
+| 2026-08-21 | SM, medel (Swedish League, #6) | H21-6 | 3 | ja | 27:50 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D18 A-Final | 25 | ja | 20:49 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D18 B-Final | 4 | ja | 19:15 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D18 B-Final | 23 | ja | 19:51 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D18 C-Final | 17 | ja | 15:17 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D20 A-Final | 15 | ja | 23:38 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D20 A-Final | 4 | ja | 23:27 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D20 B-Final | 17 | ja | 21:01 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D21 A-Final | 30 | ja | 35:36 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D21 B-Final | 23 | ja | 35:15 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D21 B-Final | 3 | ja | 33:36 |
 | 2026-08-22 | SM, medel (Swedish League, #6) | D21 B-Final | 3 | ojusterad | 50:02 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | D21 C-Final | 21 | ja | 29:54 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H18 A-Final | 18 | ja | 23:15 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H18 A-Final | 3 | ja | 22:33 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H18 B-Final | 19 | ja | 21:42 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | D21 C-Final | 21 | ja | 29:59 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H18 A-Final | 18 | ja | 23:12 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H18 A-Final | 3 | ja | 22:31 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H18 B-Final | 19 | ja | 21:40 |
 | 2026-08-22 | SM, medel (Swedish League, #6) | H18 B-Final | 5 | ja | 22:05 |
 | 2026-08-22 | SM, medel (Swedish League, #6) | H18 B-Final | 3 | ojusterad | 33:26 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H18 C-Final | 19 | ja | 19:43 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H18 C-Final | 4 | ja | 19:54 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H18 C-Final | 4 | ja | 20:33 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H18 D-Final | 9 | ja | 20:46 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H18 D-Final | 3 | ja | 21:05 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H20 A-Final | 28 | ja | 30:17 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H20 B-Final | 24 | ja | 28:15 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H21 A-Final | 39 | ja | 35:41 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H21 B-Final | 28 | ja | 31:37 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H21 C-Final | 21 | ja | 30:31 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H21 C-Final | 7 | ja | 30:52 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H21 D-Final | 35 | ja | 27:09 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H21 E-Final | 23 | ja | 26:42 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H21 E-Final | 3 | ja | 28:28 |
-| 2026-08-22 | SM, medel (Swedish League, #6) | H21 F-Final | 3 | ja | 28:54 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | D18-1 | 31 | ja | 33:36 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | D18-2 | 30 | ja | 32:47 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | D18-3 | 28 | ja | 33:53 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | D20-1 | 21 | ja | 45:57 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | D20-2 | 22 | ja | 46:20 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | D21-1 | 26 | ja | 51:56 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | D21-2 | 27 | ja | 54:10 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | H18-1 | 31 | ja | 40:11 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | H18-2 | 32 | ja | 38:01 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | H18-3 | 31 | ja | 38:14 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | H18-4 | 29 | ja | 39:03 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | H20-1 | 36 | ja | 46:50 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | H20-2 | 29 | ja | 46:31 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | H21-1 | 34 | ja | 53:55 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | H21-2 | 31 | ja | 54:11 |
-| 2026-09-12 | SM, lång (Swedish League, #7) | H21-3 | 32 | ja | 54:49 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | D18A | 43 | ja | 41:07 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | D18B | 37 | ja | 35:41 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | D20A | 19 | ja | 62:47 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | D20A | 19 | ja | 62:55 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | D20B | 4 | ja | 53:12 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | D21A | 18 | ja | 87:09 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | D21A | 20 | ja | 86:37 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | D21B | 9 | ja | 79:22 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H18A | 41 | ja | 42:39 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H18B | 35 | ja | 44:13 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H18C | 40 | ja | 44:27 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H20A | 20 | ja | 63:42 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H20A | 21 | ja | 63:42 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H20B | 17 | ja | 61:53 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H21A | 21 | ja | 85:39 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H21A | 20 | ja | 84:56 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H21B | 33 | ja | 78:35 |
-| 2026-09-13 | SM, lång (Swedish League, #7) | H21C | 10 | ja | 72:49 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H18 C-Final | 19 | ja | 19:42 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H18 C-Final | 4 | ja | 19:53 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H18 C-Final | 4 | ja | 20:31 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H18 D-Final | 9 | ja | 20:44 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H18 D-Final | 3 | ja | 21:02 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H20 A-Final | 28 | ja | 30:06 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H20 B-Final | 24 | ja | 28:00 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H21 A-Final | 39 | ja | 35:42 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H21 B-Final | 28 | ja | 31:39 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H21 C-Final | 21 | ja | 30:32 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H21 C-Final | 7 | ja | 30:54 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H21 D-Final | 35 | ja | 27:10 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H21 E-Final | 23 | ja | 26:43 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H21 E-Final | 3 | ja | 28:29 |
+| 2026-08-22 | SM, medel (Swedish League, #6) | H21 F-Final | 3 | ja | 28:56 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | D18-1 | 31 | ja | 33:24 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | D18-2 | 30 | ja | 32:35 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | D18-3 | 28 | ja | 33:40 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | D20-1 | 21 | ja | 45:41 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | D20-2 | 22 | ja | 46:04 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | D21-1 | 26 | ja | 52:03 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | D21-2 | 27 | ja | 54:15 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | H18-1 | 31 | ja | 40:06 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | H18-2 | 32 | ja | 37:56 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | H18-3 | 31 | ja | 38:09 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | H18-4 | 29 | ja | 39:00 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | H20-1 | 36 | ja | 46:33 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | H20-2 | 29 | ja | 46:15 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | H21-1 | 34 | ja | 53:59 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | H21-2 | 31 | ja | 54:14 |
+| 2026-09-12 | SM, lång (Swedish League, #7) | H21-3 | 32 | ja | 54:52 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | D18A | 43 | ja | 40:51 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | D18B | 37 | ja | 35:27 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | D20A | 19 | ja | 62:22 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | D20A | 19 | ja | 62:33 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | D20B | 4 | ja | 52:54 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | D21A | 18 | ja | 87:16 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | D21A | 20 | ja | 86:46 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | D21B | 9 | ja | 79:38 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H18A | 41 | ja | 42:34 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H18B | 35 | ja | 44:09 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H18C | 40 | ja | 44:22 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H20A | 20 | ja | 63:15 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H20A | 21 | ja | 63:19 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H20B | 17 | ja | 61:22 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H21A | 21 | ja | 85:43 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H21A | 20 | ja | 85:03 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H21B | 33 | ja | 78:39 |
+| 2026-09-13 | SM, lång (Swedish League, #7) | H21C | 10 | ja | 72:54 |
 | 2026-09-24 | European Championships Long | D21 | 54 | ankare | 89:40 |
 | 2026-09-24 | European Championships Long | H21 | 56 | ankare | 94:03 |
 | 2026-09-26 | European Championships Middle | D21 | 70 | ankare | 32:38 |
 | 2026-09-26 | European Championships Middle | H21 | 73 | ankare | 32:56 |
 | 2026-10-11 | 25mannamedeln (WRE) | D18 | 22 | ja | 19:00 |
-| 2026-10-11 | 25mannamedeln (WRE) | D18E-1 | 78 | ja | 21:25 |
-| 2026-10-11 | 25mannamedeln (WRE) | D18E-2 | 14 | ja | 22:58 |
+| 2026-10-11 | 25mannamedeln (WRE) | D18E-1 | 78 | ja | 21:17 |
+| 2026-10-11 | 25mannamedeln (WRE) | D18E-2 | 14 | ja | 22:53 |
 | 2026-10-11 | 25mannamedeln (WRE) | D20 | 4 | ojusterad | 36:36 |
-| 2026-10-11 | 25mannamedeln (WRE) | D20E | 66 | ja | 23:37 |
-| 2026-10-11 | 25mannamedeln (WRE) | D21 | 103 | ja | 27:54 |
+| 2026-10-11 | 25mannamedeln (WRE) | D20E | 66 | ja | 23:24 |
+| 2026-10-11 | 25mannamedeln (WRE) | D21 | 103 | ja | 28:18 |
 | 2026-10-11 | 25mannamedeln (WRE) | H18 | 23 | ja | 28:10 |
-| 2026-10-11 | 25mannamedeln (WRE) | H18E-1 | 79 | ja | 21:41 |
+| 2026-10-11 | 25mannamedeln (WRE) | H18E-1 | 79 | ja | 21:40 |
 | 2026-10-11 | 25mannamedeln (WRE) | H18E-2 | 26 | ja | 22:22 |
 | 2026-10-11 | 25mannamedeln (WRE) | H20 | 11 | ojusterad | 39:48 |
-| 2026-10-11 | 25mannamedeln (WRE) | H20E-1 | 69 | ja | 28:26 |
-| 2026-10-11 | 25mannamedeln (WRE) | H21-1 | 70 | ja | 24:10 |
+| 2026-10-11 | 25mannamedeln (WRE) | H20E-1 | 69 | ja | 28:07 |
+| 2026-10-11 | 25mannamedeln (WRE) | H21-1 | 70 | ja | 24:18 |
 | 2026-10-11 | 25mannamedeln (WRE) | H21-2 | 72 | ja | 23:55 |
-| 2026-10-11 | 25mannamedeln (WRE) | M21E1 | 76 | ja | 35:04 |
-| 2026-10-11 | 25mannamedeln (WRE) | M21E2 | 69 | ja | 33:55 |
+| 2026-10-11 | 25mannamedeln (WRE) | M21E1 | 76 | ja | 35:06 |
+| 2026-10-11 | 25mannamedeln (WRE) | M21E2 | 69 | ja | 33:57 |
 | 2026-10-11 | 25mannamedeln (WRE) | M21E3 | 43 | ja | 33:32 |
-| 2026-10-11 | 25mannamedeln (WRE) | W21E1 | 85 | ja | 32:27 |
+| 2026-10-11 | 25mannamedeln (WRE) | W21E1 | 85 | ja | 32:39 |
 
 ## Tvetydiga namn i WinSplits-filer (granska)
 
@@ -514,5 +514,5 @@ Löpare: 3073, med betyg: 3039, synliga i spelet: 974 (574 herrar, 400 damer). F
 - Edvin Nilsson (Gotlands Bro OK), O-Ringen E4, Middle: e48672, e86144
 - Erik Johansson (FK Boken), O-Ringen E4, Middle: e138443, e94151
 
-WinSplits-löpare utan Eventor-träff (oftast utländska): 122.
+WinSplits-löpare utan Eventor-träff (oftast utländska): 118.
 
