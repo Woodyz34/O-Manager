@@ -36,8 +36,10 @@ public class RouteChoiceLeg
 // Finds 2 to 4 clearly different routes on a leg for the route choice game. Plain C# with no Unity objects, so it
 // runs on a background thread.
 //
-// How: the fastest time from the start to every point of the map round the leg, and from every point to the goal,
-// is worked out once (Dijkstra both ways). The fastest route through any point is then known at once. Points are
+// How: first the fastest route. Then parts of it are closed off in turn (a fifth of it at a time, along the whole leg)
+// and the fastest way round is searched again; that finds the other side of a block, the next street, the path through
+// the park. The same is done with the first choices found. Besides that, the fastest time from the start to every
+// point of the map round the leg, and from every point to the goal, is worked out once (Dijkstra both ways). The fastest route through any point is then known at once. Points are
 // taken cheapest first, skipping points close to a route already taken, so every route found runs somewhere new:
 // left, right, straight on, along a road or across the open. Each is the real fastest way through its point,
 // on roads and paths before and after. All routes are timed with the speed-100 runner, including slope and the speed lost
@@ -59,6 +61,9 @@ public class RouteChoiceGenerator
     // properly: a stretch at least DivergeShare of the leg long where they are at least SpreadShare of the leg apart
     const float DivergeShare = 0.15f;
     const float SpreadShare = 0.10f;
+    const float MinDivergeMeters = 50f;
+    const float MinSpreadMeters = 35f;
+    const float MinSameMeters = 8f;        // closer than this to another route counts as running in the same place
     const float LocalShare = 0.15f;        // round its point, a route must be the fastest way over this share of the leg's time
     const float LocalSlack = 1.05f;        // (5 % slower still counts as the fastest way)
     const float TurnAcceleration = 2f;     // as AgentMovement.TurnAcceleration (world units per second²)
@@ -265,12 +270,13 @@ public class RouteChoiceGenerator
         }
 
         // The corridor round a route, and how close two routes may run and still count as different
-        divergeCells = Mathf.Max(4f, straightMeters * DivergeShare / cellMeters);
-        spreadCells = Mathf.Max(3f, straightMeters * SpreadShare / cellMeters);
+        // (and never closer than MinSpreadMeters: two ways a few metres apart, say both sides of a street, are the same choice)
+        divergeCells = Mathf.Max(4f, Mathf.Max(straightMeters * DivergeShare, MinDivergeMeters) / cellMeters);
+        spreadCells = Mathf.Max(3f, Mathf.Max(straightMeters * SpreadShare, MinSpreadMeters) / cellMeters);
         // (a little narrower than the spread, so a point on the other side of a house is still tried)
         float corridorMeters = Mathf.Min(Mathf.Clamp(straightMeters * 0.07f, 2.5f * cellMeters, 60f), Mathf.Max(1.5f * cellMeters, spreadCells * cellMeters * 0.8f));
         int corridor = Mathf.Max(1, Mathf.RoundToInt(corridorMeters / cellMeters));
-        float sameMeters = Mathf.Max(1.5f * cellMeters, straightMeters * 0.035f);
+        float sameMeters = Mathf.Max(Mathf.Max(1.5f * cellMeters, straightMeters * 0.035f), MinSameMeters);
         float endMeters = Mathf.Max(corridorMeters, 3f * cellMeters); // near the controls all routes may meet
         int endCells = Mathf.CeilToInt(endMeters / cellMeters);
 
@@ -309,12 +315,15 @@ public class RouteChoiceGenerator
         }
         vias.Sort((p, q) => p.Key.CompareTo(q.Key));
 
-        List<RouteChoice> candidates = new List<RouteChoice> { Evaluate(best) };
+        // First the way an orienteer looks for choices: take the fastest route, close off a part of it and see
+        // which way is fastest then (BlockParts). Then the points round the leg, for ways that closing off missed.
+        List<RouteChoice> candidates = BlockParts(best, from, to, bestCost, endCells, sameMeters / cellMeters);
         bool[] covered = new bool[cellCount];
-        Cover(covered, best, corridor);
+        foreach (RouteChoice c in candidates) Cover(covered, c.cells, corridor);
         int tried = 0;
         foreach (KeyValuePair<float, int> via in vias)
         {
+            if (candidates.Count >= MaxCandidates) break;
             if (covered[via.Value]) continue;
             List<Vector2Int> route = Through(via.Value, backToStart, onToGoal);
             // (A point just beside a good route gives a route with a spike out to the point and back: the sharp
@@ -401,6 +410,95 @@ public class RouteChoiceGenerator
     }
 
     // ---- Building the alternatives ----
+
+    // Parts of the route closed off in turn, as shares of its length: a fifth at a time (every tenth), then two
+    // fifths at a time. Closing off a part makes the search find the best way round it: the other side of a block of
+    // houses, another street, a path through the park.
+    static readonly float[][] BlockedParts =
+    {
+        new[] { 0.0f, 0.2f }, new[] { 0.1f, 0.3f }, new[] { 0.2f, 0.4f }, new[] { 0.3f, 0.5f }, new[] { 0.4f, 0.6f },
+        new[] { 0.5f, 0.7f }, new[] { 0.6f, 0.8f }, new[] { 0.7f, 0.9f }, new[] { 0.8f, 1.0f },
+        new[] { 0.0f, 0.4f }, new[] { 0.3f, 0.7f }, new[] { 0.6f, 1.0f },
+    };
+    // Round a closed-off part, the cells this far away (as shares of the spread) are closed too: first a narrow
+    // band, so the way round can be the next street, then a wide one, so it can be a street further off
+    static readonly float[] BlockRadiusShares = { 0.6f, 1.2f };
+    const int BlockedRoutes = 3;            // the fastest route and the first two choices found get parts closed off
+
+    // The route choices found by closing off parts of the fastest route (and then of the choices found that way).
+    // A choice is kept when it is not much slower than the fastest, really runs somewhere else than every choice kept
+    // so far (Different), and is a sensible way in itself: round the point where it is furthest from the route it
+    // came from, it must be the fastest way on the open map too. A route that only bulges out round the closed part
+    // and back (a "bubble") fails that, as the fastest way there runs through the closed part.
+    List<RouteChoice> BlockParts(List<Vector2Int> best, Vector2Int from, Vector2Int to, float bestCost, int endCells, float sameCells)
+    {
+        List<RouteChoice> found = new List<RouteChoice> { Evaluate(best) };
+        float limit = found[0].seconds * MaxSlower + 3f;
+        float[,] grid = new float[height, width];
+        for (int done = 0; done < found.Count && done < BlockedRoutes; done++)
+        foreach (float radiusShare in BlockRadiusShares)
+        {
+            int radius = Mathf.Max(2, Mathf.RoundToInt(spreadCells * radiusShare));
+            int e2 = (endCells + radius) * (endCells + radius);
+            List<Vector2Int> route = found[done].cells;
+            float[] along = new float[route.Count];
+            for (int i = 1; i < route.Count; i++) along[i] = along[i - 1] + (route[i] - route[i - 1]).magnitude;
+            float total = Mathf.Max(1f, along[route.Count - 1]);
+            foreach (float[] part in BlockedParts)
+            {
+                System.Array.Copy(speed, grid, speed.Length);
+                bool any = false;
+                for (int i = 0; i < route.Count; i++)
+                {
+                    float share = along[i] / total;
+                    if (share < part[0] || share > part[1]) continue;
+                    Vector2Int c = route[i];
+                    // Never round the controls: everybody leaves and reaches them the same way
+                    if ((c - from).sqrMagnitude <= e2 || (c - to).sqrMagnitude <= e2) continue;
+                    any = true;
+                    for (int dy = -radius; dy <= radius; dy++)
+                    {
+                        for (int dx = -radius; dx <= radius; dx++)
+                        {
+                            int x = c.x + dx, y = c.y + dy;
+                            if (x >= 0 && y >= 0 && x < width && y < height && dx * dx + dy * dy <= radius * radius) grid[y, x] = 0f;
+                        }
+                    }
+                }
+                if (!any) continue;
+                List<Vector2Int> other = Path(from, to, grid);
+                if (other == null || other.Count < 2) continue;
+                other = RemoveLoops(other);
+                bool fresh = true;
+                foreach (RouteChoice c in found)
+                {
+                    if (!Different(other, c.cells, from, to, endCells, sameCells)) { fresh = false; break; }
+                }
+                if (!fresh) continue;
+                if (!Natural(other, Furthest(other, route), bestCost * LocalShare)) continue;
+                RouteChoice choice = Evaluate(other);
+                if (choice.seconds > limit) continue;
+                found.Add(choice);
+                if (found.Count >= MaxCandidates) return found;
+            }
+        }
+        return found;
+    }
+
+    // The cell of a route furthest from another route (as an index into the window)
+    int Furthest(List<Vector2Int> route, List<Vector2Int> from)
+    {
+        int bestIndex = 0;
+        float bestDistance = -1f;
+        for (int i = 0; i < route.Count; i += 2)
+        {
+            float d = NearbySquared(route[i], from);
+            if (d == float.MaxValue) d = spreadCells * spreadCells * 4f + NearestSquared(route[i], from, int.MaxValue);
+            if (d > bestDistance) { bestDistance = d; bestIndex = i; }
+        }
+        Vector2Int v = route[bestIndex];
+        return v.y * width + v.x;
+    }
 
     static List<Vector2Int> RemoveLoops(List<Vector2Int> route)
     {
