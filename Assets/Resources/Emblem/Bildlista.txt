@@ -1,5 +1,5 @@
 Bilder till löparkorten: flaggor, klubbmärken och profilbilder
-Uppdaterad 2026-11-03 av eventor/compute_points.py. Listan skrivs om varje gång poängen räknas.
+Uppdaterad 2026-11-06 av eventor/compute_points.py. Listan skrivs om varje gång poängen räknas.
 
 Lägg flaggor i Emblem/Flaggor och klubbmärken i Emblem/Klubbar, med namnen nedan.
 Riktiga profilbilder läggs i Resources/Profilbilder och heter som löparen, t.ex. Tove Alexandersson.jpg.
