@@ -31,6 +31,7 @@ public class MapImportPanel : MonoBehaviour
     double[] guessedEdge, edge;             // paper mm; null = the whole map
     string version;
     string mapType = "forest";
+    bool contourTyped;   // the player wrote the contour interval: changing the type no longer changes it
     bool permission;
     bool working;
 
@@ -72,7 +73,7 @@ public class MapImportPanel : MonoBehaviour
 
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Import a map", 36, CourseUI.Ink, FontStyles.Bold), 44);
         CourseUI.Size(CourseUI.Text("Info", card.transform,
-            "Pick a map file from OCAD (.ocd, version 11 or newer) or OpenOrienteering Mapper (.omap or .xmap). " +
+            "Pick a map file from OCAD (.ocd, OCAD 6 or newer) or OpenOrienteering Mapper (.omap or .xmap). " +
             "The game makes the grid, the heights and the map picture from it. Everyone can use the map at once: it is shared through Unity Cloud until it is built into the game.",
             20, CourseUI.InkMuted), 56);
 
@@ -106,6 +107,7 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.Size(contourLabel, -1, 230);
         contourField = CourseUI.Input("Contour interval", optionRow, "5", 5, null);
         contourField.contentType = TMP_InputField.ContentType.DecimalNumber;
+        contourField.onValueChanged.AddListener(_ => contourTyped = true);
         CourseUI.Size(contourField, -1, 110);
 
         // An own picture instead of the one the game draws (optional)
@@ -282,7 +284,8 @@ public class MapImportPanel : MonoBehaviour
                 preview = t.Result.Item3;
                 guessedEdge = edge = t.Result.Item4;
                 mapType = SymbolRules.LooksLikeSprint(mapFile) ? "sprint" : "forest";
-                contourField.SetTextWithoutNotify(SymbolRules.Equidistance(mapFile).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+                contourTyped = false;
+                ShowTypicalContours();
                 string warnings = mapFile.warnings.Count > 0 ? "  (" + mapFile.warnings.Count + " things in the file were skipped)" : "";
                 SetStatus($"{version}, 1:{mapFile.scale:0}, {mapFile.objects.Count} objects. Looks like a {mapType} map." + warnings
                     + (guessedEdge != null ? " Parts look unfinished: check the map edge." : ""), false);
@@ -322,7 +325,14 @@ public class MapImportPanel : MonoBehaviour
     void NextType()
     {
         mapType = MapTypes[(Array.IndexOf(MapTypes, mapType) + 1) % MapTypes.Length];
+        if (!contourTyped) ShowTypicalContours();
         Refresh();
+    }
+
+    // Map files don't say what contour interval they use, so the field starts with the most usual one for the type
+    void ShowTypicalContours()
+    {
+        contourField.SetTextWithoutNotify(SymbolRules.TypicalInterval(mapType).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
     }
 
     void Refresh()

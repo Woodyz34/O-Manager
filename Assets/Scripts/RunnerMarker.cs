@@ -107,7 +107,9 @@ public class RunnerMarker : MonoBehaviour
             drawer = GetComponentInParent<ManualPathDrawer>();
             lookedForDrawer = true;
         }
-        drawing = drawer != null && drawer.timeToDraw;
+        // Hidden while this runner's player draws, and also while you draw yourself: other players' runners standing
+        // at the start were in the way of your line (not in relays, where team mates run while the next one draws)
+        drawing = (drawer != null && drawer.timeToDraw) || LocalDrawing();
         // On sprint maps only the smaller copy shows; the full-size circle would stick out under it
         if (circle != null) circle.forceRenderingOff = drawing || sizeFactor < 1f;
         if (nameCanvas != null && nameCanvas.gameObject.activeSelf == drawing) nameCanvas.gameObject.SetActive(!drawing);
@@ -118,6 +120,15 @@ public class RunnerMarker : MonoBehaviour
         float growth = Growth(screenHeight);
         UpdateCircle(growth);
         UpdateName(cam, screenHeight);
+    }
+
+    static bool LocalDrawing()
+    {
+        if (RelayRace.Active != null) return false;
+        NetworkPlayer local = NetworkPlayer.Local;
+        if (local == null || local.agentMovement == null) return false;
+        ManualPathDrawer own = local.agentMovement.manualPathDrawer;
+        return own != null && own.timeToDraw;
     }
 
     // ---------- circle ----------
@@ -141,7 +152,8 @@ public class RunnerMarker : MonoBehaviour
         if (marker == null) return;
         float size = growth * sizeFactor;
         marker.localScale = new Vector3(size, size, 1f);
-        if (trail != null) trail.widthMultiplier = baseTrailWidth * size;
+        // (on sprint maps the trail is thinner still, so it does not hide the narrow streets and passages)
+        if (trail != null) trail.widthMultiplier = baseTrailWidth * size * (sizeFactor < 1f ? 0.6f : 1f);
         if (circle == null) return;
 
         // The copy follows the colour the player picked, and hides when the circle is hidden

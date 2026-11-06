@@ -639,6 +639,8 @@ public class RouteChoiceGenerator
                 if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
                 int other = ny * width + nx;
                 if (done[other] || speed[ny, nx] <= 0.01f) continue;
+                // No cutting a corner past a closed cell (a fence drawn diagonally across the grid), as AStarPathfinder
+                if (DirX[d] != 0 && DirY[d] != 0 && (speed[cy, nx] <= 0.01f || speed[ny, cx] <= 0.01f)) continue;
                 float step = (DirX[d] != 0 && DirY[d] != 0) ? 1.414f : 1f;
                 float c;
                 if (!backwards)
@@ -773,6 +775,8 @@ public class RouteChoiceGenerator
                 if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
                 float cellSpeed = grid[ny, nx];
                 if (cellSpeed <= 0.01f) continue;
+                // No cutting a corner past a closed cell (a fence drawn diagonally across the grid), as AStarPathfinder
+                if (DirX[d] != 0 && DirY[d] != 0 && (grid[cy, nx] <= 0.01f || grid[ny, cx] <= 0.01f)) continue;
                 int next = ny * width + nx;
                 if (closed[next] == search) continue;
                 float slope = slopes[d] != null ? slopes[d][cy, cx] : 1f;
@@ -942,6 +946,7 @@ public class RouteChoiceGenerator
         float step = length / steps;
         int d = Direction(ab);
         float cost = 0f;
+        int px = int.MinValue, py = int.MinValue;
         for (int s = 0; s < steps; s++)
         {
             Vector2 p = a + ab * ((s + 0.5f) / steps);
@@ -949,9 +954,18 @@ public class RouteChoiceGenerator
             if (x < 0 || y < 0 || x >= width || y >= height) { blocked = true; return float.MaxValue; }
             float cellSpeed = speed[y, x];
             if (cellSpeed <= 0.01f) { blocked = true; cellSpeed = BlockedSpeed; }
+            // A line that goes from one cell to the next only through their corners slips through a fence drawn
+            // diagonally across the grid (its cells only touch at the corners): that counts as going over it
+            else if (px != int.MinValue && x != px && y != py && (speed[py, x] <= 0.01f || speed[y, px] <= 0.01f))
+            {
+                blocked = true;
+                cellSpeed = BlockedSpeed;
+            }
             else if (margin > 0f && !blocked && NearBlocked(p, margin)) blocked = true;
             float slope = slopes[d] != null ? Mathf.Max(0.05f, slopes[d][y, x]) : 1f;
             cost += step / cellSpeed / slope;
+            px = x;
+            py = y;
         }
         return cost;
     }
