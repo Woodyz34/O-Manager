@@ -56,6 +56,7 @@ public class MainMenuUI : MonoBehaviour
             return;
         }
         Show(homePanel);
+        SharedMaps.CheckOnce();   // maps other players have shared, downloaded in the background
     }
 
     static void BackGoesToLobby(GameObject panel)

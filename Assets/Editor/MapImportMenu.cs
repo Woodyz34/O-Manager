@@ -121,6 +121,8 @@ public static class MapImportMenu
                 if (!MapPackageBuilder.FitOwnPicture(package, w, h, out string problem)) throw new InvalidDataException(problem);
             }
             package.info.id = MapPackages.Slug(name);   // importing the same map again replaces it
+            // A sent-in map keeps the id it had in the game, so courses made on the shared copy still find it
+            if (!string.IsNullOrEmpty(sent?.id) && MapPackages.Slug(sent.id) == sent.id) package.info.id = sent.id;
             package.info.sourceFile = Path.GetFileName(file);
             package.info.permissionConfirmed = true;   // imported by the game's owner
             if (sent != null)

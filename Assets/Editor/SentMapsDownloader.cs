@@ -15,6 +15,9 @@ using UnityEngine;
 // It needs a service account (Unity Cloud dashboard > Administration > Service accounts) with the project role
 // Cloud Save Viewer. Its key id and secret are kept in EditorPrefs on this computer only, never in the project.
 // The files land in <project>/SentInMaps/<player>/ (outside Assets, not in git).
+// When a sent-in map has been imported into the game, its files are deleted from Cloud Save, which also stops it
+// being shared with other players (SharedMaps). That needs a role that may delete, such as Cloud Save Editor; with
+// only Cloud Save Viewer the files stay, and the sender's game removes them once it has the new version.
 public class SentMapsDownloader : EditorWindow
 {
     const string Api = "https://services.api.unity.com/cloud-save/v1/files/projects/";
@@ -117,7 +120,12 @@ public class SentMapsDownloader : EditorWindow
             var results = new List<string>();
             foreach (Remote m in fresh)
             {
-                if (choice == 0) results.Add(MapImportMenu.ImportSent(Path.Combine(DownloadRoot, m.player, m.SourceFile)));
+                if (choice == 0)
+                {
+                    string result = MapImportMenu.ImportSent(Path.Combine(DownloadRoot, m.player, m.SourceFile));
+                    if (!result.StartsWith("Failed")) result += "\n" + await RemoveFromCloud(m.player, m.prefix);
+                    results.Add(result);
+                }
                 EditorPrefs.SetString(m.SeenKey, m.stamp);
             }
             if (choice == 0) EditorUtility.DisplayDialog("New maps sent in", string.Join("\n\n", results), "OK");
@@ -130,6 +138,46 @@ public class SentMapsDownloader : EditorWindow
     }
 
     static string Or(string s) => string.IsNullOrEmpty(s) ? "?" : s;
+
+    async Task RemoveAfterImport(Found map)
+    {
+        string removed = await RemoveFromCloud(map.player, "map-" + map.id + "-");
+        SetStatus(status + "\n" + removed);
+    }
+
+    // Deletes a sent-in map's files (map-<id>-*) from Cloud Save once it is built into the game, so it is no longer
+    // shared with the players. The downloaded copies in SentInMaps stay.
+    static async Task<string> RemoveFromCloud(string player, string prefix)
+    {
+        try
+        {
+            string projectId = CloudProjectSettings.projectId;
+            using (HttpClient http = Client(EditorPrefs.GetString(KeyIdPref, ""), EditorPrefs.GetString(SecretPref, "")))
+            {
+                string items = Root(projectId, EditorPrefs.GetString(EnvironmentPref, "")) + "/" + player + "/items";
+                int deleted = 0;
+                foreach (JObject f in await Pages(http, items, "key"))
+                {
+                    string key = (string)f["key"];
+                    if (key == null || !key.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                    using (HttpResponseMessage response = await http.DeleteAsync(items + "/" + Uri.EscapeDataString(key)))
+                    {
+                        if (!response.IsSuccessStatusCode)
+                            throw new Exception((int)response.StatusCode + " " + response.ReasonPhrase + ": " + await response.Content.ReadAsStringAsync());
+                    }
+                    deleted++;
+                }
+                Debug.Log("Sent-in maps: deleted " + deleted + " files of " + prefix + "* from Unity Cloud");
+                return "Removed from Unity Cloud: the map is no longer shared from there.";
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("Sent-in maps: could not delete " + prefix + "* from Unity Cloud: " + e.Message);
+            return "Could not remove the map from Unity Cloud (" + e.Message.Split('\n')[0] + "). Give the service account the role Cloud Save Editor " +
+                   "to have it removed here; otherwise the sender's game removes it once it has the version with the map built in.";
+        }
+    }
 
     static MapPackageInfo ReadInfo(Remote m)
     {
@@ -233,6 +281,7 @@ public class SentMapsDownloader : EditorWindow
                                 string result = MapImportMenu.ImportSent(map.source);
                                 map.imported = !result.StartsWith("Failed");
                                 status = result;
+                                if (map.imported) _ = RemoveAfterImport(map);
                             }
                         }
                         if (GUILayout.Button("Show folder")) EditorUtility.RevealInFinder(map.source ?? DownloadRoot);
