@@ -462,7 +462,7 @@ public static class CourseGenerator
         for (int tries = 0; tries < 200 && !found; tries++)
         {
             Vector2Int cell = area.cells[random.Next(area.cells.Count)];
-            if (area.MetersToOutside(cell) < startRoom) continue;
+            if (area.MetersToOutside(cell) < startRoom || !OpenAround(area, cell)) continue;
             start = CellCenter(map, cell);
             found = true;
         }
@@ -488,7 +488,9 @@ public static class CourseGenerator
                 double angle = heading + turn;
                 CoursePoint p = new CoursePoint(from.e + Math.Cos(angle) * leg, from.n + Math.Sin(angle) * leg);
                 Vector2Int cell = map.ToCell(p);
-                if (!area.IsPlayable(cell)) continue;
+                // Never right at the edge of a building, plot or fence: the runner must be able to stand there and
+                // the line drawn from it must start on open ground
+                if (!area.IsPlayable(cell) || !OpenAround(area, cell)) continue;
 
                 float nearest = float.MaxValue;
                 for (int i = 0; i < points.Count; i++)
@@ -550,6 +552,17 @@ public static class CourseGenerator
             points.Add(chosen);
         }
         return points;
+    }
+
+    // Every cell within about 3 m (at least the 8 cells round it) can be run on, so a control is never put on a
+    // thin strip of open ground beside a house, a plot or a fence
+    static bool OpenAround(MapPlayArea area, Vector2Int cell)
+    {
+        int r = Mathf.Max(1, Mathf.RoundToInt(3f / area.CellMeters));
+        for (int dy = -r; dy <= r; dy++)
+            for (int dx = -r; dx <= r; dx++)
+                if (!area.IsPlayable(new Vector2Int(cell.x + dx, cell.y + dy))) return false;
+        return true;
     }
 
     // How much slower the second fastest route choice is than the fastest (1.05 = 5 % slower).
