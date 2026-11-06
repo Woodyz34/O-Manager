@@ -204,7 +204,6 @@ public class RouteChoiceView : MonoBehaviour
     Vector3 fittedPosition;
     Quaternion fittedRotation = Quaternion.identity;
     readonly List<GameObject> drawn = new List<GameObject>();
-    readonly List<LineRenderer> lines = new List<LineRenderer>();
     float nextRefresh;
     static Material material;
 
@@ -1186,27 +1185,16 @@ public class RouteChoiceView : MonoBehaviour
         cam.transform.position = fittedPosition;
     }
 
+    // Drawn as a flat mesh, not a LineRenderer: that one narrowed whole pieces to a thin wedge near the controls
     void Line(string name, List<Vector3> points, Color color, float width, int order)
     {
-        LineRenderer line = new GameObject(name).AddComponent<LineRenderer>();
-        line.sharedMaterial = material;
-        line.useWorldSpace = true;
-        line.widthMultiplier = width;
-        line.startColor = line.endColor = color;
-        line.numCapVertices = 3;
-        line.numCornerVertices = 3;
-        line.sortingOrder = order;
-        line.positionCount = points.Count;
-        for (int i = 0; i < points.Count; i++) line.SetPosition(i, new Vector3(points[i].x, points[i].y, -1.3f));
-        drawn.Add(line.gameObject);
-        lines.Add(line);
+        drawn.Add(FlatLine.Make(name, points, color, width, order, material));
     }
 
     void ClearDrawn()
     {
         foreach (GameObject go in drawn) if (go != null) Destroy(go);
         drawn.Clear();
-        lines.Clear();
     }
 
     // The drawing screen's Undo button and the race clock mean nothing here

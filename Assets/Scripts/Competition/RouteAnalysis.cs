@@ -892,59 +892,11 @@ public class RouteCompareView : MonoBehaviour
         value.raycastTarget = false;
     }
 
+    // Drawn as a flat mesh (FlatLine), not a LineRenderer: that one narrowed whole pieces to a thin wedge where the
+    // route starts and ends at the controls
     GameObject Line(string name, List<Vector3> points, Color color, float width, int order)
     {
-        LineRenderer line = new GameObject(name).AddComponent<LineRenderer>();
-        line.sharedMaterial = material;
-        line.useWorldSpace = true;
-        line.widthMultiplier = width;
-        line.startColor = line.endColor = color;
-        line.numCapVertices = 3;
-        line.numCornerVertices = 3;
-        line.sortingOrder = order;
-        points = Clean(points, width);
-        line.positionCount = points.Count;
-        for (int i = 0; i < points.Count; i++) line.SetPosition(i, new Vector3(points[i].x, points[i].y, -1.3f));
-        return line.gameObject;
-    }
-
-    // A route starts and ends on the control's exact place, but the route itself starts and ends in the middle of the
-    // control's grid cell, up to half a cell away. That tiny first or last piece often points backwards, and a
-    // LineRenderer then turns the line edge-on at that corner: the whole next piece narrowed to a thin wedge (seen
-    // on long straight pieces into a control). Points closer than a fraction of the line width to the one before are
-    // dropped, and so are short pieces that turn back sharply, so the line keeps its width all the way.
-    static List<Vector3> Clean(List<Vector3> points, float width)
-    {
-        if (points == null || points.Count < 3) return points;
-        float near = Mathf.Max(width * 0.75f, 0.0001f);
-        List<Vector3> kept = new List<Vector3> { points[0] };
-        for (int i = 1; i < points.Count - 1; i++)
-        {
-            if (Vector2.Distance(points[i], kept[kept.Count - 1]) >= near) kept.Add(points[i]);
-        }
-        Vector3 end = points[points.Count - 1];
-        if (kept.Count > 1 && Vector2.Distance(kept[kept.Count - 1], end) < near) kept[kept.Count - 1] = end;
-        else kept.Add(end);
-
-        // Sharp turns back on a short piece: the middle point goes
-        float shortPiece = width * 4f;
-        bool changed = true;
-        while (changed && kept.Count > 2)
-        {
-            changed = false;
-            for (int i = 1; i < kept.Count - 1; i++)
-            {
-                Vector2 into = kept[i] - kept[i - 1];
-                Vector2 outOf = kept[i + 1] - kept[i];
-                if (Mathf.Min(into.magnitude, outOf.magnitude) < shortPiece && Vector2.Angle(into, outOf) > 120f)
-                {
-                    kept.RemoveAt(i);
-                    changed = true;
-                    break;
-                }
-            }
-        }
-        return kept;
+        return FlatLine.Make(name, points, color, width, order, material);
     }
 
     // The runners stand on the map; they are hidden so the routes can be seen
