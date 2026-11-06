@@ -88,7 +88,8 @@ namespace MapImport
             var pkg = new MapPackage();
             void Log(string s) { pkg.log.Add(s); }
             progress?.Invoke("Reading the map", 0.05f);
-            MapExtent extent = MapBoundary.Clip(MapExtent.Of(map), map.boundary);
+            MapExtent whole = MapExtent.Of(map);
+            MapExtent extent = MapBoundary.Clip(whole, map.boundary);
             float cell = sprint ? SprintCell : ForestCell;
 
             progress?.Invoke("Building the grid and the heights", 0.15f);
@@ -105,8 +106,9 @@ namespace MapImport
             pkg.fullExtent = MapExtent.Full(map);
             pkg.metersPerMm = mpm;
 
-            // Coordinates start at 1000 m, so a course's points are never negative
-            double offE = 1000 - Math.Floor(grid.minE), offN = 1000 - Math.Floor(grid.minN);
+            // Coordinates start at 1000 m, so a course's points are never negative. Taken from the whole map, not the
+            // edge, so a course made on the map imported without an edge stays in the same place on it
+            double offE = 1000 - Math.Floor(whole.minX * mpm), offN = 1000 - Math.Floor(whole.minY * mpm);
             var info = new MapPackageInfo
             {
                 offsetEast = offE,
@@ -232,6 +234,12 @@ namespace MapImport
             N("pivotX", i.pivotX); N("pivotY", i.pivotY); B("ownPicture", i.ownPicture); B("hasHeights", i.hasHeights); N("contourInterval", i.contourInterval);
             B("georeferenced", i.georeferenced); N("refEast", i.refEast); N("refNorth", i.refNorth); N("gridAngle", i.gridAngle); N("crs", i.crs);
             N("offsetEast", i.offsetEast); N("offsetNorth", i.offsetNorth);
+            if (i.boundary != null && i.boundary.Length >= 6)
+            {
+                sb.Append("  \"boundary\": [");
+                for (int k = 0; k < i.boundary.Length; k++) sb.Append(k > 0 ? "," : "").Append(i.boundary[k].ToString("0.###", CultureInfo.InvariantCulture));
+                sb.Append("],\n");
+            }
             S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created);
             sb.Append("  \"permissionConfirmed\": ").Append(i.permissionConfirmed ? "true" : "false").Append("\n}\n");
             File.WriteAllText(Path.Combine(folder, "map.json"), sb.ToString());
