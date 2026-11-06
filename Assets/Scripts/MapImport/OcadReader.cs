@@ -4,9 +4,13 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 
-// Reads OCAD map files (.ocd), version 11 and newer (OCAD 11, 12, 2018, 2019, 2020 ...).
-// The layout follows OCAD's own file format description: a header, then chains of index blocks that point at
-// the symbols, the objects and the parameter strings (colours, georeferencing).
+// Reads OCAD map files (.ocd) from OCAD 6 up to the newest (OCAD 6-10, 11, 12, 2018, 2019, 2020 ...).
+// The layout follows OCAD's own file format description (and OpenOrienteering Mapper's notes on the old
+// versions): a header, then chains of index blocks that point at the symbols, the objects and the parameter
+// strings (colours, georeferencing). The versions differ in how big the symbol and object headers are:
+//  - OCAD 6-8: 16-bit symbol numbers (101.0 is stored as 1010), colours and scale in the file header
+//  - OCAD 9-11: colours and scale as parameter strings, 32-bit symbol numbers, 40-byte object headers
+//  - OCAD 12 and newer: 56-byte object headers and a few more area symbol fields
 namespace MapImport
 {
     public static class OcadReader
@@ -34,19 +38,27 @@ namespace MapImport
             }
             int version = BitConverter.ToInt16(b, 4);
             int subVersion = b[6];
-            if (version < 11)
+            if (version < 6)
             {
                 throw new InvalidDataException("The file is saved in OCAD " + version +
-                    ". The game reads OCAD 11 and newer. Save it again in a newer OCAD version (File > Export).");
+                    ". The game reads OCAD 6 and newer. Open it in a newer OCAD and save it again.");
             }
             var map = new MapFile { format = "OCAD", version = version + "." + subVersion };
+            var v = new Layout(version);
             int symbolBlock = BitConverter.ToInt32(b, 8);
             int objectBlock = BitConverter.ToInt32(b, 12);
-            int stringBlock = BitConverter.ToInt32(b, 32);
 
             var colorByNumber = new Dictionary<int, int>();
-            ReadStrings(b, stringBlock, map, colorByNumber);
-            ReadSymbols(b, symbolBlock, version, map, colorByNumber);
+            if (v.old)
+            {
+                ReadOldColors(b, map, colorByNumber);
+                ReadOldSetup(b, BitConverter.ToInt32(b, 16), map);
+            }
+            else
+            {
+                ReadStrings(b, BitConverter.ToInt32(b, 32), v, map, colorByNumber);
+            }
+            ReadSymbols(b, symbolBlock, v, map, colorByNumber);
             foreach (MapSymbol symbol in map.symbols.Values)
             {
                 if (symbol.area != null && symbol.area.borderNumber != 0 &&
@@ -55,13 +67,91 @@ namespace MapImport
                     symbol.area.border = border;
                 }
             }
-            ReadObjects(b, objectBlock, map);
+            ReadObjects(b, objectBlock, v, map);
             return map;
+        }
+
+        // What differs between the OCAD versions
+        class Layout
+        {
+            public readonly int version;
+            public readonly bool old;            // OCAD 6-8
+            public readonly bool utf8;           // OCAD 11 and newer write text as UTF-8/UTF-16, older as 8-bit
+            public readonly int symbolHeader;    // size of the common symbol header
+            public readonly int objectHeader;    // size of the object header before the coordinates
+            public readonly int areaElements;    // where an area symbol's pattern starts, after the symbol header
+
+            public Layout(int version)
+            {
+                this.version = version;
+                old = version <= 8;
+                utf8 = version >= 11;
+                symbolHeader = old ? 348 : version <= 10 ? 572 : 796;
+                objectHeader = old ? 32 : version <= 11 ? 40 : 56;
+                areaElements = version >= 12 ? 36 : 32;
+            }
+
+            // OCAD 6-8 number symbols as 1010 for 101.0; the game uses 101000 like the newer versions
+            public int SymbolKey(int number) => old ? (number / 10) * 1000 + number % 10 : number;
+        }
+
+        static string Latin(byte[] b, int pos, int len)
+        {
+            var chars = new char[len];
+            for (int i = 0; i < len; i++) chars[i] = (char)b[pos + i];
+            return new string(chars);
+        }
+
+        // A Pascal string: one length byte, then the 8-bit characters
+        static string Pascal(byte[] b, int pos, int max)
+        {
+            int len = Math.Min(b[pos], max);
+            return Latin(b, pos + 1, len);
+        }
+
+        // ---- OCAD 6-8: colours in the file header, scale in the setup block ----
+
+        static void ReadOldColors(byte[] b, MapFile map, Dictionary<int, int> colorByNumber)
+        {
+            const int header = 48;           // the symbol header comes right after the file header
+            int count = BitConverter.ToUInt16(b, header);
+            const int first = header + 24;   // after the colour count, separation count, screens and 4 spare bytes
+            for (int i = 0; i < Math.Min(count, 256); i++)
+            {
+                int o = first + 72 * i;
+                if (o + 72 > b.Length) break;
+                int number = BitConverter.ToUInt16(b, o);
+                // CMYK in half percent (0-200)
+                double c = b[o + 4] / 200.0, m = b[o + 5] / 200.0, y = b[o + 6] / 200.0, k = b[o + 7] / 200.0;
+                var color = new MapColor
+                {
+                    name = Pascal(b, o + 8, 31),
+                    number = number,
+                    r = (byte)Math.Round(255 * (1 - Math.Min(1, c)) * (1 - Math.Min(1, k))),
+                    g = (byte)Math.Round(255 * (1 - Math.Min(1, m)) * (1 - Math.Min(1, k))),
+                    b = (byte)Math.Round(255 * (1 - Math.Min(1, y)) * (1 - Math.Min(1, k))),
+                    priority = map.colors.Count
+                };
+                if (!colorByNumber.ContainsKey(number)) colorByNumber[number] = map.colors.Count;
+                map.colors.Add(color);
+            }
+        }
+
+        static void ReadOldSetup(byte[] b, int setup, MapFile map)
+        {
+            map.scale = 10000;
+            if (setup <= 0 || setup + 56 > b.Length) return;
+            double scale = BitConverter.ToDouble(b, setup + 24);
+            if (scale > 100 && scale < 1000000) map.scale = scale;
+            map.refEast = BitConverter.ToDouble(b, setup + 32);
+            map.refNorth = BitConverter.ToDouble(b, setup + 40);
+            map.gridAngle = BitConverter.ToDouble(b, setup + 48);
+            map.georeferenced = map.refEast != 0 || map.refNorth != 0;
         }
 
         // ---- Parameter strings: colours (type 9) and scale/georeferencing (type 1039) ----
 
-        static void ReadStrings(byte[] b, int block, MapFile map, Dictionary<int, int> colorByNumber)
+        static void ReadStrings(byte[] b, int block, Layout v, MapFile map, Dictionary<int, int> colorByNumber)
         {
             int guard = 0;
             while (block > 0 && block + 4 + 256 * 16 <= b.Length && guard++ < 10000)
@@ -74,7 +164,7 @@ namespace MapImport
                     int len = BitConverter.ToInt32(b, o + 4);
                     int type = BitConverter.ToInt32(b, o + 8);
                     if (pos <= 0 || len <= 0 || pos + len > b.Length) continue;
-                    string text = DecodeString(b, pos, len);
+                    string text = DecodeString(b, pos, len, v.utf8);
                     if (type == 9) AddColor(text, map, colorByNumber);
                     else if (type == 1039) ReadScale(text, map);
                 }
@@ -82,11 +172,11 @@ namespace MapImport
             }
         }
 
-        static string DecodeString(byte[] b, int pos, int len)
+        static string DecodeString(byte[] b, int pos, int len, bool utf8)
         {
             int end = pos;
             while (end < pos + len && b[end] != 0) end++;
-            return Encoding.UTF8.GetString(b, pos, end - pos);
+            return utf8 ? Encoding.UTF8.GetString(b, pos, end - pos) : Latin(b, pos, end - pos);
         }
 
         static Dictionary<char, string> Fields(string text, out string first)
@@ -148,9 +238,7 @@ namespace MapImport
 
         // ---- Symbols ----
 
-        const int SymbolBaseSize = 796;   // the common symbol header in OCAD 11 and newer
-
-        static void ReadSymbols(byte[] b, int block, int version, MapFile map, Dictionary<int, int> colorByNumber)
+        static void ReadSymbols(byte[] b, int block, Layout v, MapFile map, Dictionary<int, int> colorByNumber)
         {
             int guard = 0;
             while (block > 0 && block + 4 + 256 * 4 <= b.Length && guard++ < 10000)
@@ -159,10 +247,10 @@ namespace MapImport
                 for (int k = 0; k < 256; k++)
                 {
                     int pos = BitConverter.ToInt32(b, block + 4 + 4 * k);
-                    if (pos <= 0 || pos + SymbolBaseSize > b.Length) continue;
+                    if (pos <= 0 || pos + v.symbolHeader > b.Length) continue;
                     try
                     {
-                        MapSymbol symbol = ReadSymbol(b, pos, map, colorByNumber);
+                        MapSymbol symbol = ReadSymbol(b, pos, v, colorByNumber);
                         if (symbol != null) map.symbols[symbol.key] = symbol;
                     }
                     catch (Exception e)
@@ -179,11 +267,24 @@ namespace MapImport
             return colorByNumber.TryGetValue(number, out int index) ? index : -1;
         }
 
-        static MapSymbol ReadSymbol(byte[] b, int pos, MapFile map, Dictionary<int, int> colors)
+        static MapSymbol ReadSymbol(byte[] b, int pos, Layout v, Dictionary<int, int> colors)
         {
-            int size = BitConverter.ToInt32(b, pos);
-            int number = BitConverter.ToInt32(b, pos + 4);
-            int otp = b[pos + 8];
+            int size, number, otp;
+            if (v.old)
+            {
+                size = BitConverter.ToUInt16(b, pos);
+                number = v.SymbolKey(BitConverter.ToUInt16(b, pos + 2));
+                otp = BitConverter.ToUInt16(b, pos + 4);
+                // OCAD 6-8 types: 1 point, 2 line (or line text), 3 area, 4 text, 5 rectangle
+                if (otp == 2 && b[pos + 6] == 1) otp = 6;
+                else if (otp == 5) otp = 7;
+            }
+            else
+            {
+                size = BitConverter.ToInt32(b, pos);
+                number = BitConverter.ToInt32(b, pos + 4);
+                otp = b[pos + 8];
+            }
             int status = b[pos + 11];
             var s = new MapSymbol
             {
@@ -193,17 +294,32 @@ namespace MapImport
                 hidden = status == 2
             };
             s.code = s.minor == 0 ? s.major.ToString() : s.major + "." + s.minor;
-            s.name = Encoding.Unicode.GetString(b, pos + 56, 128).Split('\0')[0];
+            if (v.old) s.name = Pascal(b, pos + 52, 31);
+            else if (!v.utf8) s.name = Pascal(b, pos + 56, 31);
+            else s.name = Encoding.Unicode.GetString(b, pos + 56, 128).Split('\0')[0];
 
             // The colours the symbol uses, as a fallback when the details can't be read
-            int nColors = BitConverter.ToInt16(b, pos + 26);
-            for (int i = 0; i < Math.Min(nColors, 14); i++)
+            if (v.old)
             {
-                int c = Col(colors, BitConverter.ToInt16(b, pos + 28 + 2 * i));
-                if (c >= 0 && (s.mainColor < 0 || c > s.mainColor)) s.mainColor = c;
+                // a bit set for each of the 256 colours the symbol uses
+                for (int bit = 0; bit < 256; bit++)
+                {
+                    if ((b[pos + 20 + bit / 8] & (1 << (bit % 8))) == 0) continue;
+                    int c = Col(colors, bit);
+                    if (c >= 0 && (s.mainColor < 0 || c > s.mainColor)) s.mainColor = c;
+                }
+            }
+            else
+            {
+                int nColors = BitConverter.ToInt16(b, pos + 26);
+                for (int i = 0; i < Math.Min(nColors, 14); i++)
+                {
+                    int c = Col(colors, BitConverter.ToInt16(b, pos + 28 + 2 * i));
+                    if (c >= 0 && (s.mainColor < 0 || c > s.mainColor)) s.mainColor = c;
+                }
             }
 
-            int d = pos + SymbolBaseSize;
+            int d = pos + v.symbolHeader;
             int end = pos + size;
             switch (otp)
             {
@@ -218,8 +334,9 @@ namespace MapImport
                     break;
                 case 3:
                     s.kind = SymbolKind.Area;
-                    s.area = ReadArea(b, d, end, colors);
-                    s.area.borderNumber = BitConverter.ToInt32(b, d);
+                    s.area = ReadArea(b, d, end, v, colors);
+                    // OCAD 6-8 have no border symbol; their two first fields are a spare word and "fill on"
+                    s.area.borderNumber = v.old ? 0 : BitConverter.ToInt32(b, d);
                     break;
                 case 4:
                 case 6:
@@ -278,11 +395,11 @@ namespace MapImport
             return line;
         }
 
-        static AreaStyle ReadArea(byte[] b, int d, int end, Dictionary<int, int> colors)
+        static AreaStyle ReadArea(byte[] b, int d, int end, Layout v, Dictionary<int, int> colors)
         {
             short H(int offset) => BitConverter.ToInt16(b, d + offset);
             var area = new AreaStyle();
-            bool fillOn = b[d + 18] != 0;
+            bool fillOn = v.old ? H(2) != 0 : b[d + 18] != 0;
             if (fillOn) area.fillColor = Col(colors, H(4));
             int hatchMode = H(6);
             if (hatchMode > 0)
@@ -294,15 +411,15 @@ namespace MapImport
                 area.hatchAngle2 = H(16) / 10.0;
                 area.hatchCount = hatchMode == 2 ? 2 : 1;
             }
-            int structMode = H(20);
+            int structMode = b[d + 20];   // one byte; OCAD 12 uses the next byte for something else
             if (structMode > 0)
             {
                 area.patternWidth = Mm(H(22));
                 area.patternHeight = Mm(H(24));
                 area.patternAngle = H(26) / 10.0;
                 area.patternShifted = structMode == 2;
-                int dataSize = BitConverter.ToUInt16(b, d + 34);
-                int start = d + 36;
+                int start = d + v.areaElements;
+                int dataSize = BitConverter.ToUInt16(b, start - 2);
                 if (start + dataSize * 8 <= end)
                 {
                     area.pattern = ReadElements(b, start, start + dataSize * 8, colors);
@@ -376,25 +493,36 @@ namespace MapImport
 
         // ---- Objects ----
 
-        static void ReadObjects(byte[] b, int block, MapFile map)
+        static void ReadObjects(byte[] b, int block, Layout v, MapFile map)
         {
+            int entrySize = v.old ? 24 : 40;
             int guard = 0;
-            while (block > 0 && block + 4 + 256 * 40 <= b.Length && guard++ < 100000)
+            while (block > 0 && block + 4 + 256 * entrySize <= b.Length && guard++ < 100000)
             {
                 int next = BitConverter.ToInt32(b, block);
                 for (int k = 0; k < 256; k++)
                 {
-                    int o = block + 4 + 40 * k;
+                    int o = block + 4 + entrySize * k;
                     int pos = BitConverter.ToInt32(b, o + 16);
-                    int len = BitConverter.ToInt32(b, o + 20);
-                    int sym = BitConverter.ToInt32(b, o + 24);
-                    int status = b[o + 30];
-                    int viewType = b[o + 31];
-                    if (pos <= 0 || status != 1 || viewType != 0 || pos + 56 > b.Length) continue;
+                    int sym;
+                    if (v.old)
+                    {
+                        sym = BitConverter.ToInt16(b, o + 22);
+                        if (sym <= 0) continue;   // deleted
+                        sym = v.SymbolKey(sym);
+                    }
+                    else
+                    {
+                        sym = BitConverter.ToInt32(b, o + 24);
+                        int status = b[o + 30];
+                        int viewType = b[o + 31];
+                        if (status != 1 || viewType != 0) continue;
+                    }
+                    if (pos <= 0 || pos + v.objectHeader > b.Length) continue;
                     if (!map.symbols.TryGetValue(sym, out MapSymbol symbol) || symbol.hidden) continue;
                     try
                     {
-                        MapObject obj = ReadObject(b, pos, len, symbol);
+                        MapObject obj = ReadObject(b, pos, v, symbol);
                         if (obj != null) map.objects.Add(obj);
                     }
                     catch (Exception e)
@@ -406,13 +534,36 @@ namespace MapImport
             }
         }
 
-        static MapObject ReadObject(byte[] b, int pos, int len, MapSymbol symbol)
+        static MapObject ReadObject(byte[] b, int pos, Layout v, MapSymbol symbol)
         {
-            int otp = b[pos + 4];
-            int nItems = BitConverter.ToInt32(b, pos + 44);
-            int header = 56;
+            int otp, nItems, nText, angle;
+            bool unicodeText = true;
+            if (v.old)
+            {
+                otp = b[pos + 2];
+                unicodeText = b[pos + 3] != 0;
+                nItems = BitConverter.ToUInt16(b, pos + 4);
+                nText = BitConverter.ToUInt16(b, pos + 6);
+                angle = BitConverter.ToInt16(b, pos + 8);
+                if (otp == 5) otp = 7;   // rectangle in OCAD 6-8
+            }
+            else if (v.version <= 11)
+            {
+                otp = b[pos + 4];
+                angle = BitConverter.ToInt16(b, pos + 6);
+                nItems = BitConverter.ToInt32(b, pos + 8);
+                nText = BitConverter.ToUInt16(b, pos + 12);
+            }
+            else
+            {
+                otp = b[pos + 4];
+                angle = BitConverter.ToInt16(b, pos + 6);
+                nItems = BitConverter.ToInt32(b, pos + 44);
+                nText = BitConverter.ToUInt16(b, pos + 48);
+            }
+            int header = v.objectHeader;
             if (nItems < 0 || pos + header + nItems * 8 > b.Length) return null;
-            var obj = new MapObject { symbol = symbol, angle = BitConverter.ToInt16(b, pos + 6) / 10.0 };
+            var obj = new MapObject { symbol = symbol, angle = angle / 10.0 };
             switch (otp)
             {
                 case 1: obj.kind = SymbolKind.Point; break;
@@ -427,11 +578,11 @@ namespace MapImport
             if (pts.Count >= 2) obj.parts.Add(pts.ToArray());
             if (obj.kind == SymbolKind.Text)
             {
-                int nText = BitConverter.ToInt16(b, pos + 48);
                 int textStart = pos + header + nItems * 8;
                 if (nText > 0 && textStart + nText * 8 <= b.Length)
                 {
-                    obj.text = Encoding.Unicode.GetString(b, textStart, nText * 8).Split('\0')[0];
+                    obj.text = (unicodeText ? Encoding.Unicode.GetString(b, textStart, nText * 8)
+                                            : Latin(b, textStart, nText * 8)).Split('\0')[0];
                 }
             }
             return obj.parts.Count > 0 ? obj : null;
