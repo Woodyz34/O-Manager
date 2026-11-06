@@ -213,7 +213,7 @@ public static class UIToast
 {
     static GameObject current;
 
-    public static void Show(string message, float seconds = 6f)
+    public static void Show(string message, float seconds = 6f, Color? color = null)
     {
         if (current != null) UnityEngine.Object.Destroy(current);
         GameObject go = new GameObject("Toast", typeof(Canvas), typeof(CanvasScaler));
@@ -225,7 +225,7 @@ public static class UIToast
         Image card = CourseUI.CardPanel("Message", go.transform);
         card.raycastTarget = false;
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 60), new Vector2(1100, 110));
-        TextMeshProUGUI text = CourseUI.Text("Text", card.transform, message, 26, CourseUI.Danger, FontStyles.Bold, TextAlignmentOptions.Center);
+        TextMeshProUGUI text = CourseUI.Text("Text", card.transform, message, 26, color ?? CourseUI.Danger, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Stretch(text.rectTransform, 24, 24, 10, 10);
         current = go;
         UnityEngine.Object.Destroy(go, seconds);

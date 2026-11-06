@@ -50,6 +50,8 @@ public class Clock : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // The lobby's shop, My Runners and course builder are loaded on top of the lobby (LobbyVisit); not a new race
+        if (mode == LoadSceneMode.Additive) return;
         // The object can be destroyed by another scene-loaded handler earlier in the same call (e.g. when the
         // network session shuts down as the scene changes); Unity then still calls this handler
         if (this == null)

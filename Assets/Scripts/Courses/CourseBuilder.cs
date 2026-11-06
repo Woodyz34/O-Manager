@@ -1766,7 +1766,9 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Size(bottomRow, 52);
         CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Light, ClearCourse, 22);
         CourseUI.Button("Import map", bottomRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 22);
-        CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
+        // Opened from the multiplayer lobby: back to the lobby, the network game is still running
+        if (LobbyVisit.Active) CourseUI.Button("Back", bottomRow, "Back to lobby", CourseUI.ButtonKind.Light, LobbyVisit.Close, 22);
+        else CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
 
         BuildRelayPanel(canvasObject.transform);
     }
