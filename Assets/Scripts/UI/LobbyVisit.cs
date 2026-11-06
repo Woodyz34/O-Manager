@@ -66,6 +66,7 @@ public static class LobbyVisit
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 5;   // above the lobby, under its pop-ups
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
+        go.AddComponent<LobbyVisitCard>();
 
         Image card = CourseUI.CardPanel("While you wait", go.transform);
         CourseUI.Place(card.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(48, 48), new Vector2(420, 292));
@@ -202,5 +203,49 @@ public static class LobbyVisit
         }
         offBehaviours.Clear();
         offRenderers.Clear();
+    }
+}
+
+// Hides the "While you wait" card while something else is open in the lobby (choose course, AI course,
+// runner pool, game mode, colour picker...), so it stays in the background and never covers a pop-up.
+public class LobbyVisitCard : MonoBehaviour
+{
+    Canvas canvas;
+    MapSelectUI maps;
+    GameModeSelectUI pools;
+    float nextCheck;
+
+    void Start()
+    {
+        canvas = GetComponent<Canvas>();
+        maps = FindObjectOfType<MapSelectUI>(true);
+        pools = FindObjectOfType<GameModeSelectUI>(true);
+    }
+
+    void Update()
+    {
+        if (Time.unscaledTime < nextCheck || canvas == null) return;
+        nextCheck = Time.unscaledTime + 0.1f;
+        // While visiting the shop or the course builder LobbyVisit has switched the canvas off; leave it alone
+        if (LobbyVisit.Active) return;
+        bool show = !SomethingOpen();
+        if (canvas.enabled != show) canvas.enabled = show;
+    }
+
+    bool SomethingOpen()
+    {
+        if (maps != null && maps.mapSelectPanel != null && maps.mapSelectPanel.activeInHierarchy) return true;
+        if (pools != null && pools.gameModeSelectPanel != null && pools.gameModeSelectPanel.activeInHierarchy) return true;
+        if (FindObjectOfType<AICoursePanel>() != null) return true;
+        // Pop-ups made in code have their own canvas above this one (the short toast messages do not count)
+        foreach (Canvas other in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+        {
+            if (other == canvas || !other.isRootCanvas || !other.isActiveAndEnabled) continue;
+            if (other.renderMode != RenderMode.ScreenSpaceOverlay || other.sortingOrder <= canvas.sortingOrder) continue;
+            if (other.name == "Toast" || other.name == "Esc menu") continue;
+            if (other.GetComponent<LoadingScreenUI>() != null) continue;
+            return true;
+        }
+        return false;
     }
 }

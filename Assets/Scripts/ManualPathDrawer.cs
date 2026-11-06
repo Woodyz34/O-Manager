@@ -388,21 +388,17 @@ public class ManualPathDrawer : MonoBehaviour
         return false;
     }
 
-    // The drawn line as wide as the prefab makes it, except in route analysis: there it is thinner (much thinner
-    // on a sprint map, in scale with the smaller controls there), so it does not cover what you want to see
+    // The drawn line as wide as the prefab makes it on forest maps, thinner on sprint maps in every game mode (in scale
+    // with the smaller controls there), and a bit thinner in route analysis, so it does not cover what you want to see
     float normalLineWidth = -1f;
 
     void FitLineWidth()
     {
         if (line == null) return;
         if (normalLineWidth < 0f) normalLineWidth = line.widthMultiplier;
-        float share = 1f;
-        if (RouteAnalysis.On && RelayRace.Active == null)
-        {
-            bool sprint = CourseLoader.LoadedMap != null ? CourseLoader.LoadedMap.IsSprint
-                : manager != null && manager.cellSize / MapDefinition.WorldUnitsPerMeter < 5f;
-            share = sprint ? CourseRenderer.SprintSize : 0.6f;
-        }
+        bool sprint = CourseLoader.LoadedMap != null ? CourseLoader.LoadedMap.IsSprint
+            : manager != null && manager.cellSize / MapDefinition.WorldUnitsPerMeter < 5f;
+        float share = sprint ? CourseRenderer.SprintSize : (RouteAnalysis.On && RelayRace.Active == null ? 0.6f : 1f);
         line.widthMultiplier = normalLineWidth * share;
     }
 
