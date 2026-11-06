@@ -72,14 +72,46 @@ public static class LobbyVisit
         CourseUI.Place(card.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(48, 48), new Vector2(420, 292));
         CourseUI.Column(card.gameObject, 10, new RectOffset(26, 26, 20, 24));
 
-        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "While you wait", 30, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Size(title, 44);
+        // Title on the left and your money on the right: the money belongs with the pack shop, not alone up in
+        // the top left corner over Runner setup
+        RectTransform header = CourseUI.Rect("Header", card.transform);
+        CourseUI.Row(header.gameObject, 8, new RectOffset(0, 0, 0, 0)).childAlignment = TextAnchor.MiddleLeft;
+        CourseUI.Size(header, 44);
+        TextMeshProUGUI title = CourseUI.Text("Title", header, "While you wait", 30, CourseUI.Ink, FontStyles.Bold);
+        title.enableWordWrapping = false;
+        CourseUI.Size(title, -1, -1, 1);
+        Image coin = CourseUI.Panel("Coin", header, CourseUI.Accent);
+        coin.raycastTarget = false;
+        LayoutElement coinSize = CourseUI.Size(coin, -1, 18);
+        coinSize.preferredHeight = 18;
+        coinSize.flexibleHeight = 0;
+        HorizontalLayoutGroup headerRow = header.GetComponent<HorizontalLayoutGroup>();
+        headerRow.childForceExpandHeight = false;
+        TextMeshProUGUI amount = CourseUI.Text("Money", header, "", 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+        amount.enableWordWrapping = false;
+        amount.overflowMode = TextOverflowModes.Overflow;
+        CourseUI.Size(amount, 44);
+        MoneyLabel money = amount.gameObject.AddComponent<MoneyLabel>();
+        money.text = amount;
+        HideTopMoneyPill();
         Button shop = CourseUI.Button("Pack shop", card.transform, "Pack shop", CourseUI.ButtonKind.Light, () => Open(Place.Shop), 24);
         CourseUI.Size(shop, 60);
         Button runners = CourseUI.Button("My Runners", card.transform, "My Runners", CourseUI.ButtonKind.Light, () => Open(Place.Runners), 24);
         CourseUI.Size(runners, 60);
         Button builder = CourseUI.Button("Course builder", card.transform, "Course builder", CourseUI.ButtonKind.Light, () => Open(Place.CourseBuilder), 24);
         CourseUI.Size(builder, 60);
+    }
+
+    // The lobby scene has its own money pill in the top left corner; the money is shown in the card instead
+    static void HideTopMoneyPill()
+    {
+        foreach (MoneyLabel label in UnityEngine.Object.FindObjectsByType<MoneyLabel>(FindObjectsSortMode.None))
+        {
+            if (label.gameObject.name == "Money pill" && label.gameObject.scene.name == LobbyScene)
+            {
+                label.gameObject.SetActive(false);
+            }
+        }
     }
 
     // ---- Going and coming back ----

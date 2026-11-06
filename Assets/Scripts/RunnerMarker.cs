@@ -97,10 +97,6 @@ public class RunnerMarker : MonoBehaviour
     void LateUpdate()
     {
         if (!ready) return;
-        UpdateTrail();
-
-        Camera cam = Camera.main;
-        if (cam == null) return;
 
         if (!lookedForDrawer)
         {
@@ -109,12 +105,17 @@ public class RunnerMarker : MonoBehaviour
         }
         // Hidden while this runner's player draws, and also while you draw yourself: other players' runners standing
         // at the start were in the way of your line (not in relays, where team mates run while the next one draws)
+        bool wasDrawing = drawing;
         drawing = (drawer != null && drawer.timeToDraw) || LocalDrawing();
+        UpdateTrail(wasDrawing && !drawing);
+
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
         // On sprint maps only the smaller copy shows; the full-size circle would stick out under it
         if (circle != null) circle.forceRenderingOff = drawing || sizeFactor < 1f;
         if (nameCanvas != null && nameCanvas.gameObject.activeSelf == drawing) nameCanvas.gameObject.SetActive(!drawing);
-        // No trail either while drawing, and none drawn from where the runner stood when drawing ends
-        if (drawing) QuietTrail(0.3f);
+        // No trail while drawing (UpdateTrail); it starts again the moment the runner sets off
 
         float screenHeight = cam.orthographic ? cam.orthographicSize * 2f : 0f;   // in world units
         float growth = Growth(screenHeight);
@@ -206,15 +207,34 @@ public class RunnerMarker : MonoBehaviour
 
     // ---------- trail ----------
 
-    void UpdateTrail()
+    void UpdateTrail(bool drawingJustEnded)
     {
         if (trail == null) return;
         Vector3 position = transform.position;
-        if ((position - lastPosition).sqrMagnitude > teleportDistance * teleportDistance)
-        {
-            QuietTrail(0.2f);
-        }
+        bool teleported = (position - lastPosition).sqrMagnitude > teleportDistance * teleportDistance;
         lastPosition = position;
+
+        if (drawing)
+        {
+            QuietTrail(0.3f);
+            return;
+        }
+        if (drawingJustEnded)
+        {
+            // The leg starts now: the trail starts right here at the runner, not some way into the leg. It used to wait
+            // a moment after drawing, and by then the runner was already a bit along the leg.
+            trailQuiet = 0f;
+            trail.Clear();
+            trail.emitting = true;
+            return;
+        }
+        if (teleported)
+        {
+            // Moved to a new place in one jump: the streak there is dropped and the trail goes on from the new place.
+            // This runs after the move and before the trail takes its new point, so nothing is lost.
+            trail.Clear();
+            return;
+        }
 
         if (trailQuiet > 0f)
         {

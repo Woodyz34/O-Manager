@@ -124,14 +124,20 @@ public class CameraController : MonoBehaviour
             return;
         }
 
-        if (!following && !EscMenu.IsOpen)
+        if (mapRenderer == null)
+        {
+            // The camera was set up before the map picture was in place; look again
+            InitializeCamera();
+        }
+
+        if (!following && !EscMenu.IsOpen && mapRenderer != null)
         {
             PanCamera();
         }
         
         // The wheel belongs to the list under the mouse (the leaderboard, for one), not to the map behind it
         float wheel = Input.GetAxis("Mouse ScrollWheel");
-        if (wheel != 0f && !PointerOverUI() && !EscMenu.IsOpen)
+        if (wheel != 0f && !PointerOverUI() && !EscMenu.IsOpen && mapRenderer != null)
         {
             if (wheel > 0f) { ZoomIn(); }
             else { ZoomOut(); }
@@ -348,13 +354,15 @@ public class CameraController : MonoBehaviour
         cam.transform.position = camPos;
     }
 
+    // Drag with the right or the middle mouse button (the left one draws the route)
     private void PanCamera()
     {
+        int button = Input.GetMouseButton(1) || Input.GetMouseButtonDown(1) ? 1 : 2;
 
-        if (Input.GetMouseButtonDown(1))
+        if (Input.GetMouseButtonDown(button))
             dragOrigin = cam.ScreenToWorldPoint(Input.mousePosition);
 
-        if (Input.GetMouseButton(1))
+        if (Input.GetMouseButton(button))
         {
             Vector3 difference = dragOrigin - cam.ScreenToWorldPoint(Input.mousePosition);
 
@@ -369,25 +377,40 @@ public class CameraController : MonoBehaviour
 
     private void ZoomIn()
     {
-        float newSize = cam.orthographicSize - zoomStep;
+        float newSize = cam.orthographicSize - zoomStep * MapScale();
 
-        cam.orthographicSize = Mathf.Clamp(newSize, minCamSize, MaxZoomOut());
+        cam.orthographicSize = Mathf.Clamp(newSize, MinZoomIn(), MaxZoomOut());
         cam.transform.position = ClampCamera(cam.transform.position);
     }
 
     private void ZoomOut()
     {
-        float newSize = cam.orthographicSize + zoomStep;
-        cam.orthographicSize = Mathf.Clamp(newSize, minCamSize, MaxZoomOut());
+        float newSize = cam.orthographicSize + zoomStep * MapScale();
+        cam.orthographicSize = Mathf.Clamp(newSize, MinZoomIn(), MaxZoomOut());
         cam.transform.position = ClampCamera(cam.transform.position);
+    }
+
+    // Sprint maps are drawn at a larger scale (1:4000) and are small in the world, so zoom steps and the closest
+    // zoom are smaller there. With the forest steps a whole sprint leg was already as close as you could get and
+    // one step out showed most of the map, so the wheel seemed to do nothing.
+    private static float MapScale()
+    {
+        return CourseLoader.LoadedMap != null && CourseLoader.LoadedMap.IsSprint ? 0.25f : 1f;
+    }
+
+    private float MinZoomIn()
+    {
+        return minCamSize * MapScale();
     }
 
     // How far out the player may scroll: as wide as the map, and always far enough to see the whole
     // current leg. Without the second part one scroll step on a long leg pushed its ends off the screen.
+    // On sprint maps also as tall as the map, since the camera turns with the leg and sprint maps are often narrow.
     private float MaxZoomOut()
     {
         float mapLimit = (mapRenderer.bounds.size.x / 2f) / cam.aspect;
-        return Mathf.Min(maxCamSize, Mathf.Max(mapLimit, legCamSize));
+        if (MapScale() < 1f) mapLimit = Mathf.Max(mapLimit, mapRenderer.bounds.size.y / 2f);
+        return Mathf.Max(MinZoomIn(), Mathf.Min(maxCamSize, Mathf.Max(mapLimit, legCamSize)));
     }
 
     private Vector3 ClampCamera(Vector3 targetPosition)
@@ -400,8 +423,9 @@ public class CameraController : MonoBehaviour
         float minY = mapMinY + camHeight;
         float maxY = mapMaxY - camHeight;
 
-        float newX = Mathf.Clamp(targetPosition.x, minX, maxX);
-        float newY = Mathf.Clamp(targetPosition.y, minY, maxY);
+        // Zoomed out wider than the map allows: keep the map in the middle instead of pinning it to one side
+        float newX = minX <= maxX ? Mathf.Clamp(targetPosition.x, minX, maxX) : (mapMinX + mapMaxX) / 2f;
+        float newY = minY <= maxY ? Mathf.Clamp(targetPosition.y, minY, maxY) : (mapMinY + mapMaxY) / 2f;
 
         return new Vector3(newX, newY, targetPosition.z);
     }
