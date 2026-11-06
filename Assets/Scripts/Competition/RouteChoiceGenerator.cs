@@ -51,9 +51,12 @@ public class RouteChoiceGenerator
     // long way round that nobody would take, so there the cap is tighter (two good choices are enough)
     const float MaxSlowerSprint = 1.3f;
     const float MaxSlowerForest = 1.07f;
-    const float ViaReach = 0.75f;          // route choices split in the first 75 % of the leg; after that, the fastest way in
+    const float ViaReach = 0.95f;          // a route may go its own way anywhere from 5 % to 95 % along the leg
     const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
-    const float MaxSameShare = 0.5f;       // at most half of a route's middle may run next to another route
+    // Two routes may share most of the leg (everyone runs the same street at first), but somewhere they must part
+    // properly: a stretch at least DivergeShare of the leg long where they are at least SpreadShare of the leg apart
+    const float DivergeShare = 0.15f;
+    const float SpreadShare = 0.10f;
     const float LocalShare = 0.15f;        // round its point, a route must be the fastest way over this share of the leg's time
     const float LocalSlack = 1.05f;        // (5 % slower still counts as the fastest way)
     const float TurnAcceleration = 2f;     // as AgentMovement.TurnAcceleration (world units per second²)
@@ -191,6 +194,7 @@ public class RouteChoiceGenerator
     RouteChoiceLeg MakeHere(int leg, Vector2Int from, Vector2Int to, int seed, float straightMeters)
     {
         RouteChoiceLeg result = new RouteChoiceLeg { leg = leg };
+        bucketed.Clear();
         List<Vector2Int> best = Path(from, to);
         if (best == null || best.Count < 2)
         {
@@ -199,7 +203,10 @@ public class RouteChoiceGenerator
         }
 
         // The corridor round a route, and how close two routes may run and still count as different
-        float corridorMeters = Mathf.Clamp(straightMeters * 0.07f, 2.5f * cellMeters, 60f);
+        divergeCells = Mathf.Max(4f, straightMeters * DivergeShare / cellMeters);
+        spreadCells = Mathf.Max(3f, straightMeters * SpreadShare / cellMeters);
+        // (a little narrower than the spread, so a point on the other side of a house is still tried)
+        float corridorMeters = Mathf.Min(Mathf.Clamp(straightMeters * 0.07f, 2.5f * cellMeters, 60f), Mathf.Max(1.5f * cellMeters, spreadCells * cellMeters * 0.8f));
         int corridor = Mathf.Max(1, Mathf.RoundToInt(corridorMeters / cellMeters));
         float sameMeters = Mathf.Max(1.5f * cellMeters, straightMeters * 0.035f);
         float endMeters = Mathf.Max(corridorMeters, 3f * cellMeters); // near the controls all routes may meet
@@ -330,47 +337,69 @@ public class RouteChoiceGenerator
         return result;
     }
 
-    // True when the middle of each route (away from the controls) mostly runs somewhere else than the other one
-    static bool Different(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
+    float divergeCells;  // see DivergeShare, in cells, for the leg being worked out
+    float spreadCells;   // see SpreadShare
+
+    // True when the two routes part properly somewhere (away from the controls): each has a stretch at least
+    // divergeCells long that runs away from the other one and gets at least spreadCells from it. Sharing the rest of
+    // the leg is fine: a choice of going left or right round a house at the end is a real route choice.
+    bool Different(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
     {
-        return SameShare(a, b, from, to, endCells, sameCells) < MaxSameShare
-            && SameShare(b, a, from, to, endCells, sameCells) < MaxSameShare;
+        return Parts(a, b, from, to, endCells, sameCells) && Parts(b, a, from, to, endCells, sameCells);
     }
 
-    static float SameShare(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
+    bool Parts(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
     {
         int e2 = endCells * endCells;
-        int s2 = Mathf.CeilToInt(sameCells * sameCells);
-        // The cells of b in buckets as big as "the same place", so each cell of a only looks at the buckets round it
-        int bucket = Mathf.Max(1, Mathf.CeilToInt(sameCells));
-        Dictionary<long, List<Vector2Int>> buckets = new Dictionary<long, List<Vector2Int>>();
-        foreach (Vector2Int c in b)
+        float near2 = sameCells * sameCells;
+        float run = 0f, far = 0f;
+        for (int i = 0; i < a.Count; i++)
         {
-            long key = Key(Floor(c.x, bucket), Floor(c.y, bucket));
-            if (!buckets.TryGetValue(key, out List<Vector2Int> list)) buckets[key] = list = new List<Vector2Int>();
-            list.Add(c);
-        }
-        int middle = 0, same = 0;
-        foreach (Vector2Int c in a)
-        {
-            if ((c - from).sqrMagnitude <= e2 || (c - to).sqrMagnitude <= e2) continue;
-            middle++;
-            int bx = Floor(c.x, bucket), by = Floor(c.y, bucket);
-            bool near = false;
-            for (int dy = -1; dy <= 1 && !near; dy++)
+            Vector2Int c = a[i];
+            bool end = (c - from).sqrMagnitude <= e2 || (c - to).sqrMagnitude <= e2;
+            float d2 = end ? 0f : NearbySquared(c, b);
+            if (d2 <= near2)
             {
-                for (int dx = -1; dx <= 1 && !near; dx++)
-                {
-                    if (!buckets.TryGetValue(Key(bx + dx, by + dy), out List<Vector2Int> list)) continue;
-                    foreach (Vector2Int o in list)
-                    {
-                        if ((o - c).sqrMagnitude <= s2) { near = true; break; }
-                    }
-                }
+                run = 0f;
+                far = 0f;
+                continue;
             }
-            if (near) same++;
+            if (i > 0) run += (a[i] - a[i - 1]).magnitude;
+            far = Mathf.Max(far, d2);
+            if (run >= divergeCells && far >= spreadCells * spreadCells) return true;
         }
-        return middle == 0 ? 1f : (float)same / middle;
+        return false;
+    }
+
+    // Squared distance from a cell to the nearest cell of a route, looked up in buckets as big as spreadCells
+    // (anything further than that is "far enough", float.MaxValue)
+    readonly Dictionary<List<Vector2Int>, Dictionary<long, List<Vector2Int>>> bucketed = new Dictionary<List<Vector2Int>, Dictionary<long, List<Vector2Int>>>();
+
+    float NearbySquared(Vector2Int c, List<Vector2Int> route)
+    {
+        int size = Mathf.Max(1, Mathf.CeilToInt(spreadCells));
+        if (!bucketed.TryGetValue(route, out Dictionary<long, List<Vector2Int>> buckets))
+        {
+            buckets = new Dictionary<long, List<Vector2Int>>();
+            foreach (Vector2Int r in route)
+            {
+                long key = Key(Floor(r.x, size), Floor(r.y, size));
+                if (!buckets.TryGetValue(key, out List<Vector2Int> list)) buckets[key] = list = new List<Vector2Int>();
+                list.Add(r);
+            }
+            bucketed[route] = buckets;
+        }
+        int bx = Floor(c.x, size), by = Floor(c.y, size);
+        float best = float.MaxValue;
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                if (!buckets.TryGetValue(Key(bx + dx, by + dy), out List<Vector2Int> list)) continue;
+                foreach (Vector2Int o in list) best = Mathf.Min(best, (o - c).sqrMagnitude);
+            }
+        }
+        return best;
     }
 
     static int Floor(int v, int size) => v >= 0 ? v / size : (v - size + 1) / size;

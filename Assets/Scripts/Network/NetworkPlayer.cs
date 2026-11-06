@@ -139,6 +139,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int choiceAnswered { get; set; }
     [Networked] public int choiceQuestions { get; set; }
     [Networked] public NetworkBool choiceDone { get; set; }
+    // Per leg (index 1 = start to control 1): the route picked and the points (RouteChoiceGame.WriteLeg / ReadLeg)
+    [Networked, Capacity(52)] public NetworkArray<int> choiceLegs => default;
 
     void ClearModeChoices()
     {
@@ -149,6 +151,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         choiceAnswered = 0;
         choiceQuestions = 0;
         choiceDone = false;
+        for (int i = 0; i < choiceLegs.Length; i++) choiceLegs.Set(i, 0);
         bearPlaced = false;
         bearPosition = Vector2.zero;
         moveUsed = false;
