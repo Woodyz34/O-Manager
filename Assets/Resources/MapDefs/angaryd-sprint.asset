@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdf7c09cbde9a0e429736d1cbce57569, type: 3}
+  m_Name: angaryd-sprint
+  m_EditorClassIdentifier: Assembly-CSharp::MapDefinition
+  id: angaryd-sprint
+  displayName: "\xC4ngaryd sprint"
+  mapType: sprint
+  gridName: MapPackages/angaryd-sprint/grid
+  minx: 1018.652
+  miny: 1427.284
+  maxx: 2238.652
+  maxy: 3833.284
+  gridSize: 2
+  rows: 1204
+  cols: 611
+  pointsPath: MapPackages/angaryd-sprint/points
+  linesPath: MapPackages/angaryd-sprint/lines
+  defaultBackground: map
+  backgrounds:
+  - id: map
+    spritePath: MapPackages/angaryd-sprint/picture
+    thumbnailPath: MapPackages/angaryd-sprint/thumb
+    position: {x: 0, y: 0, z: 0}
+    rotation: 0
+    scale: 1
+    courseInPicture: 0
+    pixelSize: {x: 7332, y: 14448}
+    pivotPixels: {x: 3666, y: 7224}
+    pixelsPerUnit: 600
