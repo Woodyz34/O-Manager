@@ -18,8 +18,8 @@ public class MapImportPanel : MonoBehaviour
 {
     public static bool IsOpen { get; private set; }
 
-    const double PixelsPerMm = 16;          // about 400 dpi: sharp, and the picture stays a manageable size
-    const int MaxPictureSide = 16384;       // the largest texture Unity can make
+    public const double PixelsPerMm = 16;   // about 400 dpi: sharp, and the picture stays a manageable size
+    public const int MaxPictureSide = 16384; // the largest texture Unity can make
 
     static readonly string[] MapExtensions = { "ocd", "omap", "xmap" };
     static readonly string[] MapTypes = { "forest", "sprint", "both" };
@@ -73,7 +73,7 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Import a map", 36, CourseUI.Ink, FontStyles.Bold), 44);
         CourseUI.Size(CourseUI.Text("Info", card.transform,
             "Pick a map file from OCAD (.ocd, version 11 or newer) or OpenOrienteering Mapper (.omap or .xmap). " +
-            "The game makes the grid, the heights and the map picture from it. The map is kept on this computer until it is built into the game.",
+            "The game makes the grid, the heights and the map picture from it. Everyone can use the map at once: it is shared through Unity Cloud until it is built into the game.",
             20, CourseUI.InkMuted), 56);
 
         // The map file: the computer's own file window, dragging it onto the game, or its path pasted in
@@ -372,6 +372,24 @@ public class MapImportPanel : MonoBehaviour
 
     // ---- Import ----
 
+    // Builds a map package from a map file, the same way on every computer: here, and when a map another player
+    // shared is downloaded (SharedMaps). Safe on a background thread. ownPng: the player's own picture, or null.
+    public static MapPackage BuildPackage(MapFile source, string name, string mapType, byte[] ownPng, Action<string, float> progress)
+    {
+        int w = 0, h = 0;
+        if (ownPng != null)
+        {
+            if (!PngFile.TrySize(ownPng, out w, out h)) throw new InvalidDataException("The picture is not a PNG file.");
+            if (w > MaxPictureSide || h > MaxPictureSide)
+                throw new InvalidDataException($"The picture is {w} x {h} pixels; the game can show at most {MaxPictureSide} pixels each way. Export it at a lower resolution.");
+        }
+        bool sprintCells = mapType != "forest";   // sprint maps and maps that are both get 2 m cells
+        MapPackage package = MapPackageBuilder.Build(source, name, sprintCells, PixelsPerMm, MaxPictureSide, ownPng == null, progress);
+        if (ownPng != null && !MapPackageBuilder.FitOwnPicture(package, w, h, out string problem)) throw new InvalidDataException(problem);
+        package.info.mapType = mapType;
+        return package;
+    }
+
     IEnumerator Import()
     {
         string name = nameField.text.Trim();
@@ -409,7 +427,6 @@ public class MapImportPanel : MonoBehaviour
         string author = PlayerPrefs.GetString("PlayerNickName", "");
         string picture = picturePath;
         MapFile source = mapFile;
-        bool sprintCells = mapType != "forest";   // sprint maps and maps that are both get 2 m cells
         string type = mapType;
         source.contourInterval = contours;
         source.boundary = edge;
@@ -420,20 +437,8 @@ public class MapImportPanel : MonoBehaviour
 
         Task work = Task.Run(() =>
         {
-            if (picture != null)
-            {
-                ownPng = File.ReadAllBytes(picture);
-                if (!PngFile.TrySize(ownPng, out int w, out int h)) throw new InvalidDataException("The picture is not a PNG file.");
-                if (w > MaxPictureSide || h > MaxPictureSide)
-                    throw new InvalidDataException($"The picture is {w} x {h} pixels; the game can show at most {MaxPictureSide} pixels each way. Export it at a lower resolution.");
-            }
-            package = MapPackageBuilder.Build(source, name, sprintCells, PixelsPerMm, MaxPictureSide, ownPng == null,
-                (step, share) => { progressShare = share; progressStep = step; });
-            if (ownPng != null)
-            {
-                PngFile.TrySize(ownPng, out int w, out int h);
-                if (!MapPackageBuilder.FitOwnPicture(package, w, h, out string problem)) throw new InvalidDataException(problem);
-            }
+            if (picture != null) ownPng = File.ReadAllBytes(picture);
+            package = BuildPackage(source, name, type, ownPng, (step, share) => { progressShare = share; progressStep = step; });
             package.info.id = id;
             package.info.sourceFile = sourceName;
             package.info.author = author;
@@ -486,7 +491,7 @@ public class MapImportPanel : MonoBehaviour
             }
             else
             {
-                sentNote = " It has been sent in to be built into the game.";
+                sentNote = " It is shared with all players until it is built into the game.";
             }
         }
         Debug.Log($"MapImportPanel: imported {name} as {id} in {watch.Elapsed.TotalSeconds:F1} s -> {target}");

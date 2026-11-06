@@ -88,13 +88,14 @@ public static class CloudCourses
         await SignInAsync();
         Query query = new Query(
             new List<FieldFilter> { new FieldFilter(UpdatedKey, 0, FieldFilter.OpOptions.GT, false) },
-            new HashSet<string> { CoursesKey },
+            new HashSet<string> { CoursesKey, SharedMaps.SharedKey },
             0,
             MaxPlayersPerFetch);
         List<EntityData> results = await CloudSaveService.Instance.Data.Player.QueryAsync(query, new PlayerData.QueryOptions());
 
         string me = PlayerId;
         List<CourseData> courses = new List<CourseData>();
+        SharedMaps.BeginListing();
         foreach (EntityData entity in results)
         {
             if (entity.Id == me || entity.Data == null)
@@ -103,6 +104,11 @@ public static class CloudCourses
             }
             foreach (Item item in entity.Data)
             {
+                if (item.Key == SharedMaps.SharedKey)
+                {
+                    SharedMaps.AddListed(entity.Id, item.Value.GetAs<string>());
+                    continue;
+                }
                 if (item.Key != CoursesKey)
                 {
                     continue;
@@ -126,6 +132,7 @@ public static class CloudCourses
                 }
             }
         }
+        SharedMaps.Sync();   // downloads maps other players shared, in the background
         courses.Sort((a, b) => b.createdAt.CompareTo(a.createdAt));
         if (courses.Count > MaxCommunityCourses) courses.RemoveRange(MaxCommunityCourses, courses.Count - MaxCommunityCourses);
         return courses;

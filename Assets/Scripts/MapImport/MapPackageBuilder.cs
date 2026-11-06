@@ -45,6 +45,10 @@ namespace MapImport
         public string created;                // ISO date
         public bool permissionConfirmed;      // the uploader says the map's owner allows it
         public double[] boundary;             // the edge of the finished map the player chose (paper mm), or empty for all of it
+        // A copy of a map another player shared through Unity Cloud (see SharedMaps): their player id and when they
+        // shared it (unix seconds). Empty for maps imported on this computer and for maps built into the game.
+        public string sharedBy;
+        public long sharedAt;
     }
 
     public class MapPackage
@@ -233,6 +237,7 @@ namespace MapImport
             B("georeferenced", i.georeferenced); N("refEast", i.refEast); N("refNorth", i.refNorth); N("gridAngle", i.gridAngle); N("crs", i.crs);
             N("offsetEast", i.offsetEast); N("offsetNorth", i.offsetNorth);
             S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created);
+            S("sharedBy", i.sharedBy); N("sharedAt", i.sharedAt);
             sb.Append("  \"permissionConfirmed\": ").Append(i.permissionConfirmed ? "true" : "false").Append("\n}\n");
             File.WriteAllText(Path.Combine(folder, "map.json"), sb.ToString());
         }
