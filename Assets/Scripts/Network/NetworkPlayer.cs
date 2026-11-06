@@ -569,8 +569,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             manager.ChooseWhomeverYouWantMode = true;
             manager.ChooseRunnerPanel.SetActive(true);
-            UIToast.Show("Same stats: every runner has speed " + sameSpeed + " and technique " + sameTechnique
-                + ". Pick whoever you like.", 8f);
+            // (No message at the bottom of the screen: the user does not want instruction pop-ups in any game mode)
         }
 
         if (Object.HasStateAuthority && effectiveGameMode.Contains("Choose a runner"))
