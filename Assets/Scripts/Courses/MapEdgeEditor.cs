@@ -18,8 +18,12 @@ public class MapEdgeEditor : MonoBehaviour
     double[] chosen;                   // what Done gives back while no corner has been moved
     bool moved;
 
-    RectTransform imageRect;
-    Vector2 shown;                     // size of the picture on screen
+    RectTransform imageRect, frameRect;
+    Vector2 shown;                     // size of the picture on screen (grows when zoomed in)
+    Vector2 baseShown, area;           // the whole picture fitted in the frame; the frame's size
+    float zoom = 1f;
+    Vector2 pan;                       // where the picture's middle sits in the frame
+    const float MaxZoom = 16f;
     EdgeGraphic lines;
     readonly List<GameObject> handles = new List<GameObject>();
     TextMeshProUGUI hint;
@@ -59,14 +63,21 @@ public class MapEdgeEditor : MonoBehaviour
         CourseUI.Place(hint.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -70), new Vector2(1100, 54));
 
         // The picture, as big as fits
-        Vector2 area = new Vector2(1100, 760);
+        area = new Vector2(1100, 760);
         float scale = Mathf.Min(area.x / preview.width, area.y / preview.height);
-        shown = new Vector2(preview.width * scale, preview.height * scale);
+        baseShown = shown = new Vector2(preview.width * scale, preview.height * scale);
         texture = new Texture2D(preview.width, preview.height, TextureFormat.RGBA32, false);
         texture.LoadRawTextureData(preview.rgba);
         texture.Apply(false, true);
         Image frame = CourseUI.Panel("Frame", card.transform, Color.white, false);
         CourseUI.Place(frame.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -130), area);
+        frame.gameObject.AddComponent<RectMask2D>();
+        frameRect = frame.rectTransform;
+        // Behind the picture: catches the wheel (zoom) and drags on the map (move it)
+        Image view = CourseUI.Panel("View", frame.transform, new Color(1, 1, 1, 0));
+        CourseUI.Stretch(view.rectTransform);
+        view.raycastTarget = true;
+        view.gameObject.AddComponent<EdgeView>().editor = this;
         RawImage picture = CourseUI.Rect("Picture", frame.transform).gameObject.AddComponent<RawImage>();
         picture.texture = texture;
         picture.uvRect = new Rect(0, 1, 1, -1);     // the preview's row 0 is the top
@@ -84,6 +95,10 @@ public class MapEdgeEditor : MonoBehaviour
         RectTransform buttons = CourseUI.Rect("Buttons", card.transform);
         CourseUI.Place(buttons, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 26), new Vector2(1100, 58));
         CourseUI.Row(buttons.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        Button zoomOut = CourseUI.Button("Zoom out", buttons, "-", CourseUI.ButtonKind.Light, () => Zoom(Vector2.zero, 0.67f), 28);
+        CourseUI.Size(zoomOut, -1, 70, 0);
+        Button zoomIn = CourseUI.Button("Zoom in", buttons, "+", CourseUI.ButtonKind.Light, () => Zoom(Vector2.zero, 1.5f), 28);
+        CourseUI.Size(zoomIn, -1, 70, 0);
         CourseUI.Button("Whole map", buttons, "Use the whole map", CourseUI.ButtonKind.Light, () => { chosen = null; moved = false; points = null; Redraw(); }, 22);
         Button guess = CourseUI.Button("Guess", buttons, "Use the guess", CourseUI.ButtonKind.Secondary, () => { chosen = guessed; moved = false; points = ToPixels(guessed); Redraw(); }, 22);
         guess.interactable = guessed != null;
@@ -131,7 +146,7 @@ public class MapEdgeEditor : MonoBehaviour
         handles.Clear();
         hint.text = points == null
             ? "The whole map file is used. \"Use the guess\" shows where the game thinks the finished map ends."
-            : "Everything outside the orange line is left out. Drag the corners; drag a small dot to make a new corner; right-click a corner to remove it.";
+            : "Everything outside the orange line is left out. Drag the corners; drag a small dot to make a new corner; right-click a corner to remove it. The wheel or + and - zoom; drag the map to move it.";
         if (points == null)
         {
             lines.SetPoints(null);
@@ -193,6 +208,45 @@ public class MapEdgeEditor : MonoBehaviour
     internal void EndDrag()
     {
         Redraw();   // the middle dots move to the new sides
+    }
+
+    // ---- Zoom and move ----
+
+    // Zooms round a point on the screen (null: the middle of the frame), keeping that spot of the map under it
+    internal void ZoomAt(Vector2 screen, Camera cam, float factor)
+    {
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(frameRect, screen, cam, out Vector2 at)) at = Vector2.zero;
+        Zoom(at, factor);
+    }
+
+
+    void Zoom(Vector2 at, float factor)
+    {
+        float next = Mathf.Clamp(zoom * factor, 1f, MaxZoom);
+        if (Mathf.Approximately(next, zoom)) return;
+        Vector2 spot = new Vector2((at.x - pan.x) / shown.x, (at.y - pan.y) / shown.y);   // -0.5..0.5 across the picture
+        zoom = next;
+        shown = baseShown * zoom;
+        pan = at - new Vector2(spot.x * shown.x, spot.y * shown.y);
+        ApplyView(true);
+    }
+
+    internal void PanBy(Vector2 screen, Vector2 delta, Camera cam)
+    {
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(frameRect, screen, cam, out Vector2 now)) return;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(frameRect, screen - delta, cam, out Vector2 before)) return;
+        pan += now - before;
+        ApplyView(false);
+    }
+
+    void ApplyView(bool resized)
+    {
+        // The picture may not leave the frame: at most its own overhang each way
+        float maxX = Mathf.Max(0, (shown.x - area.x) / 2f), maxY = Mathf.Max(0, (shown.y - area.y) / 2f);
+        pan = new Vector2(Mathf.Clamp(pan.x, -maxX, maxX), Mathf.Clamp(pan.y, -maxY, maxY));
+        imageRect.sizeDelta = shown;
+        imageRect.anchoredPosition = pan;
+        if (resized) Redraw();   // corners and lines sit at the new size
     }
 
     internal void Remove(EdgeHandle handle)

@@ -30,7 +30,7 @@ namespace MapImport
         const int CoverBlocks = 9;            // 45 m square for "drawn edge to edge"
         const double CoverShare = 0.5;        // at least half of it not white paper
         const int CloseBlocks = 4;            // 20 m: small notches in the edge are filled
-        const int MarginBlocks = 2;           // 10 m added all round, so nothing at the edge is cut
+        const int MarginBlocks = 1;           // 5 m added all round, so nothing at the edge is cut
 
         // A small picture of the whole map (about 1 pixel per metre, at most maxSide pixels each way)
         public static MapPreview Preview(MapFile map, int maxSide = 3000)
@@ -43,7 +43,7 @@ namespace MapImport
         }
 
         // The guessed edge, x,y pairs in paper mm, or null when the whole map looks finished (or it can't tell)
-        public const int MaxCorners = 30;
+        public const int MaxCorners = 40;
 
         public static double[] Guess(MapFile map, MapPreview preview)
         {
@@ -128,8 +128,8 @@ namespace MapImport
             if (outline == null || outline.Count < 3) return null;
             var poly = new List<double>();
             // Few enough corners to move by hand: loosen the fit until there are at most MaxCorners
-            List<(int x, int y)> corners = Simplify(outline, 2.5);
-            for (double tolerance = 3; corners.Count > MaxCorners && tolerance < 40; tolerance *= 1.25)
+            List<(int x, int y)> corners = Simplify(outline, 1.0);
+            for (double tolerance = 1.25; corners.Count > MaxCorners && tolerance < 40; tolerance *= 1.25)
                 corners = Simplify(outline, tolerance);
             foreach ((int x, int y) in corners)
             {

@@ -159,14 +159,23 @@ public static class CourseUI
         value.alignment = TextAlignmentOptions.MidlineLeft;
         value.enableWordWrapping = false;
 
+        // The field is set up while switched off: TMP_InputField makes its caret when it is switched on, and only
+        // if it already has its text by then (without this the text cursor never shows)
+        bool wasActive = frame.gameObject.activeSelf;
+        frame.gameObject.SetActive(false);
         TMP_InputField field = frame.gameObject.AddComponent<TMP_InputField>();
         field.textViewport = area;
         field.textComponent = value;
         field.placeholder = hint;
         field.characterLimit = characterLimit;
         field.lineType = TMP_InputField.LineType.SingleLine;
+        field.caretWidth = 2;
+        field.customCaretColor = true;
+        field.caretColor = Ink;
+        field.selectionColor = new Color(Accent.r, Accent.g, Accent.b, 0.35f);
         if (Skin != null && Skin.font != null) field.fontAsset = Skin.font;
         if (onChanged != null) field.onValueChanged.AddListener(v => onChanged(v));
+        frame.gameObject.SetActive(wasActive);
         return field;
     }
 
