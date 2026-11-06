@@ -99,6 +99,7 @@ public static class MapImportMenu
             EditorUtility.DisplayProgressBar("Import map", "Reading " + Path.GetFileName(file), 0f);
             MapFile mapFile = MapPackageBuilder.ReadMapFile(bytes);
             if (sent != null && sent.contourInterval > 0) mapFile.contourInterval = sent.contourInterval;
+            if (sent?.boundary != null && sent.boundary.Length >= 6) mapFile.boundary = sent.boundary;   // the edge the sender chose
             bool isSprint = sprint ?? SymbolRules.LooksLikeSprint(mapFile);
             if (sprint == null)
             {

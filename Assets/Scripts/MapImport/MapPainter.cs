@@ -84,6 +84,15 @@ namespace MapImport
                 if (progress != null && (i & 1023) == 0) progress(i / (float)ops.Count);
             }
             ops.Clear();
+            // White paper outside the edge of the finished map
+            if (map.boundary != null && map.boundary.Length >= 6)
+            {
+                MapBoundary.ForOutside(map.boundary, width, height, row => maxY - (row + 0.5) / ppm, x => (x - minX) * ppm,
+                    (row, from, to) =>
+                    {
+                        for (int i = (row * width + from) * 4, end = (row * width + to) * 4; i < end; i++) rgba[i] = 255;
+                    });
+            }
         }
 
         void Add(int color, Action draw, ref int order)
@@ -186,13 +195,13 @@ namespace MapImport
             {
                 int c = l.leftColor;
                 double off = (l.doubleWidth + l.leftWidth) / 2;
-                Add(c, () => StrokePaper(Offset(p, off), l.leftWidth, c, false), ref order);
+                Add(c, () => StrokeMaybeDashed(Offset(p, off), l.leftWidth, c, l.borderDash, l.borderGap), ref order);
             }
             if (l.rightColor >= 0 && l.rightWidth > 0)
             {
                 int c = l.rightColor;
                 double off = -(l.doubleWidth + l.rightWidth) / 2;
-                Add(c, () => StrokePaper(Offset(p, off), l.rightWidth, c, false), ref order);
+                Add(c, () => StrokeMaybeDashed(Offset(p, off), l.rightWidth, c, l.borderDash, l.borderGap), ref order);
             }
             if (l.color >= 0 && l.width > 0)
             {
@@ -213,7 +222,9 @@ namespace MapImport
             {
                 double spacing = l.midSpacing > 0 ? l.midSpacing : (l.mainLength > 0 ? l.mainLength + l.mainGap : 0);
                 if (spacing <= 0.05) spacing = 1;
-                List<(double x, double y, double a)> spots = AlongLine(p, spacing, l.midCount, l.midDistance);
+                List<(double x, double y, double a)> spots = l.oomMid && !(l.mainGap > 0 && l.mainLength > 0)
+                    ? AlongLineOom(p, l.midSpacing, l.midEnd, l.midCount, l.midDistance, l.midAtLeastOne, l.midMinCount)
+                    : AlongLine(p, spacing, l.midCount, l.midDistance);
                 foreach (SymbolElement e in l.midElements)
                 {
                     SymbolElement el = e;
@@ -346,6 +357,44 @@ namespace MapImport
         }
 
         // Places symbols along a line: groups of 'count' symbols 'distance' apart, every 'spacing' mm
+        void StrokeMaybeDashed(double[] p, double width, int color, double dash, double gap)
+        {
+            if (dash > 0 && gap > 0)
+            {
+                foreach (double[] d in Dashes(p, dash, gap)) StrokePaper(d, width, color, false);
+            }
+            else StrokePaper(p, width, color, false);
+        }
+
+        // Symbols along a solid line the way OpenOrienteering Mapper puts them: the first and last group endLength
+        // from the ends and the rest evenly between, as near segment apart as fits. No room: none, or one group in
+        // the middle when atLeastOne is set.
+        static List<(double, double, double)> AlongLineOom(double[] p, double segment, double endLength, int count,
+                                                            double distance, bool atLeastOne, int minCount)
+        {
+            int n = p.Length / 2;
+            double total = 0;
+            for (int i = 0; i < n - 1; i++) total += MapGeometry.Dist(p[2 * i], p[2 * i + 1], p[2 * i + 2], p[2 * i + 3]);
+            var centres = new List<double>();
+            double groupWidth = (count - 1) * distance;
+            double room = total - 2 * endLength - groupWidth;
+            if (total <= 0) return new List<(double, double, double)>();
+            if (segment <= 0 || room < 0)
+            {
+                if (atLeastOne || (segment > 0 && minCount > 0)) centres.Add(total / 2);
+            }
+            else
+            {
+                int gaps = Math.Max(Math.Max(0, minCount - 1), (int)Math.Round(room / segment));
+                if (gaps == 0) centres.Add(total / 2);
+                else for (int g = 0; g <= gaps; g++) centres.Add(endLength + groupWidth / 2 + room * g / gaps);
+            }
+            var targets = new List<double>();
+            foreach (double c in centres)
+                for (int k = 0; k < count; k++) targets.Add(c - groupWidth / 2 + k * distance);
+            return SpotsAt(p, targets, total);
+        }
+
         static List<(double, double, double)> AlongLine(double[] p, double spacing, int count, double distance)
         {
             var spots = new List<(double, double, double)>();
@@ -362,6 +411,14 @@ namespace MapImport
                 double centre = (g + 0.5) * step;
                 for (int k = 0; k < count; k++) targets.Add(centre - groupWidth / 2 + k * distance);
             }
+            return SpotsAt(p, targets, total);
+        }
+
+        // Points (and the line's direction) at these distances along a polyline
+        static List<(double, double, double)> SpotsAt(double[] p, List<double> targets, double total)
+        {
+            var spots = new List<(double, double, double)>();
+            int n = p.Length / 2;
             int seg = 0;
             double segStart = 0;
             foreach (double t in targets)

@@ -106,8 +106,9 @@ public static class CourseThumbnail
         }
         // Marks as on the big map, but never thinner or smaller than reads well on the card
         float pixelsPerMeter = MapDefinition.WorldUnitsPerMeter * background.pixelsPerUnit * background.scale * texture.width / (area.width * background.pixelSize.x);
-        float radius = Mathf.Max(37f * pixelsPerMeter, 9f * Scale);
-        float width = Mathf.Max(4.5f * pixelsPerMeter, 2.4f * Scale);
+        float size = CourseRenderer.SizeFor(map);   // smaller on sprint maps, as on the big map
+        float radius = Mathf.Max(37f * size * pixelsPerMeter, 9f * Scale);
+        float width = Mathf.Max(4.5f * size * pixelsPerMeter, 2.4f * Scale);
         Color32 purple = CourseRenderer.CoursePurple;
 
         // Out-of-bounds areas: vertical purple stripes and a border, under the course

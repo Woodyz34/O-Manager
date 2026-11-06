@@ -27,6 +27,8 @@ public class MapImportPanel : MonoBehaviour
     Action<MapDefinition> onImported;
     string mapPath, picturePath;
     MapFile mapFile;
+    MapPreview preview;                     // small picture of the whole file, for the map edge
+    double[] guessedEdge, edge;             // paper mm; null = the whole map
     string version;
     string mapType = "forest";
     bool permission;
@@ -39,7 +41,8 @@ public class MapImportPanel : MonoBehaviour
     TextMeshProUGUI fileText, statusText;
     TMP_InputField pathField, pictureField, nameField, contourField;
     TMP_InputField senderField, clubField, contactField;   // who sends the map in, so the game's owner can reach them
-    Button typeButton, pictureButton, permissionButton, importButton, cancelButton;
+    Button typeButton, pictureButton, permissionButton, importButton, cancelButton, edgeButton;
+    TextMeshProUGUI edgeText;
     Image permissionBox;
 
     public static MapImportPanel Open(Transform canvas, Action<MapDefinition> onImported)
@@ -114,6 +117,16 @@ public class MapImportPanel : MonoBehaviour
         pictureField.onEndEdit.AddListener(p => ChoosePicture(p));
         pictureButton = CourseUI.Button("Picture", pictureRow, "", CourseUI.ButtonKind.Light, OnPictureButton, 20);
         CourseUI.Size(pictureButton, -1, 300);
+
+        // The edge of the finished map: parts of the file outside it (unfinished mapping) are left out
+        RectTransform edgeRow = CourseUI.Rect("Edge row", card.transform);
+        CourseUI.Row(edgeRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(edgeRow, 52);
+        edgeText = CourseUI.Text("Edge", edgeRow, "", 20, CourseUI.Ink);
+        edgeText.alignment = TextAlignmentOptions.MidlineLeft;
+        CourseUI.Size(edgeText, -1, -1, 1);
+        edgeButton = CourseUI.Button("Edge button", edgeRow, "Check map edge...", CourseUI.ButtonKind.Secondary, OpenEdge, 20);
+        CourseUI.Size(edgeButton, -1, 300);
 
         // The permission checkbox: a box that fills orange, and the text
         permissionButton = CourseUI.Button("Permission", card.transform, "", CourseUI.ButtonKind.Light, () => { permission = !permission; Refresh(); }, 18);
@@ -216,6 +229,8 @@ public class MapImportPanel : MonoBehaviour
         PlayerPrefs.SetString("MapImport.Folder", Path.GetDirectoryName(path));
         mapPath = path;
         mapFile = null;
+        preview = null;
+        guessedEdge = edge = null;
         version = null;
         nameField.text = Path.GetFileNameWithoutExtension(path).Replace('_', ' ');
         SetStatus("Reading " + Path.GetFileName(path) + " ...", false);
@@ -226,7 +241,19 @@ public class MapImportPanel : MonoBehaviour
             byte[] bytes = File.ReadAllBytes(reading);
             string v = MapPackageBuilder.DescribeVersion(bytes);
             MapFile m = MapPackageBuilder.ReadMapFile(bytes);
-            return (v, m);
+            // A small picture and a guess at where the finished map ends; a failure here never stops the import
+            MapPreview p = null;
+            double[] g = null;
+            try
+            {
+                p = MapBoundary.Preview(m);
+                g = MapBoundary.Guess(m, p);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("MapImportPanel: no map edge guess: " + e);
+            }
+            return (v, m, p, g);
         }).ContinueWith(t =>
         {
             // Picked up on the main thread in Update; a file chosen after this one wins
@@ -235,13 +262,13 @@ public class MapImportPanel : MonoBehaviour
         Refresh();
     }
 
-    Task<(string, MapFile)> pendingRead;
+    Task<(string, MapFile, MapPreview, double[])> pendingRead;
 
     void Update()
     {
         if (pendingRead != null)
         {
-            Task<(string, MapFile)> t = pendingRead;
+            Task<(string, MapFile, MapPreview, double[])> t = pendingRead;
             pendingRead = null;
             if (t.IsFaulted)
             {
@@ -252,10 +279,13 @@ public class MapImportPanel : MonoBehaviour
             {
                 version = t.Result.Item1;
                 mapFile = t.Result.Item2;
+                preview = t.Result.Item3;
+                guessedEdge = edge = t.Result.Item4;
                 mapType = SymbolRules.LooksLikeSprint(mapFile) ? "sprint" : "forest";
                 contourField.SetTextWithoutNotify(SymbolRules.Equidistance(mapFile).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
                 string warnings = mapFile.warnings.Count > 0 ? "  (" + mapFile.warnings.Count + " things in the file were skipped)" : "";
-                SetStatus($"{version}, 1:{mapFile.scale:0}, {mapFile.objects.Count} objects. Looks like a {mapType} map." + warnings, false);
+                SetStatus($"{version}, 1:{mapFile.scale:0}, {mapFile.objects.Count} objects. Looks like a {mapType} map." + warnings
+                    + (guessedEdge != null ? " Parts look unfinished: check the map edge." : ""), false);
             }
             Refresh();
         }
@@ -283,6 +313,12 @@ public class MapImportPanel : MonoBehaviour
         if (path != null) ChoosePicture(path);
     }
 
+    void OpenEdge()
+    {
+        if (working || preview == null) return;
+        MapEdgeEditor.Open(transform, preview, edge, guessedEdge, chosen => { edge = chosen; Refresh(); });
+    }
+
     void NextType()
     {
         mapType = MapTypes[(Array.IndexOf(MapTypes, mapType) + 1) % MapTypes.Length];
@@ -295,6 +331,12 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.SetButtonText(typeButton, mapType == "sprint" ? "Type: Sprint map" : mapType == "both" ? "Type: Forest and sprint" : "Type: Forest map");
         CourseUI.SetButtonText(pictureButton, string.IsNullOrEmpty(picturePath)
             ? (NativeFiles.CanBrowse ? "Choose picture..." : "Drawn by the game") : "Remove picture");
+        edgeText.text = mapFile == null ? "Map edge: choose a map file first."
+            : edge == null ? "Map edge: the whole map file is used."
+            : edge == guessedEdge ? "Map edge: the game left out parts that look unfinished. Check that it is right."
+            : "Map edge: your own edge. Everything outside it is left out.";
+        edgeText.color = edge != null && edge == guessedEdge ? CourseUI.Accent : CourseUI.Ink;
+        edgeButton.interactable = !working && preview != null;
         permissionBox.enabled = permission;
         bool ready = mapFile != null && permission && !working && ContactGiven();
         importButton.interactable = ready;
@@ -370,6 +412,7 @@ public class MapImportPanel : MonoBehaviour
         bool sprintCells = mapType != "forest";   // sprint maps and maps that are both get 2 m cells
         string type = mapType;
         source.contourInterval = contours;
+        source.boundary = edge;
         string sourceName = Path.GetFileName(mapPath);
         MapPackage package = null;
         byte[] ownPng = null;
