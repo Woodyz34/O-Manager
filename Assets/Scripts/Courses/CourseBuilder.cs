@@ -1697,8 +1697,16 @@ public class CourseBuilder : MonoBehaviour
         // always visible: the two lists give up room first (down to their minimum heights) when space runs short
         CourseUI.Column(panel.gameObject, 8, new RectOffset(28, 28, 20, 20));
 
-        TextMeshProUGUI title = CourseUI.Text("Title", panel.transform, "Course builder", 38, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Size(title, 44);
+        // The title, with New course in the top-right corner, so the buttons at the bottom have room for their names
+        RectTransform titleRow = CourseUI.Rect("Title row", panel.transform);
+        CourseUI.Row(titleRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(titleRow, 44);
+        TextMeshProUGUI title = CourseUI.Text("Title", titleRow, "Course builder", 38, CourseUI.Ink, FontStyles.Bold);
+        title.alignment = TextAlignmentOptions.MidlineLeft;
+        title.enableWordWrapping = false;
+        CourseUI.Size(title, 44, -1, 1);
+        Button newCourse = CourseUI.Button("New", titleRow, "New course", CourseUI.ButtonKind.Light, ClearCourse, 20);
+        CourseUI.Size(newCourse, 40, 150);
 
         RectTransform mapRow = CourseUI.Rect("Map row", panel.transform);
         CourseUI.Row(mapRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
@@ -1771,7 +1779,6 @@ public class CourseBuilder : MonoBehaviour
         RectTransform bottomRow = CourseUI.Rect("Bottom", panel.transform);
         CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(bottomRow, 52);
-        CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Light, ClearCourse, 22);
         CourseUI.Button("Import map", bottomRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 22);
         // Opened from the multiplayer lobby: back to the lobby, the network game is still running
         if (LobbyVisit.Active) CourseUI.Button("Back", bottomRow, "Back to lobby", CourseUI.ButtonKind.Light, LobbyVisit.Close, 22);
