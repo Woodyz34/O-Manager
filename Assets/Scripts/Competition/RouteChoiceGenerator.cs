@@ -753,10 +753,10 @@ public class RouteChoiceGenerator
                 bool clear = true;
                 for (int s = 0; s < pts.Count - 1 && clear; s++)
                 {
-                    LineCost(pts[s], pts[s + 1], out bool blocked);
+                    LineCost(pts[s], pts[s + 1], out bool blocked, EdgeMargin);
                     if (blocked) clear = false;
                 }
-                LineCost(round[round.Count - 1], pts[0], out bool blockedIn);
+                LineCost(round[round.Count - 1], pts[0], out bool blockedIn, EdgeMargin);
                 if (clear && !blockedIn) curve = pts;
             }
             if (curve != null) round.AddRange(curve);
@@ -766,9 +766,14 @@ public class RouteChoiceGenerator
         return round;
     }
 
+    // How far (in cells) a rounded corner keeps from impassable ground. A cell is open or blocked as a whole, so a
+    // curve that only keeps its points on open cells can still run up to half a cell into a garden or a house where
+    // it cuts a corner. With the margin it stays about a third of a cell inside the open cells.
+    const float EdgeMargin = 0.35f;
+
     // The A* cost (distance / ground speed / slope) of a straight line between two points, sampled about every
-    // third of a cell; blocked when it touches impassable ground
-    float LineCost(Vector2 a, Vector2 b, out bool blocked)
+    // third of a cell; blocked when it touches impassable ground (or comes within margin cells of it)
+    float LineCost(Vector2 a, Vector2 b, out bool blocked, float margin = 0f)
     {
         blocked = false;
         Vector2 ab = b - a;
@@ -785,10 +790,23 @@ public class RouteChoiceGenerator
             if (x < 0 || y < 0 || x >= width || y >= height) { blocked = true; return float.MaxValue; }
             float cellSpeed = speed[y, x];
             if (cellSpeed <= 0.01f) { blocked = true; cellSpeed = 0.05f; }
+            else if (margin > 0f && !blocked && NearBlocked(p, margin)) blocked = true;
             float slope = slopes[d] != null ? Mathf.Max(0.05f, slopes[d][y, x]) : 1f;
             cost += step / cellSpeed / slope;
         }
         return cost;
+    }
+
+    // Whether a blocked (or outside) cell lies within margin cells of the point, along x and y
+    bool NearBlocked(Vector2 p, float margin)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            int x = Mathf.RoundToInt(p.x + ((i & 1) == 0 ? -margin : margin));
+            int y = Mathf.RoundToInt(p.y + ((i & 2) == 0 ? -margin : margin));
+            if (x < 0 || y < 0 || x >= width || y >= height || speed[y, x] <= 0.01f) return true;
+        }
+        return false;
     }
 
     // The nearest of the 8 grid directions
