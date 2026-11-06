@@ -10,6 +10,7 @@ public class RouteChoice
     public float seconds;   // race time (game seconds) for the speed-100 runner
     public float meters;    // length of the route
     public int colour;      // index into RouteChoiceGame.Colours
+    public bool crossesBlocked; // route analysis: the line goes over ground nobody can run on (a building, a fence ...)
 }
 
 // The route choices of one leg (index 1 = start to control 1), in the order they are shown: from left to right
@@ -72,6 +73,8 @@ public class RouteChoiceGenerator
     readonly float gameSecondsPerSecond;
     readonly int width, height;
     readonly float MaxSlower;
+    // How fast ground nobody can run on counts when a line goes over it anyway (only drawn lines in route analysis do)
+    public float BlockedSpeed { get; set; } = 0.05f;
 
     public RouteChoiceGenerator(float[,] speedGrid, Dictionary<string, float[,]> slopeFactors, float cellSize,
                                 float baseSpeed, float gameSecondsPerSecond, bool sprint)
@@ -122,6 +125,7 @@ public class RouteChoiceGenerator
         baseSpeed = full.baseSpeed;
         gameSecondsPerSecond = full.gameSecondsPerSecond;
         MaxSlower = full.MaxSlower;
+        BlockedSpeed = full.BlockedSpeed;
     }
 
     static float[,] Cut(float[,] grid, int x0, int y0, int w, int h)
@@ -185,7 +189,64 @@ public class RouteChoiceGenerator
         if (route == null || route.Count == 0) return null;
         List<Vector2> line = Smooth(route);
         float seconds = Seconds(line, out float sharpest);
-        return new RouteChoice { cells = route, points = line, seconds = seconds, meters = Meters(line), sharpestTurn = sharpest };
+        bool crosses = false;
+        for (int i = 0; i < line.Count - 1 && !crosses; i++)
+        {
+            LineCost(line[i], line[i + 1], out bool blocked);
+            crosses = blocked;
+        }
+        return new RouteChoice { cells = route, points = line, seconds = seconds, meters = Meters(line), sharpestTurn = sharpest, crossesBlocked = crosses };
+    }
+
+    // Route analysis: the fastest way from one control to the next that keeps within radius cells of a line (grid
+    // coordinates), e.g. a route a player drew. The plain search finds the fastest way from cell to cell, but once
+    // made smooth and timed with the turns, a way close to a player's line (say through a narrow passage) can come out
+    // faster. Searching again along each player's line lets the computer take that way too, so its route is never
+    // slower than a route someone drew on open ground. Null when there is no way along the line.
+    public RouteChoice FastestNear(Vector2Int from, Vector2Int to, List<Vector2> line, int radius)
+    {
+        if (line == null || line.Count < 2) return null;
+        float minX = Mathf.Min(from.x, to.x), maxX = Mathf.Max(from.x, to.x);
+        float minY = Mathf.Min(from.y, to.y), maxY = Mathf.Max(from.y, to.y);
+        foreach (Vector2 p in line)
+        {
+            minX = Mathf.Min(minX, p.x); maxX = Mathf.Max(maxX, p.x);
+            minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y);
+        }
+        int x0 = Mathf.Max(0, Mathf.FloorToInt(minX) - radius - 2);
+        int y0 = Mathf.Max(0, Mathf.FloorToInt(minY) - radius - 2);
+        int x1 = Mathf.Min(width - 1, Mathf.CeilToInt(maxX) + radius + 2);
+        int y1 = Mathf.Min(height - 1, Mathf.CeilToInt(maxY) + radius + 2);
+        if (x1 <= x0 || y1 <= y0) return null;
+        Vector2Int offset = new Vector2Int(x0, y0);
+        RouteChoiceGenerator window = new RouteChoiceGenerator(this, x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+
+        // Only the cells close to the line (and round the controls) are open
+        float[,] near = new float[window.height, window.width];
+        void Open(Vector2 p)
+        {
+            int cx = Mathf.RoundToInt(p.x) - x0, cy = Mathf.RoundToInt(p.y) - y0;
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    int x = cx + dx, y = cy + dy;
+                    if (x >= 0 && y >= 0 && x < window.width && y < window.height) near[y, x] = window.speed[y, x];
+                }
+            }
+        }
+        Open(from);
+        Open(to);
+        for (int i = 0; i < line.Count - 1; i++)
+        {
+            Vector2 ab = line[i + 1] - line[i];
+            int steps = Mathf.Max(1, Mathf.CeilToInt(ab.magnitude * 2f));
+            for (int s = 0; s <= steps; s++) Open(line[i] + ab * ((float)s / steps));
+        }
+        List<Vector2Int> path = window.Path(from - offset, to - offset, near);
+        if (path == null || path.Count < 2) return null;
+        for (int i = 0; i < path.Count; i++) path[i] += offset;
+        return Timed(path);
     }
 
     RouteChoiceLeg MakeHere(int leg, Vector2Int from, Vector2Int to, int seed, float straightMeters)
@@ -733,7 +794,7 @@ public class RouteChoiceGenerator
             int x = Mathf.RoundToInt(p.x), y = Mathf.RoundToInt(p.y);
             if (x < 0 || y < 0 || x >= width || y >= height) { blocked = true; return float.MaxValue; }
             float cellSpeed = speed[y, x];
-            if (cellSpeed <= 0.01f) { blocked = true; cellSpeed = 0.05f; }
+            if (cellSpeed <= 0.01f) { blocked = true; cellSpeed = BlockedSpeed; }
             float slope = slopes[d] != null ? Mathf.Max(0.05f, slopes[d][y, x]) : 1f;
             cost += step / cellSpeed / slope;
         }
