@@ -73,8 +73,12 @@ namespace MapImport
         // Reads either file type
         public static MapFile ReadMapFile(byte[] bytes)
         {
-            if (OcadReader.IsOcad(bytes)) return OcadReader.Read(bytes);
-            if (OmapReader.IsOmap(bytes)) return OmapReader.Read(bytes);
+            MapFile map = OcadReader.IsOcad(bytes) ? OcadReader.Read(bytes) : OmapReader.IsOmap(bytes) ? OmapReader.Read(bytes) : null;
+            if (map != null)
+            {
+                SymbolRules.MarkOldNumbers(map);
+                return map;
+            }
             throw new InvalidDataException("The file is not a map file the game knows. It reads OCAD files (.ocd, OCAD 6 or newer) and OpenOrienteering Mapper files (.omap/.xmap).");
         }
 

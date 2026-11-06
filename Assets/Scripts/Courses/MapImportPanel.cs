@@ -98,8 +98,11 @@ public class MapImportPanel : MonoBehaviour
         RectTransform optionRow = CourseUI.Rect("Options", card.transform);
         CourseUI.Row(optionRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
         CourseUI.Size(optionRow, 52);
-        nameField = CourseUI.Input("Map name", optionRow, "Map name", 32, null);
-        CourseUI.Size(nameField, -1, 380);
+        TextMeshProUGUI nameLabel = CourseUI.Text("Name label", optionRow, "Name:", 20, CourseUI.Ink, FontStyles.Bold);
+        nameLabel.alignment = TextAlignmentOptions.MidlineRight;
+        CourseUI.Size(nameLabel, -1, 70);
+        nameField = CourseUI.Input("Map name", optionRow, "The map's name in the game", 32, null);
+        CourseUI.Size(nameField, -1, 330);
         typeButton = CourseUI.Button("Type", optionRow, "", CourseUI.ButtonKind.Light, NextType, 20);
         CourseUI.Size(typeButton, -1, 300);
         TextMeshProUGUI contourLabel = CourseUI.Text("Contour label", optionRow, "Contour interval (m):", 20, CourseUI.Ink, FontStyles.Bold);
@@ -149,11 +152,17 @@ public class MapImportPanel : MonoBehaviour
 
         // Every map is sent in: if a club asks about its map, the game's owner knows who to ask
         RectTransform contact = CourseUI.Rect("Contact", card.transform);
-        CourseUI.Row(contact.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Row(contact.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
         CourseUI.Size(contact, 52);
         senderField = CourseUI.Input("Your name", contact, "Your full name", 40, _ => Refresh());
         clubField = CourseUI.Input("Club", contact, "Club that owns the map", 60, _ => Refresh());
         contactField = CourseUI.Input("Contact", contact, "E-mail or phone", 60, _ => Refresh());
+        // The e-mail gets the most room, so a long address shows whole
+        CourseUI.Size(senderField, -1, 270, 0);
+        CourseUI.Size(clubField, -1, 270, 0);
+        CourseUI.Size(contactField, -1, 400, 1);
+        contactField.textComponent.fontSize = 21;
+        contactField.placeholder.GetComponent<TextMeshProUGUI>().fontSize = 21;
         senderField.SetTextWithoutNotify(PlayerPrefs.GetString("MapImport.Sender", ""));   // no Refresh yet: the buttons below are not made
         contactField.SetTextWithoutNotify(PlayerPrefs.GetString("MapImport.Contact", ""));
 
@@ -234,7 +243,7 @@ public class MapImportPanel : MonoBehaviour
         preview = null;
         guessedEdge = edge = null;
         version = null;
-        nameField.text = Path.GetFileNameWithoutExtension(path).Replace('_', ' ');
+        nameField.text = NiceName(Path.GetFileNameWithoutExtension(path));
         SetStatus("Reading " + Path.GetFileName(path) + " ...", false);
         // Read it straight away, so the version and the scale can be shown and the import goes quicker
         string reading = path;
@@ -320,6 +329,19 @@ public class MapImportPanel : MonoBehaviour
     {
         if (working || preview == null) return;
         MapEdgeEditor.Open(transform, preview, edge, guessedEdge, chosen => { edge = chosen; Refresh(); });
+    }
+
+    // "Tranås_sprint_20190125 ocad9 (1)" -> "Tranås sprint": no copy numbers, dates or OCAD versions
+    static string NiceName(string file)
+    {
+        string s = file.Replace('_', ' ');
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\(\d+\)", " ");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"(?i)\b(ocad|ocd)\s*\d*\b", " ");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\b(19|20)\d{2}[-.]?\d{2}[-.]?\d{2}\b", " ");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ").Trim(' ', '-', '.');
+        if (s.Length == 0) s = file;
+        if (s.Length > 32) s = s.Substring(0, 32).Trim();
+        return char.ToUpper(s[0]) + s.Substring(1);
     }
 
     void NextType()

@@ -33,9 +33,23 @@ namespace MapImport
 
     public static class SymbolRules
     {
+        // Old maps (ISOM 2000, ISSOM 2007, many OCAD 6-10 files) number some symbols differently: building 526,
+        // forbidden area 527, paved area 529, uncrossable water 304. In the new standards 526-529 are points or
+        // lines, never areas, so an area symbol with one of those numbers tells the map uses the old numbering.
+        public static void MarkOldNumbers(MapFile map)
+        {
+            bool old = false;
+            foreach (MapSymbol s in map.symbols.Values)
+            {
+                if (s.kind == SymbolKind.Area && (s.major == 526 || s.major == 527 || s.major == 529)) { old = true; break; }
+            }
+            foreach (MapSymbol s in map.symbols.Values) s.oldNumbers = old;
+        }
+
         public static TerrainRule For(MapSymbol s, bool sprint)
         {
             if (s == null) return TerrainRule.None;
+            if (s.oldNumbers) return ForOld(s, sprint);
             string name = (s.name ?? "").ToLowerInvariant();
             int m = s.major, minor = s.minor;
             bool area = s.kind == SymbolKind.Area;
@@ -128,6 +142,113 @@ namespace MapImport
                 if (m == 519 || m == 512 || m == 708) return new TerrainRule(TerrainRole.Crossing, 1.2f); // crossing point, footbridge
                 if (m == 206) return Blocked();
                 return TerrainRule.None;
+            }
+            return TerrainRule.None;
+        }
+
+        public static bool IsBuilding(MapSymbol s) => s != null && s.kind == SymbolKind.Area && (s.oldNumbers ? s.major == 526 : s.major == 521);
+
+        // Areas nobody may enter: out of bounds, forbidden, course-setting overprint
+        public static bool IsOutOfBounds(MapSymbol s) => s != null && (s.major >= 700 || (s.oldNumbers ? s.major == 527 || s.major == 528 : s.major == 520));
+
+        // ISOM 2000 / ISSOM 2007 numbering. The names help where the two old standards differ (304 is uncrossable
+        // water in ISSOM but a crossable stream in ISOM 2000).
+        static TerrainRule ForOld(MapSymbol s, bool sprint)
+        {
+            string name = (s.name ?? "").ToLowerInvariant();
+            int m = s.major;
+            bool area = s.kind == SymbolKind.Area;
+            bool line = s.kind == SymbolKind.Line;
+            bool point = s.kind == SymbolKind.Point;
+            bool impassable = name.Contains("opasserb") || name.Contains("uncrossable") || name.Contains("impassable") || name.Contains("not be entered");
+            bool canopy = name.Contains("skärmtak") || name.Contains("canopy") || name.Contains("överbyggnad");
+
+            if (area)
+            {
+                switch (m)
+                {
+                    case 301: return Blocked();                                           // lake
+                    case 302: return Blocked();                                           // pond
+                    case 304: return impassable || sprint ? Blocked() : Ground(0.5f, sprint); // uncrossable body of water (ISSOM)
+                    case 305: return Ground(sprint ? 0.4f : 0.5f, sprint);                // crossable shallow water
+                    case 308: return impassable ? Blocked() : Ground(0.8f, sprint);       // uncrossable marsh (ISOM 2000)
+                    case 309: return impassable ? Blocked() : Ground(0.8f, sprint);       // marsh (ISOM 2000) / uncrossable marsh (ISSOM)
+                    case 310: return Ground(0.8f, sprint);                                // marsh
+                    case 311: return Ground(0.9f, sprint);                                // indistinct marsh
+                    case 210: return Ground(0.85f, sprint);                               // stony ground
+                    case 211: return Ground(0.85f, sprint);                               // open sandy ground
+                    case 212: return Ground(1.2f, sprint);                                // bare rock
+                    case 401: return Ground(1.3f, sprint);
+                    case 402: return Ground(1.2f, sprint);
+                    case 403: return Ground(1.3f, sprint);
+                    case 404: return Ground(1.2f, sprint);
+                    case 405: return Ground(1.0f, sprint);
+                    case 406: return Ground(0.7f, sprint);
+                    case 407: return Ground(0.7f, sprint);
+                    case 408: return Ground(0.6f, sprint);
+                    case 409: return Ground(0.6f, sprint);
+                    case 410: return impassable ? Blocked() : Ground(0.4f, sprint);       // vegetation, very difficult
+                    case 411: return Ground(0.8f, sprint);
+                    case 412: case 415: return Ground(1.3f, sprint);                      // cultivated land
+                    case 413: case 414: return Ground(1.0f, sprint);                      // orchard, vineyard
+                    case 421: return Blocked();                                           // impassable vegetation (ISSOM)
+                    case 526: return canopy ? Ground(1.4f, sprint) : Blocked();           // building (canopy: run under it)
+                    case 527: return Blocked();                                           // forbidden area / settlement
+                    case 528: return Blocked();                                           // permanently out of bounds
+                    case 529:                                                             // paved area
+                        if (name.Contains("grus") || name.Contains("gravel")) return Ground(1.4f, sprint);
+                        return Ground(1.5f, sprint);
+                    case 709: case 714: return Blocked();                                 // out of bounds (course setting)
+                }
+                if (m == 206 && impassable) return Blocked();
+                return TerrainRule.None;
+            }
+
+            if (line)
+            {
+                switch (m)
+                {
+                    case 201: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // impassable cliff
+                    case 301: case 302: return new TerrainRule(TerrainRole.BlockingLine, 0f);   // lake shore
+                    case 304: return impassable ? new TerrainRule(TerrainRole.BlockingLine, 0f) : TerrainRule.None;
+                    case 308: case 309: return impassable ? new TerrainRule(TerrainRole.BlockingLine, 0f) : TerrainRule.None;
+                    case 421: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // impassable vegetation edge
+                    case 501: return Path(1.55f);                                         // motorway (ISOM 2000)
+                    case 502: return Path(1.55f);                                         // major road
+                    case 503: return Path(1.5f);                                          // minor road
+                    case 504: return Path(1.55f);                                         // road
+                    case 505: return Path(1.45f);                                         // vehicle track
+                    case 506: return Path(1.35f);                                         // footpath
+                    case 507: return Path(1.2f);                                          // small path
+                    case 508: return Path(1.2f);                                          // less distinct path
+                    case 509: return Path(1.4f);                                          // narrow ride
+                    case 512: return new TerrainRule(TerrainRole.Bridge, 1.4f);           // bridge
+                    case 513: case 519:                                                   // stone wall (ISOM 2000 513, ISSOM 519)
+                        if (impassable) return new TerrainRule(TerrainRole.BlockingLine, 0f);
+                        return new TerrainRule(TerrainRole.SlowLine, 0.5f);
+                    case 514: return new TerrainRule(TerrainRole.SlowLine, 0.8f);         // ruined wall
+                    case 515:                                                             // high wall (ISOM 2000) / railway (ISSOM)
+                        return impassable || name.Contains("mur") || name.Contains("wall") ? new TerrainRule(TerrainRole.BlockingLine, 0f) : TerrainRule.None;
+                    case 516: case 522: return new TerrainRule(TerrainRole.SlowLine, 0.8f);   // fence, railing
+                    case 518:                                                             // high fence (ISOM 2000) / tunnel (ISSOM)
+                        return name.Contains("tunnel") || name.Contains("genomgång") ? TerrainRule.None : new TerrainRule(TerrainRole.BlockingLine, 0f);
+                    case 521: case 524: return new TerrainRule(TerrainRole.BlockingLine, 0f); // impassable wall, impassable fence
+                    case 526: return canopy ? TerrainRule.None : new TerrainRule(TerrainRole.BlockingLine, 0f); // building outline
+                    case 527: case 528: return new TerrainRule(TerrainRole.BlockingLine, 0f);   // out of bounds edge
+                    case 529:                                                             // paved paths; paved area edges and stairs
+                        if (name.Contains("stig") || name.Contains("path") || name.Contains("väg") || name.Contains("road")) return Path(1.45f);
+                        return TerrainRule.None;
+                    case 533: case 534: return impassable ? new TerrainRule(TerrainRole.BlockingLine, 0f) : TerrainRule.None; // pipeline
+                    case 707: return new TerrainRule(TerrainRole.BlockingLine, 0f);
+                }
+                if (impassable && (m == 410)) return new TerrainRule(TerrainRole.BlockingLine, 0f);
+                return TerrainRule.None;
+            }
+
+            if (point)
+            {
+                if (m == 525 || m == 519 && name.Contains("grind") || m == 708) return new TerrainRule(TerrainRole.Crossing, 1.2f);   // gate, crossing point
+                return TerrainRule.None;   // 206 is an ordinary boulder in the old standards
             }
             return TerrainRule.None;
         }

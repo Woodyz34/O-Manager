@@ -85,6 +85,7 @@ namespace MapImport
         public AreaStyle area;
         public List<SymbolElement> point;
         public List<MapSymbol> parts;   // OOM combined symbols
+        public bool oldNumbers;         // the map uses the old numbering (ISOM 2000 / ISSOM 2007), see SymbolRules
 
         // The colour the symbol shows most of, used for priority and as a simple fallback
         public int mainColor = -1;

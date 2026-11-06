@@ -86,8 +86,8 @@ namespace MapImport
             areas.Sort((a, b) => a.prio != b.prio ? b.prio.CompareTo(a.prio) : a.order.CompareTo(b.order));
             foreach (var a in areas)
             {
-                bool isHard = a.rule.role == TerrainRole.Blocked && (a.obj.symbol.major == 520 || a.obj.symbol.major == 521 || a.obj.symbol.major >= 700);
-                bool isBuilding = a.obj.symbol.major == 521;
+                bool isBuilding = a.rule.role == TerrainRole.Blocked && SymbolRules.IsBuilding(a.obj.symbol);
+                bool isHard = a.rule.role == TerrainRole.Blocked && (isBuilding || SymbolRules.IsOutOfBounds(a.obj.symbol));
                 FillArea(g, a.obj.parts, ox, oy, scale, (idx) =>
                 {
                     g.speed[idx] = a.rule.speed;
