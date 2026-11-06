@@ -212,14 +212,14 @@ public class LobbyVisitCard : MonoBehaviour
 {
     Canvas canvas;
     MapSelectUI maps;
-    GameModeSelectUI pools;
+    GameModeSelect pools;
     float nextCheck;
 
     void Start()
     {
         canvas = GetComponent<Canvas>();
         maps = FindObjectOfType<MapSelectUI>(true);
-        pools = FindObjectOfType<GameModeSelectUI>(true);
+        pools = FindObjectOfType<GameModeSelect>(true);
     }
 
     void Update()
