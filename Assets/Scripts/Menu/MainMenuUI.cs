@@ -47,13 +47,37 @@ public class MainMenuUI : MonoBehaviour
 
     void Start()
     {
+        // Opened from the multiplayer lobby: straight to the shop or My Runners, and "Back" goes to the lobby
+        if (LobbyVisit.Active && LobbyVisit.Current != LobbyVisit.Place.CourseBuilder)
+        {
+            BackGoesToLobby(shopPanel);
+            BackGoesToLobby(runnersPanel);
+            Show(LobbyVisit.Current == LobbyVisit.Place.Runners ? runnersPanel : shopPanel);
+            return;
+        }
         Show(homePanel);
+    }
+
+    static void BackGoesToLobby(GameObject panel)
+    {
+        if (panel == null) return;
+        Transform back = panel.transform.Find("Back");
+        if (back == null) return;
+        TextMeshProUGUI label = back.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (label != null) label.text = "Back to lobby";
+        RectTransform rect = back as RectTransform;
+        if (rect != null) rect.sizeDelta = new Vector2(Mathf.Max(rect.sizeDelta.x, 260f), rect.sizeDelta.y);
     }
 
     // ---------- buttons ----------
 
     public void ShowHome()
     {
+        if (LobbyVisit.Active)
+        {
+            LobbyVisit.Close();
+            return;
+        }
         Show(homePanel);
     }
 

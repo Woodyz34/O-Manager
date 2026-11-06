@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using Fusion;
 using UnityEngine;
@@ -33,15 +34,31 @@ public class SceneLoader : MonoBehaviour
             SceneManager.LoadScene(scene);
             return;
         }
+        loading = true;
+        page.SetActive(true);
+        Runner().StartCoroutine(runner.Run(page, scene, message, LoadSceneMode.Single, null));
+    }
+
+    // Loads a scene on top of the one that is open (the lobby's shop, My Runners and course builder visits),
+    // behind the same loading page. done gets the new scene once its objects have started.
+    public static void LoadAdditive(string scene, string message, Action<Scene> done)
+    {
+        if (loading) return;
+        loading = true;
+        GameObject page = Page();
+        if (page != null) page.SetActive(true);
+        Runner().StartCoroutine(runner.Run(page, scene, message, LoadSceneMode.Additive, done));
+    }
+
+    static SceneLoader Runner()
+    {
         if (runner == null)
         {
             GameObject go = new GameObject("Scene loader");
             DontDestroyOnLoad(go);
             runner = go.AddComponent<SceneLoader>();
         }
-        loading = true;
-        page.SetActive(true);
-        runner.StartCoroutine(runner.Run(page, scene, message));
+        return runner;
     }
 
     // Leaves a network game and then changes scene. The scene only changes once the runner has shut down:
@@ -72,17 +89,17 @@ public class SceneLoader : MonoBehaviour
         return null;
     }
 
-    IEnumerator Run(GameObject page, string scene, string message)
+    IEnumerator Run(GameObject page, string scene, string message, LoadSceneMode mode, Action<Scene> done)
     {
-        LoadingScreenUI ui = page.GetComponent<LoadingScreenUI>();
+        LoadingScreenUI ui = page != null ? page.GetComponent<LoadingScreenUI>() : null;
         if (ui != null) ui.SetMessage(message);
         Slider slider = ui != null ? ui.slider : null;
         if (slider != null) slider.value = 0f;
-        page.SetActive(true);
+        if (page != null) page.SetActive(true);
         float shownAt = Time.unscaledTime;
         yield return null;   // let the page draw before the loading starts
 
-        AsyncOperation operation = SceneManager.LoadSceneAsync(scene);
+        AsyncOperation operation = SceneManager.LoadSceneAsync(scene, mode);
         operation.allowSceneActivation = false;
         while (operation.progress < 0.9f)
         {
@@ -98,7 +115,12 @@ public class SceneLoader : MonoBehaviour
         while (!operation.isDone) yield return null;
         if (slider != null) slider.value = 1f;
         yield return null;   // one frame for the new scene's Start methods
-        page.SetActive(false);
+        if (page != null) page.SetActive(false);
         loading = false;
+        if (done != null)
+        {
+            Scene loaded = SceneManager.GetSceneByName(scene);
+            done(loaded);
+        }
     }
 }

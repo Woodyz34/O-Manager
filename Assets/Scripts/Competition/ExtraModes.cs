@@ -103,8 +103,8 @@ public static class ExtraModes
     public static string NotOn(ExtraMode mode, CourseData course)
     {
         if (course == null) return null;
-        if ((mode & IndividualOnly) != 0 && course.IsRelay()) return "Not on relays";
-        if ((mode & ForestOnly) != 0 && course.IsSprint()) return "Not on sprint";
+        if ((mode & IndividualOnly) != 0 && course.IsRelay()) return "You can't have this game mode on a relay";
+        if ((mode & ForestOnly) != 0 && course.IsSprint()) return "You can't have this game mode on sprint";
         return null;
     }
 
@@ -124,6 +124,8 @@ public static class ExtraModes
 
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // The lobby's shop, My Runners and course builder are loaded on top of the lobby (LobbyVisit); not a new race
+        if (mode == LoadSceneMode.Additive) return;
         known = false;
         active = ExtraMode.None;
     }

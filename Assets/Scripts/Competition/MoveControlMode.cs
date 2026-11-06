@@ -36,6 +36,8 @@ public static class MoveControlMode
 
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // The lobby's shop, My Runners and course builder are loaded on top of the lobby (LobbyVisit); not a new race
+        if (mode == LoadSceneMode.Additive) return;
         ResetState();
     }
 

@@ -65,28 +65,33 @@ public class ModesPopup : MonoBehaviour
         {
             ExtraMode captured = mode;
             string description = ExtraModes.Description(mode);
-            // Bears and Move a control cannot be ticked on a sprint course (nor the modes for individual courses on a relay)
+            // Bears and Move a control cannot be ticked on a sprint course (nor the modes for individual courses on a relay).
+            // They are shown greyed out; clicking one anyway says why.
             string notHere = ExtraModes.NotOn(mode, CourseLibrary.Current);
             if (notHere != null)
             {
                 modes &= ~mode;
-                AddTile(ExtraModes.Title(mode) + "  <size=20><color=#C0392B>" + notHere + " (this course)</color></size>", description, false,
-                    () => UIToast.Show(ExtraModes.Title(captured) + ": " + notHere.ToLowerInvariant() + ". Choose another course to play it."));
+                AddTile(ExtraModes.Title(mode), description, false,
+                    () => UIToast.Show(notHere, 3f, CourseUI.Ink), true);
                 continue;
             }
             AddTile(ExtraModes.Title(mode), description, (modes & mode) != 0, () => modes = ExtraModes.Toggle(modes, captured));
         }
     }
 
-    void AddTile(string name, string description, bool on, Action click)
+    static readonly Color DisabledTile = new Color(0.55f, 0.55f, 0.52f, 0.55f);
+    static readonly Color DisabledInk = new Color(0.25f, 0.27f, 0.25f, 0.55f);
+
+    void AddTile(string name, string description, bool on, Action click, bool disabled = false)
     {
-        Image tile = CourseUI.Panel(name, list, on ? CourseUI.Forest : CourseUI.Soft);
+        Image tile = CourseUI.Panel(name, list, disabled ? DisabledTile : on ? CourseUI.Forest : CourseUI.Soft);
         CourseUI.Size(tile, 102);
         Button button = tile.gameObject.AddComponent<Button>();
         button.targetGraphic = tile;
         ColorBlock colors = button.colors;
-        colors.highlightedColor = new Color(0.92f, 0.92f, 0.92f);
-        colors.pressedColor = new Color(0.8f, 0.8f, 0.8f);
+        // A greyed-out tile does not light up under the mouse, so it does not look clickable
+        colors.highlightedColor = disabled ? Color.white : new Color(0.92f, 0.92f, 0.92f);
+        colors.pressedColor = disabled ? Color.white : new Color(0.8f, 0.8f, 0.8f);
         button.colors = colors;
         button.onClick.AddListener(() =>
         {
@@ -95,7 +100,7 @@ public class ModesPopup : MonoBehaviour
         });
 
         // A tick box on the left
-        Image box = CourseUI.Panel("Tick", tile.transform, on ? Color.white : new Color(1f, 1f, 1f, 0.9f));
+        Image box = CourseUI.Panel("Tick", tile.transform, disabled ? new Color(1f, 1f, 1f, 0.35f) : on ? Color.white : new Color(1f, 1f, 1f, 0.9f));
         CourseUI.Place(box.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(24, 0), new Vector2(40, 40));
         box.raycastTarget = false;
         Outline outline = box.gameObject.AddComponent<Outline>();
@@ -104,12 +109,12 @@ public class ModesPopup : MonoBehaviour
         TextMeshProUGUI tick = CourseUI.Text("Mark", box.transform, on ? "X" : "", 28, CourseUI.Forest, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Stretch(tick.rectTransform);
 
-        TextMeshProUGUI text = CourseUI.Text("Text", tile.transform, "", 29, on ? Color.white : CourseUI.Ink);
+        TextMeshProUGUI text = CourseUI.Text("Text", tile.transform, "", 29, disabled ? DisabledInk : on ? Color.white : CourseUI.Ink);
         CourseUI.Stretch(text.rectTransform, 86, 22, 10, 10);
         text.alignment = TextAlignmentOptions.MidlineLeft;
         text.richText = true;
         text.raycastTarget = false;
-        string muted = on ? "<color=#FFFFFFCC>" : "<color=#5B7563>";
+        string muted = disabled ? "<color=#3F443F88>" : on ? "<color=#FFFFFFCC>" : "<color=#5B7563>";
         text.text = "<b>" + name + "</b>\n<size=20>" + muted + description + "</color></size>";
     }
 
