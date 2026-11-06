@@ -94,8 +94,6 @@ public static class RouteChoiceGame
         local.SetHasChoosenRunner();
         GameObject board = GameObject.Find("LeaderboardPanel");
         if (board != null) board.SetActive(false);
-        UIToast.Show("Route choice game: pick the route you think is fastest on each leg. "
-            + "Right answers give points, more the quicker you are.", 8f);
     }
 
     // Everyone is ready: start the questions
@@ -192,6 +190,7 @@ public class RouteChoiceView : MonoBehaviour
     TextMeshProUGUI timerText;
     TextMeshProUGUI scoreText;
     Button nextButton;
+    Button previousLegButton, nextLegButton;
     readonly List<Button> choiceButtons = new List<Button>();
     GameObject keysPanel;
     readonly List<Button> keyButtons = new List<Button>();
@@ -315,6 +314,13 @@ public class RouteChoiceView : MonoBehaviour
 
         nextButton = CourseUI.Button("Next", card.transform, "Next leg", CourseUI.ButtonKind.Primary, OnNext, 24);
         CourseUI.Place((RectTransform)nextButton.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(28, 22), new Vector2(504, 60));
+        // Looking through the legs after the game: the leg before and after, without going back to the table
+        previousLegButton = CourseUI.Button("PreviousLeg", card.transform, "<  Previous leg", CourseUI.ButtonKind.Light, () => StepLeg(-1), 20);
+        CourseUI.Place((RectTransform)previousLegButton.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(28, 92), new Vector2(246, 52));
+        nextLegButton = CourseUI.Button("NextLeg", card.transform, "Next leg  >", CourseUI.ButtonKind.Light, () => StepLeg(1), 20);
+        CourseUI.Place((RectTransform)nextLegButton.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(286, 92), new Vector2(246, 52));
+        previousLegButton.gameObject.SetActive(false);
+        nextLegButton.gameObject.SetActive(false);
         ShowTimer(false);
         nextButton.gameObject.SetActive(false);
         UpdateScore();
@@ -417,8 +423,11 @@ public class RouteChoiceView : MonoBehaviour
             case Step.Done:
                 if (legShown > 0)
                 {
-                    // Looking at a leg on the map: any key goes back to the table
-                    if (AnyKeyForNext()) ShowOverlay(Page.Legs);
+                    // Looking at a leg on the map: the arrow keys go to the leg before or after, Enter or
+                    // Backspace back to the table (other keys do nothing, so a stray key does not throw you out)
+                    if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.UpArrow)) StepLeg(-1);
+                    else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.DownArrow)) StepLeg(1);
+                    else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Backspace)) ShowOverlay(Page.Legs);
                     break;
                 }
                 if (Time.unscaledTime > nextRefresh)
@@ -937,9 +946,29 @@ public class RouteChoiceView : MonoBehaviour
 
         nextButton.onClick.RemoveAllListeners();
         nextButton.onClick.AddListener(() => ShowOverlay(Page.Legs));
-        CourseUI.SetButtonText(nextButton, "Back to the results  <size=70%>(any key)</size>");
+        CourseUI.SetButtonText(nextButton, "Back to the results");
         nextButton.interactable = true;
         nextButton.gameObject.SetActive(true);
+        // Only the buttons that lead somewhere (no "Next leg" on the last leg)
+        previousLegButton.gameObject.SetActive(Neighbour(k, -1) > 0);
+        nextLegButton.gameObject.SetActive(Neighbour(k, 1) > 0);
+    }
+
+    // The leg asked before (-1) or after (+1) leg k, or -1 when there is none
+    int Neighbour(int k, int direction)
+    {
+        if (results == null) return -1;
+        for (int j = k + direction; j >= 1 && j <= legs; j += direction)
+        {
+            if (results[j] != null && picks[j] != -2) return j;
+        }
+        return -1;
+    }
+
+    void StepLeg(int direction)
+    {
+        int j = Neighbour(legShown, direction);
+        if (j > 0) ShowLeg(j);
     }
 
     // The players in the game, best score first; also notes your place for the prize money
