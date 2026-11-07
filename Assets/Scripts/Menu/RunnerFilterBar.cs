@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -30,11 +31,15 @@ public class RunnerFilterBar : MonoBehaviour
     bool reversed;                        // lowest rating first, or Z to A
     Button orderChip;
     int tierFilter = -1;                  // -1 = all tiers
-    int classFilter;                      // index in ClassChoices
     Button classChip;
+    Button countryChip;
+    Button clubChip;
 
-    // The class chip goes round these: every class, 21, 20, 18, and the two junior classes together
-    static readonly string[][] ClassChoices = { null, new[] { "21" }, new[] { "20" }, new[] { "18" }, new[] { "18", "20" } };
+    // What is ticked in the three drop-downs (empty = no filter). Classes are the ages, 21, 20 and 18.
+    readonly HashSet<string> classes = new HashSet<string>();
+    readonly HashSet<string> countries = new HashSet<string>();
+    readonly HashSet<string> clubs = new HashSet<string>();
+    static readonly string[] ClassAges = { "21", "20", "18" };
     bool wired;
 
     // Women and men are never shown together. The choice is shared by My Runners and Choose a runner,
@@ -165,8 +170,8 @@ public class RunnerFilterBar : MonoBehaviour
         get { return sortBy == SortBy.Name || sortBy == SortBy.Club || sortBy == SortBy.Country; }
     }
 
-    // One chip after the tiers that goes round the classes (All classes, H21, H20, H18, H18 + H20).
-    // The tier chips get a little narrower to make room before the sliders.
+    // Three drop-down chips after the tiers: Class, Country and Club. Each opens a list where several can be
+    // ticked. The tier chips and the sliders get a little narrower to make room.
     void MakeClassChip()
     {
         if (tierButtons == null || tierButtons.Length == 0) return;
@@ -175,29 +180,114 @@ public class RunnerFilterBar : MonoBehaviour
         float x = first.anchoredPosition.x - first.sizeDelta.x / 2f;
         for (int i = 0; i < tierButtons.Length; i++)
         {
-            Place(tierButtons[i], x, y, 98f);
-            x += 106f;
+            Place(tierButtons[i], x, y, 84f);
+            x += 90f;
         }
-        classChip = CopyChip("All classes", 0, y, 136f, tierButtons[0]);
+        classChip = CopyChip("Class", 0, y, 128f, tierButtons[0]);
         classChip.name = "Class";
-        Place(classChip, x + 4f, y, 136f);
-        classChip.onClick.AddListener(() => { classFilter = (classFilter + 1) % ClassChoices.Length; Notify(); });
+        Place(classChip, x + 4f, y, 128f);
+        x += 4f + 128f + 8f;
+        countryChip = CopyChip("Country", 0, y, 150f, tierButtons[0]);
+        countryChip.name = "Country filter";
+        Place(countryChip, x + 4f, y, 150f);
+        x += 4f + 150f + 8f;
+        clubChip = CopyChip("Club", 0, y, 150f, tierButtons[0]);
+        clubChip.name = "Club filter";
+        Place(clubChip, x + 4f, y, 150f);
+        x += 4f + 150f + 20f;
+
+        classChip.onClick.AddListener(() => MultiSelectDropdown.Open((RectTransform)classChip.transform, "Class",
+            ClassAges, classes, false, age => (ShowWomen ? "D" : "H") + age, Notify));
+        countryChip.onClick.AddListener(() => MultiSelectDropdown.Open((RectTransform)countryChip.transform, "Country",
+            CountryOptions(), countries, true, TitleCase, Notify));
+        clubChip.onClick.AddListener(() => MultiSelectDropdown.Open((RectTransform)clubChip.transform, "Club",
+            ClubOptions(), clubs, true, null, Notify));
+
+        MoveSliders(x, y);
+    }
+
+    // The two "Min ..." sliders move right of the drop-downs
+    void MoveSliders(float left, float y)
+    {
+        float labelWidth = 150f;
+        float sliderWidth = 130f;
+        PlaceRow(minSpeedLabel.rectTransform, left, y, labelWidth);
+        left += labelWidth + 8f;
+        PlaceRow((RectTransform)minSpeed.transform, left, y, sliderWidth);
+        left += sliderWidth + 22f;
+        labelWidth = 215f;
+        PlaceRow(minTechniqueLabel.rectTransform, left, y, labelWidth);
+        left += labelWidth + 8f;
+        PlaceRow((RectTransform)minTechnique.transform, left, y, sliderWidth);
+    }
+
+    static void PlaceRow(RectTransform rect, float left, float y, float width)
+    {
+        rect.sizeDelta = new Vector2(width, rect.sizeDelta.y);
+        rect.anchoredPosition = new Vector2(left + width / 2f, y);
+    }
+
+    // Every country and club on the cards, A to Z
+    static string[] CountryOptions()
+    {
+        SortedSet<string> set = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
+        foreach (CardData card in RunnerCards.All())
+        {
+            string country = RunnerCards.CountryName(card);
+            if (!string.IsNullOrWhiteSpace(country)) set.Add(country);
+        }
+        string[] result = new string[set.Count];
+        set.CopyTo(result);
+        return result;
+    }
+
+    static string[] ClubOptions()
+    {
+        SortedSet<string> set = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
+        foreach (CardData card in RunnerCards.All())
+        {
+            if (!string.IsNullOrWhiteSpace(card.clubName)) set.Add(card.clubName);
+        }
+        string[] result = new string[set.Count];
+        set.CopyTo(result);
+        return result;
+    }
+
+    static string TitleCase(string text)
+    {
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(text.ToLowerInvariant());
+    }
+
+    // The chip's text: its name, or what is ticked
+    static string ChipText(string name, HashSet<string> chosen, Func<string, string> show, string plural)
+    {
+        if (chosen.Count == 0) return name + " v";
+        if (chosen.Count == 1)
+        {
+            foreach (string one in chosen) return Shorten(show(one), 16) + " v";
+        }
+        return chosen.Count + " " + plural + " v";
+    }
+
+    static string Shorten(string text, int max)
+    {
+        return text.Length <= max ? text : text.Substring(0, max - 1) + "...";
     }
 
     string ClassLabel()
     {
-        string[] ages = ClassChoices[classFilter];
-        if (ages == null) return "All classes";
+        if (classes.Count == 0) return "Class v";
         string sex = ShowWomen ? "D" : "H";
-        return string.Join(" + ", Array.ConvertAll(ages, age => sex + age));
+        List<string> picked = new List<string>();
+        foreach (string age in ClassAges) if (classes.Contains(age)) picked.Add(sex + age);
+        return string.Join(" + ", picked) + " v";
     }
 
     bool ClassMatches(CardData card)
     {
-        string[] ages = ClassChoices[classFilter];
-        if (ages == null) return true;
+        if (classes.Count == 0) return true;
         string klass = card.klass ?? "";
-        foreach (string age in ages)
+        foreach (string age in classes)
         {
             if (klass.EndsWith(age, StringComparison.Ordinal)) return true;
         }
@@ -234,7 +324,7 @@ public class RunnerFilterBar : MonoBehaviour
     {
         get
         {
-            return tierFilter >= 0 || classFilter != 0 || !string.IsNullOrWhiteSpace(search.text)
+            return tierFilter >= 0 || classes.Count > 0 || countries.Count > 0 || clubs.Count > 0 || !string.IsNullOrWhiteSpace(search.text)
                 || minSpeed.value > minSpeed.minValue || minTechnique.value > minTechnique.minValue;
         }
     }
@@ -247,6 +337,8 @@ public class RunnerFilterBar : MonoBehaviour
             && !Contains(RunnerCards.CountryName(card), wanted)) return false;
         if (tierFilter >= 0 && (int)RunnerCards.Tier(card) != tierFilter) return false;
         if (!ClassMatches(card)) return false;
+        if (countries.Count > 0 && !countries.Contains(RunnerCards.CountryName(card))) return false;
+        if (clubs.Count > 0 && (card.clubName == null || !clubs.Contains(card.clubName))) return false;
         if (Mathf.RoundToInt(card.speed) < minSpeed.value) return false;
         if (Mathf.RoundToInt(card.technique) < minTechnique.value) return false;
         return true;
@@ -293,7 +385,9 @@ public class RunnerFilterBar : MonoBehaviour
     public void Clear()
     {
         tierFilter = -1;
-        classFilter = 0;
+        classes.Clear();
+        countries.Clear();
+        clubs.Clear();
         search.SetTextWithoutNotify("");
         minSpeed.SetValueWithoutNotify(minSpeed.minValue);
         minTechnique.SetValueWithoutNotify(minTechnique.minValue);
@@ -315,12 +409,24 @@ public class RunnerFilterBar : MonoBehaviour
         for (int i = 0; i < tierButtons.Length; i++) PaintChip(tierButtons[i], TierOfButton(i) == tierFilter);
         if (classChip != null)
         {
-            PaintChip(classChip, classFilter != 0);
-            TextMeshProUGUI label = classChip.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (label != null) label.text = ClassLabel();
+            PaintDrop(classChip, classes.Count > 0, ClassLabel());
+            PaintDrop(countryChip, countries.Count > 0, ChipText("Country", countries, TitleCase, "countries"));
+            PaintDrop(clubChip, clubs.Count > 0, ChipText("Club", clubs, c => c, "clubs"));
         }
         if (womenChip != null) PaintChip(womenChip, ShowWomen);
         if (menChip != null) PaintChip(menChip, !ShowWomen);
+    }
+
+    void PaintDrop(Button chip, bool on, string text)
+    {
+        PaintChip(chip, on);
+        TextMeshProUGUI label = chip.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (label != null)
+        {
+            label.text = text;
+            label.enableWordWrapping = false;
+            label.fontSize = Mathf.Min(label.fontSize, 21f);
+        }
     }
 
     void PaintChip(Button chip, bool on)
