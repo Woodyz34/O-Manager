@@ -388,7 +388,7 @@ public static class CourseGenerator
         return new Result { error = "Could not make a course with these settings. Try a shorter course or fewer controls." };
     }
 
-    const double BarrierBudgetSeconds = 10.0;
+    const double BarrierBudgetSeconds = 15.0;
 
     // Sprint with barriers ticked: closes the obvious straight way on legs with one clear route (SprintBarriers),
     // so they get a choice left or right. The course is kept without barriers when they would break it.
