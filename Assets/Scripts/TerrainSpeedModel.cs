@@ -30,6 +30,20 @@ public static class TerrainSpeedModel
     public const float OldFactorPerGradient = 5f;
 
     public const float MinFactor = 0.25f;
+
+    // Sprint races run slower than the grid alone says. The grid's ground speeds are made for the forest (runnable
+    // forest 1.0) and sprint ground is mostly road, paving and open land (1.3 to 1.55), so a speed-100 runner went
+    // 6.5 to 7.75 m/s on a sprint, faster than a world-class 5000 m on the track. Real elite sprint races are run at
+    // about 5.5 to 6 m/s on flat paving, so on a sprint course every speed is multiplied by this.
+    public const float SprintSpeedScale = 0.75f;
+
+    // The speed scale for the course being raced now: SprintSpeedScale on a sprint course, 1 in the forest
+    public static float RaceSpeedScale()
+    {
+        bool sprint = CourseLoader.Loaded != null ? CourseLoader.Loaded.IsSprint()
+                    : CourseLoader.LoadedMap != null && CourseLoader.LoadedMap.IsSprint;
+        return sprint ? SprintSpeedScale : 1f;
+    }
     const float MaxUphillGradient = 0.45f; // Minetti measured up to +/-45 %
 
     // Arrays already converted, so a grid that is cached and loaded twice is not converted twice
