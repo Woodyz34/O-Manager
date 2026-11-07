@@ -474,7 +474,7 @@ public class RouteChoiceGenerator
     // Round a closed-off part, the cells this far away (as shares of the spread) are closed too: first a narrow
     // band, so the way round can be the next street, then a wide one, so it can be a street further off
     static readonly float[] BlockRadiusShares = { 0.6f, 1.2f };
-    const int BlockedRoutes = 4;            // the fastest route and the first two choices found get parts closed off
+    const int BlockedRoutes = 4;            // the fastest route and the first three choices found get parts closed off
 
     // The route choices found by closing off parts of the fastest route (and then of the choices found that way).
     // A choice is kept when it is not much slower than the fastest, really runs somewhere else than every choice kept
