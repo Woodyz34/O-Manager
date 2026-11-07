@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -174,7 +175,6 @@ public class RouteChoiceView : MonoBehaviour
     float answeredAt;
     int[] picks;       // per leg: the route picked, -1 time ran out, -2 no question
     Page page;
-    readonly List<Button> tabButtons = new List<Button>();
     Button endButton;  // the host sends everyone back to the lobby, at any time
     Button keysButton;
     float endConfirmUntil;
@@ -709,6 +709,7 @@ public class RouteChoiceView : MonoBehaviour
     RectTransform overlayBody;
     ScrollRect overlayScroll;
     Button overlayLobby;
+    Button overlayBack;
     TextMeshProUGUI panelHeading;
     TextMeshProUGUI panelInfo;
     RectTransform panelBody;
@@ -753,19 +754,6 @@ public class RouteChoiceView : MonoBehaviour
         overlayInfo = CourseUI.Text("Info", sheet.transform, "", 24, CourseUI.InkMuted);
         CourseUI.Place(overlayInfo.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(70, -104), new Vector2(1100, 70));
 
-        RectTransform tabs = CourseUI.Rect("Tabs", sheet.transform);
-        CourseUI.Place(tabs, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-70, -46), new Vector2(460, 54));
-        CourseUI.Row(tabs.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
-        tabButtons.Clear();
-        string[] names = { "Legs", "Prize money" };
-        for (int i = 0; i < names.Length; i++)
-        {
-            Page target = (Page)i;
-            Button tab = CourseUI.Button("Tab " + names[i], tabs, names[i], CourseUI.ButtonKind.Light, () => ShowOverlay(target), 22);
-            CourseUI.Size(tab, 54, -1, 1);
-            tabButtons.Add(tab);
-        }
-
         overlayBody = CourseUI.ScrollList("Rows", sheet.transform, out overlayScroll);
         RectTransform list = (RectTransform)overlayScroll.transform;
         list.anchorMin = Vector2.zero;
@@ -775,11 +763,37 @@ public class RouteChoiceView : MonoBehaviour
         CourseUI.Column(overlayBody.gameObject, 6, new RectOffset(0, 0, 0, 0)).childForceExpandHeight = false;
         FastScroll.Add(overlayScroll);
 
-        bool host = CompetitionFlow.LocalIsHost();
-        overlayLobby = CourseUI.Button("Lobby", sheet.transform, host ? "Back to the lobby" : "The host takes everyone back to the lobby",
-            CourseUI.ButtonKind.Primary, CompetitionFlow.HostReturnToLobby, 24);
+        // Bottom right: from the legs on to the results (places and prize money), and from there back to the lobby.
+        // Bottom left on the results: back to the legs.
+        overlayLobby = CourseUI.Button("Lobby", sheet.transform, "See results  >", CourseUI.ButtonKind.Primary, OnOverlayButton, 24);
         CourseUI.Place((RectTransform)overlayLobby.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-70, 36), new Vector2(560, 64));
-        overlayLobby.interactable = host;
+        overlayBack = CourseUI.Button("Back", sheet.transform, "<  Legs", CourseUI.ButtonKind.Light, () => ShowOverlay(Page.Legs), 22);
+        CourseUI.Place((RectTransform)overlayBack.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(70, 36), new Vector2(220, 64));
+        overlayBack.gameObject.SetActive(false);
+    }
+
+    void OnOverlayButton()
+    {
+        if (page == Page.Legs) ShowOverlay(Page.Money);
+        else CompetitionFlow.HostReturnToLobby();
+    }
+
+    // The buttons at the bottom for the page shown
+    void RefreshOverlayButtons()
+    {
+        if (overlayLobby == null) return;
+        bool host = CompetitionFlow.LocalIsHost();
+        if (page == Page.Legs)
+        {
+            CourseUI.SetButtonText(overlayLobby, "See results  >");
+            overlayLobby.interactable = true;
+        }
+        else
+        {
+            CourseUI.SetButtonText(overlayLobby, host ? "Back to the lobby" : "The host takes everyone back to the lobby");
+            overlayLobby.interactable = host;
+        }
+        if (overlayBack != null) overlayBack.gameObject.SetActive(page == Page.Money);
     }
 
     void ShowOverlay(Page show)
@@ -795,7 +809,7 @@ public class RouteChoiceView : MonoBehaviour
         body = overlayBody;
         page = show;
         tableShown = null;
-        for (int i = 0; i < tabButtons.Count; i++) CourseUI.SetButtonColor(tabButtons[i], i == (int)show ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        RefreshOverlayButtons();
         if (show == Page.Legs) FillTable();
         else FillMoney();
     }
@@ -816,7 +830,7 @@ public class RouteChoiceView : MonoBehaviour
         if (now == tableShown) return;
         tableShown = now;
 
-        heading.text = "Results";
+        heading.text = "Legs";
         int waiting = 0;
         foreach (NetworkPlayer p in players) if (!p.choiceDone) waiting++;
         info.text = (question == 0 ? "This course has no legs with a clear route choice. Try another course or a longer one."
@@ -1000,10 +1014,10 @@ public class RouteChoiceView : MonoBehaviour
     void FillMoney()
     {
         if (failed || body == null) return;
-        heading.text = "Prize money";
+        heading.text = "Results";
         if (paid)
         {
-            ShowPaid();
+            ShowPaid(false);
             return;
         }
         ClearBody();
@@ -1012,13 +1026,14 @@ public class RouteChoiceView : MonoBehaviour
         foreach (NetworkPlayer p in players) if (!p.choiceDone) waiting.Add(BearMode.Name(p));
         if (waiting.Count > 0)
         {
-            info.text = "Waiting for " + string.Join(", ", waiting) + " to finish. The money is paid when everyone is done.";
+            info.text = "Waiting for " + string.Join(", ", waiting) + " to finish. The prize money is handed out when everyone is done.";
+            AddStandings(players);
             TextMeshProUGUI note = CourseUI.Text("Note", body, "Everyone gets " + RouteChoiceGame.TookPart + " kr for taking part, and more for a good place among the others.", 20, CourseUI.InkMuted);
             CourseUI.Size(note, 60);
             return;
         }
         Pay(lastPlace, lastPlayers, true);
-        ShowPaid();
+        ShowPaid(true);
     }
 
     int paidTookPart;
@@ -1026,6 +1041,8 @@ public class RouteChoiceView : MonoBehaviour
     int paidPlaceOf;
     int paidForPlace;
     bool paidTrophy;
+    int balanceBefore;
+    Coroutine prizeShow;
 
     // Money for taking part, and for the place when the game was played to the end
     void Pay(int place, int players, bool finished)
@@ -1039,25 +1056,135 @@ public class RouteChoiceView : MonoBehaviour
         paidTrophy = finished && place == 1 && players >= 2;
         if (Money.Instance != null)
         {
+            balanceBefore = Money.Instance.GetMoney();
             Money.Instance.AddMoney(paidTookPart + paidForPlace);
             if (paidTrophy) Money.Instance.AddTrophy(1);
         }
     }
 
-    void ShowPaid()
+    // The final places, like after a race, and the prize money handed out: the first time with the lines coming in
+    // one by one and the sum counting up, later at once
+    void ShowPaid(bool animate)
     {
         ClearBody();
+        if (prizeShow != null) StopCoroutine(prizeShow);
+        prizeShow = null;
         info.text = paidPlace > 0
             ? "You came <b>" + CompetitionFlow.Ordinal(paidPlace) + " of " + paidPlaceOf + "</b>."
             : "Thanks for taking part.";
-        AddRow(CourseUI.Accent, "Took part", "+" + paidTookPart + " kr", false);
-        if (paidPlace > 0) AddRow(CourseUI.Accent, CompetitionFlow.Ordinal(paidPlace) + " place of " + paidPlaceOf, "+" + paidForPlace + " kr", false);
-        AddRow(CourseUI.Forest, "<b>Total</b>" + (paidTrophy ? "\n<size=75%><color=#5B7563>+1 trophy for the win</color></size>" : ""), "+" + (paidTookPart + paidForPlace) + " kr", true);
-        if (Money.Instance != null)
+        AddStandings(ReadStandings());
+
+        // The prize money card
+        Image card = CourseUI.Panel("Prize money", body, new Color(1f, 1f, 1f, 0.7f));
+        CourseUI.Size(card, 330);
+        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "Your prize money", 26, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28, -18), new Vector2(500, 40));
+
+        List<CanvasGroup> lines = new List<CanvasGroup>();
+        float y = -70f;
+        lines.Add(PrizeLine(card.transform, ref y, "Took part", "+" + paidTookPart + " kr"));
+        if (paidPlace > 0) lines.Add(PrizeLine(card.transform, ref y, CompetitionFlow.Ordinal(paidPlace) + " place of " + paidPlaceOf, "+" + paidForPlace + " kr"));
+        if (paidTrophy) lines.Add(PrizeLine(card.transform, ref y, "Trophy for the win", "+1 trophy"));
+
+        int total = paidTookPart + paidForPlace;
+        TextMeshProUGUI totalLabel = CourseUI.Text("Total label", card.transform, "Total", 24, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+        CourseUI.Place(totalLabel.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-300, 70), new Vector2(200, 60));
+        TextMeshProUGUI totalText = CourseUI.Text("Total", card.transform, "+" + total + " kr", 54, CourseUI.Accent, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+        CourseUI.Place(totalText.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28, 64), new Vector2(270, 72));
+        totalText.enableWordWrapping = false;
+        TextMeshProUGUI balance = CourseUI.Text("Balance", card.transform, "", 20, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.MidlineRight);
+        CourseUI.Place(balance.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28, 20), new Vector2(500, 34));
+        int after = Money.Instance != null ? Money.Instance.GetMoney() : 0;
+        balance.text = Money.Instance != null ? "You now have " + after + " kr" : "";
+
+        if (animate && isActiveAndEnabled) prizeShow = StartCoroutine(PrizeShow(lines, totalText, total, balance, Money.Instance != null ? balanceBefore : -1, after));
+    }
+
+    CanvasGroup PrizeLine(Transform card, ref float y, string label, string amount)
+    {
+        RectTransform line = CourseUI.Rect("Line", card);
+        CourseUI.Place(line, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28, y), new Vector2(0, 46));
+        line.anchorMax = new Vector2(1f, 1f);
+        line.offsetMax = new Vector2(-28, line.offsetMax.y);
+        Image dot = CourseUI.Panel("Dot", line, CourseUI.Accent);
+        CourseUI.Place(dot.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0, 0), new Vector2(14, 14));
+        TextMeshProUGUI name = CourseUI.Text("Label", line, label, 22, CourseUI.Ink);
+        CourseUI.Stretch(name.rectTransform, 28, 200, 0, 0);
+        name.alignment = TextAlignmentOptions.MidlineLeft;
+        TextMeshProUGUI value = CourseUI.Text("Amount", line, amount, 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+        CourseUI.Place(value.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0, 0), new Vector2(200, 40));
+        y -= 50f;
+        return line.gameObject.AddComponent<CanvasGroup>();
+    }
+
+    IEnumerator PrizeShow(List<CanvasGroup> lines, TextMeshProUGUI totalText, int total, TextMeshProUGUI balance, int before, int after)
+    {
+        foreach (CanvasGroup g in lines) g.alpha = 0f;
+        totalText.text = "+0 kr";
+        if (before >= 0) balance.text = "You had " + before + " kr";
+        yield return new WaitForSecondsRealtime(0.3f);
+        // The lines slide in one by one
+        foreach (CanvasGroup g in lines)
         {
-            TextMeshProUGUI balance = CourseUI.Text("Balance", body, "You now have " + Money.Instance.GetMoney() + " kr", 20, CourseUI.InkMuted);
-            CourseUI.Size(balance, 34);
+            RectTransform r = (RectTransform)g.transform;
+            Vector2 at = r.anchoredPosition;
+            for (float t = 0f; t < 0.35f; t += Time.unscaledDeltaTime)
+            {
+                float k = t / 0.35f;
+                g.alpha = k;
+                r.anchoredPosition = at + new Vector2(40f * (1f - k) * (1f - k), 0f);
+                yield return null;
+            }
+            g.alpha = 1f;
+            r.anchoredPosition = at;
+            yield return new WaitForSecondsRealtime(0.15f);
         }
+        // The sum counts up, then pops
+        for (float t = 0f; t < 1.1f; t += Time.unscaledDeltaTime)
+        {
+            float k = 1f - Mathf.Pow(1f - t / 1.1f, 3f);
+            totalText.text = "+" + Mathf.RoundToInt(total * k) + " kr";
+            if (before >= 0) balance.text = "You now have " + Mathf.RoundToInt(Mathf.Lerp(before, after, k)) + " kr";
+            yield return null;
+        }
+        totalText.text = "+" + total + " kr";
+        if (before >= 0) balance.text = "You now have " + after + " kr";
+        RectTransform pop = totalText.rectTransform;
+        for (float t = 0f; t < 0.3f; t += Time.unscaledDeltaTime)
+        {
+            pop.localScale = Vector3.one * (1f + 0.18f * Mathf.Sin(Mathf.PI * t / 0.3f));
+            yield return null;
+        }
+        pop.localScale = Vector3.one;
+        prizeShow = null;
+    }
+
+    // Everyone in the game, best first: place, name, how many right and the points (like the list after a race)
+    void AddStandings(List<NetworkPlayer> players)
+    {
+        for (int i = 0; i < players.Count; i++)
+        {
+            NetworkPlayer p = players[i];
+            int place = PlaceOf(p, players);
+            bool mine = p.Object.HasStateAuthority;
+            Image row = CourseUI.Panel("Player", body, mine ? new Color(0.91f, 0.45f, 0.16f, 0.2f) : new Color(1f, 1f, 1f, 0.6f));
+            CourseUI.Size(row, 64);
+            Image badge = CourseUI.Panel("Place", row.transform, place == 1 ? CourseUI.Accent : CourseUI.Forest);
+            CourseUI.Place(badge.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(12, 0), new Vector2(46, 46));
+            TextMeshProUGUI number = CourseUI.Text("Number", badge.transform, place.ToString(), 24, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);
+            CourseUI.Stretch(number.rectTransform);
+            string name = "<b>" + BearMode.Name(p) + "</b>" + (mine ? " <color=#5B7563>(you)</color>" : "")
+                + "  <size=80%><color=#5B7563>" + p.choiceRight + " of " + p.choiceQuestions + " right" + (p.choiceDone ? "" : ", still playing") + "</color></size>";
+            TextMeshProUGUI label = CourseUI.Text("Name", row.transform, name, 24, CourseUI.Ink);
+            CourseUI.Stretch(label.rectTransform, 74, 220, 4, 4);
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+            label.enableWordWrapping = false;
+            TextMeshProUGUI points = CourseUI.Text("Points", row.transform, RouteChoiceGame.Points(p.choiceScore) + " p", 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+            CourseUI.Place(points.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-16, 0), new Vector2(200, 56));
+            points.enableWordWrapping = false;
+        }
+        RectTransform gap = CourseUI.Rect("Gap", body);
+        CourseUI.Size(gap, 12);
     }
 
     void ShowBackButton()
@@ -1081,12 +1208,14 @@ public class RouteChoiceView : MonoBehaviour
         {
             RouteChoice c = current.choices[i];
             List<Vector3> points = WorldPoints(leg, c.points);
-            bool highlight = fastest < 0 || i == fastest;
-            float w = fastest >= 0 && i == fastest ? width * 1.5f : width;
+            // While choosing, every route is see-through, so the streets, paths and houses under it still show.
+            // Afterwards the fastest is solid and thicker, the others see-through.
+            bool highlight = fastest >= 0 && i == fastest;
+            float w = highlight ? width * 1.5f : width;
             Color colour = RouteChoiceGame.Colours[c.colour];
-            if (!highlight) colour.a = 0.55f;
-            // A dark edge under each line so it shows on every kind of ground
-            Line("Route edge " + i, points, new Color(0.08f, 0.08f, 0.08f, highlight ? 0.75f : 0.35f), w * 1.6f, 40 + 2 * i);
+            if (!highlight) colour.a = fastest < 0 ? 0.6f : 0.45f;
+            // A thin dark edge under each line so it shows on every kind of ground
+            Line("Route edge " + i, points, new Color(0.08f, 0.08f, 0.08f, highlight ? 0.75f : 0.25f), w * (highlight ? 1.6f : 1.35f), 40 + 2 * i);
             Line("Route " + i, points, colour, w, 41 + 2 * i + (fastest >= 0 && i == fastest ? 20 : 0));
         }
     }
