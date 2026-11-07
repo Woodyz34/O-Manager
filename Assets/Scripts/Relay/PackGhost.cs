@@ -63,7 +63,7 @@ public class PackGhost : MonoBehaviour, IPackRunner
         string dir = dy > 0 ? (dx > 0 ? "NE" : dx < 0 ? "NW" : "N") : dy < 0 ? (dx > 0 ? "SE" : dx < 0 ? "SW" : "S") : dx > 0 ? "E" : "W";
         float slope = 1f;
         if (terrain.slopeFactors != null && terrain.slopeFactors.TryGetValue(dir, out float[,] grid)) slope = grid[i, j];
-        return ground * slope;
+        return ground * slope * TerrainSpeedModel.RaceSpeedScale();
     }
 
     void Update()

@@ -42,6 +42,7 @@ public class AICoursePanel : MonoBehaviour
             kind = LastSettings.kind,
             lengthKm = LastSettings.lengthKm,
             controls = LastSettings.controls,
+            barriers = LastSettings.barriers,
             seed = Environment.TickCount
         };
         MapDefinition map = lastMap;
@@ -54,6 +55,8 @@ public class AICoursePanel : MonoBehaviour
     int controls = 12;
     MapDefinition map;
     const string MapPref = "AICourse.Map";
+    const string BarriersPref = "AICourse.Barriers";
+    bool barriers = true;
 
     TextMeshProUGUI intro;
     Button mapButton;
@@ -101,11 +104,11 @@ public class AICoursePanel : MonoBehaviour
         AICoursePanel panel = shade.gameObject.AddComponent<AICoursePanel>();
 
         Image card = CourseUI.CardPanel("Window", shade.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1240, 820));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1240, 880));
 
         // Left: settings
         RectTransform left = CourseUI.Rect("Settings", card.transform);
-        CourseUI.Place(left, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -36), new Vector2(560, 750));
+        CourseUI.Place(left, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -36), new Vector2(560, 810));
         CourseUI.Column(left.gameObject, 14, new RectOffset(0, 0, 0, 0));
 
         TextMeshProUGUI title = CourseUI.Text("Title", left, "AI course", 42, CourseUI.Ink, FontStyles.Bold);
@@ -131,6 +134,7 @@ public class AICoursePanel : MonoBehaviour
         panel.kindButtons[CourseGenerator.Kind.Sprint] = CourseUI.Button("Sprint", kindRow, "Sprint", CourseUI.ButtonKind.Light, () => panel.SetKind(CourseGenerator.Kind.Sprint), 24);
         panel.kindHint = CourseUI.Text("Kind hint", left, "", 20, CourseUI.InkMuted);
         CourseUI.Size(panel.kindHint, 52);
+        panel.BuildBarriersRow(left);
 
         // The length in steps of 100 m
         panel.lengthLabel = CourseUI.Text("Length label", left, "", 26, CourseUI.Ink, FontStyles.Bold);
@@ -172,6 +176,48 @@ public class AICoursePanel : MonoBehaviour
     }
 
     TextMeshProUGUI kindHint;
+    Button barriersRow;
+    Image barriersBox;
+    TextMeshProUGUI barriersMark;
+
+    // Sprint only: a tick box for out-of-bounds barriers that close the obvious straight way on some legs
+    void BuildBarriersRow(RectTransform parent)
+    {
+        barriers = PlayerPrefs.GetInt(BarriersPref, 1) == 1;
+        Image tile = CourseUI.Panel("Barriers", parent, CourseUI.Soft);
+        CourseUI.Size(tile, 48);
+        barriersRow = tile.gameObject.AddComponent<Button>();
+        barriersRow.targetGraphic = tile;
+        barriersRow.onClick.AddListener(() =>
+        {
+            if (busy) return;
+            barriers = !barriers;
+            PlayerPrefs.SetInt(BarriersPref, barriers ? 1 : 0);
+            ShowBarriers();
+        });
+        barriersBox = CourseUI.Panel("Tick", tile.transform, Color.white);
+        CourseUI.Place(barriersBox.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(12, 0), new Vector2(30, 30));
+        barriersBox.raycastTarget = false;
+        Outline outline = barriersBox.gameObject.AddComponent<Outline>();
+        outline.effectColor = CourseUI.FieldBorder;
+        outline.effectDistance = new Vector2(2, -2);
+        barriersMark = CourseUI.Text("Mark", barriersBox.transform, "", 22, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);
+        CourseUI.Stretch(barriersMark.rectTransform);
+        TextMeshProUGUI text = CourseUI.Text("Text", tile.transform, "<b>Barriers</b>  <size=18><color=#5B7563>close the obvious straight way on some legs</color></size>", 22, CourseUI.Ink);
+        CourseUI.Stretch(text.rectTransform, 56, 8, 4, 4);
+        text.alignment = TextAlignmentOptions.MidlineLeft;
+        text.richText = true;
+        text.raycastTarget = false;
+        ShowBarriers();
+    }
+
+    void ShowBarriers()
+    {
+        if (barriersRow == null) return;
+        barriersRow.gameObject.SetActive(kind == CourseGenerator.Kind.Sprint);
+        barriersBox.color = barriers ? CourseUI.Forest : Color.white;
+        barriersMark.text = barriers ? "X" : "";
+    }
 
     // A new map: show only the kinds of course it can have, and forget the course made on the old map
     void SetMap(MapDefinition chosen)
@@ -221,6 +267,7 @@ public class AICoursePanel : MonoBehaviour
         lengthKm = Mathf.Clamp(lengthKm, CourseGenerator.MinLengthFor(kind), CourseGenerator.MaxLengthFor(kind));
         lengthSlider.SetValueWithoutNotify(Mathf.Round(lengthKm * 10f));
         UpdateLimits();
+        ShowBarriers();
     }
 
     // ---- Choosing a map: a pop-up with a search field and forest/sprint filters ----
@@ -331,7 +378,7 @@ public class AICoursePanel : MonoBehaviour
         generateButton.interactable = false;
         useButton.interactable = false;
         resultText.color = CourseUI.Ink;
-        resultText.text = kind == CourseGenerator.Kind.Sprint ? "Laying the course and looking for legs with good route choices..." : "Laying the course and checking every leg...";
+        resultText.text = kind == CourseGenerator.Kind.Sprint ? "Laying the course and looking for legs with good route choices" + (barriers ? ", then placing barriers..." : "...") : "Laying the course and checking every leg...";
 
         MapGrid grid = MapGrid.Load(map.gridName); // Resources has to be used on the main thread
         CourseGenerator.Settings settings = new CourseGenerator.Settings
@@ -339,6 +386,7 @@ public class AICoursePanel : MonoBehaviour
             kind = kind,
             lengthKm = lengthKm,
             controls = controls,
+            barriers = barriers && kind == CourseGenerator.Kind.Sprint,
             seed = Environment.TickCount
         };
         MapDefinition chosenMap = map;
@@ -359,14 +407,15 @@ public class AICoursePanel : MonoBehaviour
         preview.texture = CourseThumbnail.Get(generated);
         preview.enabled = preview.texture != null;
         resultText.text = $"<b>{generated.name}</b>\n{generated.controls.Count} controls  ·  {generated.LengthText()}  ·  legs {Mathf.RoundToInt(result.shortestLeg)} to {Mathf.RoundToInt(result.longestLeg)} m\nEvery control can be reached."
-                          + (result.routeChoiceLegs >= 0 ? $" {result.routeChoiceLegs} of {result.legCount} legs have a close route choice." : "");
+                          + (result.routeChoiceLegs >= 0 ? $" {result.routeChoiceLegs} of {result.legCount} legs have a close route choice." : "")
+                          + (result.barriers > 0 ? $" {result.barriers} barrier{(result.barriers == 1 ? "" : "s")} close the straight way on some legs." : settings.barriers ? " No leg needed a barrier." : "");
         useButton.interactable = true;
     }
 
     void Use()
     {
         if (generated == null) return;
-        LastSettings = new CourseGenerator.Settings { kind = kind, lengthKm = lengthKm, controls = controls };
+        LastSettings = new CourseGenerator.Settings { kind = kind, lengthKm = lengthKm, controls = controls, barriers = barriers && kind == CourseGenerator.Kind.Sprint };
         lastMap = map;
         gameObject.SetActive(false);
         onUse?.Invoke(generated);
