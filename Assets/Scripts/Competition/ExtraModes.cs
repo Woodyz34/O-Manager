@@ -5,7 +5,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 // The game modes the host can turn on in the lobby, on top of the runner pool. Several can be used together,
-// except Route analysis and the Route choice game, which are always played on their own.
+// except Route analysis and the Route choice game, which are always played on their own, and the two imposter
+// modes (Imposter and Secret task), of which only one can be on.
 [Flags]
 public enum ExtraMode
 {
@@ -15,20 +16,24 @@ public enum ExtraMode
     MoveControl = 4,
     RouteAnalysis = 8,
     RouteChoice = 16,
+    SecretTask = 32,
 }
 
 public static class ExtraModes
 {
-    public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis, ExtraMode.RouteChoice };
+    public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.SecretTask, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis, ExtraMode.RouteChoice };
 
     // Modes that cannot be combined with any other mode
     public const ExtraMode Alone = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+
+    // The two imposter modes both pick one imposter, so only one of them can be on
+    public const ExtraMode ImposterKinds = ExtraMode.Imposter | ExtraMode.SecretTask;
 
     // Modes where nobody picks a runner (everyone gets the same one), so the runner pool does not matter
     public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
     // Modes that only work on individual courses, not relays
-    public const ExtraMode IndividualOnly = ExtraMode.Bears | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+    public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.Bears | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
     // Modes that only work in the forest, not on sprint courses (Imposter works on both)
     public const ExtraMode ForestOnly = ExtraMode.Bears | ExtraMode.MoveControl;
@@ -41,6 +46,7 @@ public static class ExtraModes
         switch (mode)
         {
             case ExtraMode.Imposter: return "Imposter";
+            case ExtraMode.SecretTask: return "Secret task";
             case ExtraMode.Bears: return "Bears";
             case ExtraMode.MoveControl: return "Move a control";
             case ExtraMode.RouteAnalysis: return "Route analysis";
@@ -54,6 +60,7 @@ public static class ExtraModes
         switch (mode)
         {
             case ExtraMode.Imposter: return "One random player secretly has to finish last. Can you spot who?";
+            case ExtraMode.SecretTask: return "Everyone but one gets a secret task. The imposter isn't told it and must blend in.";
             case ExtraMode.Bears: return "Everyone hides one bear while drawing. Runners who find it get scared and run round it. Forest only.";
             case ExtraMode.MoveControl: return "Everyone may move one control up to 100 m while drawing. Good routes can turn bad. Forest only.";
             case ExtraMode.RouteAnalysis: return "Nobody runs: everyone draws the whole course the way they would run it, then you compare the route choices. Played on its own.";
@@ -79,6 +86,7 @@ public static class ExtraModes
     {
         if ((modes & mode) != 0) return modes & ~mode;
         if ((mode & Alone) != 0) return mode;
+        if ((mode & ImposterKinds) != 0) modes &= ~ImposterKinds;
         return (modes & ~Alone) | mode;
     }
 

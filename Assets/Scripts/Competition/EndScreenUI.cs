@@ -56,6 +56,9 @@ public class EndScreenUI : MonoBehaviour
 
     bool imposterMode;
     PlayerRef imposter;
+    // Secret task mode: an imposter mode where the others had a task (SecretTasks)
+    bool secretTaskMode;
+    int secretTask;
     bool voting;
     bool rewardsGiven;
     bool revealRunning;
@@ -117,7 +120,8 @@ public class EndScreenUI : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.8f);
         standings = CompetitionFlow.ComputeStandings();
         imposterMode = CompetitionFlow.TryGetImposter(out imposter);
-        subtitleText.text = imposterMode ? "IMPOSTER MODE" : "COMPETITION FINISHED";
+        secretTaskMode = imposterMode && SecretTasks.TryGet(out secretTask);
+        subtitleText.text = secretTaskMode ? "SECRET TASK" : imposterMode ? "IMPOSTER MODE" : "COMPETITION FINISHED";
         yield return BuildRows();
 
         if (imposterMode)
@@ -234,12 +238,15 @@ public class EndScreenUI : MonoBehaviour
         if (amImposter)
         {
             voteTitleText.text = "You were the imposter";
-            voteHintText.text = "The others are guessing now. Keep a straight face.";
+            voteHintText.text = secretTaskMode
+                ? "Their task was: " + SecretTasks.Short(secretTask) + ". The others are guessing now. Keep a straight face."
+                : "The others are guessing now. Keep a straight face.";
             return;
         }
 
         voteTitleText.text = "Who was the imposter?";
-        voteHintText.text = "One runner was trying to finish last. Guess right for +" + CompetitionRewards.CorrectGuess + " kr.";
+        voteHintText.text = (secretTaskMode ? "One runner didn't know the task." : "One runner was trying to finish last.")
+            + " Guess right for +" + CompetitionRewards.CorrectGuess + " kr.";
         foreach (Standing standing in standings)
         {
             if (standing.isLocal)
@@ -355,6 +362,10 @@ public class EndScreenUI : MonoBehaviour
         {
             detail = correct + " of " + votersCount + " runners guessed right.";
         }
+        if (secretTaskMode)
+        {
+            detail += "\nThe task was: " + SecretTasks.Short(secretTask);
+        }
         return new ImposterOverlay.RevealResult { caught = caught, detail = detail };
     }
 
@@ -384,7 +395,17 @@ public class EndScreenUI : MonoBehaviour
             : "Did not finish";
 
         int total = 0;
-        if (amImposter)
+        if (amImposter && secretTaskMode)
+        {
+            // Without a task, the imposter simply races: a normal place, plus money for getting away
+            total += AddLine(placeLabel, CompetitionRewards.ForPlace(me.place, runners, me.finished));
+            if (votersCount > 0)
+            {
+                total += AddLine(caught ? "Caught by the others" : "Got away with it",
+                    caught ? 0 : CompetitionRewards.ForImposterEscape(votersCount));
+            }
+        }
+        else if (amImposter)
         {
             total += AddLine(me.finished ? placeLabel + ", counted from the back" : placeLabel,
                 CompetitionRewards.ForImposterPlace(me.place, runners, me.finished));
