@@ -1208,14 +1208,14 @@ public class RouteChoiceView : MonoBehaviour
         {
             RouteChoice c = current.choices[i];
             List<Vector3> points = WorldPoints(leg, c.points);
-            // While choosing, every route is see-through, so the streets, paths and houses under it still show.
-            // Afterwards the fastest is solid and thicker, the others see-through.
+            // While choosing, every route is just a little see-through, so what is right under it still shows a bit.
+            // Afterwards the fastest is solid and thicker, the others a bit more see-through.
             bool highlight = fastest >= 0 && i == fastest;
             float w = highlight ? width * 1.5f : width;
             Color colour = RouteChoiceGame.Colours[c.colour];
-            if (!highlight) colour.a = fastest < 0 ? 0.6f : 0.45f;
-            // A thin dark edge under each line so it shows on every kind of ground
-            Line("Route edge " + i, points, new Color(0.08f, 0.08f, 0.08f, highlight ? 0.75f : 0.25f), w * (highlight ? 1.6f : 1.35f), 40 + 2 * i);
+            if (!highlight) colour.a = fastest < 0 ? 0.92f : 0.8f;
+            // A dark edge under each line so it shows on every kind of ground
+            Line("Route edge " + i, points, new Color(0.08f, 0.08f, 0.08f, highlight ? 0.75f : 0.5f), w * (highlight ? 1.6f : 1.45f), 40 + 2 * i);
             Line("Route " + i, points, colour, w, 41 + 2 * i + (fastest >= 0 && i == fastest ? 20 : 0));
         }
     }
