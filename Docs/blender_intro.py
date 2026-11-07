@@ -198,37 +198,50 @@ def log(name, mats):
     return o
 
 
+def box(name, loc, size, material, coll):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+    o = bpy.context.active_object
+    o.name = name
+    o.scale = size
+    o.data.materials.append(material)
+    link(o, coll)
+    return o
+
+
 def control_flag(mats):
-    # The orienteering control: a three-sided prism, each side white over orange split along the diagonal,
-    # hung from a wooden stake with an SI unit on it.
+    # The orienteering control as it stands in a Swedish forest: a small wooden trestle (two legs and a bar
+    # on top), the SI units on the bar, and the three-sided flag hanging in the middle on short strings.
     coll = bpy.data.collections.new("Control")
     bpy.context.scene.collection.children.link(coll)
-    s = 0.3   # side length of the flag
-    hang_z = 0.95
-    # Stake
-    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.025, depth=1.45, location=(0, 0, 0.72))
-    stake = bpy.context.active_object
-    stake.data.materials.append(mats["wood"])
-    link(stake, coll)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.012, depth=0.32, location=(0.16, 0, 1.38), rotation=(0, math.pi / 2, 0))
-    arm = bpy.context.active_object
-    arm.data.materials.append(mats["wood"])
-    link(arm, coll)
-    # SI unit
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, -0.045, 0.82))
-    si = bpy.context.active_object
-    si.scale = (0.05, 0.03, 0.11)
-    si.data.materials.append(mats["si"])
-    link(si, coll)
-    # Flag: 3 faces round a triangle; each face is two triangles (white top-left, orange bottom-right)
+    cx = 0.30            # middle of the control
+    half = 0.42          # half the width between the legs
+    height = 0.95        # top of the bar
+    for side in (-1, 1):
+        leg = box("Leg", (cx + side * half, 0, height / 2), (0.035, 0.035, height), mats["wood_light"], coll)
+        leg.rotation_euler = (0, side * 0.03, 0)
+    box("Bar", (cx, 0, height + 0.02), (2 * half + 0.12, 0.08, 0.025), mats["wood"], coll)
+    # SI units lying on the bar
+    box("SI", (cx - 0.30, 0, height + 0.05), (0.13, 0.05, 0.035), mats["si"], coll)
+    box("SI2", (cx + 0.18, 0, height + 0.05), (0.13, 0.05, 0.035), mats["si_dark"], coll)
+    box("SI2 top", (cx + 0.18, 0, height + 0.069), (0.09, 0.035, 0.004), mats["flag_white"], coll)
+    # the code stake under the flag, with its number plate
+    box("Stake", (cx + 0.12, 0.03, 0.18), (0.022, 0.022, 0.36), mats["wood_light"], coll)
+    box("Stake top", (cx + 0.12, 0.03, 0.33), (0.026, 0.026, 0.06), mats["si"], coll)
+    box("Code", (cx + 0.12, -0.0, 0.22), (0.06, 0.004, 0.05), mats["flag_white"], coll)
+
+    # Flag: 3 faces round a triangle; each face is two triangles (white top-left, orange bottom-right),
+    # turned so a corner points at the camera and two faces are seen
+    s = 0.30
+    top = height - 0.09
+    bot = top - s
     r = s / math.sqrt(3)
-    corners = [(r * math.cos(a), r * math.sin(a)) for a in (math.pi / 2, math.pi / 2 + 2 * math.pi / 3, math.pi / 2 + 4 * math.pi / 3)]
+    corners = [(r * math.cos(a), r * math.sin(a)) for a in (-math.pi / 2, -math.pi / 2 + 2 * math.pi / 3, -math.pi / 2 + 4 * math.pi / 3)]
     verts, faces, mat_idx = [], [], []
-    top, bot = hang_z + s / 2, hang_z - s / 2
     for i in range(3):
-        (x0, y0), (x1, y1) = corners[i], corners[(i + 1) % 3]
+        (x0, y0), (x1, y1) = corners[(i + 1) % 3], corners[i]
         b = len(verts)
-        verts += [(x0, y0, top), (x1, y1, top), (x1, y1, bot), (x0, y0, bot)]
+        sag = 0.012   # the cloth bulges in a little at the bottom
+        verts += [(x0, y0, 0), (x1, y1, 0), (x1 * (1 - sag / r), y1 * (1 - sag / r), -s), (x0 * (1 - sag / r), y0 * (1 - sag / r), -s)]
         faces.append((b + 0, b + 1, b + 3)); mat_idx.append(0)   # white half
         faces.append((b + 1, b + 2, b + 3)); mat_idx.append(1)   # orange half
     me = bpy.data.meshes.new("Flag")
@@ -240,13 +253,25 @@ def control_flag(mats):
     flag.data.materials.append(mats["flag_orange"])
     for p, i in zip(flag.data.polygons, mat_idx):
         p.material_index = i
-    flag.location = (0.30, 0, 1.38 - top)  # top edge right under the arm
-    flag.location.z += 0.0
+    flag.location = (cx, 0, top)
     sol = flag.modifiers.new("Thick", "SOLIDIFY")
     sol.thickness = 0.004
-    # Gently swinging in the wind
+    # strings from the bar down to the flag's top corners
+    for x, y in corners:
+        bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.003, depth=1, location=(0, 0, 0))
+        st = bpy.context.active_object
+        p0 = Vector((cx, 0, height + 0.005))
+        p1 = Vector((cx + x, y, top))
+        mid = (p0 + p1) / 2
+        st.location = mid
+        st.scale = (1, 1, (p1 - p0).length)
+        st.rotation_mode = "QUATERNION"
+        st.rotation_quaternion = Vector((0, 0, 1)).rotation_difference((p1 - p0).normalized())
+        st.data.materials.append(mats["flag_white"])
+        link(st, coll)
+    # Turning a little in the wind
     flag.rotation_mode = "XYZ"
-    for f, a in ((1, -0.25), (60, 0.2), (120, -0.12), (180, 0.15)):
+    for f, a in ((1, -0.12), (60, 0.08), (120, -0.05), (180, 0.06)):
         flag.rotation_euler = (0, 0, a)
         flag.keyframe_insert("rotation_euler", frame=f)
     return coll
@@ -266,7 +291,9 @@ def build():
         "rock": noise_mat("Rock", (0.18, 0.18, 0.17, 1), (0.38, 0.38, 0.35, 1), scale=2.0),
         "shrub": noise_mat("Shrub", (0.03, 0.09, 0.03, 1), (0.10, 0.20, 0.06, 1), scale=2.0),
         "heather": noise_mat("Heather", (0.18, 0.10, 0.12, 1), (0.30, 0.20, 0.16, 1), scale=2.0),
-        "wood": mat("Wood", (0.35, 0.22, 0.12, 1)),
+        "wood": mat("Wood", (0.30, 0.19, 0.11, 1)),
+        "wood_light": noise_mat("WoodLight", (0.55, 0.42, 0.28, 1), (0.72, 0.60, 0.45, 1), scale=8.0, rough=0.7),
+        "si_dark": mat("SIDark", (0.08, 0.08, 0.09, 1), rough=0.4),
         "si": mat("SI", (0.75, 0.12, 0.05, 1), rough=0.4),
         "flag_white": mat("FlagWhite", WHITE, rough=0.7),
         "flag_orange": mat("FlagOrange", ORANGE, rough=0.7),
@@ -425,7 +452,7 @@ def build():
         # fast at first, slowing to a stop: the run ends at the flag
         return 1 - (1 - t) ** 2.6
 
-    flag_pos = Vector((0.30, 0, 1.15))
+    flag_pos = Vector((0.30, 0, 0.78))
     for f in range(1, LENGTH + 1):
         t = (f - 1) / (LENGTH - 1)
         run = min(1.0, t / 0.86)
@@ -446,7 +473,7 @@ def build():
         w = min(1.0, max(0.0, (t - 0.45) / 0.35))
         w = w * w * (3 - 2 * w)
         # at the end the flag sits low in the picture, leaving the sky above it for the title
-        target.location = look_far.lerp(flag_pos + Vector((0, 0, 0.32 * side)), w)
+        target.location = look_far.lerp(flag_pos + Vector((0, 0, 0.30 * side)), w)
         target.keyframe_insert("location", frame=f)
         cam.data.lens = 24 + 11 * w
         cam.data.keyframe_insert("lens", frame=f)
