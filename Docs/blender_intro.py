@@ -224,10 +224,6 @@ def control_flag(mats):
     box("SI", (cx - 0.30, 0, height + 0.05), (0.13, 0.05, 0.035), mats["si"], coll)
     box("SI2", (cx + 0.18, 0, height + 0.05), (0.13, 0.05, 0.035), mats["si_dark"], coll)
     box("SI2 top", (cx + 0.18, 0, height + 0.069), (0.09, 0.035, 0.004), mats["flag_white"], coll)
-    # the code stake under the flag, with its number plate
-    box("Stake", (cx + 0.12, 0.03, 0.18), (0.022, 0.022, 0.36), mats["wood_light"], coll)
-    box("Stake top", (cx + 0.12, 0.03, 0.33), (0.026, 0.026, 0.06), mats["si"], coll)
-    box("Code", (cx + 0.12, -0.0, 0.22), (0.06, 0.004, 0.05), mats["flag_white"], coll)
 
     # Flag: 3 faces round a triangle; each face is two triangles (white top-left, orange bottom-right),
     # turned so a corner points at the camera and two faces are seen
@@ -475,7 +471,7 @@ def build():
         # at the end the flag sits low in the picture, leaving the sky above it for the title
         target.location = look_far.lerp(flag_pos + Vector((0, 0, 0.30 * side)), w)
         target.keyframe_insert("location", frame=f)
-        cam.data.lens = 24 + 11 * w
+        cam.data.lens = 24 + 4 * w
         cam.data.keyframe_insert("lens", frame=f)
 
     for fc in (cam.animation_data.action.fcurves if cam.animation_data and cam.animation_data.action and hasattr(cam.animation_data.action, "fcurves") else []):
