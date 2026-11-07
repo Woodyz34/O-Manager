@@ -24,6 +24,7 @@ public class SprintBarriers
     const float MaxSlowdown = 1.35f;           // the leg at most this much slower than its straight way was
     const float SkirtMeters = 5f;              // the route choices keep this far from a barrier: they go round the houses, not round its end
     const int MinWallCells = 12;               // a barrier ends on something big (a house, a plot, a fence), not a tree or a boulder
+    const float OtherLegSlack = 1.06f;         // a leg the barrier was not for may get at most this much slower (unless it gets a close choice)
     const int MaxPerLeg = 2;
     const int TriesPerRound = 6;
     public const int MaxBarriers = 8;          // per course
@@ -167,7 +168,11 @@ public class SprintBarriers
             {
                 if (j == k || !Near(state[j], placed)) continue;
                 LegState again = Measure(points, j);
-                if (again.blocked || (state[j].Fun(close) && !again.Fun(close)) || again.fastest > state[j].fastest * MaxSlowdown)
+                // Another leg may get close choices from it, but must not lose them, and a leg that stays plain must
+                // keep its way (a barrier for one leg should not quietly close the best way of the next)
+                bool wasFun = state[j].Fun(close), nowFun = again.Fun(close);
+                if (again.blocked || (wasFun && !nowFun) || (!nowFun && again.fastest > state[j].fastest * OtherLegSlack)
+                    || again.fastest > state[j].fastest * MaxSlowdown)
                 {
                     ok = false;
                     why = "it would spoil leg " + j;
