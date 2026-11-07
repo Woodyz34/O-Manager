@@ -15,7 +15,9 @@ Per race and class (runners on the same course):
   * Physic P = min(100, 100 * c100 / c). Double the clean time = 50.
 
 Calibration of c100 (separate scales for women and men, since classes never mix):
-  * VM/EM/VC races (WinSplits, level 6) are the anchor: best clean time = 100.
+  * VM/EM/VC finals (WinSplits, level 6) are the anchor: best clean time = 100.
+    Qualifications and B/C finals of VM/EM/VC are NOT anchors (user 2026-11-07): their
+    winner does not get 100 automatically, they are calibrated like any other race.
   * Other races: c100 = median of c * R / 100 over runners who already have a
     rating R (MIN_RACES_TO_CALIBRATE adjusted races, default 1, so juniors can
     chain in through juniors who also ran senior/international races).
@@ -28,7 +30,8 @@ Rating per runner, over the last 365 days:
   * weight = 0.5 ** (age_days / 180)
   * physic: Tukey biweight (c = 4.685, scale = max(1.4826 * MAD, 5)) times weight
   * technique: weighted mean
-  * visible in the game with >= 5 adjusted races, or any VM/EM/VC race.
+  * visible in the game with >= 5 adjusted races, or any VM/EM/VC race (finals,
+    qualifications and B finals alike; national qualifications do not count).
 
 Merits (best races of the last 365 days, shown on the card close-up):
   * race score = 100 * c100 / finish time, mistakes included, only adjusted races.
@@ -78,6 +81,8 @@ HALF_LIFE = 180
 MIN_CALIBRATORS = 3
 MIN_RACES_TO_CALIBRATE = 1     # 3 left every H/D18 and H/D20 race unadjusted with one year of data
 MIN_RACES_VISIBLE = 5
+# File name text that marks a VM/EM/VC race as a side race (not an anchor), on top of _kval
+SIDE_RACE = re.compile(r"(?<![a-z])(final[ _-]?[b-z]|[b-z][ _-]?final|semi|heat|kval|qual)", re.I)
 MISTAKE_SECONDS = 15            # user chose 15 s (was 30) on 2026-11-02
 MISTAKE_SHARE = 0.25
 TUKEY_C = 4.685
@@ -248,6 +253,12 @@ def load_races():
     return races
 
 
+def is_side_race(race):
+    """VM/EM/VC qualification or B/C final: rated against known runners, winner not 100."""
+    name = os.path.splitext(os.path.basename(race.get("source_file") or ""))[0]
+    return bool(race.get("qualification")) or bool(SIDE_RACE.search(name.split("_", 4)[-1] if name.count("_") >= 4 else ""))
+
+
 def build_entries(races, ids):
     """One entry per (race, class/course group) with OK runners and clean times."""
     eventor = [r for r in races if r.get("source") != "winsplits"]
@@ -257,7 +268,8 @@ def build_entries(races, ids):
     for race in eventor + winsplits:     # Eventor first so WinSplits can match to Eventor ids
         date = dt.date.fromisoformat(race["date"])
         is_ws = race.get("source") == "winsplits"
-        anchor = is_ws and race.get("level") == 6
+        international = is_ws and race.get("level") == 6
+        anchor = international and not is_side_race(race)
         for cls in race["classes"]:
             ok = [r for r in cls["runners"] if r["status"] == "OK" and r.get("time")]
             by_course = collections.defaultdict(list)
@@ -284,7 +296,7 @@ def build_entries(races, ids):
                 groups.append({
                     "id": f"{race['event_id']}|{race.get('race_id', '')}|{cls['class']}|{len(groups)}",
                     "event": race["event_name"], "class": cls["class"], "date": date,
-                    "anchor": anchor, "level": race.get("level"), "controls": len(codes),
+                    "anchor": anchor, "international": international, "level": race.get("level"), "controls": len(codes),
                     "runners": rs, "class_ok": len(ok), "class_best": class_best,
                     "file": class_file, "class_rows": None,
                     "codes": list(codes), "distance": race.get("distance") or "",
@@ -761,7 +773,7 @@ def main():
     c100, adjusted, rating, iterations = solve(groups, today)
 
     best = merits(groups, adjusted, c100, rating, today)
-    anchored_keys = {r["_key"] for g in groups if g["anchor"] for r in g["runners"]}
+    anchored_keys = {r["_key"] for g in groups if g["international"] for r in g["runners"]}
     all_keys = {r["_key"] for g in groups for r in g["runners"]}
     runners = []
     for key in all_keys:
@@ -812,7 +824,7 @@ def main():
         rep += ["## Tvetydiga namn i WinSplits-filer (granska)", ""]
         rep += [f"- {n} ({o}), {src}: {', '.join(c)}" for n, o, src, c in ids.ambiguous]
         rep.append("")
-    unmatched = sorted({(ids.info[r['_key']]['name'], ids.info[r['_key']]['country'] or '') for g in groups if g["anchor"]
+    unmatched = sorted({(ids.info[r['_key']]['name'], ids.info[r['_key']]['country'] or '') for g in groups if g["international"]
                         for r in g["runners"] if r["_key"].startswith("w:")})
     rep += [f"WinSplits-löpare utan Eventor-träff (oftast utländska): {len(unmatched)}.", ""]
     text = "\n".join(rep)
