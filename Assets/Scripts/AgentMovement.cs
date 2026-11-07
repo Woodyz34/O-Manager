@@ -522,7 +522,7 @@ public class AgentMovement : NetworkBehaviour
 
 
                 // Kombinera bas-hastighet och lutning
-                float targetSpeed2 = (baseSpeed * cellSpeed2) * slopeFactor2;
+                float targetSpeed2 = (baseSpeed * cellSpeed2) * slopeFactor2 * TerrainSpeedModel.RaceSpeedScale();
 
                 // Lerp mot mål-hastighet för mjuk acceleration/deceleration
                 float maxDelta2 = acceleration * Time.deltaTime;
@@ -695,7 +695,8 @@ public class AgentMovement : NetworkBehaviour
             // Uphill, downhill, too steep and the kind of ground are all in the slope factor now (TerrainSpeedModel)
 
             // Kombinera bas-hastighet och lutning
-            float targetSpeed = (baseSpeed * cellSpeed) * slopeFactor;
+            // Sprint courses run slower than the grid alone says (see TerrainSpeedModel.SprintSpeedScale)
+            float targetSpeed = (baseSpeed * cellSpeed) * slopeFactor * TerrainSpeedModel.RaceSpeedScale();
             // Relays: a runner just ahead helps, hanging on sets the pace, and a tired runner is slower
             if (packRunning != null)
             {

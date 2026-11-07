@@ -124,7 +124,7 @@ public static class RouteAnalysis
         // Ground nobody can run on (a building, a fence, private land) counts as 100 times slower than open ground
         // when a drawn line goes over it, so going through is never faster than the way round
         return new RouteChoiceGenerator(manager.speedGrid2D, manager.slopeFactors, manager.cellSize,
-            baseSpeed, PackRunning.GameSecondsPerSecond, IsSprint(manager)) { BlockedSpeed = 0.01f };
+            baseSpeed * TerrainSpeedModel.RaceSpeedScale(), PackRunning.GameSecondsPerSecond, IsSprint(manager)) { BlockedSpeed = 0.01f };
     }
 
     // A point in grid coordinates (cell centres on whole numbers) on the map
