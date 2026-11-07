@@ -130,6 +130,11 @@ public class ImposterOverlay : MonoBehaviour
             yield return null;
         }
 
+        if (secretTask && !amImposter && SecretTasks.TaskOf(task) == SecretTasks.Task.SecretPlace)
+        {
+            SecretPlaceMarker.Show(SecretTasks.ControlOf(task));
+        }
+
         ResetStage();
         pulseSpeed = 0.9f;
         pulseStrength = amImposter ? 0.45f : 0.25f;
