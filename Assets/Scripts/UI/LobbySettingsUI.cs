@@ -75,7 +75,7 @@ public class LobbySettingsUI : MonoBehaviour
     }
 
     // The strip with runner pool, game mode and course sat so low that the Runner setup and Players panels
-    // covered its ends. It goes up to the top row, between the money pill and Leave lobby.
+    // covered its ends. It goes up to the top row, between Leave lobby (left) and the money pill (right).
     void MoveHeaderUp()
     {
         if (mapText == null) return;
