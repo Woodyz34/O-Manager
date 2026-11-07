@@ -1,4 +1,4 @@
-# Poäng 2026-11-06
+# Poäng 2026-11-07
 
 Grupper (klass/bana per lopp): 383, justerade: 368, ojusterade: 15. Varv: 106.
 Löpare: 3060, med betyg: 3026, synliga i spelet: 978 (576 herrar, 402 damer). Frysta kort (inte längre med i paketen): 0.
@@ -10,8 +10,8 @@ Löpare: 3060, med betyg: 3026, synliga i spelet: 978 (576 herrar, 402 damer). F
 | 1 | Kasper Harlem Fosser | Norway | 97.83 | 97.16 | 7 |
 | 2 | Viktor Svensk | Sweden | 97.17 | 94.33 | 13 |
 | 3 | Tomas Krivda | Czechia | 96.78 | 92.06 | 4 |
-| 4 | Miika Kirmula | Finland | 95.31 | 94.19 | 7 |
-| 5 | Emil Svensk | Sweden | 95.31 | 85.65 | 9 |
+| 4 | Emil Svensk | Sweden | 95.31 | 85.65 | 9 |
+| 5 | Miika Kirmula | Finland | 95.31 | 94.19 | 7 |
 | 6 | Anton Johansson | Sweden | 95.3 | 95.18 | 8 |
 | 7 | Axel Elmblad | Sweden | 95.09 | 97.09 | 11 |
 | 8 | Olli Ojanaho | Finland | 94.88 | 97.08 | 3 |
