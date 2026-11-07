@@ -548,6 +548,19 @@ public class RouteCompareView : MonoBehaviour
                     if (d < best) { best = d; closest = i; }
                     if (d <= 0.35f) { hit = i; break; }
                 }
+                // The runner first comes this close a little before the control and then runs on into it. Cut where
+                // it came closest while still near the control, or the last bit into the control would be drawn as
+                // the start of the next leg (a hook back towards where the runner came from).
+                if (hit >= 0)
+                {
+                    best = Vector2.Distance(track.positions[hit], control);
+                    for (int i = hit + 1; i < track.positions.Count; i++)
+                    {
+                        float d = Vector2.Distance(track.positions[i], control);
+                        if (d > 0.35f) break;
+                        if (d < best) { best = d; hit = i; }
+                    }
+                }
                 int end = hit >= 0 ? hit : closest;
                 List<Vector3> line = new List<Vector3> { points[k - 1].position };
                 for (int i = from; i <= end && i < track.positions.Count; i++) line.Add(track.positions[i]);
