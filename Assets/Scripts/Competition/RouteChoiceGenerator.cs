@@ -378,7 +378,8 @@ public class RouteChoiceGenerator
                 float apart = float.MaxValue;
                 foreach (RouteChoice p in picked)
                 {
-                    if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells))
+                    if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells)
+                        || Detour(c.cells, p.cells, from, to, endCells, sameCells))
                     {
                         ok = false;
                         break;
@@ -409,6 +410,56 @@ public class RouteChoiceGenerator
         return result;
     }
 
+    // True when a route is only another route with costly detours: wherever it leaves the other one, it is much
+    // slower (DetourLoss) than the other one between the same two places, and then it comes back. That is a mistake
+    // more than a route choice (out round something and back, losing a third of the time on that bit), so it is not
+    // shown. A real choice is about as fast as the other way over the part where they differ.
+    const float DetourLoss = 1.25f;
+
+    bool Detour(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
+    {
+        int e2 = endCells * endCells;
+        float near2 = sameCells * sameCells;
+        int parts = 0;
+        int i = 0;
+        while (i < a.Count)
+        {
+            Vector2Int c = a[i];
+            bool end = (c - from).sqrMagnitude <= e2 || (c - to).sqrMagnitude <= e2;
+            if (end || NearbySquared(c, b) <= near2) { i++; continue; }
+            // A part away from b: from the last cell next to b before it to the first one after it
+            int start = Mathf.Max(0, i - 1);
+            while (i < a.Count)
+            {
+                Vector2Int d = a[i];
+                bool dEnd = (d - from).sqrMagnitude <= e2 || (d - to).sqrMagnitude <= e2;
+                if (dEnd || NearbySquared(d, b) <= near2) break;
+                i++;
+            }
+            int stop = Mathf.Min(a.Count - 1, i);
+            if (stop - start < 3) continue;
+            int j0 = NearestIndex(a[start], b), j1 = NearestIndex(a[stop], b);
+            if (j1 <= j0) return false; // b runs the other way there: not comparable, so a real difference
+            float own = 0f, other = 0f;
+            for (int k = start; k < stop; k++) own += StepCost(a[k], a[k + 1]);
+            for (int k = j0; k < j1; k++) other += StepCost(b[k], b[k + 1]);
+            parts++;
+            if (own <= other * DetourLoss) return false; // this part is a real choice
+        }
+        return parts > 0;
+    }
+
+    static int NearestIndex(Vector2Int c, List<Vector2Int> route)
+    {
+        int best = 0, bestD = int.MaxValue;
+        for (int i = 0; i < route.Count; i++)
+        {
+            int dx = route[i].x - c.x, dy = route[i].y - c.y, d = dx * dx + dy * dy;
+            if (d < bestD) { bestD = d; best = i; }
+        }
+        return best;
+    }
+
     // ---- Building the alternatives ----
 
     // Parts of the route closed off in turn, as shares of its length: a fifth at a time (every tenth), then two
@@ -423,7 +474,7 @@ public class RouteChoiceGenerator
     // Round a closed-off part, the cells this far away (as shares of the spread) are closed too: first a narrow
     // band, so the way round can be the next street, then a wide one, so it can be a street further off
     static readonly float[] BlockRadiusShares = { 0.6f, 1.2f };
-    const int BlockedRoutes = 3;            // the fastest route and the first two choices found get parts closed off
+    const int BlockedRoutes = 4;            // the fastest route and the first three choices found get parts closed off
 
     // The route choices found by closing off parts of the fastest route (and then of the choices found that way).
     // A choice is kept when it is not much slower than the fastest, really runs somewhere else than every choice kept
