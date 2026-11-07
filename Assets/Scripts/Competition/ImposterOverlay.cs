@@ -122,15 +122,38 @@ public class ImposterOverlay : MonoBehaviour
         }
         bool amImposter = local.Object.StateAuthority == imposter;
 
+        // Secret task mode: the task is set by the host together with the imposter
+        bool secretTask = SecretTasks.On;
+        int task = 0;
+        while (secretTask && !SecretTasks.TryGet(out task) && Time.unscaledTime < giveUp)
+        {
+            yield return null;
+        }
+
         ResetStage();
         pulseSpeed = 0.9f;
         pulseStrength = amImposter ? 0.45f : 0.25f;
-        smallText.text = "IMPOSTER MODE";
-        bigText.text = amImposter ? "YOU ARE THE IMPOSTER" : "ONE OF YOU IS AN IMPOSTER";
+        if (secretTask)
+        {
+            // The task is longer than the usual line, so let it shrink a little to fit
+            detailText.enableAutoSizing = true;
+            detailText.fontSizeMax = detailText.fontSize;
+            detailText.fontSizeMin = Mathf.Min(20f, detailText.fontSize);
+            smallText.text = "SECRET TASK";
+            bigText.text = amImposter ? "YOU ARE THE IMPOSTER" : "YOUR SECRET TASK";
+            detailText.text = amImposter
+                ? "Everyone else got a secret task, but nobody told you what it is. Watch how they run and blend in."
+                : SecretTasks.Text(task) + "\nOne of you doesn't know the task. Spot who!";
+        }
+        else
+        {
+            smallText.text = "IMPOSTER MODE";
+            bigText.text = amImposter ? "YOU ARE THE IMPOSTER" : "ONE OF YOU IS AN IMPOSTER";
+            detailText.text = amImposter
+                ? "Finish last without getting caught."
+                : "Someone will try to finish last. Remember who looks suspicious.";
+        }
         bigText.color = amImposter ? bloodColor : boneColor;
-        detailText.text = amImposter
-            ? "Finish last without getting caught."
-            : "Someone will try to finish last. Remember who looks suspicious.";
         SetAlpha(bigText, 0f);
         SetAlpha(detailText, 0f);
 
@@ -139,13 +162,26 @@ public class ImposterOverlay : MonoBehaviour
         StartCoroutine(Shake(0.35f, 14f));
         yield return SlamIn(bigText, 0.3f);
         yield return FadeText(detailText, 0f, 0.9f, 0.4f);
-        yield return FlickerHold(bigText, 2.6f);
+        // The task needs a moment to be read
+        yield return FlickerHold(bigText, secretTask ? 4.5f : 2.6f);
         yield return Fade(stageGroup, 1f, 0f, 0.6f);
         stage.SetActive(false);
 
         if (!CompetitionFlow.ResultsShown)
         {
-            roleChipText.text = amImposter ? "You are the imposter: finish last" : "Imposter mode: who is trying to lose?";
+            if (secretTask)
+            {
+                roleChipText.text = amImposter ? "You are the imposter: blend in" : "Secret task: " + SecretTasks.Short(task);
+                RectTransform chip = roleChip.GetComponent<RectTransform>();
+                chip.sizeDelta = new Vector2(Mathf.Max(chip.sizeDelta.x, 640f), chip.sizeDelta.y);
+                roleChipText.enableAutoSizing = true;
+                roleChipText.fontSizeMax = roleChipText.fontSize;
+                roleChipText.fontSizeMin = Mathf.Min(14f, roleChipText.fontSize);
+            }
+            else
+            {
+                roleChipText.text = amImposter ? "You are the imposter: finish last" : "Imposter mode: who is trying to lose?";
+            }
             roleChip.SetActive(true);
         }
     }
