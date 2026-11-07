@@ -7,7 +7,8 @@ using UnityEngine.UI;
 
 // Sounds for the whole game's interface, made at start so no scene needs setting up:
 //   a click on every button, a lighter click on toggles and dropdowns, a tick on sliders,
-//   and the start sound (forest, the start clock's beeps) the first time the main menu opens.
+//   and the start sound (forest, the start clock's beeps) the first time the main menu opens
+//   (not after the intro, which has its own sound).
 // The sounds are in Resources/Sounds (made by Docs/ui_sounds.py). They follow the master volume
 // in the Esc menu, since that sets AudioListener.volume.
 //
@@ -93,6 +94,11 @@ public class UISounds : MonoBehaviour
         if (mode == LoadSceneMode.Additive) return;
         pressed = null;
         CheckEar();
+        // The intro film has its own sound, so the start sound is left out when the game opened with it
+        if (scene.name == "Intro")
+        {
+            startPlayed = true;
+        }
         // Once per run, when the game opens on the main menu (not when coming back to it)
         if (!startPlayed && scene.name == "MainMenu")
         {
