@@ -52,57 +52,9 @@ public static class ForbiddenAreas
                 poly.Add(new Vector2(world.x / cell + cols / 2f, world.y / cell + rows / 2f));
             }
 
-            // Inside, for an area (a boundary line is only its sides): one scanline through the middle of every row
-            if (!area.line)
-            {
-                float minY = float.MaxValue, maxY = float.MinValue;
-                foreach (Vector2 p in poly) { minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y); }
-                int firstRow = Mathf.Max(0, Mathf.FloorToInt(minY)), lastRow = Mathf.Min(rows - 1, Mathf.CeilToInt(maxY));
-                List<float> crossings = new List<float>();
-                for (int i = firstRow; i <= lastRow; i++)
-                {
-                    float y = i + 0.5f;
-                    crossings.Clear();
-                    for (int k = 0; k < poly.Count; k++)
-                    {
-                        Vector2 a = poly[k], b = poly[(k + 1) % poly.Count];
-                        if ((a.y <= y && y < b.y) || (b.y <= y && y < a.y))
-                        {
-                            crossings.Add(a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y));
-                        }
-                    }
-                    crossings.Sort();
-                    for (int k = 0; k + 1 < crossings.Count; k += 2)
-                    {
-                        int from = Mathf.Max(0, Mathf.CeilToInt(crossings[k] - 0.5f));
-                        int to = Mathf.Min(cols - 1, Mathf.FloorToInt(crossings[k + 1] - 0.5f));
-                        for (int j = from; j <= to; j++) closed += Close(speed, i, j);
-                    }
-                }
-            }
-
-            // The border: walk along every side in quarter cells (a line's last corner is not joined to its first)
-            int sides = area.line ? poly.Count - 1 : poly.Count;
-            for (int k = 0; k < sides; k++)
-            {
-                Vector2 a = poly[k], b = poly[(k + 1) % poly.Count];
-                int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(a, b) * 4f));
-                for (int s = 0; s <= steps; s++)
-                {
-                    Vector2 p = Vector2.Lerp(a, b, s / (float)steps);
-                    int j = Mathf.FloorToInt(p.x), i = Mathf.FloorToInt(p.y);
-                    if (i >= 0 && i < rows && j >= 0 && j < cols) closed += Close(speed, i, j);
-                }
-            }
+            closed += ForbiddenRaster.Close(speed, poly, area.line);
         }
         return closed;
-    }
-
-    static int Close(float[,] speed, int i, int j)
-    {
-        if (speed[i, j] <= 0f) return 0;
-        speed[i, j] = 0f;
-        return 1;
     }
 
     // A copy of the grid with the course's out-of-bounds areas closed, or the grid itself when the course has none

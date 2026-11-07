@@ -70,6 +70,11 @@ public class EscMenu : MonoBehaviour
         {
             return;
         }
+        // Escape skips the intro film; the menu is not opened on top of it
+        if (SceneManager.GetActiveScene().name == "Intro")
+        {
+            return;
+        }
         // Escape belongs to the route choice game's keys panel while it is open
         if (RouteChoiceView.KeysOpen || RouteChoiceView.KeysClosedFrame == Time.frameCount)
         {

@@ -21,4 +21,6 @@ Klassen är `H` eller `D` (betyder H21/D21) eller hela klassnamnet, t.ex. `D20`,
 
 I spelet får loppet ett engelskt namn: "World Championships Middle", "World Cup Long Qualification". Texten sist i filnamnet (med _ som mellanslag) läggs till inom parentes, "European Championships Middle (final A)". För niva2 är texten loppets eget namn: "O-Ringen E1, Middle".
 
+**Kval och B-finaler** (`_kval` i namnet, eller fritext som `final_B`, `B-final`, `semi`, `heat`): alla som springer dem från VM, EM och världscupen kommer med i spelet direkt, men vinnaren får inte automatiskt 100. Loppet räknas i stället om mot löpare som redan har betyg, precis som svenska lopp. Bara A-finaler (och lopp utan sådan text) är ankare där snabbaste rena tid = 100. Kval på niva2-lopp (t.ex. SM) ger inte direktplats i spelet.
+
 Ladda upp på GitHub (Add file → Upload files i den här mappen) eller med GitHub Desktop. Jobbet "WinSplits-import" startar då av sig självt och sparar resultaten i `eventor/data/races/`. Om ett filnamn är fel blir körningen röd och säger vilken fil det gäller.
