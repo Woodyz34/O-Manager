@@ -252,6 +252,7 @@ public static class CourseGenerator
         public float lengthKm = 4f;
         public int controls = 12;
         public int seed;
+        public bool barriers;   // sprint: out-of-bounds barriers that close the obvious straight way on some legs
     }
 
     public class Result
@@ -261,6 +262,7 @@ public static class CourseGenerator
         public float shortestLeg, longestLeg;
         public int routeChoiceLegs = -1;   // sprint: legs with two or more close route choices (-1: not checked)
         public int legCount;
+        public int barriers;               // sprint: out-of-bounds barriers placed
     }
 
     // Sprint: a leg is fun when it has at least two route choices and the second fastest is at most this much
@@ -380,10 +382,66 @@ public static class CourseGenerator
             if (choices == null) return result;
             // Sprint: keep the course with the most fun legs; try again while too few are fun and there is time
             if (best == null || result.routeChoiceLegs > best.routeChoiceLegs) best = result;
-            if (best.routeChoiceLegs >= Mathf.CeilToInt(GoodShare * best.legCount) || choices.OutOfTime) return best;
+            if (best.routeChoiceLegs >= Mathf.CeilToInt(GoodShare * best.legCount) || choices.OutOfTime) return WithBarriers(map, grid, best, settings);
         }
-        if (best != null) return best;
+        if (best != null) return WithBarriers(map, grid, best, settings);
         return new Result { error = "Could not make a course with these settings. Try a shorter course or fewer controls." };
+    }
+
+    const double BarrierBudgetSeconds = 10.0;
+
+    // Sprint with barriers ticked: closes the obvious straight way on legs with one clear route (SprintBarriers),
+    // so they get a choice left or right. The course is kept without barriers when they would break it.
+    static Result WithBarriers(MapDefinition map, MapGrid grid, Result result, Settings settings)
+    {
+        if (!settings.barriers || settings.kind != Kind.Sprint || result?.course == null) return result;
+        try
+        {
+            float cs = map.CellSize;
+            int rows = grid.Rows, cols = grid.Cols;
+            float[,] work = (float[,])grid.speed.Clone();
+            RouteChoiceGenerator generator = new RouteChoiceGenerator(work, grid.slopes, cs, 1f, 20f, true);
+            List<Vector2Int> cells = new List<Vector2Int>();
+            foreach (CoursePoint p in result.course.AllPoints()) cells.Add(map.ToCell(p));
+            // Grid coordinates (cell j spans j to j + 1) to the map's whole metres and back, as the corners are saved
+            CoursePoint ToPoint(Vector2 g)
+            {
+                CoursePoint p = map.FromWorld(new Vector3(g.x * cs - cols * cs / 2f, g.y * cs - rows * cs / 2f, 0f));
+                return new CoursePoint(Math.Round(p.e), Math.Round(p.n));
+            }
+            Vector2 ToGrid(CoursePoint p)
+            {
+                Vector3 w = map.ToWorld(p);
+                return new Vector2(w.x / cs + cols / 2f, w.y / cs + rows / 2f);
+            }
+            SprintBarriers planner = new SprintBarriers(work, generator, map.gridSize, CloseChoice, BarrierBudgetSeconds, g => ToGrid(ToPoint(g)));
+            List<SprintBarriers.Barrier> barriers = planner.Plan(cells);
+            foreach (string line in planner.Log) Debug.Log("AI course barriers: " + line);
+            if (barriers.Count == 0) return result;
+
+            CourseData course = result.course;
+            course.forbidden = new List<ForbiddenArea>();
+            foreach (SprintBarriers.Barrier b in barriers)
+            {
+                ForbiddenArea area = new ForbiddenArea();
+                foreach (Vector2 corner in b.corners) area.corners.Add(ToPoint(corner));
+                course.forbidden.Add(area);
+            }
+            // The final word, with the barriers: every control can still be reached
+            if (!CourseValidator.Check(map, grid, course).ok)
+            {
+                course.forbidden = new List<ForbiddenArea>();
+                return result;
+            }
+            result.barriers = barriers.Count;
+            result.routeChoiceLegs = planner.FunAfter;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("AI course barriers failed: " + e.Message);
+            if (result.course != null) result.course.forbidden = new List<ForbiddenArea>();
+        }
+        return result;
     }
 
     // Leg lengths that add up to the course length
