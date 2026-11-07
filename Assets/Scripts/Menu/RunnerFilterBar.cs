@@ -118,23 +118,21 @@ public class RunnerFilterBar : MonoBehaviour
         menChip.onClick.AddListener(() => { ShowWomen = false; Notify(); });
     }
 
-    // Club and Country are added after Name, and a last chip turns the order round (best or worst first).
-    // The sort chips get a little narrower so all of them fit before "Clear filters".
+    // A last chip turns the order round (best or worst first). (Club and Country sorting is gone: the
+    // Club and Country drop-downs find runners more easily.)
     void MakeSortChips()
     {
         if (sortButtons.Length < 4) return;
         RectTransform first = (RectTransform)sortButtons[0].transform;
         float y = first.anchoredPosition.y;
         float left = first.anchoredPosition.x - first.sizeDelta.x / 2f;
-        Button[] all = new Button[6];
-        for (int i = 0; i < 4; i++) all[i] = sortButtons[i];
-        all[4] = CopyChip("Club", 0, y, 80, sortButtons[0]);
-        all[5] = CopyChip("Country", 0, y, 116, sortButtons[0]);
-        sortButtons = all;
+        Button[] four = new Button[4];
+        for (int i = 0; i < 4; i++) four[i] = sortButtons[i];
+        sortButtons = four;
         orderChip = CopyChip("Best first", 0, y, 150, sortButtons[0]);
         orderChip.name = "Sort order";
 
-        float[] widths = { 112, 92, 136, 88, 80, 116 };
+        float[] widths = { 112, 92, 136, 88 };
         float x = left;
         for (int i = 0; i < sortButtons.Length; i++)
         {
@@ -258,15 +256,16 @@ public class RunnerFilterBar : MonoBehaviour
         return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(text.ToLowerInvariant());
     }
 
-    // The chip's text: its name, or what is ticked
-    static string ChipText(string name, HashSet<string> chosen, Func<string, string> show, string plural)
+    // The chip's text: "Club v" with nothing ticked, the name when one is ticked (cut short to fit),
+    // and "Club (3)" when several are. A long list of names never fits in a chip.
+    static string ChipText(string name, HashSet<string> chosen, Func<string, string> show)
     {
         if (chosen.Count == 0) return name + " v";
         if (chosen.Count == 1)
         {
-            foreach (string one in chosen) return Shorten(show(one), 16) + " v";
+            foreach (string one in chosen) return Shorten(show(one), 15);
         }
-        return chosen.Count + " " + plural + " v";
+        return name + " (" + chosen.Count + ")";
     }
 
     static string Shorten(string text, int max)
@@ -278,9 +277,9 @@ public class RunnerFilterBar : MonoBehaviour
     {
         if (classes.Count == 0) return "Class v";
         string sex = ShowWomen ? "D" : "H";
-        List<string> picked = new List<string>();
-        foreach (string age in ClassAges) if (classes.Contains(age)) picked.Add(sex + age);
-        return string.Join(" + ", picked) + " v";
+        if (classes.Count > 1) return "Class (" + classes.Count + ")";
+        foreach (string age in classes) return sex + age;
+        return "Class v";
     }
 
     bool ClassMatches(CardData card)
@@ -410,8 +409,8 @@ public class RunnerFilterBar : MonoBehaviour
         if (classChip != null)
         {
             PaintDrop(classChip, classes.Count > 0, ClassLabel());
-            PaintDrop(countryChip, countries.Count > 0, ChipText("Country", countries, TitleCase, "countries"));
-            PaintDrop(clubChip, clubs.Count > 0, ChipText("Club", clubs, c => c, "clubs"));
+            PaintDrop(countryChip, countries.Count > 0, ChipText("Country", countries, TitleCase));
+            PaintDrop(clubChip, clubs.Count > 0, ChipText("Club", clubs, c => c));
         }
         if (womenChip != null) PaintChip(womenChip, ShowWomen);
         if (menChip != null) PaintChip(menChip, !ShowWomen);
@@ -425,6 +424,7 @@ public class RunnerFilterBar : MonoBehaviour
         {
             label.text = text;
             label.enableWordWrapping = false;
+            label.overflowMode = TextOverflowModes.Ellipsis;
             label.fontSize = Mathf.Min(label.fontSize, 21f);
         }
     }
