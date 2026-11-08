@@ -84,6 +84,14 @@ public class RouteChoiceGenerator
     readonly float MaxSlower;
     // How fast ground nobody can run on counts when a line goes over it anyway (only drawn lines in route analysis do)
     public float BlockedSpeed { get; set; } = 0.05f;
+    // When above 0: a choice that runs along a faster choice for a good part of the way (VariantShare) is only a
+    // variant of it (both go the same side), so it may be at most this much slower than that one to be shown at all.
+    // A choice that meets a faster one in the middle of the leg (and leaves it again) is not shown either: the
+    // runner can change between the two there, so it is no way of its own. Choices that really go different ways
+    // keep the wide MaxSlower limit. The route choice game and the AI course both use Variants.
+    public float VariantSlower { get; set; } = 0f;
+    public const float Variants = 1.10f;
+    const float VariantShare = 0.3f;
 
     public RouteChoiceGenerator(float[,] speedGrid, Dictionary<string, float[,]> slopeFactors, float cellSize,
                                 float baseSpeed, float gameSecondsPerSecond, bool sprint)
@@ -135,6 +143,7 @@ public class RouteChoiceGenerator
         gameSecondsPerSecond = full.gameSecondsPerSecond;
         MaxSlower = full.MaxSlower;
         BlockedSpeed = full.BlockedSpeed;
+        VariantSlower = full.VariantSlower;
     }
 
     static float[,] Cut(float[,] grid, int x0, int y0, int w, int h)
@@ -379,7 +388,10 @@ public class RouteChoiceGenerator
                 foreach (RouteChoice p in picked)
                 {
                     if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells)
-                        || Detour(c.cells, p.cells, from, to, endCells, sameCells))
+                        || Detour(c.cells, p.cells, from, to, endCells, sameCells)
+                        || (VariantSlower > 0f && c.seconds > p.seconds * VariantSlower
+                            && Shared(c.cells, p.cells, from, to, endCells, sameCells) >= VariantShare)
+                        || (VariantSlower > 0f && c.seconds > p.seconds && Meets(c.cells, p.cells, from, to, endCells, sameCells)))
                     {
                         ok = false;
                         break;
@@ -447,6 +459,40 @@ public class RouteChoiceGenerator
             if (own <= other * DetourLoss) return false; // this part is a real choice
         }
         return parts > 0;
+    }
+
+    // True when route a leaves route b, comes back to it away from the controls and then leaves it again: the two
+    // meet (or cross) in the middle of the leg
+    bool Meets(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
+    {
+        int e2 = endCells * endCells;
+        float near2 = sameCells * sameCells;
+        float apart = spreadCells * spreadCells / 4f; // half the spread away on both sides of the meeting
+        int stage = 0; // 0: not yet away from b, 1: away, 2: back at b in the middle, 3: away again
+        foreach (Vector2Int c in a)
+        {
+            if ((c - from).sqrMagnitude <= e2 || (c - to).sqrMagnitude <= e2) continue;
+            float d2 = NearbySquared(c, b);
+            if (stage == 0 && d2 >= apart) stage = 1;
+            else if (stage == 1 && d2 <= near2) stage = 2;
+            else if (stage == 2 && d2 >= apart) return true;
+        }
+        return false;
+    }
+
+    // Share of route a (leaving out the ends at the controls) that runs along route b
+    float Shared(List<Vector2Int> a, List<Vector2Int> b, Vector2Int from, Vector2Int to, int endCells, float sameCells)
+    {
+        int e2 = endCells * endCells;
+        float near2 = sameCells * sameCells;
+        int counted = 0, along = 0;
+        foreach (Vector2Int c in a)
+        {
+            if ((c - from).sqrMagnitude <= e2 || (c - to).sqrMagnitude <= e2) continue;
+            counted++;
+            if (NearbySquared(c, b) <= near2) along++;
+        }
+        return counted == 0 ? 1f : along / (float)counted;
     }
 
     static int NearestIndex(Vector2Int c, List<Vector2Int> route)
