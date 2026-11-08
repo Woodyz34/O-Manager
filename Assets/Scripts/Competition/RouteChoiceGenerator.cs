@@ -55,6 +55,9 @@ public class RouteChoiceGenerator
     // long way round that nobody would take, so there the cap is tighter (two good choices are enough)
     const float MaxSlowerSprint = 1.2f;
     const float MaxSlowerForest = 1.07f;
+    // A way round on the other side (left when all choices go right, or the other way round) may be this much slower
+    // again: a left-or-right question is the best kind to practise, even when one side is clearly worse
+    const float OtherSideSlower = 1.1f;
     const float ViaReach = 0.95f;          // a route may go its own way anywhere from 5 % to 95 % along the leg
     const float MaxTurn = 135f;            // routes with a sharper turn than this (out and back) are left out
     // Two routes may share most of the leg (everyone runs the same street at first), but somewhere they must part
@@ -319,7 +322,7 @@ public class RouteChoiceGenerator
                 if (share < 0.05f || share > ViaReach) continue;
                 int i = y * width + x;
                 float total = fromStart[i] + toGoal[i];
-                if (total <= bestCost * MaxSlower * 1.1f) vias.Add(new KeyValuePair<float, int>(total, i));
+                if (total <= bestCost * MaxSlower * OtherSideSlower * 1.1f) vias.Add(new KeyValuePair<float, int>(total, i));
             }
         }
         vias.Sort((p, q) => p.Key.CompareTo(q.Key));
@@ -367,7 +370,7 @@ public class RouteChoiceGenerator
         List<RouteChoice> usable = new List<RouteChoice>();
         foreach (RouteChoice c in candidates)
         {
-            if (c.seconds > fastest * MaxSlower + 3f) break;
+            if (c.seconds > fastest * MaxSlower * OtherSideSlower + 3f) break;
             // Turning right round (out and back) is never a route anyone would choose
             // (unless the fastest route has to turn as sharply too, e.g. on a zigzag path up a hill)
             if (c.sharpestTurn > Mathf.Max(MaxTurn, candidates[0].sharpestTurn + 10f)) continue;
@@ -382,7 +385,7 @@ public class RouteChoiceGenerator
             float bestScore = 0f;
             foreach (RouteChoice c in usable)
             {
-                if (picked.Contains(c)) continue;
+                if (picked.Contains(c) || c.seconds > fastest * MaxSlower + 3f) continue;
                 bool ok = true;
                 float apart = float.MaxValue;
                 foreach (RouteChoice p in picked)
@@ -406,6 +409,31 @@ public class RouteChoiceGenerator
             }
             if (next == null) break;
             picked.Add(next);
+        }
+        // No way round on one side yet? Then the fastest one there, even if a bit slower than the others
+        if (picked.Count < most)
+        {
+            float leftmost = float.MaxValue, rightmost = float.MinValue;
+            foreach (RouteChoice p in picked) { leftmost = Mathf.Min(leftmost, p.side); rightmost = Mathf.Max(rightmost, p.side); }
+            bool noLeft = leftmost >= -spreadCells, noRight = rightmost <= spreadCells;
+            foreach (RouteChoice c in usable)
+            {
+                if (!noLeft && !noRight) break;
+                if (picked.Contains(c)) continue;
+                bool left = noLeft && c.side < Mathf.Min(0f, leftmost) - spreadCells;
+                bool right = noRight && c.side > Mathf.Max(0f, rightmost) + spreadCells;
+                if (!left && !right) continue;
+                bool ok = true;
+                foreach (RouteChoice p in picked)
+                {
+                    if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells)
+                        || Detour(c.cells, p.cells, from, to, endCells, sameCells)) { ok = false; break; }
+                }
+                if (!ok) continue;
+                picked.Add(c); // usable is fastest first, so this is the fastest on that side
+                if (left) noLeft = false; else noRight = false;
+                if (picked.Count >= most) break;
+            }
         }
         if (picked.Count < 2)
         {
@@ -530,7 +558,7 @@ public class RouteChoiceGenerator
     List<RouteChoice> BlockParts(List<Vector2Int> best, Vector2Int from, Vector2Int to, float bestCost, int endCells, float sameCells)
     {
         List<RouteChoice> found = new List<RouteChoice> { Evaluate(best) };
-        float limit = found[0].seconds * MaxSlower + 3f;
+        float limit = found[0].seconds * MaxSlower * OtherSideSlower + 3f;
         float[,] grid = new float[height, width];
         for (int done = 0; done < found.Count && done < BlockedRoutes; done++)
         foreach (float radiusShare in BlockRadiusShares)
