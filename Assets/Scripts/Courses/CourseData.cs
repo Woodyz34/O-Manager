@@ -76,7 +76,7 @@ public class CourseData
     public bool IsSprint()
     {
         if (!string.IsNullOrEmpty(terrain)) return terrain == Sprint;
-        MapDefinition map = MapDefinition.All.Find(m => m.id == mapId);
+        MapDefinition map = MapDefinition.FindExact(mapId);
         return map != null && map.IsSprint;
     }
 

@@ -143,6 +143,8 @@ public class LobbySettingsUI : MonoBehaviour
             return;
         }
 
+        PublishCloudId(local);
+
         if (host)
         {
             // We have just taken over from a host who left: keep what they had picked
@@ -153,6 +155,23 @@ public class LobbySettingsUI : MonoBehaviour
                 if (CourseLibrary.Current != null) mapHandler.Select(CourseLibrary.Current);
                 modes = seenModes;
             }
+
+            // A course on the old host's private map cannot be raced once that host has left
+            if (mapHandler.course != null && !MapDefinition.Exists(mapHandler.course.mapId) && CourseLibrary.BuiltIn.Count > 0)
+            {
+                UIToast.Show("The course was on the old host's private map, so a built-in course is picked instead.", 5f);
+                mapHandler.Select(CourseLibrary.BuiltIn[0]);
+            }
+            // A course on this player's own private map: the others in the lobby get a copy for the race (PrivateMaps)
+            MapDefinition courseMap = mapHandler.course != null ? MapDefinition.FindExact(mapHandler.course.mapId) : null;
+            string mapOwner = "";
+            if (PrivateMaps.IsMine(courseMap))
+            {
+                mapOwner = CloudCourses.PlayerId;
+                PrivateMaps.HostTick(courseMap, GuestIds(local));
+            }
+            if (local.lobbyMapOwner.ToString() != mapOwner) local.lobbyMapOwner = mapOwner;
+            if (local.privateMapReady.Length > 0) local.privateMapReady = "";
 
             if (local.lobbyGameMode.ToString() != gameModeHandler.gameMode) local.lobbyGameMode = gameModeHandler.gameMode;
             if (local.lobbyMap.ToString() != mapHandler.map) local.lobbyMap = mapHandler.map;
@@ -179,11 +198,14 @@ public class LobbySettingsUI : MonoBehaviour
                 CourseLibrary.ApplyLobbyString(player.LobbyCourseText());
                 seenModes = (ExtraMode)player.lobbyModes;
                 hasSeenHostSettings = true;
+                FollowPrivateMap(local, player.lobbyMapOwner.ToString());
                 break;
             }
             if (hasSeenHostSettings)
             {
-                Show(seenMode, seenModes, CourseLibrary.Current != null ? CourseTitle(CourseLibrary.Current) : seenMap);
+                string title = CourseLibrary.Current != null ? CourseTitle(CourseLibrary.Current) : seenMap;
+                if (guestNote != null) title += "  <size=70%><color=#E8742A>" + guestNote + "</color></size>";
+                Show(seenMode, seenModes, title);
             }
         }
         wasHost = host;
@@ -193,11 +215,76 @@ public class LobbySettingsUI : MonoBehaviour
         imposterToggle.image.color = toggleOffColor;
     }
 
+    // ---- Private maps (PrivateMaps) ----
+
+    string guestNote;
+    float nextSignIn;
+
+    // Every player shows its Unity player id, so a host can let it download a private map
+    void PublishCloudId(NetworkPlayer local)
+    {
+        if (CloudCourses.IsSignedIn)
+        {
+            if (local.cloudId.ToString() != CloudCourses.PlayerId) local.cloudId = CloudCourses.PlayerId;
+        }
+        else if (Time.unscaledTime >= nextSignIn)
+        {
+            nextSignIn = Time.unscaledTime + 15f;
+            SignInQuietly();
+        }
+    }
+
+    static async void SignInQuietly()
+    {
+        try { await CloudCourses.SignInAsync(); }
+        catch (System.Exception e) { Debug.LogWarning("LobbySettingsUI: could not sign in to Unity Cloud: " + e.Message); }
+    }
+
+    static System.Collections.Generic.List<string> GuestIds(NetworkPlayer local)
+    {
+        var ids = new System.Collections.Generic.List<string>();
+        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        {
+            if (player == local || player.Object == null || !player.Object.IsValid) continue;
+            string id = player.cloudId.ToString();
+            if (id.Length > 0 && !ids.Contains(id)) ids.Add(id);
+        }
+        return ids;
+    }
+
+    // Not the host: when the host's course is on the host's private map, get a copy of it for this lobby and say
+    // when it is ready
+    void FollowPrivateMap(NetworkPlayer local, string owner)
+    {
+        string readyId = "";
+        int progress = 0;
+        guestNote = null;
+        CourseData course = CourseLibrary.Current;
+        if (owner.Length > 0 && course != null)
+        {
+            if (owner == CloudCourses.PlayerId)
+            {
+                readyId = course.mapId;   // my own map, raced while someone else hosts
+            }
+            else
+            {
+                readyId = PrivateMaps.GuestTick(owner, course.mapId);
+                progress = PrivateMaps.GuestProgress;
+                if (readyId.Length == 0 && PrivateMaps.GuestStatus != null)
+                    guestNote = PrivateMaps.GuestStatus + (progress > 0 ? " " + progress + " %" : "");
+            }
+        }
+        if (local.privateMapReady.ToString() != readyId) local.privateMapReady = readyId;
+        if (local.privateMapProgress != progress) local.privateMapProgress = progress;
+    }
+
     static string CourseTitle(CourseData course)
     {
         if (course == null) return "...";
         // Everyone sees whether it is a sprint or a forest course, next to the name and who made it
         string type = course.IsSprint() ? "<color=#E8742A>Sprint</color>" : "<color=#3F7D54>Forest</color>";
+        MapDefinition courseMap = MapDefinition.FindExact(course.mapId);
+        if (courseMap != null && courseMap.isPrivate) type += "  ·  <color=#8A5A2B>Private map</color>";
         string by = string.IsNullOrEmpty(course.author) ? "" : "  ·  by " + course.author;
         return course.name + "  <size=70%><b>" + type + "</b>" + by + "</size>";
     }

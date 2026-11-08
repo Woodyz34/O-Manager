@@ -52,6 +52,17 @@ public class MapDefinition : ScriptableObject
 
     // Imported on this computer and not yet built into the game
     [NonSerialized] public bool isLocal;
+    // Imported as private: only this player can use it (see PrivateMaps)
+    [NonSerialized] public bool isPrivate;
+    // A short-lived copy of the lobby host's private map, only for the races in that lobby (see PrivateMaps)
+    [NonSerialized] public bool isBorrowed;
+    // A copy of a public map another player shared (SharedMaps)
+    [NonSerialized] public bool isSharedCopy;
+    // The folder of a map imported on this computer
+    [NonSerialized] public string folder;
+
+    // Imported on this computer by this player: they can change its name, who may use it, the club and the map edge
+    public bool CanEdit => isLocal && !isBorrowed && !isSharedCopy && !string.IsNullOrEmpty(folder);
 
     public bool IsSprint => mapType == "sprint" || mapType == "both";   // 2 m cells, sprint courses by default
     public bool IsForest => mapType != "sprint";                        // forest courses fit it too
@@ -140,17 +151,39 @@ public class MapDefinition : ScriptableObject
         all = null;
     }
 
+    // Borrowed maps (the lobby host's private map) are not in All, so they never show up in map lists or let
+    // courses on them be picked; Exists leaves them out too. Find and FindExact use them first, so the race and the
+    // course pictures in the lobby use the host's map.
+    static readonly List<MapDefinition> borrowed = new List<MapDefinition>();
+
+    public static void Borrow(MapDefinition map)
+    {
+        borrowed.RemoveAll(m => m.id == map.id);
+        borrowed.Add(map);
+    }
+
+    public static void ForgetBorrowed()
+    {
+        borrowed.Clear();
+    }
+
     public static bool Exists(string mapId)
     {
         return string.IsNullOrEmpty(mapId) || All.Exists(m => m.id == mapId);
     }
 
+    // The map with this id, or null
+    public static MapDefinition FindExact(string mapId)
+    {
+        if (string.IsNullOrEmpty(mapId)) return null;
+        MapDefinition map = borrowed.Find(m => m.id == mapId);
+        return map != null ? map : All.Find(m => m.id == mapId);
+    }
+
     public static MapDefinition Find(string mapId)
     {
-        foreach (MapDefinition map in All)
-        {
-            if (map.id == mapId) return map;
-        }
+        MapDefinition map = FindExact(mapId);
+        if (map != null) return map;
         return All.Count > 0 ? All[0] : null;
     }
 }

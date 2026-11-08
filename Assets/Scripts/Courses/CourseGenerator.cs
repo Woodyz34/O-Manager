@@ -26,6 +26,12 @@ public class MapPlayArea
     static readonly Dictionary<string, MapPlayArea> cache = new Dictionary<string, MapPlayArea>();
     static readonly object cacheLock = new object();
 
+    // After a map has been built again (its edge changed)
+    public static void Forget(string mapId)
+    {
+        lock (cacheLock) cache.Remove(mapId ?? "");
+    }
+
     public static MapPlayArea For(MapDefinition map, MapGrid grid)
     {
         lock (cacheLock)

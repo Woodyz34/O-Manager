@@ -56,6 +56,7 @@ public class MainMenuUI : MonoBehaviour
             return;
         }
         Show(homePanel);
+        PrivateMaps.ForgetBorrowed();   // copies of other players' private maps are only for the lobby they were in
         SharedMaps.CheckOnce();   // maps other players have shared, downloaded in the background
     }
 

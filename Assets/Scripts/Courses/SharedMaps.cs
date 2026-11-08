@@ -84,6 +84,13 @@ public static class SharedMaps
         Debug.Log("SharedMaps: sharing " + info.name + " (" + info.id + ") with everyone");
     }
 
+    // Takes a map out of this player's shared maps (it was made private)
+    public static async Task UnshareAsync(string id)
+    {
+        List<SharedMap> mine = await LoadMineAsync();
+        if (mine.RemoveAll(m => m.id == id) > 0) await SaveMineAsync(mine);
+    }
+
     static async Task<List<SharedMap>> LoadMineAsync()
     {
         var loaded = await CloudSaveService.Instance.Data.Player.LoadAsync(new HashSet<string> { SharedKey },
@@ -118,7 +125,15 @@ public static class SharedMaps
     // ---- Listing (called by CloudCourses with every player the course query returns) ----
 
     // Called with the "sharedMaps" value of each player. Afterwards Sync downloads what is missing.
-    public static void BeginListing() => others.Clear();
+    public static void BeginListing()
+    {
+        others.Clear();
+        listedOwners.Clear();
+    }
+
+    // Players whose shared maps were listed: a downloaded copy of theirs that they no longer share was made
+    // private (or deleted) and is deleted here too
+    static readonly HashSet<string> listedOwners = new HashSet<string>();
 
     public static void AddListed(string ownerId, string json)
     {
@@ -126,6 +141,7 @@ public static class SharedMaps
         {
             List<SharedMap> list = JsonConvert.DeserializeObject<List<SharedMap>>(json);
             if (list == null) return;
+            listedOwners.Add(ownerId);
             foreach (SharedMap m in list)
             {
                 if (m == null || !ValidId(m.id) || m.sourceKey == null || !m.sourceKey.StartsWith("map-" + m.id + "-source.", StringComparison.Ordinal)) continue;
@@ -280,10 +296,13 @@ public static class SharedMaps
                     continue;
                 }
                 MapPackageInfo info = ReadLocal(name);
-                if (info == null || string.IsNullOrEmpty(info.sharedBy) || !IsBuiltIn(info.id)) continue;
+                if (info == null || string.IsNullOrEmpty(info.sharedBy)) continue;
+                bool builtIn = IsBuiltIn(info.id);
+                bool withdrawn = listedOwners.Contains(info.sharedBy) && !others.Exists(m => m.ownerId == info.sharedBy && m.id == info.id);
+                if (!builtIn && !withdrawn) continue;
                 Directory.Delete(folder, true);
                 removed = true;
-                Debug.Log("SharedMaps: " + info.name + " is built into the game now; the downloaded copy was deleted");
+                Debug.Log("SharedMaps: " + info.name + (builtIn ? " is built into the game now" : " is no longer shared by the player who imported it") + "; the downloaded copy was deleted");
             }
             if (removed)
             {
@@ -323,7 +342,7 @@ public static class SharedMaps
     // ---- Unity Cloud calls ----
 
     // Asks the Cloud Code script for download links to a player's map files: { "<key>": { signedUrl, httpMethod, requiredHeaders } }
-    static async Task<JObject> FileLinks(string ownerId, List<string> keys)
+    internal static async Task<JObject> FileLinks(string ownerId, List<string> keys)
     {
         string url = "https://cloud-code.services.api.unity.com/v1/projects/" + Application.cloudProjectId + "/scripts/" + ScriptName;
         string body = JsonConvert.SerializeObject(new { @params = new { ownerId, keys = string.Join(",", keys) } });
@@ -336,6 +355,9 @@ public static class SharedMaps
             await Send(request);
             if (request.result != UnityWebRequest.Result.Success)
             {
+                // The script says no (for instance a private map this player has not been let in to yet)
+                string said = ScriptError(request.downloadHandler.text);
+                if (said != null) throw new Exception(said);
                 string why = request.responseCode == 404
                     ? "the Cloud Code script " + ScriptName + " is not set up in Unity Cloud yet (see Docs/cloud-code/SharedMapFiles.js)"
                     : request.responseCode + " " + request.error + ": " + request.downloadHandler.text;
@@ -348,7 +370,20 @@ public static class SharedMaps
         }
     }
 
-    static async Task<byte[]> Download(JObject links, string key)
+    // The message a Cloud Code script threw, or null
+    static string ScriptError(string body)
+    {
+        try
+        {
+            JObject answer = JObject.Parse(body);
+            string detail = (string)answer["detail"] ?? (string)answer["message"];
+            if (detail != null && detail.Contains("Not let in")) return "Not let in yet";
+        }
+        catch { /* not JSON */ }
+        return null;
+    }
+
+    internal static async Task<byte[]> Download(JObject links, string key, Action<float> progress = null)
     {
         if (!(links[key] is JObject link) || string.IsNullOrEmpty((string)link["signedUrl"]))
             throw new Exception("No download link for " + key + " (the file is not in the cloud any more?)");
@@ -363,7 +398,12 @@ public static class SharedMaps
                     if (!string.IsNullOrEmpty(value)) request.SetRequestHeader(h.Key, value);
                 }
             }
-            await Send(request);
+            UnityWebRequestAsyncOperation operation = request.SendWebRequest();
+            while (!operation.isDone)
+            {
+                progress?.Invoke(request.downloadProgress);
+                await Task.Yield();
+            }
             if (request.result != UnityWebRequest.Result.Success)
                 throw new Exception("Download of " + key + " failed: " + request.responseCode + " " + request.error);
             return request.downloadHandler.data;

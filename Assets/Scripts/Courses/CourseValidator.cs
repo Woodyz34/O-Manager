@@ -11,6 +11,12 @@ public class MapGrid
 
     static readonly Dictionary<string, MapGrid> cache = new Dictionary<string, MapGrid>();
 
+    // After a map has been built again (its edge changed), so the new grid is read
+    public static void Forget(string gridName)
+    {
+        if (gridName != null) cache.Remove(gridName);
+    }
+
     public int Rows => speed.GetLength(0);
     public int Cols => speed.GetLength(1);
 

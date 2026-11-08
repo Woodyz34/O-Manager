@@ -96,6 +96,13 @@ public class ReadyUIHandler : NetworkBehaviour
             UIToast.Show(modeProblem);
             return;
         }
+        // A course on the host's private map: everyone needs their copy of the map before the race can start
+        string mapProblem = PrivateMaps.StartProblem(CourseLibrary.Current);
+        if (mapProblem != null)
+        {
+            UIToast.Show(mapProblem);
+            return;
+        }
 
         Runner.SessionInfo.IsOpen = false;
 

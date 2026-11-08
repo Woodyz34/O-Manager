@@ -90,4 +90,42 @@ public static class CloudMaps
         // Everyone can use the map straight away, until it is built into the game (see SharedMaps)
         await SharedMaps.ShareAsync(info, sourceKey, ownPng != null ? prefix + "picture.png" : null, source.Length);
     }
+
+    // The map was made private: it is taken back. Its files (map-<id>-*) are deleted from the cloud, it is no
+    // longer sent in or shared, and the other players' copies are deleted the next time they look for shared maps.
+    public static async Task WithdrawAsync(string id)
+    {
+        await CloudCourses.SignInAsync();
+        await SharedMaps.UnshareAsync(id);
+        await DeleteFilesAsync("map-" + id + "-");
+        var loaded = await CloudSaveService.Instance.Data.Player.LoadAsync(new HashSet<string> { SubmissionsKey });
+        if (loaded.TryGetValue(SubmissionsKey, out var item))
+        {
+            List<Submission> list = null;
+            try { list = JsonConvert.DeserializeObject<List<Submission>>(item.Value.GetAs<string>()); }
+            catch (Exception e) { Debug.LogWarning("CloudMaps: could not read the earlier submissions: " + e.Message); }
+            if (list != null && list.RemoveAll(s => s.id == id) > 0)
+                await CloudSaveService.Instance.Data.Player.SaveAsync(new Dictionary<string, object> { { SubmissionsKey, JsonConvert.SerializeObject(list) } });
+        }
+        Debug.Log("CloudMaps: " + id + " is private now; it was taken out of the cloud");
+    }
+
+    // Deletes this player's files whose keys start with prefix
+    public static async Task DeleteFilesAsync(string prefix)
+    {
+        var files = await CloudSaveService.Instance.Files.Player.ListAllAsync();
+        foreach (var f in files)
+        {
+            if (!f.Key.StartsWith(prefix, StringComparison.Ordinal)) continue;
+            try { await CloudSaveService.Instance.Files.Player.DeleteAsync(f.Key); }
+            catch (Exception e) { Debug.LogWarning("CloudMaps: could not delete " + f.Key + ": " + e.Message); }
+        }
+    }
+
+    // The player's own map file in the cloud (for a map imported before the game kept the map file with the map)
+    public static async Task<byte[]> LoadOwnSourceAsync(string id, string extension)
+    {
+        await CloudCourses.SignInAsync();
+        return await CloudSaveService.Instance.Files.Player.LoadBytesAsync("map-" + id + "-source" + extension);
+    }
 }
