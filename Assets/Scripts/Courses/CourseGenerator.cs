@@ -414,7 +414,12 @@ public static class CourseGenerator
             };
         }
         Result best = null;
-        for (int attempt = 0; attempt < Attempts && (DateTime.UtcNow - started).TotalSeconds < TimeBudgetSeconds; attempt++)
+        // Sprint with barriers: every course laid gets barriers on its dull legs, and the course is laid again
+        // (keeping the best) while too few legs are fun even with barriers
+        bool withBarriers = settings.barriers && settings.kind == Kind.Sprint;
+        int barrierCourses = 0;
+        double budget = withBarriers ? BarrierTotalSeconds : TimeBudgetSeconds;
+        for (int attempt = 0; attempt < Attempts && (DateTime.UtcNow - started).TotalSeconds < budget; attempt++)
         {
             List<float> legs = PlanLegs(settings.kind, length, controls + 1, random);
             if (choices != null) choices.goodLegs = 0;
@@ -456,16 +461,28 @@ public static class CourseGenerator
                 result.longestLeg = Mathf.Max(result.longestLeg, leg);
             }
             if (choices == null) return result;
+            int enough = Mathf.CeilToInt(GoodShare * result.legCount);
+            if (withBarriers)
+            {
+                // Lay the course, then make its dull legs fun with barriers; lay it again when that is not enough
+                result = WithBarriers(map, grid, result, settings);
+                barrierCourses++;
+                if (best == null || result.routeChoiceLegs > best.routeChoiceLegs) best = result;
+                if (best.routeChoiceLegs >= enough || barrierCourses >= MaxBarrierCourses) return best;
+                continue;
+            }
             // Sprint: keep the course with the most fun legs; try again while too few are fun and there is time
             if (best == null || result.routeChoiceLegs > best.routeChoiceLegs) best = result;
-            if (best.routeChoiceLegs >= Mathf.CeilToInt(GoodShare * best.legCount) || choices.OutOfTime) return WithBarriers(map, grid, best, settings);
+            if (best.routeChoiceLegs >= enough || choices.OutOfTime) return best;
         }
-        if (best != null) return WithBarriers(map, grid, best, settings);
+        if (best != null) return withBarriers ? best : WithBarriers(map, grid, best, settings);
         if (settings.HasRegion) return new Result { error = "Could not fit a " + lengthText + " course with " + controls + " controls in the area you drew. Draw a bigger area, or choose a shorter course or fewer controls." };
         return new Result { error = "Could not make a course with these settings. Try a shorter course or fewer controls." };
     }
 
-    const double BarrierBudgetSeconds = 15.0;
+    const double BarrierBudgetSeconds = 12.0;    // barriers on one course
+    const int MaxBarrierCourses = 3;             // courses laid and given barriers before the best is kept
+    const double BarrierTotalSeconds = 40.0;     // all of it together
     // Same rule as the route choice game: a variant of a faster choice must be close in time to count
     const float VariantSlower = RouteChoiceGenerator.Variants;
 
