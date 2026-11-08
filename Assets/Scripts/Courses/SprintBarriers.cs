@@ -21,13 +21,16 @@ public class SprintBarriers
     const float IntoWallMeters = 1.5f;         // a barrier reaches this far into the house on each side, so no gap is left
     const float ControlRoomMeters = 25f;       // never this close to a control, the start or the finish
     const float GapSpacingMeters = 10f;        // places tried on one leg at least this far apart
-    const float MaxSlowdown = 1.35f;           // the leg at most this much slower than its straight way was
+    const float MaxSlowdown = 1.6f;            // the leg at most this much slower than its straight way was
+    const float MaxMiddleSlowdown = 1.6f;      // a little more when an obvious middle or fastest way is closed too
     const float SkirtMeters = 5f;              // the route choices keep this far from a barrier: they go round the houses, not round its end
     const int MinWallCells = 12;               // a barrier ends on something big (a house, a plot, a fence), not a tree or a boulder
-    const float OtherLegSlack = 1.06f;         // a leg the barrier was not for may get at most this much slower (unless it gets a close choice)
-    const int MaxPerLeg = 2;
-    const int TriesPerRound = 6;
-    public const int MaxBarriers = 8;          // per course
+    const float OtherLegSlack = 1.10f;         // a leg the barrier was not for may get at most this much slower (unless it gets a close choice)
+    const int MaxPerLeg = 3;
+    const int TriesPerRound = 8;
+    const int MaxMiddle = 2;                   // extra barriers per leg that close routes between the left and the right choice
+    public const int MaxBarriers = 12;         // per course
+    const float TargetSlack = 1.05f;           // a barrier leg counts as even when its two best choices are within close x this
 
     public class Barrier
     {
@@ -42,7 +45,9 @@ public class SprintBarriers
         public float fastest;             // seconds of the fastest way
         public List<RouteChoice> choices = new List<RouteChoice>();
         public List<Vector2Int> fastestCells;
+        public bool leftRight;            // the two fastest choices go on different sides of the straight line
         public bool Fun(float close) => !blocked && ratio <= close;
+        public bool Balanced(float close) => Fun(close) && leftRight;
     }
 
     class Gap
@@ -89,15 +94,21 @@ public class SprintBarriers
         for (int k = 1; k <= legs; k++) state[k] = Measure(points, k);
         for (int k = 1; k <= legs; k++) if (state[k].Fun(close)) FunBefore++;
 
-        // The legs with one clear way, longest first (on a short leg a detour round a house is soon too much)
+        // Every leg that is not already an even choice left or right: first the ones with one clear way, then the
+        // ones whose close choices all go the same way; longest first (on a short leg a detour is soon too much)
         List<int> order = new List<int>();
         for (int k = 1; k <= legs; k++)
         {
-            if (state[k].blocked || state[k].Fun(close)) continue;
-            if (Vector2.Distance(points[k - 1], points[k]) * cellMeters < 70f) continue;
+            if (state[k].blocked || state[k].Balanced(close)) continue;
+            if (Vector2.Distance(points[k - 1], points[k]) * cellMeters < 60f) continue;
             order.Add(k);
         }
-        order.Sort((a, b) => Vector2.Distance(points[b - 1], points[b]).CompareTo(Vector2.Distance(points[a - 1], points[a])));
+        order.Sort((a, b) =>
+        {
+            int funA = state[a].Fun(close) ? 1 : 0, funB = state[b].Fun(close) ? 1 : 0;
+            if (funA != funB) return funA.CompareTo(funB);
+            return Vector2.Distance(points[b - 1], points[b]).CompareTo(Vector2.Distance(points[a - 1], points[a]));
+        });
 
         foreach (int k in order)
         {
@@ -111,7 +122,9 @@ public class SprintBarriers
 
     void TryLeg(List<Vector2Int> points, int k, LegState[] state, List<Barrier> kept)
     {
+        float target = close * TargetSlack;
         LegState original = state[k];
+        bool originalFun = original.Fun(close);
         LegState current = original;
         List<KeyValuePair<int, float>> changed = new List<KeyValuePair<int, float>>();
         List<Gap> placed = new List<Gap>();
@@ -132,8 +145,8 @@ public class SprintBarriers
                 LegState after = Measure(points, k);
                 ForbiddenRaster.Undo(speed, trial);
                 // Good: two close choices that go properly round. Best: one on each side of the barrier.
-                bool good = !after.blocked && after.Fun(close) && KeepsAway(after, gap, placed);
-                bool sides = good && BothSides(after, gap, placed);
+                bool good = !after.blocked && after.Fun(target) && KeepsAway(after, gap, placed);
+                bool sides = good && (after.leftRight || BothSides(after, gap, placed));
                 if (Verbose) Log.Add($"   leg {k} round {round} gap {gap.width * cellMeters:0.0} m at ({gap.centre.x:0},{gap.centre.y:0}): "
                                      + (after.blocked ? "blocked" : $"{after.fastest / original.fastest:0.00}x slower, ratio {after.ratio:0.00}, choices {after.choices.Count}, sides {BothSides(after, gap, placed)}, away {KeepsAway(after, gap, placed)}"));
                 if (after.blocked || after.fastest > original.fastest * MaxSlowdown) continue;
@@ -151,14 +164,19 @@ public class SprintBarriers
             placed.Add(best);
             current = bestState;
             if (bestRank == 2) break;
-            if (bestGood)
-            {
-                // Close choices, but both on the same side: one more barrier may give one each way; else keep this
-                break;
-            }
+            // Close choices, but both on the same side: keep it (a leg that had no choice is better off), unless the
+            // leg had close choices already, where only one each way is worth a barrier: then try one more
+            // (every leg must end with one each way, so keep trying)
         }
 
-        bool ok = placed.Count > 0 && current.Fun(close) && KeepsAway(current, placed[placed.Count - 1], placed);
+        // Only a barrier that gives one choice each way, left and right, is kept
+        bool ok = placed.Count > 0 && current.Fun(target) && KeepsAway(current, placed[placed.Count - 1], placed)
+                  && (current.leftRight || BothSides(current, placed[placed.Count - 1], placed));
+        // Tidy up: the leg now has a choice left or right, but often also routes in between (a gap between two
+        // houses in the middle). Close those too while the left and right choices stay even, so the leg is a clear
+        // either-or.
+        if (ok) current = CloseMiddle(points, k, current, placed, changed, target, kept.Count, original);
+
         // The other legs must not get worse: a leg with close choices keeps them, and every leg can still be run
         List<KeyValuePair<int, LegState>> others = new List<KeyValuePair<int, LegState>>();
         string why = placed.Count == 0 ? "no narrow passage that helps" : "no even choice left and right";
@@ -192,6 +210,75 @@ public class SprintBarriers
         Log.Add($"leg {k}: {placed.Count} barrier(s), {original.fastest:0}s straight -> choices {Describe(current)}");
     }
 
+    // Evens out a leg with several choices: while the slowest choice is more than 'target' slower than the fastest,
+    // the fastest (the obvious one) is closed, kept only when the rest are then more even. Every other choice
+    // stays, so a leg can keep three or four ways as long as they are all about as good.
+    LegState CloseMiddle(List<Vector2Int> points, int k, LegState current, List<Gap> placed,
+                         List<KeyValuePair<int, float>> changed, float target, int keptCount, LegState start)
+    {
+        for (int round = 0; round < MaxMiddle && placed.Count < MaxPerLeg + MaxMiddle && keptCount + placed.Count < MaxBarriers && !OutOfTime; round++)
+        {
+            if (current.choices.Count < 3 || Spread(current) <= target) break;
+            List<RouteChoice> byTime = new List<RouteChoice>(current.choices);
+            byTime.Sort((x, y) => x.seconds.CompareTo(y.seconds));
+            List<RouteChoice[]> tries = new List<RouteChoice[]> { new[] { byTime[0], null, null } };
+            bool closed = false;
+            foreach (RouteChoice[] t in tries)
+            {
+                if (closed || OutOfTime) break;
+                int tried = 0;
+                foreach (Gap gap in FindGaps(t[0].cells, points))
+                {
+                    if (tried++ >= 4 || OutOfTime) break;
+                    if (t[1] != null && (Crosses(t[1].cells, gap) || Crosses(t[2].cells, gap))) continue;
+                    List<KeyValuePair<int, float>> trial = new List<KeyValuePair<int, float>>();
+                    ForbiddenRaster.Close(speed, gap.corners, false, trial);
+                    LegState after = Measure(points, k);
+                    List<Gap> with = new List<Gap>(placed) { gap };
+                    bool good = !after.blocked && after.Fun(target) && after.fastest <= start.fastest * MaxMiddleSlowdown
+                                && after.choices.Count >= 2 && Spread(after) < Spread(current)
+                                && KeepsAway(after, gap, with)
+                                && (t[1] == null || after.leftRight || BothSides(after, gap, with));
+                    if (Verbose) Log.Add($"   leg {k} middle {t[0].seconds:0}s gap {gap.width * cellMeters:0.0} m at ({gap.centre.x:0},{gap.centre.y:0}): "
+                                         + (after.blocked ? "blocked" : Describe(after) + (after.leftRight ? " L/R" : "") + (KeepsAway(after, gap, with) ? "" : " near")) + (good ? " KEPT" : ""));
+                    if (!good)
+                    {
+                        ForbiddenRaster.Undo(speed, trial);
+                        continue;
+                    }
+                    changed.AddRange(trial);
+                    placed.Add(gap);
+                    current = after;
+                    closed = true;
+                    break;
+                }
+            }
+            if (!closed) break;
+        }
+        return current;
+    }
+
+    // How much slower the slowest choice is than the fastest
+    static float Spread(LegState s)
+    {
+        float min = float.MaxValue, max = 0f;
+        foreach (RouteChoice c in s.choices) { min = Mathf.Min(min, (float)c.seconds); max = Mathf.Max(max, (float)c.seconds); }
+        return min > 0f && s.choices.Count > 0 ? max / min : float.MaxValue;
+    }
+
+    // Does a route run through a barrier's passage?
+    bool Crosses(List<Vector2Int> route, Gap gap)
+    {
+        foreach (Vector2Int c in route)
+        {
+            Vector2 p = new Vector2(c.x + 0.5f, c.y + 0.5f);
+            Vector2 ab = gap.b - gap.a;
+            float t = Mathf.Clamp01(Vector2.Dot(p - gap.a, ab) / Mathf.Max(0.001f, ab.sqrMagnitude));
+            if (Vector2.Distance(p, gap.a + ab * t) < 3f / cellMeters) return true;
+        }
+        return false;
+    }
+
     static string Describe(LegState s)
     {
         List<string> parts = new List<string>();
@@ -216,6 +303,9 @@ public class SprintBarriers
             }
             s.fastest = fastest;
             s.ratio = second / Mathf.Max(0.001f, fastest);
+            List<RouteChoice> sorted = new List<RouteChoice>(made.choices);
+            sorted.Sort((x, y) => x.seconds.CompareTo(y.seconds));
+            s.leftRight = sorted[0].side * sorted[1].side < 0f;
             return s;
         }
         RouteChoice only = generator.Fastest(points[k - 1], points[k]);
