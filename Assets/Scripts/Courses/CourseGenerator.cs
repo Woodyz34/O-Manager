@@ -333,7 +333,7 @@ public static class CourseGenerator
             // one choice is than the other)
             choices = new ChoiceCheck
             {
-                generator = new RouteChoiceGenerator(grid.speed, grid.slopes, map.CellSize, 1f, 20f, true),
+                generator = new RouteChoiceGenerator(grid.speed, grid.slopes, map.CellSize, 1f, 20f, true) { VariantSlower = VariantSlower },
                 started = DateTime.UtcNow
             };
         }
@@ -389,6 +389,9 @@ public static class CourseGenerator
     }
 
     const double BarrierBudgetSeconds = 15.0;
+    // A choice that is only a variant of a faster one (same side, runs along it a good part of the way) counts as a
+    // choice only when it is at most this much slower; really different ways may be up to 20 % slower
+    const float VariantSlower = 1.10f;
 
     // Sprint with barriers ticked: closes the obvious straight way on legs with one clear route (SprintBarriers),
     // so they get a choice left or right. The course is kept without barriers when they would break it.
@@ -400,7 +403,7 @@ public static class CourseGenerator
             float cs = map.CellSize;
             int rows = grid.Rows, cols = grid.Cols;
             float[,] work = (float[,])grid.speed.Clone();
-            RouteChoiceGenerator generator = new RouteChoiceGenerator(work, grid.slopes, cs, 1f, 20f, true);
+            RouteChoiceGenerator generator = new RouteChoiceGenerator(work, grid.slopes, cs, 1f, 20f, true) { VariantSlower = VariantSlower };
             List<Vector2Int> cells = new List<Vector2Int>();
             foreach (CoursePoint p in result.course.AllPoints()) cells.Add(map.ToCell(p));
             // Grid coordinates (cell j spans j to j + 1) to the map's whole metres and back, as the corners are saved

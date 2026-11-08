@@ -21,7 +21,7 @@ public class SprintBarriers
     const float IntoWallMeters = 1.5f;         // a barrier reaches this far into the house on each side, so no gap is left
     const float ControlRoomMeters = 25f;       // never this close to a control, the start or the finish
     const float GapSpacingMeters = 10f;        // places tried on one leg at least this far apart
-    const float MaxSlowdown = 1.5f;            // the leg at most this much slower than its straight way was
+    const float MaxSlowdown = 1.6f;            // the leg at most this much slower than its straight way was
     const float MaxMiddleSlowdown = 1.6f;      // a little more when an obvious middle or fastest way is closed too
     const float SkirtMeters = 5f;              // the route choices keep this far from a barrier: they go round the houses, not round its end
     const int MinWallCells = 12;               // a barrier ends on something big (a house, a plot, a fence), not a tree or a boulder
