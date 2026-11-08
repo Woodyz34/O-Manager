@@ -210,31 +210,18 @@ public class SprintBarriers
         Log.Add($"leg {k}: {placed.Count} barrier(s), {original.fastest:0}s straight -> choices {Describe(current)}");
     }
 
-    // Closes passages on the choices between the leftmost and the rightmost, one at a time, keeping each only when
-    // the leg is still an even choice left or right that goes properly round every barrier
+    // Evens out a leg with several choices: while the slowest choice is more than 'target' slower than the fastest,
+    // the fastest (the obvious one) is closed, kept only when the rest are then more even. Every other choice
+    // stays, so a leg can keep three or four ways as long as they are all about as good.
     LegState CloseMiddle(List<Vector2Int> points, int k, LegState current, List<Gap> placed,
                          List<KeyValuePair<int, float>> changed, float target, int keptCount, LegState start)
     {
         for (int round = 0; round < MaxMiddle && placed.Count < MaxPerLeg + MaxMiddle && keptCount + placed.Count < MaxBarriers && !OutOfTime; round++)
         {
-            // The leftmost and the rightmost choice stay; the ones in between are closed, the most central first
-            // (that is the "obvious" way through the middle, even when it is one of the fastest)
-            List<RouteChoice> sorted = new List<RouteChoice>(current.choices);
-            if (sorted.Count < 3) break;
-            sorted.Sort((x, y) => x.side.CompareTo(y.side));
-            RouteChoice left = sorted[0], right = sorted[sorted.Count - 1];
-            List<RouteChoice> middle = sorted.GetRange(1, sorted.Count - 2);
-            float centre = (left.side + right.side) / 2f;
-            middle.Sort((x, y) => Mathf.Abs(x.side - centre).CompareTo(Mathf.Abs(y.side - centre)));
-            // Then the slower choices (keeping the two fastest): fewer, clearer choices
+            if (current.choices.Count < 3 || Spread(current) <= target) break;
             List<RouteChoice> byTime = new List<RouteChoice>(current.choices);
             byTime.Sort((x, y) => x.seconds.CompareTo(y.seconds));
-            List<RouteChoice[]> tries = new List<RouteChoice[]>();
-            foreach (RouteChoice m in middle) tries.Add(new[] { m, left, right });
-            for (int c = 2; c < byTime.Count; c++) if (!middle.Contains(byTime[c])) tries.Add(new[] { byTime[c], byTime[0], byTime[1] });
-            // Last, the fastest choices themselves: a way that is too obvious is closed when two other ways are
-            // still close in time without it (they do not have to go round different sides then)
-            for (int c = 0; c < Mathf.Min(2, byTime.Count); c++) if (!middle.Contains(byTime[c])) tries.Add(new[] { byTime[c], null, null });
+            List<RouteChoice[]> tries = new List<RouteChoice[]> { new[] { byTime[0], null, null } };
             bool closed = false;
             foreach (RouteChoice[] t in tries)
             {
@@ -249,7 +236,7 @@ public class SprintBarriers
                     LegState after = Measure(points, k);
                     List<Gap> with = new List<Gap>(placed) { gap };
                     bool good = !after.blocked && after.Fun(target) && after.fastest <= start.fastest * MaxMiddleSlowdown
-                                && (t[1] == null || after.choices.Count < current.choices.Count)
+                                && after.choices.Count >= 2 && Spread(after) < Spread(current)
                                 && KeepsAway(after, gap, with)
                                 && (t[1] == null || after.leftRight || BothSides(after, gap, with));
                     if (Verbose) Log.Add($"   leg {k} middle {t[0].seconds:0}s gap {gap.width * cellMeters:0.0} m at ({gap.centre.x:0},{gap.centre.y:0}): "
@@ -269,6 +256,14 @@ public class SprintBarriers
             if (!closed) break;
         }
         return current;
+    }
+
+    // How much slower the slowest choice is than the fastest
+    static float Spread(LegState s)
+    {
+        float min = float.MaxValue, max = 0f;
+        foreach (RouteChoice c in s.choices) { min = Mathf.Min(min, (float)c.seconds); max = Mathf.Max(max, (float)c.seconds); }
+        return min > 0f && s.choices.Count > 0 ? max / min : float.MaxValue;
     }
 
     // Does a route run through a barrier's passage?
