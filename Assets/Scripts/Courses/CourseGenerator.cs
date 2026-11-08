@@ -459,23 +459,6 @@ public static class CourseGenerator
         return new Result { error = "Could not make a course with these settings. Try a shorter course or fewer controls." };
     }
 
-    // Controls stay this far inside the edge of a drawn area, so their circles are inside it too
-    const float RegionMarginForest = 25f;
-    const float RegionMarginSprint = 8f;
-
-    // Map coordinates to grid coordinates (cell j spans j to j + 1)
-    static List<Vector2> ToGrid(MapDefinition map, List<CoursePoint> points)
-    {
-        float cs = map.CellSize;
-        List<Vector2> grid = new List<Vector2>();
-        foreach (CoursePoint p in points)
-        {
-            Vector3 w = map.ToWorld(p);
-            grid.Add(new Vector2(w.x / cs + map.cols / 2f, w.y / cs + map.rows / 2f));
-        }
-        return grid;
-    }
-
     const double BarrierBudgetSeconds = 10.0;
 
     // Sprint with barriers ticked: closes the obvious straight way on legs with one clear route (SprintBarriers),
@@ -530,6 +513,23 @@ public static class CourseGenerator
             if (result.course != null) result.course.forbidden = new List<ForbiddenArea>();
         }
         return result;
+    }
+
+    // Controls stay this far inside the edge of a drawn area, so their circles are inside it too
+    const float RegionMarginForest = 25f;
+    const float RegionMarginSprint = 8f;
+
+    // Map coordinates to grid coordinates (cell j spans j to j + 1)
+    static List<Vector2> ToGrid(MapDefinition map, List<CoursePoint> points)
+    {
+        float cs = map.CellSize;
+        List<Vector2> grid = new List<Vector2>();
+        foreach (CoursePoint p in points)
+        {
+            Vector3 w = map.ToWorld(p);
+            grid.Add(new Vector2(w.x / cs + map.cols / 2f, w.y / cs + map.rows / 2f));
+        }
+        return grid;
     }
 
     // Leg lengths that add up to the course length
