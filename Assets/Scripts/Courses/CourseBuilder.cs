@@ -245,15 +245,45 @@ public class CourseBuilder : MonoBehaviour
             if (mapFilter == "forest" && !m.IsForest) continue;
             if (mapFilter == "sprint" && !m.IsSprint) continue;
             string type = m.mapType == "both" ? "Forest and sprint" : m.mapType == "sprint" ? "Sprint" : "Forest";
+            if (m.isPrivate) type += "  ·  Private";
             if (search.Length > 0 && !(m.displayName + " " + type).ToLowerInvariant().Contains(search)) continue;
             MapDefinition chosen = m;
-            Button button = CourseUI.Button(m.displayName, mapPickerList, m.displayName + "   <size=18><color=#5B7563>" + type + "</color></size>",
-                m == map ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light, () => { CloseMapPicker(); if (chosen != map) SelectMap(chosen); }, 22);
+            // Maps this player imported can be edited (name, public or private, club, map edge)
+            RectTransform row = CourseUI.Rect(m.displayName, mapPickerList);
+            CourseUI.Row(row.gameObject, 8, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+            CourseUI.Size(row, 52);
+            Button button = CourseUI.Button("Map", row, m.displayName + "   <size=18><color=#5B7563>" + type + "</color></size>",
+                m.id == map?.id ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light, () => { CloseMapPicker(); if (chosen.id != map?.id) SelectMap(chosen); }, 22);
             button.GetComponentInChildren<TextMeshProUGUI>().alignment = TextAlignmentOptions.MidlineLeft;
-            CourseUI.Size(button, 52);
+            CourseUI.Size(button, 52, -1, 1);
+            if (m.CanEdit)
+            {
+                Button edit = CourseUI.Button("Edit", row, "Edit", CourseUI.ButtonKind.Secondary, () => EditMap(chosen), 20);
+                CourseUI.Size(edit, 52, 110);
+            }
             shown++;
         }
         if (shown == 0) CourseUI.Size(CourseUI.Text("None", mapPickerList, "No maps match.", 20, CourseUI.InkMuted, FontStyles.Italic), 40);
+    }
+
+    void EditMap(MapDefinition chosen)
+    {
+        if (busy || MapEditPanel.IsOpen) return;
+        MapEditPanel.Open(canvasObject.transform, chosen, (saved, rebuilt) =>
+        {
+            FillMapPicker();
+            if (saved == null || map == null || saved.id != map.id) return;
+            // The map on screen changed: show the new version (a new edge means a new grid, so the course starts again)
+            if (!rebuilt)
+            {
+                map = saved;
+                if (mapButton != null) CourseUI.SetButtonText(mapButton, "Map: " + map.displayName + (MapDefinition.All.Count > 1 ? "  (change)" : ""));
+            }
+            else
+            {
+                SelectMap(saved);
+            }
+        });
     }
 
     void CloseMapPicker()
@@ -281,7 +311,7 @@ public class CourseBuilder : MonoBehaviour
 
     void Update()
     {
-        if (map == null || busy || forkPopup != null || MapImportPanel.IsOpen || mapPicker != null || coursesPopup != null) return;
+        if (map == null || busy || forkPopup != null || MapImportPanel.IsOpen || MapEditPanel.IsOpen || mapPicker != null || coursesPopup != null) return;
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
         bool typing = EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null
                       && EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>() != null;

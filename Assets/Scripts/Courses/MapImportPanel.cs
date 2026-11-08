@@ -518,8 +518,9 @@ public class MapImportPanel : MonoBehaviour
             package.info.permissionConfirmed = true;
             package.info.isPrivate = keepPrivate;
             MapPackageBuilder.WriteFolder(target, package, ownPng, (step, share) => { progressShare = share; progressStep = step; });
-            // A private map keeps its map file, so it can be handed to the players in a lobby its owner hosts
-            if (keepPrivate) File.Copy(sourcePath, PrivateMaps.SourceFile(target, package.info), true);
+            // The map file is kept with the map: a private map is handed from it to the players in a lobby its owner
+            // hosts, and the map edge can be changed later (MapEditPanel)
+            File.Copy(sourcePath, PrivateMaps.SourceFile(target, package.info), true);
         });
         while (!work.IsCompleted) yield return null;
 

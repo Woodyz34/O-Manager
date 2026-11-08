@@ -84,6 +84,12 @@ public static class PrivateMaps
         HostAsync(map, guestIds, key);
     }
 
+    // The owner changed the map (MapEditPanel): the lobby's entry is written again with the new details
+    public static void MapChanged()
+    {
+        hostedKey = null;
+    }
+
     static async void HostAsync(MapDefinition map, List<string> guestIds, string key)
     {
         hostBusy = true;

@@ -78,6 +78,17 @@ public static class MapPackages
 
     static readonly Dictionary<string, Texture2D> thumbCache = new Dictionary<string, Texture2D>();
 
+    // Forgets the pictures loaded from a map folder, after the map has been built again
+    public static void ForgetCached(string folder)
+    {
+        string sprite = FilePrefix + folder.Replace('\\', '/') + "/";
+        string file = folder.Replace('\\', '/');
+        foreach (string key in new List<string>(spriteCache.Keys))
+            if (key.Replace('\\', '/').StartsWith(sprite, StringComparison.Ordinal)) spriteCache.Remove(key);
+        foreach (string key in new List<string>(thumbCache.Keys))
+            if (key.Replace('\\', '/').StartsWith(file, StringComparison.Ordinal)) thumbCache.Remove(key);
+    }
+
     static Texture2D LoadTexture(string file, bool cache)
     {
         if (cache && thumbCache.TryGetValue(file, out Texture2D cached) && cached != null) return cached;
@@ -169,6 +180,8 @@ public static class MapPackages
                     MapDefinition map = Definition(info, FilePrefix + folder.Replace('\\', '/') + "/");
                     map.isLocal = true;
                     map.isPrivate = info.isPrivate;
+                    map.isSharedCopy = !string.IsNullOrEmpty(info.sharedBy);
+                    map.folder = folder;
                     list.Add(map);
                 }
                 catch (Exception e)

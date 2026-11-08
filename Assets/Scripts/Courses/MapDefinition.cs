@@ -56,6 +56,13 @@ public class MapDefinition : ScriptableObject
     [NonSerialized] public bool isPrivate;
     // A short-lived copy of the lobby host's private map, only for the races in that lobby (see PrivateMaps)
     [NonSerialized] public bool isBorrowed;
+    // A copy of a public map another player shared (SharedMaps)
+    [NonSerialized] public bool isSharedCopy;
+    // The folder of a map imported on this computer
+    [NonSerialized] public string folder;
+
+    // Imported on this computer by this player: they can change its name, who may use it, the club and the map edge
+    public bool CanEdit => isLocal && !isBorrowed && !isSharedCopy && !string.IsNullOrEmpty(folder);
 
     public bool IsSprint => mapType == "sprint" || mapType == "both";   // 2 m cells, sprint courses by default
     public bool IsForest => mapType != "sprint";                        // forest courses fit it too

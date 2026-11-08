@@ -84,6 +84,13 @@ public static class SharedMaps
         Debug.Log("SharedMaps: sharing " + info.name + " (" + info.id + ") with everyone");
     }
 
+    // Takes a map out of this player's shared maps (it was made private)
+    public static async Task UnshareAsync(string id)
+    {
+        List<SharedMap> mine = await LoadMineAsync();
+        if (mine.RemoveAll(m => m.id == id) > 0) await SaveMineAsync(mine);
+    }
+
     static async Task<List<SharedMap>> LoadMineAsync()
     {
         var loaded = await CloudSaveService.Instance.Data.Player.LoadAsync(new HashSet<string> { SharedKey },
@@ -118,7 +125,15 @@ public static class SharedMaps
     // ---- Listing (called by CloudCourses with every player the course query returns) ----
 
     // Called with the "sharedMaps" value of each player. Afterwards Sync downloads what is missing.
-    public static void BeginListing() => others.Clear();
+    public static void BeginListing()
+    {
+        others.Clear();
+        listedOwners.Clear();
+    }
+
+    // Players whose shared maps were listed: a downloaded copy of theirs that they no longer share was made
+    // private (or deleted) and is deleted here too
+    static readonly HashSet<string> listedOwners = new HashSet<string>();
 
     public static void AddListed(string ownerId, string json)
     {
@@ -126,6 +141,7 @@ public static class SharedMaps
         {
             List<SharedMap> list = JsonConvert.DeserializeObject<List<SharedMap>>(json);
             if (list == null) return;
+            listedOwners.Add(ownerId);
             foreach (SharedMap m in list)
             {
                 if (m == null || !ValidId(m.id) || m.sourceKey == null || !m.sourceKey.StartsWith("map-" + m.id + "-source.", StringComparison.Ordinal)) continue;
@@ -280,10 +296,13 @@ public static class SharedMaps
                     continue;
                 }
                 MapPackageInfo info = ReadLocal(name);
-                if (info == null || string.IsNullOrEmpty(info.sharedBy) || !IsBuiltIn(info.id)) continue;
+                if (info == null || string.IsNullOrEmpty(info.sharedBy)) continue;
+                bool builtIn = IsBuiltIn(info.id);
+                bool withdrawn = listedOwners.Contains(info.sharedBy) && !others.Exists(m => m.ownerId == info.sharedBy && m.id == info.id);
+                if (!builtIn && !withdrawn) continue;
                 Directory.Delete(folder, true);
                 removed = true;
-                Debug.Log("SharedMaps: " + info.name + " is built into the game now; the downloaded copy was deleted");
+                Debug.Log("SharedMaps: " + info.name + (builtIn ? " is built into the game now" : " is no longer shared by the player who imported it") + "; the downloaded copy was deleted");
             }
             if (removed)
             {
