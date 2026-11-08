@@ -99,6 +99,8 @@ namespace MapImport
                 }
                 if (m == 206) return Blocked();                                           // gigantic boulder
                 if (m == 528 || m == 529) return Blocked();
+                // A map maker's own symbol (e.g. 999) for an area nobody may enter: known by its name
+                if (ForbiddenName(name)) return Blocked();
                 return TerrainRule.None;
             }
 
@@ -149,6 +151,10 @@ namespace MapImport
         public static bool IsBuilding(MapSymbol s) => s != null && s.kind == SymbolKind.Area && (s.oldNumbers ? s.major == 526 : s.major == 521);
 
         // Areas nobody may enter: out of bounds, forbidden, course-setting overprint
+        static bool ForbiddenName(string name) =>
+            name.Contains("shall not be entered") || name.Contains("out of bounds") || name.Contains("out-of-bounds")
+            || name.Contains("forbidden") || name.Contains("förbjud") || name.Contains("beträdas");
+
         public static bool IsOutOfBounds(MapSymbol s) => s != null && (s.major >= 700 || (s.oldNumbers ? s.major == 527 || s.major == 528 : s.major == 520));
 
         // ISOM 2000 / ISSOM 2007 numbering. The names help where the two old standards differ (304 is uncrossable
@@ -201,6 +207,7 @@ namespace MapImport
                     case 709: case 714: return Blocked();                                 // out of bounds (course setting)
                 }
                 if (m == 206 && impassable) return Blocked();
+                if (ForbiddenName(name)) return Blocked();
                 return TerrainRule.None;
             }
 
