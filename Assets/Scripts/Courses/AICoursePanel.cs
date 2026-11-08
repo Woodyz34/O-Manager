@@ -439,7 +439,7 @@ public class AICoursePanel : MonoBehaviour
         generateButton.interactable = false;
         useButton.interactable = false;
         resultText.color = CourseUI.Ink;
-        resultText.text = kind == CourseGenerator.Kind.Sprint ? "Laying the course and looking for legs with good route choices" + (barriers ? ", then placing barriers..." : "...") : "Laying the course and checking every leg...";
+        resultText.text = kind == CourseGenerator.Kind.Sprint ? (barriers ? "Laying the course and placing barriers to turn dull legs into good route choices..." : "Laying the course and looking for legs with good route choices...") : "Laying the course and checking every leg...";
 
         MapGrid grid = MapGrid.Load(map.gridName); // Resources has to be used on the main thread
         CourseGenerator.Settings settings = new CourseGenerator.Settings

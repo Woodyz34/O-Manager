@@ -87,13 +87,14 @@ public class RouteChoiceGenerator
     readonly float MaxSlower;
     // How fast ground nobody can run on counts when a line goes over it anyway (only drawn lines in route analysis do)
     public float BlockedSpeed { get; set; } = 0.05f;
+    // Every user of the generator (route choice game, AI course, route analysis) uses the same rules: Variants.
     // When above 0: a choice that runs along a faster choice for a good part of the way (VariantShare) is only a
     // variant of it (both go the same side), so it may be at most this much slower than that one to be shown at all.
     // A choice that meets a faster one in the middle of the leg (and leaves it again) is not shown either: the
     // runner can change between the two there, so it is no way of its own. Choices that really go different ways
     // keep the wide MaxSlower limit. The route choice game and the AI course both use Variants.
-    public float VariantSlower { get; set; } = 0f;
     public const float Variants = 1.10f;
+    public float VariantSlower { get; set; } = Variants;
     const float VariantShare = 0.3f;
 
     public RouteChoiceGenerator(float[,] speedGrid, Dictionary<string, float[,]> slopeFactors, float cellSize,
@@ -360,6 +361,11 @@ public class RouteChoiceGenerator
         // The fastest first. Then, again and again, the route that runs furthest from the ones already taken
         // (and is not much slower), so the choices spread out: one far to the left, one far to the right, rather
         // than four ways down the same side
+        if (VariantSlower > 0f)
+        {
+            for (int i = 0; i < candidates.Count; i++)
+                candidates[i] = Tighten(candidates[i], from, to, fromStart, toGoal, backToStart, onToGoal, endCells);
+        }
         candidates.Sort((a, b) => a.seconds.CompareTo(b.seconds));
         float fastest = candidates[0].seconds;
         float gap = Mathf.Max(MinGapSeconds, fastest * MinGapShare);
@@ -394,7 +400,8 @@ public class RouteChoiceGenerator
                         || Detour(c.cells, p.cells, from, to, endCells, sameCells)
                         || (VariantSlower > 0f && c.seconds > p.seconds * VariantSlower
                             && Shared(c.cells, p.cells, from, to, endCells, sameCells) >= VariantShare)
-                        || (VariantSlower > 0f && c.seconds > p.seconds && Meets(c.cells, p.cells, from, to, endCells, sameCells)))
+                        || (VariantSlower > 0f && c.seconds > p.seconds && Meets(c.cells, p.cells, from, to, endCells, sameCells))
+                        || (VariantSlower > 0f && NothingBetween(c.cells, p.cells)))
                     {
                         ok = false;
                         break;
@@ -506,6 +513,121 @@ public class RouteChoiceGenerator
             else if (stage == 2 && d2 >= apart) return true;
         }
         return false;
+    }
+
+    // True when there is nothing between two routes: they run on the same kind of ground and the ground they
+    // enclose has no building, fence, water or slow vegetation worth speaking of. Then they are the same way across
+    // open ground (one just bends a little more), not a choice. Something to go round (ObstacleSquareMeters), or a
+    // road against rough ground, makes them two ways.
+    const float ObstacleSpeed = 0.6f;
+    const float ObstacleSquareMeters = 30f;
+    const float SameGround = 1.12f;   // average ground speed under two routes within this: the same kind of way
+
+    float MeanSpeed(List<Vector2Int> route)
+    {
+        float sum = 0f;
+        foreach (Vector2Int c in route) sum += speed[c.y, c.x];
+        return route.Count > 0 ? sum / route.Count : 0f;
+    }
+
+    bool NothingBetween(List<Vector2Int> a, List<Vector2Int> b)
+    {
+        // A road round versus straight across a marsh is a choice too: the ground under the two must be alike
+        float ga = MeanSpeed(a), gb = MeanSpeed(b);
+        if (Mathf.Max(ga, gb) > Mathf.Min(ga, gb) * SameGround) return false;
+        return !Obstacles(a, b);
+    }
+
+    // Whether the ground between two routes holds something to go round (ObstacleSquareMeters of buildings, fences,
+    // water or slow vegetation)
+    bool Obstacles(List<Vector2Int> a, List<Vector2Int> b)
+    {
+        List<Vector2> ring = new List<Vector2>(a.Count + b.Count);
+        foreach (Vector2Int c in a) ring.Add(new Vector2(c.x + 0.5f, c.y + 0.5f));
+        for (int i = b.Count - 1; i >= 0; i--) ring.Add(new Vector2(b[i].x + 0.5f, b[i].y + 0.5f));
+        float minY = float.MaxValue, maxY = float.MinValue;
+        foreach (Vector2 v in ring) { minY = Mathf.Min(minY, v.y); maxY = Mathf.Max(maxY, v.y); }
+        int need = Mathf.Max(1, Mathf.CeilToInt(ObstacleSquareMeters / (cellMeters * cellMeters)));
+        int found = 0;
+        List<float> crossings = new List<float>();
+        for (int y = Mathf.Max(0, Mathf.FloorToInt(minY)); y <= Mathf.Min(height - 1, Mathf.CeilToInt(maxY)); y++)
+        {
+            float sy = y + 0.5f;
+            crossings.Clear();
+            for (int k = 0; k < ring.Count; k++)
+            {
+                Vector2 p = ring[k], q = ring[(k + 1) % ring.Count];
+                if ((p.y <= sy && sy < q.y) || (q.y <= sy && sy < p.y)) crossings.Add(p.x + (sy - p.y) * (q.x - p.x) / (q.y - p.y));
+            }
+            crossings.Sort();
+            for (int k = 0; k + 1 < crossings.Count; k += 2)
+            {
+                int x0 = Mathf.Max(0, Mathf.CeilToInt(crossings[k] - 0.5f)), x1 = Mathf.Min(width - 1, Mathf.FloorToInt(crossings[k + 1] - 0.5f));
+                for (int x = x0; x <= x1; x++)
+                {
+                    if (speed[y, x] <= ObstacleSpeed && ++found >= need) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Pulls a route in towards the straight line as long as nothing comes between the old and the new way: a route
+    // found through a point far out swings wide round open ground, while a runner keeps tight to the house, fence or
+    // water it goes round. The new way goes round the same things, so it is the same choice, only faster.
+    RouteChoice Tighten(RouteChoice c, Vector2Int from, Vector2Int to, float[] fromStart, float[] toGoal,
+                        int[] backToStart, int[] onToGoal, int endCells)
+    {
+        Vector2 line = to - from;
+        float length = Mathf.Max(1f, line.magnitude);
+        Vector2 dir = line / length;
+        int e2 = endCells * endCells;
+        List<Vector2Int> route = c.cells;
+        float cost = RouteCost(route);
+        bool changed = false;
+        for (int round = 0; round < 4; round++)
+        {
+            // The point of the route furthest from the straight line
+            Vector2Int far = route[0];
+            float farOut = 0f;
+            foreach (Vector2Int p in route)
+            {
+                if ((p - from).sqrMagnitude <= e2 || (p - to).sqrMagnitude <= e2) continue;
+                Vector2 rel = p - from;
+                float out_ = Mathf.Abs(rel.x * dir.y - rel.y * dir.x);
+                if (out_ > farOut) { farOut = out_; far = p; }
+            }
+            if (farOut < 2f) break;
+            Vector2 rel2 = far - from;
+            Vector2 foot = (Vector2)from + dir * Vector2.Dot(rel2, dir);
+            List<Vector2Int> better = null;
+            float betterCost = cost;
+            for (int k = 1; k <= 8; k++)
+            {
+                Vector2 v = Vector2.Lerp(far, foot, k / 9f);
+                int x = Mathf.RoundToInt(v.x), y = Mathf.RoundToInt(v.y);
+                if (x < 0 || y < 0 || x >= width || y >= height) continue;
+                int i = y * width + x;
+                float through = fromStart[i] + toGoal[i];
+                if (float.IsInfinity(through) || through >= betterCost * 0.995f) continue;
+                List<Vector2Int> r = Through(i, backToStart, onToGoal);
+                if (r.Count < 2 || Obstacles(route, r)) continue;
+                better = r;
+                betterCost = RouteCost(r);
+            }
+            if (better == null) break;
+            route = better;
+            cost = betterCost;
+            changed = true;
+        }
+        return changed ? Evaluate(route) : c;
+    }
+
+    float RouteCost(List<Vector2Int> route)
+    {
+        float sum = 0f;
+        for (int i = 1; i < route.Count; i++) sum += StepCost(route[i - 1], route[i]);
+        return sum;
     }
 
     // Share of route a (leaving out the ends at the controls) that runs along route b
