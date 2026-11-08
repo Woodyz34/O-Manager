@@ -347,7 +347,7 @@ public class MapEditPanel : MonoBehaviour
                 Directory.Delete(folder, true);
                 Directory.Move(building, folder);
                 MapGrid.Forget(map.gridName);
-                CourseGenerator.Forget(map.id);
+                MapPlayArea.Forget(map.id);
                 MapPackages.ForgetCached(folder);
             }
             updated.name = name;
