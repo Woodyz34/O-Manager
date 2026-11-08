@@ -389,9 +389,8 @@ public static class CourseGenerator
     }
 
     const double BarrierBudgetSeconds = 15.0;
-    // A choice that is only a variant of a faster one (same side, runs along it a good part of the way) counts as a
-    // choice only when it is at most this much slower; really different ways may be up to 20 % slower
-    const float VariantSlower = 1.10f;
+    // Same rule as the route choice game: a variant of a faster choice must be close in time to count
+    const float VariantSlower = RouteChoiceGenerator.Variants;
 
     // Sprint with barriers ticked: closes the obvious straight way on legs with one clear route (SprintBarriers),
     // so they get a choice left or right. The course is kept without barriers when they would break it.
