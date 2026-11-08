@@ -175,6 +175,11 @@ public static class MapImportMenu
                     Debug.LogWarning("Build imported maps: " + info.name + " has no confirmed permission from the map's owner, skipped.");
                     continue;
                 }
+                if (info.isPrivate)
+                {
+                    Debug.Log("Build imported maps: " + info.name + " is private (only for the player who imported it), skipped.");
+                    continue;
+                }
                 string folder = PackagesFolder + "/" + info.id;
                 Directory.CreateDirectory(folder);
                 foreach (string name in new[] { "grid.bytes", "points.json", "lines.json", "picture.png", "thumb.png", "map.json" })

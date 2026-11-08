@@ -86,6 +86,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // The host's lobby choices, published on the host's own player so everyone can see them
     [Networked] public NetworkString<_64> lobbyGameMode { get; set; }
     [Networked] public NetworkString<_64> lobbyMap { get; set; }
+    // This player's Unity player id (Unity Cloud), so a host can let the players in its lobby download its private map
+    [Networked] public NetworkString<_64> cloudId { get; set; }
+    // Set by the host when the lobby course is on a private map of its own: the host's Unity player id (PrivateMaps)
+    [Networked] public NetworkString<_64> lobbyMapOwner { get; set; }
+    // Set by the other players: the id of the host's private map once their copy is ready, and how far they are (0-100)
+    [Networked] public NetworkString<_64> privateMapReady { get; set; }
+    [Networked] public int privateMapProgress { get; set; }
     // The chosen course in compact text form (CourseData.ToLobbyString), so the others can run it even if it is not on their computer
     [Networked] public NetworkString<_512> lobbyCourse { get; set; }
     // A relay with several courses can be longer, so it continues in these

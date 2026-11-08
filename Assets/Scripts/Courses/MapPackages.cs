@@ -168,6 +168,7 @@ public static class MapPackages
                     if (info == null || string.IsNullOrEmpty(info.id)) continue;
                     MapDefinition map = Definition(info, FilePrefix + folder.Replace('\\', '/') + "/");
                     map.isLocal = true;
+                    map.isPrivate = info.isPrivate;
                     list.Add(map);
                 }
                 catch (Exception e)

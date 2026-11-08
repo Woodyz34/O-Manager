@@ -11,8 +11,10 @@ using UnityEngine.UI;
 // The "Import map" pop-up in the course builder. The player picks a map file (OCAD .ocd or OpenOrienteering Mapper
 // .omap/.xmap) on their computer (the computer's own file window, dragging the file onto the game, or pasting its
 // path), names the map, says if it is a forest map, a sprint map or both, and may give a PNG of the map instead of
-// the picture the game draws. They have to confirm that the club that owns the map allows it. Every imported map
-// is also sent in, so it can be built into the game for everyone.
+// the picture the game draws. They have to confirm that the club that owns the map allows it.
+// Public (the default): the map is sent in, so it can be built into the game, and shared with every player until
+// then. Private: only this player can use it; it is not sent in or shared, and other players only get a copy for
+// the races in a lobby this player hosts on it (see PrivateMaps).
 // The map is built on a background thread and saved in <persistent data>/Maps/<id>/ (see MapPackages).
 public class MapImportPanel : MonoBehaviour
 {
@@ -33,6 +35,7 @@ public class MapImportPanel : MonoBehaviour
     string mapType = "forest";
     bool contourTyped;   // the player wrote the contour interval: changing the type no longer changes it
     bool permission;
+    bool isPrivate;      // Public is the default
     bool working;
 
     // Written by the background thread, shown in Update
@@ -43,7 +46,9 @@ public class MapImportPanel : MonoBehaviour
     TMP_InputField pathField, pictureField, nameField, contourField;
     TMP_InputField senderField, clubField, contactField;   // who sends the map in, so the game's owner can reach them
     Button typeButton, pictureButton, permissionButton, importButton, cancelButton, edgeButton;
-    TextMeshProUGUI edgeText;
+    Button publicButton, privateButton;
+    TextMeshProUGUI edgeText, visibilityText;
+    RectTransform contactRow;
     Image permissionBox;
 
     public static MapImportPanel Open(Transform canvas, Action<MapDefinition> onImported)
@@ -74,7 +79,7 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Import a map", 36, CourseUI.Ink, FontStyles.Bold), 44);
         CourseUI.Size(CourseUI.Text("Info", card.transform,
             "Pick a map file from OCAD (.ocd, OCAD 6 or newer) or OpenOrienteering Mapper (.omap or .xmap). " +
-            "The game makes the grid, the heights and the map picture from it. Everyone can use the map at once: it is shared through Unity Cloud until it is built into the game.",
+            "The game makes the grid, the heights and the map picture from it. Public maps are shared with everyone through Unity Cloud; private maps only you can use.",
             20, CourseUI.InkMuted), 56);
 
         // The map file: the computer's own file window, dragging it onto the game, or its path pasted in
@@ -133,6 +138,19 @@ public class MapImportPanel : MonoBehaviour
         edgeButton = CourseUI.Button("Edge button", edgeRow, "Check map edge...", CourseUI.ButtonKind.Secondary, OpenEdge, 20);
         CourseUI.Size(edgeButton, -1, 300);
 
+        // Who can use the map: everyone (Public, the default) or only this player (Private)
+        RectTransform visibilityRow = CourseUI.Rect("Visibility row", card.transform);
+        CourseUI.Row(visibilityRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(visibilityRow, 56);
+        publicButton = CourseUI.Button("Public", visibilityRow, "Public", CourseUI.ButtonKind.Primary, () => { isPrivate = false; Refresh(); }, 20);
+        CourseUI.Size(publicButton, -1, 150);
+        privateButton = CourseUI.Button("Private", visibilityRow, "Private", CourseUI.ButtonKind.Light, () => { isPrivate = true; Refresh(); }, 20);
+        CourseUI.Size(privateButton, -1, 150);
+        visibilityText = CourseUI.Text("Visibility", visibilityRow, "", 17, CourseUI.InkMuted);
+        visibilityText.alignment = TextAlignmentOptions.MidlineLeft;
+        visibilityText.textWrappingMode = TextWrappingModes.Normal;
+        CourseUI.Size(visibilityText, -1, -1, 1);
+
         // The permission checkbox: a box that fills orange, and the text
         permissionButton = CourseUI.Button("Permission", card.transform, "", CourseUI.ButtonKind.Light, () => { permission = !permission; Refresh(); }, 18);
         CourseUI.Size(permissionButton, 76);
@@ -150,8 +168,9 @@ public class MapImportPanel : MonoBehaviour
         permissionBox = CourseUI.Panel("Tick", box.transform, CourseUI.Accent);
         CourseUI.Stretch(permissionBox.rectTransform, 6, 6, 6, 6);
 
-        // Every map is sent in: if a club asks about its map, the game's owner knows who to ask
+        // Every public map is sent in: if a club asks about its map, the game's owner knows who to ask
         RectTransform contact = CourseUI.Rect("Contact", card.transform);
+        contactRow = contact;
         CourseUI.Row(contact.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
         CourseUI.Size(contact, 52);
         senderField = CourseUI.Input("Your name", contact, "Your full name", 40, _ => Refresh());
@@ -370,7 +389,16 @@ public class MapImportPanel : MonoBehaviour
         edgeText.color = edge != null && edge == guessedEdge ? CourseUI.Accent : CourseUI.Ink;
         edgeButton.interactable = !working && preview != null;
         permissionBox.enabled = permission;
-        bool ready = mapFile != null && permission && !working && ContactGiven();
+        CourseUI.SetButtonColor(publicButton, isPrivate ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Primary);
+        CourseUI.SetButtonColor(privateButton, isPrivate ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        publicButton.interactable = !working;
+        privateButton.interactable = !working;
+        visibilityText.text = isPrivate
+            ? "Private: only you can use the map. It is not sent in or shared. Others can only race on it in a lobby you host, and they do not keep it."
+            : "Public: the map is sent in and every player can use it.";
+        // A private map is not sent in, so no contact details are needed
+        if (contactRow.gameObject.activeSelf == isPrivate) contactRow.gameObject.SetActive(!isPrivate);
+        bool ready = mapFile != null && permission && !working && (isPrivate || ContactGiven());
         importButton.interactable = ready;
         cancelButton.interactable = !working;
         typeButton.interactable = !working;
@@ -436,7 +464,7 @@ public class MapImportPanel : MonoBehaviour
             SetStatus("Give the map a name.", true);
             yield break;
         }
-        if (!ContactGiven())
+        if (!isPrivate && !ContactGiven())
         {
             SetStatus("Write your name, the club that owns the map and your e-mail or phone, so the club can be asked about the map.", true);
             yield break;
@@ -447,9 +475,17 @@ public class MapImportPanel : MonoBehaviour
             SetStatus("Write the contour interval in metres, for instance 5 or 2.5.", true);
             yield break;
         }
+        bool keepPrivate = isPrivate;
         string sender = senderField.text.Trim(), club = clubField.text.Trim(), contactInfo = contactField.text.Trim();
-        PlayerPrefs.SetString("MapImport.Sender", sender);
-        PlayerPrefs.SetString("MapImport.Contact", contactInfo);
+        if (keepPrivate)
+        {
+            sender = club = contactInfo = "";   // not sent anywhere
+        }
+        else
+        {
+            PlayerPrefs.SetString("MapImport.Sender", sender);
+            PlayerPrefs.SetString("MapImport.Contact", contactInfo);
+        }
         working = true;
         Refresh();
 
@@ -463,6 +499,7 @@ public class MapImportPanel : MonoBehaviour
         source.contourInterval = contours;
         source.boundary = edge;
         string sourceName = Path.GetFileName(mapPath);
+        string sourcePath = mapPath;
         MapPackage package = null;
         byte[] ownPng = null;
         var watch = System.Diagnostics.Stopwatch.StartNew();
@@ -479,7 +516,10 @@ public class MapImportPanel : MonoBehaviour
             package.info.sender = sender;
             package.info.contact = contactInfo;
             package.info.permissionConfirmed = true;
+            package.info.isPrivate = keepPrivate;
             MapPackageBuilder.WriteFolder(target, package, ownPng, (step, share) => { progressShare = share; progressStep = step; });
+            // A private map keeps its map file, so it can be handed to the players in a lobby its owner hosts
+            if (keepPrivate) File.Copy(sourcePath, PrivateMaps.SourceFile(target, package.info), true);
         });
         while (!work.IsCompleted) yield return null;
 
@@ -506,12 +546,17 @@ public class MapImportPanel : MonoBehaviour
         }
         foreach (string line in package.log) Debug.Log("MapImportPanel: " + line);
 
-        // Send it in: the map file goes to the game's owner (see CloudMaps); the map is already usable here
+        // Send it in: the map file goes to the game's owner (see CloudMaps); the map is already usable here.
+        // A private map stays on this computer.
         string sentNote;
+        if (keepPrivate)
+        {
+            sentNote = " It is private: only you can use it. Players in a lobby you host on it get it for those races.";
+        }
+        else
         {
             progressStep = null;
             SetStatus("Sending the map in ...", false);
-            string sourcePath = mapPath;
             Task<byte[]> read = Task.Run(() => File.ReadAllBytes(sourcePath));
             while (!read.IsCompleted) yield return null;
             Task submit = read.IsFaulted ? Task.FromException(read.Exception) : CloudMaps.SubmitAsync(package.info, read.Result, sourceName, ownPng);

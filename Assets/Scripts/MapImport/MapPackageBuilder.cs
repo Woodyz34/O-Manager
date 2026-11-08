@@ -49,6 +49,12 @@ namespace MapImport
         // shared it (unix seconds). Empty for maps imported on this computer and for maps built into the game.
         public string sharedBy;
         public long sharedAt;
+        // Private: only the player who imported it can use it. It is never sent in or shared; other players only
+        // get a short-lived copy when the owner hosts a lobby race on it (see PrivateMaps). The map file is kept
+        // in the folder as source.<ext> for that, and privateSourceKey is its key in the owner's Cloud Save Files
+        // once it has been uploaded (empty before).
+        public bool isPrivate;
+        public string privateSourceKey;
     }
 
     public class MapPackage
@@ -250,6 +256,7 @@ namespace MapImport
             }
             S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created);
             S("sharedBy", i.sharedBy); N("sharedAt", i.sharedAt);
+            B("isPrivate", i.isPrivate); S("privateSourceKey", i.privateSourceKey);
             sb.Append("  \"permissionConfirmed\": ").Append(i.permissionConfirmed ? "true" : "false").Append("\n}\n");
             File.WriteAllText(Path.Combine(folder, "map.json"), sb.ToString());
         }
