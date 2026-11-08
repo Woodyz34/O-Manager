@@ -24,6 +24,7 @@ public class AICoursePanel : MonoBehaviour
         LastSettings = null;
         lastMap = null;
         RacedCourseId = null;
+        regions.Clear();
     }
 
     // True when this course is an AI course that has already been raced and can be remade
@@ -43,6 +44,7 @@ public class AICoursePanel : MonoBehaviour
             lengthKm = LastSettings.lengthKm,
             controls = LastSettings.controls,
             barriers = LastSettings.barriers,
+            region = LastSettings.region,
             seed = Environment.TickCount
         };
         MapDefinition map = lastMap;
@@ -57,6 +59,12 @@ public class AICoursePanel : MonoBehaviour
     const string MapPref = "AICourse.Map";
     const string BarriersPref = "AICourse.Barriers";
     bool barriers = true;
+    // The area drawn on each map this session (none: the whole map, the default)
+    static readonly Dictionary<string, List<CoursePoint>> regions = new Dictionary<string, List<CoursePoint>>();
+    List<CoursePoint> region;
+    Button areaButton;
+    Button wholeMapButton;
+    bool drawingArea;
 
     TextMeshProUGUI intro;
     Button mapButton;
@@ -104,17 +112,17 @@ public class AICoursePanel : MonoBehaviour
         AICoursePanel panel = shade.gameObject.AddComponent<AICoursePanel>();
 
         Image card = CourseUI.CardPanel("Window", shade.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1240, 880));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1240, 950));
 
         // Left: settings
         RectTransform left = CourseUI.Rect("Settings", card.transform);
-        CourseUI.Place(left, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -36), new Vector2(560, 810));
+        CourseUI.Place(left, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -36), new Vector2(560, 880));
         CourseUI.Column(left.gameObject, 14, new RectOffset(0, 0, 0, 0));
 
         TextMeshProUGUI title = CourseUI.Text("Title", left, "AI course", 42, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 54);
         panel.intro = CourseUI.Text("Intro", left, "", 21, CourseUI.InkMuted);
-        CourseUI.Size(panel.intro, 84);
+        CourseUI.Size(panel.intro, 60);
 
         // The map: a button showing the chosen map, which opens a list of every map
         RectTransform mapRow = CourseUI.Rect("Map row", left);
@@ -125,6 +133,18 @@ public class AICoursePanel : MonoBehaviour
         CourseUI.Size(mapLabel, 56).preferredWidth = 80;
         panel.mapButton = CourseUI.Button("Map", mapRow, "Map", CourseUI.ButtonKind.Light, panel.OpenMapPicker, 24);
         CourseUI.Size(panel.mapButton, 56).flexibleWidth = 1;
+
+        // The area: the whole map, or a ring the player draws round the part they want
+        RectTransform areaRow = CourseUI.Rect("Area row", left);
+        CourseUI.Row(areaRow.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(areaRow, 56);
+        TextMeshProUGUI areaLabel = CourseUI.Text("Label", areaRow, "Area:", 26, CourseUI.Ink, FontStyles.Bold);
+        areaLabel.alignment = TextAlignmentOptions.MidlineLeft;
+        CourseUI.Size(areaLabel, 56).preferredWidth = 80;
+        panel.areaButton = CourseUI.Button("Area", areaRow, "Whole map", CourseUI.ButtonKind.Light, panel.OpenAreaDrawer, 24);
+        CourseUI.Size(panel.areaButton, 56).flexibleWidth = 1;
+        panel.wholeMapButton = CourseUI.Button("Whole map", areaRow, "Whole map", CourseUI.ButtonKind.Light, () => panel.SetRegion(null), 20);
+        CourseUI.Size(panel.wholeMapButton, 56, 150);
 
         RectTransform kindRow = CourseUI.Rect("Kind", left);
         CourseUI.Row(kindRow.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
@@ -227,7 +247,9 @@ public class AICoursePanel : MonoBehaviour
         string mapName = map != null ? map.displayName : "No map";
         string type = map == null ? "" : map.mapType == "both" ? "Forest and sprint" : map.IsSprint ? "Sprint" : "Forest";
         CourseUI.SetButtonText(mapButton, mapName + (type.Length > 0 ? "   <size=18><color=#5B7563>" + type + "</color></size>" : ""));
-        intro.text = "The game lays a course for you on " + (map != null ? map.displayName : "the map") + " and checks that every control can be reached. It is only used in this lobby and is not saved.";
+        intro.text = "The game lays a course on " + (map != null ? map.displayName : "the map") + " and checks every control can be reached. Only for this lobby; not saved.";
+        region = map != null && regions.TryGetValue(map.id, out List<CoursePoint> drawn) ? drawn : null;
+        ShowArea();
 
         List<CourseGenerator.Kind> kinds = CourseGenerator.KindsFor(map);
         foreach (var pair in kindButtons) pair.Value.gameObject.SetActive(kinds.Contains(pair.Key));
@@ -254,6 +276,45 @@ public class AICoursePanel : MonoBehaviour
         else SetKind(kind);
     }
 
+    // ---- The area: the whole map, or a ring drawn round part of it ----
+
+    void OpenAreaDrawer()
+    {
+        if (busy || map == null || mapPicker != null || drawingArea) return;
+        drawingArea = true;
+        AICourseAreaDrawer.Open(transform, map, region, SetRegion, () => { if (this != null) drawingArea = false; });
+    }
+
+    void SetRegion(List<CoursePoint> ring)
+    {
+        if (busy) return;
+        region = ring != null && ring.Count >= 3 ? ring : null;
+        if (map != null)
+        {
+            if (region != null) regions[map.id] = region; else regions.Remove(map.id);
+        }
+        ShowArea();
+        // A course made for the old area no longer fits the choice
+        generated = null;
+        if (useButton != null) useButton.interactable = false;
+        if (preview != null) { preview.texture = null; preview.enabled = false; }
+        if (resultText != null)
+        {
+            resultText.color = CourseUI.Ink;
+            resultText.text = region != null ? "The course will be laid inside the area you drew. Press Make course." : "Choose the settings and press Make course.";
+        }
+        if (generateButton != null) CourseUI.SetButtonText(generateButton, "Make course");
+    }
+
+    void ShowArea()
+    {
+        if (areaButton == null) return;
+        CourseUI.SetButtonText(areaButton, region != null
+            ? "Your area   <size=18><color=#5B7563>about " + AICourseAreaDrawer.AreaText(region) + " · change</color></size>"
+            : "Whole map   <size=18><color=#5B7563>draw an area</color></size>");
+        wholeMapButton.gameObject.SetActive(region != null);
+    }
+
     void SetKind(CourseGenerator.Kind chosen)
     {
         kind = chosen;
@@ -274,7 +335,7 @@ public class AICoursePanel : MonoBehaviour
 
     void OpenMapPicker()
     {
-        if (busy || mapPicker != null) return;
+        if (busy || mapPicker != null || drawingArea) return;
         Image dim = CourseUI.Panel("Choose a map", transform, new Color(0.08f, 0.14f, 0.1f, 0.55f), false);
         CourseUI.Stretch(dim.rectTransform);
         mapPicker = dim.gameObject;
@@ -373,7 +434,7 @@ public class AICoursePanel : MonoBehaviour
 
     async void Generate()
     {
-        if (busy || map == null || mapPicker != null) return;
+        if (busy || map == null || mapPicker != null || drawingArea) return;
         busy = true;
         generateButton.interactable = false;
         useButton.interactable = false;
@@ -387,6 +448,7 @@ public class AICoursePanel : MonoBehaviour
             lengthKm = lengthKm,
             controls = controls,
             barriers = barriers && kind == CourseGenerator.Kind.Sprint,
+            region = region,
             seed = Environment.TickCount
         };
         MapDefinition chosenMap = map;
@@ -408,6 +470,7 @@ public class AICoursePanel : MonoBehaviour
         preview.enabled = preview.texture != null;
         resultText.text = $"<b>{generated.name}</b>\n{generated.controls.Count} controls  ·  {generated.LengthText()}  ·  legs {Mathf.RoundToInt(result.shortestLeg)} to {Mathf.RoundToInt(result.longestLeg)} m\nEvery control can be reached."
                           + (result.routeChoiceLegs >= 0 ? $" {result.routeChoiceLegs} of {result.legCount} legs have a close route choice." : "")
+                          + (settings.HasRegion ? " All controls are inside your area." : "")
                           + (result.barriers > 0 ? $" {result.barriers} barrier{(result.barriers == 1 ? "" : "s")} close the straight way on some legs." : settings.barriers ? " No leg needed a barrier." : "");
         useButton.interactable = true;
     }
@@ -415,7 +478,7 @@ public class AICoursePanel : MonoBehaviour
     void Use()
     {
         if (generated == null) return;
-        LastSettings = new CourseGenerator.Settings { kind = kind, lengthKm = lengthKm, controls = controls, barriers = barriers && kind == CourseGenerator.Kind.Sprint };
+        LastSettings = new CourseGenerator.Settings { kind = kind, lengthKm = lengthKm, controls = controls, barriers = barriers && kind == CourseGenerator.Kind.Sprint, region = region };
         lastMap = map;
         gameObject.SetActive(false);
         onUse?.Invoke(generated);

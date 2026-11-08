@@ -39,6 +39,54 @@ public class MapPlayArea
         }
     }
 
+    MapPlayArea() { }
+
+    // The part of this area inside a polygon the player drew (corners in grid coordinates, x = column, y = row),
+    // at least marginMeters inside its edge. Controls then stay inside it; the routes between them may still leave it.
+    public MapPlayArea Within(IList<Vector2> gridPolygon, float marginMeters)
+    {
+        MapPlayArea area = new MapPlayArea { Rows = Rows, Cols = Cols, CellMeters = CellMeters };
+        // The same rule as an out-of-bounds area: the cells whose centre is inside, and the cells the edge runs through
+        float[,] mark = new float[Rows, Cols];
+        for (int i = 0; i < Rows; i++)
+            for (int j = 0; j < Cols; j++)
+                mark[i, j] = 1f;
+        ForbiddenRaster.Close(mark, gridPolygon, false);
+        bool[,] outsideDrawn = new bool[Rows, Cols];
+        for (int i = 0; i < Rows; i++)
+            for (int j = 0; j < Cols; j++)
+                outsideDrawn[i, j] = mark[i, j] > 0f;
+        int[,] toDrawnEdge = area.Distance(outsideDrawn);
+        int margin = Mathf.Max(0, Mathf.RoundToInt(marginMeters / CellMeters));
+
+        area.distanceToOutside = new int[Rows, Cols];
+        bool[,] candidate = new bool[Rows, Cols];
+        for (int i = 0; i < Rows; i++)
+            for (int j = 0; j < Cols; j++)
+            {
+                area.distanceToOutside[i, j] = Math.Min(distanceToOutside[i, j], toDrawnEdge[i, j]);
+                candidate[i, j] = playable[i, j] && toDrawnEdge[i, j] > margin;
+            }
+        area.playable = area.Largest(candidate, (i, j) => true);
+        for (int i = 0; i < Rows; i++)
+            for (int j = 0; j < Cols; j++)
+                if (area.playable[i, j]) area.cells.Add(new Vector2Int(j, i));
+        return area;
+    }
+
+    // The longest distance across the area in metres (the diagonal of the box round it)
+    public float SpanMeters()
+    {
+        if (cells.Count == 0) return 0f;
+        int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
+        foreach (Vector2Int c in cells)
+        {
+            minX = Math.Min(minX, c.x); maxX = Math.Max(maxX, c.x);
+            minY = Math.Min(minY, c.y); maxY = Math.Max(maxY, c.y);
+        }
+        return Mathf.Sqrt((maxX - minX) * (maxX - minX) + (maxY - minY) * (maxY - minY)) * CellMeters;
+    }
+
     public MapPlayArea(MapGrid grid, float cellMeters, bool sprint)
     {
         Rows = grid.Rows;
@@ -253,6 +301,9 @@ public static class CourseGenerator
         public int controls = 12;
         public int seed;
         public bool barriers;   // sprint: out-of-bounds barriers that close the obvious straight way on some legs
+        // The part of the map the player drew round (map coordinates); null or fewer than 3 corners: the whole map
+        public List<CoursePoint> region;
+        public bool HasRegion => region != null && region.Count >= 3;
     }
 
     public class Result
@@ -322,6 +373,25 @@ public static class CourseGenerator
         {
             return new Result { error = "This map has no area to lay a course on." };
         }
+        string lengthText = (length / 1000f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " km";
+        string tooSmall = "The area you drew is too small for a " + lengthText + " course with " + controls
+                          + " controls. Draw a bigger area, or choose a shorter course or fewer controls.";
+        if (settings.HasRegion)
+        {
+            area = area.Within(ToGrid(map, settings.region), settings.kind == Kind.Sprint ? RegionMarginSprint : RegionMarginForest);
+            if (area.cells.Count == 0)
+            {
+                return new Result { error = "The area you drew has no ground a course can use. Draw it over the map, round open ground, paths or forest." };
+            }
+            // Quick checks before trying: every control needs room of its own, and the legs must fit across the area
+            float spacing = settings.kind == Kind.Sprint ? SprintMinControlSpacing : MinControlSpacing;
+            float squareMeters = area.cells.Count * area.CellMeters * area.CellMeters;
+            float averageLeg = length / (controls + 1);
+            if (squareMeters < (controls + 2) * spacing * spacing * 1.2f || area.SpanMeters() < averageLeg * 0.9f)
+            {
+                return new Result { error = tooSmall };
+            }
+        }
 
         System.Random random = new System.Random(settings.seed);
         AStarPathfinder pathfinder = new AStarPathfinder(grid.speed, grid.slopes);
@@ -385,7 +455,25 @@ public static class CourseGenerator
             if (best.routeChoiceLegs >= Mathf.CeilToInt(GoodShare * best.legCount) || choices.OutOfTime) return WithBarriers(map, grid, best, settings);
         }
         if (best != null) return WithBarriers(map, grid, best, settings);
+        if (settings.HasRegion) return new Result { error = "Could not fit a " + lengthText + " course with " + controls + " controls in the area you drew. Draw a bigger area, or choose a shorter course or fewer controls." };
         return new Result { error = "Could not make a course with these settings. Try a shorter course or fewer controls." };
+    }
+
+    // Controls stay this far inside the edge of a drawn area, so their circles are inside it too
+    const float RegionMarginForest = 25f;
+    const float RegionMarginSprint = 8f;
+
+    // Map coordinates to grid coordinates (cell j spans j to j + 1)
+    static List<Vector2> ToGrid(MapDefinition map, List<CoursePoint> points)
+    {
+        float cs = map.CellSize;
+        List<Vector2> grid = new List<Vector2>();
+        foreach (CoursePoint p in points)
+        {
+            Vector3 w = map.ToWorld(p);
+            grid.Add(new Vector2(w.x / cs + map.cols / 2f, w.y / cs + map.rows / 2f));
+        }
+        return grid;
     }
 
     const double BarrierBudgetSeconds = 10.0;
@@ -514,13 +602,14 @@ public static class CourseGenerator
         int blockedRadius = Mathf.Max(1, Mathf.RoundToInt((sprint ? 20f : 50f) / area.CellMeters));
         float blockedWeight = sprint ? 0.5f : 1.5f;   // houses are everywhere on a sprint map
 
-        // Start somewhere with room around it
+        // Start somewhere with room around it (in a small drawn area: with as much room as there is)
         CoursePoint start = default;
         bool found = false;
-        for (int tries = 0; tries < 200 && !found; tries++)
+        for (int tries = 0; tries < 400 && !found; tries++)
         {
             Vector2Int cell = area.cells[random.Next(area.cells.Count)];
-            if (area.MetersToOutside(cell) < startRoom || !OpenAround(area, cell)) continue;
+            float room = tries < 200 ? startRoom : tries < 300 ? startRoom / 3f : 0f;
+            if (area.MetersToOutside(cell) < room || !OpenAround(area, cell)) continue;
             start = CellCenter(map, cell);
             found = true;
         }
@@ -540,11 +629,14 @@ public static class CourseGenerator
             bool homeward = legIndex >= legs.Count / 2;
 
             List<(double score, CoursePoint point)> options = new List<(double, CoursePoint)>();
-            for (int k = 0; k < 40; k++)
+            // 40 directions at the planned length; when none of them fits (a small drawn area, or a map with little
+            // open ground) up to 160 more, with the leg up to a quarter shorter or longer
+            for (int k = 0; k < 200 && (k < 40 || options.Count == 0); k++)
             {
                 double turn = (random.NextDouble() * 2 - 1) * Math.PI * 0.85; // not straight back
                 double angle = heading + turn;
-                CoursePoint p = new CoursePoint(from.e + Math.Cos(angle) * leg, from.n + Math.Sin(angle) * leg);
+                double reach = k < 40 ? leg : leg * Range(random, 0.75f, 1.25f);
+                CoursePoint p = new CoursePoint(from.e + Math.Cos(angle) * reach, from.n + Math.Sin(angle) * reach);
                 Vector2Int cell = map.ToCell(p);
                 // Never right at the edge of a building, plot or fence: the runner must be able to stand there and
                 // the line drawn from it must start on open ground
