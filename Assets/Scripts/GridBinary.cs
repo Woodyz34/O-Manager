@@ -42,6 +42,7 @@ public static class GridBinary
         gridData = null;
         speedGrid = null;
         slopeFactors = null;
+        LastHeights = null;
 
         try
         {
@@ -122,6 +123,8 @@ public static class GridBinary
     }
     // Version 2 is written by the map import (MapImport/MapPackageBuilder.cs): speed and ground height per cell.
     // The uphill/downhill factors are worked out here from the heights with TerrainSpeedModel.
+    // Ground height per cell (metres) of the last map package grid read, or null when it has none
+    public static float[,] LastHeights;
     static readonly string[] directionNames = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
     static readonly int[] directionX = { 0, 1, 1, 1, 0, -1, -1, -1 };
     static readonly int[] directionY = { 1, 1, 0, -1, -1, -1, 0, 1 };
@@ -145,6 +148,8 @@ public static class GridBinary
         float[,] height = new float[rows, cols];
         offset = (int)reader.BaseStream.Position;
         Buffer.BlockCopy(bytes, offset, height, 0, count * sizeof(float));
+        // Kept for the forest mistakes (hills, reading the contours, seeing further from high ground)
+        LastHeights = hasHeights ? height : null;
 
         slopeFactors = new Dictionary<string, float[,]>(8);
         for (int d = 0; d < 8; d++)
