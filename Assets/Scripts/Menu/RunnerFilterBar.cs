@@ -367,7 +367,7 @@ public class RunnerFilterBar : MonoBehaviour
         if (reversed) result = -result;
         if (result == 0 && (sortBy == SortBy.Club || sortBy == SortBy.Country))
         {
-            result = (b.speed + b.technique).CompareTo(a.speed + a.technique);
+            result = RunnerCards.OverallExact(b).CompareTo(RunnerCards.OverallExact(a));
         }
         return result != 0 ? result : string.Compare(a.RunnerName, b.RunnerName, StringComparison.OrdinalIgnoreCase);
     }

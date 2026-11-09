@@ -188,6 +188,31 @@ public class GeoJsonSpawner : MonoBehaviour
             if (polygonGeoJsonFile != null && spawnPolygons) files.Add(polygonGeoJsonFile.bytes);
         }
 
+        // The forest mistakes need every point and line object in metres, without rounding to the cell
+        MapFeatureIndex.Clear();
+        {
+            var indexFiles = new List<byte[]>();
+            if (map != null && !string.IsNullOrEmpty(map.pointsPath) && pathfindingManager.jsonFileName == map.gridName + ".json")
+                indexFiles.AddRange(files);
+            else
+            {
+                if (pointGeoJsonFile != null) indexFiles.Add(pointGeoJsonFile.bytes);
+                if (lineGeoJsonFile != null) indexFiles.Add(lineGeoJsonFile.bytes);
+            }
+            var indexMap = new MapFeatureIndex.Mapping
+            {
+                rows = mapping.rows, cols = mapping.cols, cellSize = mapping.cellSize,
+                minx = mapping.minx, miny = mapping.miny, maxx = mapping.maxx, maxy = mapping.maxy
+            };
+            float metresPerUnit = pathfindingManager.gridData != null && pathfindingManager.cellSize > 0f
+                ? pathfindingManager.gridData.grid_size / pathfindingManager.cellSize : 100f;
+            Task.Run(() =>
+            {
+                try { MapFeatureIndex.Build(indexFiles, indexMap, metresPerUnit); }
+                catch (System.Exception e) { Debug.LogError("MapFeatureIndex: " + e); }
+            });
+        }
+
         var tasks = new List<Task<List<ParsedFeature>>>();
         foreach (byte[] file in files)
         {

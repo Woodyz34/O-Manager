@@ -7,12 +7,22 @@ public enum RunnerTier { Bronze, Silver, Gold, Elite }
 // Change the limits and colours here and every screen follows.
 public static class RunnerCards
 {
-    // A runner's tier comes from their overall rating (the average of speed and technique).
-    // Set from the Eventor points 2026-11-02 (634 runners, technique 2 points per mistake minute
-    // per 100 controls): Elite about the top 8 %, Gold the next 15 %, Silver the next 26 %, Bronze the rest.
-    public const int EliteFrom = 92;
-    public const int GoldFrom = 87;
-    public const int SilverFrom = 79;
+    // A runner's tier comes from their overall rating (80 % speed, 20 % technique, see Overall).
+    // Set again 2026-11-09 for the 80/20 overall (978 runners in packs): Elite about the top 8 %,
+    // Gold the next 15 %, Silver the next 26 %, Bronze the rest.
+    public const int EliteFrom = 88;
+    public const int GoldFrom = 82;
+    public const int SilverFrom = 73;
+
+    // Speed counts four times as much as technique (user's choice 2026-11-09). One point of speed costs about
+    // 1.8 s per control at speed 75 (legs of about 125 s for a speed-100 runner), one point of technique 0.3 s
+    // (2 points per mistake minute per 100 controls): 6 to 8 times as much. 80/20 ranks the cards almost exactly
+    // as the expected race time does and still lets technique count.
+    public const float SpeedWeight = 0.8f;
+    public static float OverallExact(CardData card)
+    {
+        return SpeedWeight * card.speed + (1f - SpeedWeight) * card.technique;
+    }
 
     public static List<CardData> All()
     {
@@ -44,7 +54,7 @@ public static class RunnerCards
 
     public static int Overall(CardData card)
     {
-        return Mathf.FloorToInt((card.speed + card.technique) / 2f + 0.5f);
+        return Mathf.FloorToInt(OverallExact(card) + 0.5f);
     }
 
     public static RunnerTier Tier(CardData card)

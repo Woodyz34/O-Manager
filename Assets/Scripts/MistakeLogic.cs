@@ -32,6 +32,13 @@ public class MistakeLogic : MonoBehaviour
             runnerDetector.shouldMiss = false;
             return;
         }
+        // Forest mistakes are made by ForestMistakes now (direction and parallel errors, reading in on the map),
+        // once the map's objects are read. Until then (the first seconds of a race) the old logic stands in.
+        if (MapFeatureIndex.Ready)
+        {
+            runnerDetector.shouldMiss = false;
+            return;
+        }
         if (runnerDetector.cantBäckMiss || runnerDetector.cantStigMiss || runnerDetector.cantBeståndsgränsMiss)
         {
             return;

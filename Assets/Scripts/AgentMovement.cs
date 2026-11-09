@@ -98,7 +98,13 @@ public class AgentMovement : NetworkBehaviour
     [HideInInspector] public bool relayHold = false;
     // Game modes: the runner stands still for a moment (scared by a bear). The clock keeps running.
     [HideInInspector] public bool modeHold = false;
-    public bool IsMissing => isAngleMissing || isDrawMissing || isMissingControl;
+    public bool IsMissing => isAngleMissing || isDrawMissing || isMissingControl || (forestMistakes != null && forestMistakes.Active);
+
+    // Forest mistakes (Mistakes/ForestMistakes.cs): direction errors, parallel errors and reading in on the map
+    [HideInInspector] public ForestMistakes forestMistakes;
+    public Vector3 CurrentControlPosition => pathfindingManager.controlPoints[currentKontroll].position;
+    public float UnscaledBaseSpeed => unscaledBaseSpeed > 0f ? unscaledBaseSpeed : baseSpeed;
+    bool ForestMistakesApply => useManualPath && !AI && !(packRunning != null && packRunning.IsHanging);
 
 
     private static System.Random random = new System.Random();
@@ -364,6 +370,25 @@ public class AgentMovement : NetworkBehaviour
             return;
         }
         lastGridCell = path[0];
+        if (forestMistakes == null) forestMistakes = new ForestMistakes(this);
+        forestMistakes.StartLeg();
+    }
+
+    // A path the forest mistakes picked (wrong direction, searching, back to the control). Keeps the mistake state.
+    public void SetMistakePath(List<Vector2Int> newPath)
+    {
+        if (newPath == null || newPath.Count == 0) return;
+        path = newPath;
+        while (path.Count > 1 && !OpenCell(path[0])) path.RemoveAt(0);
+        ComputeTurns();
+        currentTargetIndex = 0;
+        currentTargetPosition = GridToWorldPosition(path[0]);
+        lastGridCell = path[0];
+    }
+
+    public IEnumerator FindPathAsync(Vector2Int start, Vector2Int goal, Action<List<Vector2Int>> onPathReady)
+    {
+        return CalculatePathAsync(start, goal, onPathReady, false);
     }
 
     void Update()
@@ -421,7 +446,8 @@ public class AgentMovement : NetworkBehaviour
             // sist i vägen så att löparen springer den sista biten i stället för att bli stående.
             if (useManualPath && path != null && path.Count > 0 && currentTargetIndex >= path.Count
                 && !isWaiting && !isAngleMissing && !manualPathDrawer.isDrawing && canRunNextSegment
-                && !(packRunning != null && packRunning.IsHanging))
+                && !(packRunning != null && packRunning.IsHanging)
+                && !(forestMistakes != null && forestMistakes.Blocking))
             {
                 Vector2Int controlCell = WorldToGridPositionCentered(pathfindingManager.controlPoints[currentKontroll].position);
                 if (path[path.Count - 1] != controlCell)
@@ -591,6 +617,12 @@ public class AgentMovement : NetworkBehaviour
                 if ((currentTargetIndex < path.Count) && useManualPath)
                     nextGrid = path[currentTargetIndex];
 
+                // Off the plan (a forest mistake): no flag here, the mistake logic decides what comes next
+                else if (useManualPath && forestMistakes != null && forestMistakes.Blocking)
+                {
+                    forestMistakes.OnPathEnd();
+                    return;
+                }
                 // Kontrollpunkter
                 else if ((controlDistance <= 0.3f))
                 {
@@ -740,6 +772,10 @@ public class AgentMovement : NetworkBehaviour
             if (dirVector.sqrMagnitude > 0.001f)
             {
                 transform.up = dirVector;   // eller transform.right = dirVector;
+            }
+            if (forestMistakes != null && ForestMistakesApply)
+            {
+                forestMistakes.Tick(pos, transform.position);
             }
         }
         else
