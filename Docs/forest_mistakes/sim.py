@@ -50,7 +50,7 @@ class Leg:
             rr, cc = np.where(np.isfinite(s.cum[max(0,rc[0]-5):rc[0]+6, max(0,rc[1]-5):rc[1]+6]))
             if len(rr)==0: return [p, s.b]
             k = np.argmin((rr-5)**2+(cc-5)**2); rc = (max(0,rc[0]-5)+rr[k], max(0,rc[1]-5)+cc[k])
-        tb = s.m.traceback(rc)
+        tb = s.m.traceback(rc)[::-1]
         pts = [cpos(t) for t in tb]
         return [np.array(p,float)] + pts[1:-1] + [s.b.copy()]
 

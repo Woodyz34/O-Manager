@@ -57,7 +57,7 @@ def tpath(a, b, margin=25):
         cum, _ = m.find_costs([(rb[0]-r0, rb[1]-c0)])
         st = (ra[0]-r0, ra[1]-c0)
         if np.isfinite(cum[st]):
-            tb = m.traceback(st)
+            tb = m.traceback(st)[::-1]
             pts = [np.array([MINX+(c+c0)*CELL, MINY+(r+r0)*CELL]) for r, c in tb]
             return [np.array(a, float)] + pts[1:] if len(pts) > 1 else [np.array(a, float), pts[0]]
     return [np.array(a, float)]
@@ -72,7 +72,7 @@ def sight(p, q, c):
     return base * float(np.clip(1 + dh/8.0, 0.6, 2.5))
 
 class Runner:
-    H0 = 1/4500.0
+    H0 = 1/2300.0
     def __init__(s, leg, tech, speed=80, rng=None):
         s.leg, s.s, s.P = leg, tech/100.0, speed
         s.rng = rng or random.Random()
@@ -207,7 +207,7 @@ class Runner:
                 left = np.hypot(*(leg.b - s.pos))
                 diff = 0.6 + max(0.0, 1.2 - readability(s.pos)/3.0)
                 near = 2.5 if left < 70 else 1.0
-                if s.rng.random() < 2.0*(s.H0*(1-s.s)**0.4*diff*near + 1/250000):
+                if s.rng.random() < 2.0*(s.H0*(1-s.s)**0.15*diff*near + 1/250000):
                     bad = 1 - s.s
                     a = math.radians(min(2 + 18*bad + abs(s.rng.gauss(0,1))*(3 + 8*bad), 4 + 36*bad)) * s.rng.choice((-1,1))
                     k = 1 + s.rng.gauss(0, 0.03 + 0.09*bad)

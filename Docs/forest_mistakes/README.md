@@ -12,3 +12,6 @@ Needs numpy, scipy, scikit-image and Pillow. Reads the Illern 2025 map package.
 
 ## v4 (2026-11-09)
 sim4.py: right/wrong feature by id (road side), overshoot 1.15-1.5x, direction error max 40 deg at technique 0, loose look-round loop on ground like the control (replaces the spiral), lost search spreads out (40 m min step, 70 m visited) and prefers ground like the control. Calibration N=25: T0 32, T60 13, T80 3.4, T90 1.5 s/control.
+
+## v5 (2026-11-09)
+Bug fix: skimage traceback returns the path from the cost source to the point, so every simulated path was reversed (jump straight to the target, then walk back). That made the star shapes, straight lines and olive crossings in v2-v4 images. The game uses its own A*, so it never had this bug. Recalibrated: H0 1/2300, hazard (1-skill)^0.15. Runner stops 3.5 s when it relocates.

@@ -27,7 +27,7 @@ public class ForestMistakes
 {
     enum Mode { Route, Drift, Circle, Lost, Safe }
 
-    const float H0 = 1f / 4500f;           // direction errors per metre at technique 0 in average ground
+    const float H0 = 1f / 2300f;           // direction errors per metre at technique 0 in average ground
     const float RealSpeed100 = 3.6f;       // m/s on speed-1 ground for a speed-100 runner in the real world
 
     readonly AgentMovement agent;
@@ -117,7 +117,7 @@ public class ForestMistakes
                     float left = Vector2.Distance(pos, Control);
                     float diff = 0.6f + Mathf.Max(0f, 1.2f - MapFeatureIndex.Readability(pos) / 3f);
                     float nearControl = left < 70f ? 2.5f : 1f;
-                    float perMetre = H0 * Mathf.Pow(1f - skill, 0.4f) * diff * nearControl + 1f / 250000f;
+                    float perMetre = H0 * Mathf.Pow(1f - skill, 0.15f) * diff * nearControl + 1f / 250000f;
                     if (Rand() < perMetre * d) DirectionError();
                 }
                 return;
@@ -492,7 +492,9 @@ public class ForestMistakes
     {
         Log("vet var den är");
         U = 8f; sinceFix = 0f;
-        ToControl();
+        // Stop for a few seconds of the runner's time ("now I see, I'm over here"), then run the right way
+        if (mode != Mode.Route) Run(PauseThen(3.5f, ToControl));
+        else ToControl();
     }
 
     void ToControl()
