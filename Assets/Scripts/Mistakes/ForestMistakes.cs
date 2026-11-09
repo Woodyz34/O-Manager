@@ -207,8 +207,25 @@ public class ForestMistakes
             if (seen.TryGetValue(key, out float at) && at > travel - 120f) continue;
             seen[key] = travel;
             float c = smp[j].clarity;
-            // A road junction, or a road by houses and gardens: you know exactly where you are
+            // A road by houses and gardens, or a junction that is the only one round here or has something clear by it:
+            // you know exactly where you are
             if (smp[j].roadSure && mode != Mode.Route) { Fix(); return; }
+            // Another junction: which one of the junctions round here is it?
+            if (smp[j].junction && mode != Mode.Route)
+            {
+                var jc = new List<Vector2>(); var jid = new List<long>(); var have = new HashSet<long>();
+                MapFeatureIndex.QuerySamples(Belief, U + 60f, near);
+                foreach (int k in near.ToArray())
+                {
+                    if (!smp[k].junction) continue;
+                    long cl = JunctionKey(smp[k].p);
+                    if (have.Add(cl)) { jc.Add(smp[k].p); jid.Add(cl); }
+                }
+                long trueCl = JunctionKey(smp[j].p);
+                if (!have.Contains(trueCl)) { jc.Add(smp[j].p); jid.Add(trueCl); }
+                if (Resolve(jc, jid, trueCl, smp[j].p, 0.9f, 25f, false)) return;
+                continue;
+            }
             if (!Noticed(c, boost * 1.1f)) continue;
             bool distinct = smp[j].distinct && Rand() < 0.4f + 0.5f * skill;
             var best = new Dictionary<int, (float, Vector2)>();
@@ -494,6 +511,8 @@ public class ForestMistakes
         Observe(1.5f);
         if (mode == Mode.Lost) NextLostTarget();
     }
+
+    static long JunctionKey(Vector2 p) => ((long)Mathf.FloorToInt(p.x / 30f) << 32) ^ (uint)Mathf.FloorToInt(p.y / 30f);
 
     void Fix()
     {

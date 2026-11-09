@@ -12,7 +12,7 @@ using UnityEngine;
 public static class MapFeatureIndex
 {
     public struct Point { public Vector2 p; public int group; public float clarity; public float unique; }
-    public struct Sample { public Vector2 p; public int line; public int group; public float clarity; public bool distinct; public bool roadSure; }
+    public struct Sample { public Vector2 p; public int line; public int group; public float clarity; public bool distinct; public bool roadSure; public bool junction; }
     // The edge of ground nobody can enter (houses, gardens, olive green, lakes): clear to see.
     // small = a house or a plot, which has a shape of its own; the map edge or a big lake does not.
     public struct AreaEdge { public Vector2 p; public int area; public bool small; public int size; }
@@ -179,11 +179,12 @@ public static class MapFeatureIndex
             readability.Clear();
             BuildGround(speedGrid, heightGrid, map.cellSize * mpu);
             BuildSides(smp);
-            // Places on a road you are 100 % sure of: a crossing road or big path, or houses and gardens right by it
+            // Places on a road you are 100 % sure of: houses and gardens right by it, or a junction that is the only
+            // one round here or has something clear right by it. Other junctions can be mixed up with each other.
             for (int i = 0; i < smp.Count; i++)
             {
                 if (!IsRoad(smp[i].group)) continue;
-                bool sure = false;
+                bool sure = false, junction = false;
                 Vector2 ti = Tangent(smp, i);
                 QuerySamples(smp[i].p, 12f, near);
                 foreach (int j in near)
@@ -191,14 +192,25 @@ public static class MapFeatureIndex
                     if (smp[j].line == smp[i].line || !(IsRoad(smp[j].group) || smp[j].group == 505)) continue;
                     Vector2 tj = Tangent(smp, j);
                     // not the other edge line of the same road
-                    if (ti != Vector2.zero && tj != Vector2.zero && Mathf.Abs(Vector2.Dot(ti, tj)) < 0.8f) { sure = true; break; }
+                    if (ti != Vector2.zero && tj != Vector2.zero && Mathf.Abs(Vector2.Dot(ti, tj)) < 0.8f) { junction = true; break; }
                 }
-                if (!sure)
+                QueryAreas(smp[i].p, 25f, near);
+                foreach (int j in near) if (areas[j].size < 300) { sure = true; break; }
+                if (junction && !sure)
                 {
-                    QueryAreas(smp[i].p, 25f, near);
-                    foreach (int j in near) if (areas[j].size < 300) { sure = true; break; }
+                    QueryPoints(smp[i].p, 15f, near);
+                    foreach (int j in near) if (pts[j].clarity >= 0.6f) { sure = true; break; }
                 }
-                if (sure) { Sample q = smp[i]; q.roadSure = true; smp[i] = q; }
+                if (sure || junction) { Sample q = smp[i]; q.roadSure = sure; q.junction = junction; smp[i] = q; }
+            }
+            // A junction with no other junction within 300 m: you know which one it is
+            for (int i = 0; i < smp.Count; i++)
+            {
+                if (!smp[i].junction || smp[i].roadSure) continue;
+                QuerySamples(smp[i].p, 300f, near);
+                bool other = false;
+                foreach (int j in near) if (smp[j].junction && (smp[j].p - smp[i].p).sqrMagnitude > 40f * 40f) { other = true; break; }
+                if (!other) { Sample q = smp[i]; q.roadSure = true; smp[i] = q; }
             }
             // A place on a line next to a house or a plot is one you can be sure of too
             for (int i = 0; i < smp.Count; i++)

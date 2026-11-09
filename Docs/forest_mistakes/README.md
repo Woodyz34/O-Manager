@@ -21,3 +21,6 @@ sim5.py: roads split the map into sides (you always notice crossing a road): can
 
 ## v7 (2026-11-09)
 Road junctions (with another road or big path, not the other edge line of the same road) and roads by houses/gardens (closed areas < 300 cells within 25 m) give a 100 % sure fix (Sample.roadSure).
+
+## v8 (2026-11-09, C# only)
+Junctions are sure only when no other junction lies within 300 m or a clear point (clarity >= 0.6) is within 15 m; otherwise the runner picks among the junctions near where it thinks it is (parallel error possible). Roads by houses stay sure.
