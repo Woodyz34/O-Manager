@@ -27,7 +27,7 @@ public class ForestMistakes
 {
     enum Mode { Route, Drift, Circle, Lost, Safe }
 
-    const float H0 = 1f / 3500f;           // direction errors per metre at technique 0 in average ground
+    const float H0 = 1f / 4500f;           // direction errors per metre at technique 0 in average ground
     const float RealSpeed100 = 3.6f;       // m/s on speed-1 ground for a speed-100 runner in the real world
 
     readonly AgentMovement agent;
@@ -38,6 +38,7 @@ public class ForestMistakes
     float U = 8f;                          // how unsure the runner is of its place, metres
     float sinceFix, runSinceAim, expect, travel, lostMetres, doubt, doubtNeeded, circleSimilarity, nextContour, lostTurn = 1f;
     Vector2 lostCentre;
+    Dictionary<int, int> controlSignature = new Dictionary<int, int>();
     readonly List<Vector2> visited = new List<Vector2>();
     int misses;
     readonly List<long> lostTargets = new List<long>();
@@ -116,13 +117,13 @@ public class ForestMistakes
                     float left = Vector2.Distance(pos, Control);
                     float diff = 0.6f + Mathf.Max(0f, 1.2f - MapFeatureIndex.Readability(pos) / 3f);
                     float nearControl = left < 70f ? 2.5f : 1f;
-                    float perMetre = H0 * Mathf.Pow(1f - skill, 0.5f) * diff * nearControl + 1f / 250000f;
+                    float perMetre = H0 * Mathf.Pow(1f - skill, 0.4f) * diff * nearControl + 1f / 250000f;
                     if (Rand() < perMetre * d) DirectionError();
                 }
                 return;
             case Mode.Drift:
                 U = Mathf.Min(60f, 12f + 0.18f * sinceFix);
-                if (runSinceAim > (1.15f + 0.15f * (1f - skill)) * expect + 20f)
+                if (runSinceAim > (1.15f + 0.35f * (1f - skill)) * expect + 20f)
                 {
                     Surprise("har sprungit för långt");
                     GoLost();
@@ -136,7 +137,7 @@ public class ForestMistakes
             case Mode.Lost:
             case Mode.Safe:
                 lostMetres += d; U = Mathf.Min(80f, U + 0.075f * d);
-                if (visited.Count == 0 || Vector2.Distance(visited[visited.Count - 1], pos) > 20f) visited.Add(pos);
+                if (visited.Count == 0 || Vector2.Distance(visited[visited.Count - 1], pos) > 25f) visited.Add(pos);
                 Observe(1.5f);
                 return;
         }
@@ -149,7 +150,7 @@ public class ForestMistakes
         switch (mode)
         {
             case Mode.Drift: AtEmptySite(); break;
-            case Mode.Circle: GoLost(); break;
+            case Mode.Circle: NextLookStop(); break;
             case Mode.Lost:
                 Run(ReadAndGoOn());
                 break;
@@ -164,7 +165,8 @@ public class ForestMistakes
     {
         // Good runners make small direction errors, poor ones can be far off
         float bad = 1f - skill;
-        float a = (2f + 6f * bad + Mathf.Abs(Gauss()) * (3f + 18f * bad)) * (Rand() < 0.5f ? -1f : 1f);
+        // Technique 0: mostly 20-40 degrees off; technique 99: a few degrees
+        float a = Mathf.Min(2f + 18f * bad + Mathf.Abs(Gauss()) * (3f + 8f * bad), 4f + 36f * bad) * (Rand() < 0.5f ? -1f : 1f);
         float k = 1f + Gauss() * (0.03f + 0.09f * bad);
         Vector2 toControl = Control - Pos;
         float rad = a * Mathf.Deg2Rad, cos = Mathf.Cos(rad), sin = Mathf.Sin(rad);
@@ -191,10 +193,10 @@ public class ForestMistakes
             if (seen.TryGetValue(key, out float at) && at > travel - 200f) continue;
             seen[key] = travel;
             if (!Noticed(c, boost)) continue;
-            var cands = new List<Vector2>();
+            var cands = new List<Vector2>(); var ids = new List<long>();
             MapFeatureIndex.QueryPoints(Belief, U + 25f, near);
-            foreach (int k in near) if (pts[k].group == pts[j].group) cands.Add(pts[k].p);
-            if (Resolve(cands, pts[j].p, c, 10f, false)) return;
+            foreach (int k in near) if (pts[k].group == pts[j].group) { cands.Add(pts[k].p); ids.Add(k); }
+            if (Resolve(cands, ids, j, pts[j].p, c, 10f, false)) return;
         }
         // Paths, streams, fences ... when you cross or run along them
         var smp = MapFeatureIndex.samples;
@@ -216,9 +218,9 @@ public class ForestMistakes
                 float dd = (smp[k].p - bel).sqrMagnitude;
                 if (!best.TryGetValue(smp[k].line, out var b) || dd < b.Item1) best[smp[k].line] = (dd, smp[k].p);
             }
-            var cands = new List<Vector2>();
-            foreach (var b in best.Values) cands.Add(b.Item2);
-            if (Resolve(cands, smp[j].p, c, 10f, false)) return;
+            var cands = new List<Vector2>(); var ids = new List<long>();
+            foreach (var b in best) { cands.Add(b.Value.Item2); ids.Add(b.Key); }
+            if (Resolve(cands, ids, smp[j].line, smp[j].p, c, 10f, false)) return;
         }
         // Houses, gardens, olive green, lakes: hard to miss
         var areas = MapFeatureIndex.areas;
@@ -240,10 +242,10 @@ public class ForestMistakes
                 float dd = (areas[k].p - bel).sqrMagnitude;
                 if (!best.TryGetValue(areas[k].area, out var b) || dd < b.Item1) best[areas[k].area] = (dd, areas[k].p);
             }
-            var cands = new List<Vector2>();
-            foreach (var b in best.Values) cands.Add(b.Item2);
+            var cands = new List<Vector2>(); var ids = new List<long>();
+            foreach (var b in best) { cands.Add(b.Value.Item2); ids.Add(b.Key); }
             // Matching it to the right house or plot puts you within about 25 m
-            if (Resolve(cands, areas[j].p, 0.9f, 25f, false)) return;
+            if (Resolve(cands, ids, areas[j].area, areas[j].p, 0.9f, 25f, false)) return;
             break;
         }
         // Big hills: you feel when you are on the top of one
@@ -255,10 +257,10 @@ public class ForestMistakes
             if (seen.TryGetValue(key, out float at) && at > travel - 300f) continue;
             seen[key] = travel;
             if (!Noticed(hills[j].clarity, boost * 1.3f)) continue;
-            var cands = new List<Vector2>();
+            var cands = new List<Vector2>(); var ids = new List<long>();
             Vector2 bel = Belief;
-            foreach (var h in hills) if (Vector2.Distance(h.p, bel) < U + 80f) cands.Add(h.p);
-            if (Resolve(cands, hills[j].p, hills[j].clarity, hills[j].size + 10f, true)) return;
+            for (int h = 0; h < hills.Count; h++) if (Vector2.Distance(hills[h].p, bel) < U + 80f) { cands.Add(hills[h].p); ids.Add(h); }
+            if (Resolve(cands, ids, j, hills[j].p, hills[j].clarity, hills[j].size + 10f, true)) return;
         }
         // Reading the contours as you go: works in hilly ground, for good runners
         if (travel >= nextContour)
@@ -275,7 +277,7 @@ public class ForestMistakes
     // Seen something at truePos: which one on the map is it? Returns true when the runner changed its mind.
     // tol: how close the right match puts you (a stone: 10 m, a house: 25 m). hill: the right hill only says
     // roughly where you are, so you aim from its top.
-    bool Resolve(List<Vector2> cands, Vector2 truePos, float clarity, float tol, bool hill)
+    bool Resolve(List<Vector2> cands, List<long> ids, long trueId, Vector2 truePos, float clarity, float tol, bool hill)
     {
         if (mode == Mode.Route) return false;
         float frac = runSinceAim / Mathf.Max(expect, 1f);
@@ -298,7 +300,7 @@ public class ForestMistakes
         {
             w[i] = Mathf.Exp(-(cands[i] - bel).sqrMagnitude / (2f * u * u)) + 1e-12f;
             // Reading the detail round it: the right one gets a bonus that grows with technique
-            if (Vector2.Distance(cands[i], truePos) < 1f) w[i] *= 1f + 8f * skill;
+            if (ids[i] == trueId) w[i] *= 1f + 8f * skill;
             sum += w[i];
         }
         for (int i = 0; i < w.Length; i++) { w[i] /= sum; max = Mathf.Max(max, w[i]); }
@@ -310,15 +312,16 @@ public class ForestMistakes
             return false;
         }
         Vector2 chosen = cands[pick];
-        bool right = Vector2.Distance(chosen, truePos) < 1f;
-        if (right && !hill && Vector2.Distance(chosen, pos) < tol)
+        bool right = ids[pick] == trueId;
+        if (right && !hill && Vector2.Distance(truePos, pos) < tol && Vector2.Distance(chosen, truePos) < tol)
         {
             Fix();
             return true;
         }
         if (right)
         {
-            // The right hill (or a big area), but not exactly where on it: aim from its middle
+            // The right hill, road or area, but not exactly where on it (you know which side of the road you are):
+            // aim from the place on it you think you are
             Log("vet ungefär var den är");
             U = 20f; sinceFix = 0f; mode = Mode.Drift;
             SetAim(pos + (Control - chosen));
@@ -331,6 +334,8 @@ public class ForestMistakes
         return true;
     }
 
+    readonly List<Vector2> lookStops = new List<Vector2>();
+
     void AtEmptySite()
     {
         misses++;
@@ -338,21 +343,38 @@ public class ForestMistakes
         Surprise($"ingen skärm här (likhet med kontrollområdet {circleSimilarity:F2})");
         lostBelief = Belief;
         if (circleSimilarity <= 0.3f) { Run(PauseThen(2f + 5f * (1f - skill), GoLost)); return; }
-        // Looks like the control's ground: look round here in a widening loop while what you see still fits
+        // Looks like the control's ground: look round here, a loose loop of 4-5 stops 25-45 m out on ground like
+        // the control's (green, open ...), while what you see still fits
         doubt = 0f; doubtNeeded = 1f + 3f * (1f - skill);
         mode = Mode.Circle;
+        lookStops.Clear();
         Vector2 centre = Pos;
-        float ang = Rand() * 6.28f, rad = 15f, turn = Rand() < 0.5f ? -1f : 1f;
-        var cells = new List<Vector2Int>();
-        while (rad < 60f)
+        float controlSpeed = GroundSpeed(Control), ang = Rand() * 6.28f, turn = Rand() < 0.5f ? -1f : 1f;
+        int stops = Rand() < 0.5f ? 4 : 5;
+        for (int n = 0; n < stops; n++)
         {
-            ang += turn * 2f / rad; rad += 0.25f;
-            Vector2Int c = agent.WorldToGridPositionCentered((centre + rad * new Vector2(Mathf.Cos(ang), Mathf.Sin(ang))) / Mpu);
-            if (agent.pathfindingManager.speedGrid2D[c.y, c.x] <= 0.05f) continue;
-            if (cells.Count == 0 || cells[cells.Count - 1] != c) cells.Add(c);
+            float best = -1f, bestAng = ang; Vector2 bestPoint = centre;
+            for (int t = 0; t < 6; t++)
+            {
+                float a = ang + turn * (0.9f + 0.7f * Rand()), r = 25f + 20f * Rand();
+                Vector2 q = centre + r * new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                float g = GroundSpeed(q);
+                if (g <= 0.05f) continue;
+                float sc = 1f / (1f + Mathf.Abs(g - controlSpeed) * 3f) + 0.3f * Rand();
+                if (sc > best) { best = sc; bestAng = a; bestPoint = q; }
+            }
+            if (best < 0f) break;
+            ang = bestAng; lookStops.Add(bestPoint);
         }
-        if (cells.Count < 2) { GoLost(); return; }
-        Run(PauseThen(2f + 5f * (1f - skill), () => agent.SetMistakePath(cells)));
+        if (lookStops.Count == 0) { GoLost(); return; }
+        Run(PauseThen(2f + 5f * (1f - skill), NextLookStop));
+    }
+
+    void NextLookStop()
+    {
+        if (lookStops.Count == 0 || doubt >= doubtNeeded) { GoLost(); return; }
+        Vector2 next = lookStops[0]; lookStops.RemoveAt(0);
+        PathTo(next);
     }
 
     void CircleDoubt()
@@ -374,6 +396,7 @@ public class ForestMistakes
         if (mode != Mode.Circle && mode != Mode.Lost) lostBelief = Belief;
         mode = Mode.Lost; U = Mathf.Max(U, 50f); lostMetres = 0f; lostTargets.Clear();
         lostCentre = Pos; lostTurn = Rand() < 0.5f ? -1f : 1f;
+        controlSignature = MapFeatureIndex.Signature(Control, 30f);
         visited.Clear(); visited.Add(Pos);
         Run(PauseThen(3f + 10f * (1f - skill), NextLostTarget));
     }
@@ -383,8 +406,8 @@ public class ForestMistakes
     {
         Vector2 pos = Pos;
         float d = Vector2.Distance(q, pos);
-        if (d < 15f) return 0f;
-        for (int i = 0; i < visited.Count; i += 2) if (Vector2.Distance(q, visited[i]) < 35f) return 0f;
+        if (d < 40f) return 0f;
+        for (int i = 0; i < visited.Count; i++) if (Vector2.Distance(q, visited[i]) < 70f) return 0f;
         float f = 1f;
         Vector2 r = pos - lostCentre; float rn = r.magnitude;
         if (rn > 5f)
@@ -392,7 +415,10 @@ public class ForestMistakes
             Vector2 u = (q - pos) / d, out_ = r / rn, tang = new Vector2(-out_.y, out_.x) * lostTurn;
             f = 0.4f + 0.8f * Mathf.Max(0f, Vector2.Dot(u, tang)) + (rn < 80f ? 0.3f * Mathf.Max(0f, Vector2.Dot(u, out_)) : 0f);
         }
-        return value * f / (d + 30f);
+        // The control is in green / open / rocky ground: look in ground like that
+        float like = 1f / (1f + Mathf.Abs(GroundSpeed(q) - GroundSpeed(Control)) * 3f)
+                     + 0.5f * MapFeatureIndex.Similarity(MapFeatureIndex.Signature(q, 30f), controlSignature);
+        return value * f * like / (d + 30f);
     }
 
     void NextLostTarget()

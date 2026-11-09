@@ -9,3 +9,6 @@ Needs numpy, scipy, scikit-image and Pillow. Reads the Illern 2025 map package.
 * `render2.py 28,35,38` draws the pictures (`v2-bom-stracka-*.jpg`).
 
 `sim3.py` is the model the game uses (v3: circling search, houses/olive/lakes and hills as landmarks, contour reading, longer sight in open ground and from high ground). `sim2.py` and `sim.py` are earlier versions; `sim.py` also holds shared parts. Run `calib3.py` and `render3.py` for the current model.
+
+## v4 (2026-11-09)
+sim4.py: right/wrong feature by id (road side), overshoot 1.15-1.5x, direction error max 40 deg at technique 0, loose look-round loop on ground like the control (replaces the spiral), lost search spreads out (40 m min step, 70 m visited) and prefers ground like the control. Calibration N=25: T0 32, T60 13, T80 3.4, T90 1.5 s/control.
