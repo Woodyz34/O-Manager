@@ -8,4 +8,4 @@ Needs numpy, scipy, scikit-image and Pillow. Reads the Illern 2025 map package.
   counted like the Eventor points (a leg is a mistake when > 15 s and > 25 %). Target: 0.3 * (100 - technique) s.
 * `render2.py 28,35,38` draws the pictures (`v2-bom-stracka-*.jpg`).
 
-`sim2.py` is the model the game uses; `sim.py` holds shared parts (and the first, straight-line version).
+`sim3.py` is the model the game uses (v3: circling search, houses/olive/lakes and hills as landmarks, contour reading, longer sight in open ground and from high ground). `sim2.py` and `sim.py` are earlier versions; `sim.py` also holds shared parts. Run `calib3.py` and `render3.py` for the current model.

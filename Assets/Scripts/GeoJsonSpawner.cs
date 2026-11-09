@@ -206,9 +206,11 @@ public class GeoJsonSpawner : MonoBehaviour
             };
             float metresPerUnit = pathfindingManager.gridData != null && pathfindingManager.cellSize > 0f
                 ? pathfindingManager.gridData.grid_size / pathfindingManager.cellSize : 100f;
+            float[,] speedGrid = pathfindingManager.speedGrid2D;
+            float[,] heightGrid = GridBinary.LastHeights;
             Task.Run(() =>
             {
-                try { MapFeatureIndex.Build(indexFiles, indexMap, metresPerUnit); }
+                try { MapFeatureIndex.Build(indexFiles, indexMap, metresPerUnit, speedGrid, heightGrid); }
                 catch (System.Exception e) { Debug.LogError("MapFeatureIndex: " + e); }
             });
         }

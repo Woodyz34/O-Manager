@@ -13,15 +13,25 @@ public static class MapFeatureIndex
 {
     public struct Point { public Vector2 p; public int group; public float clarity; public float unique; }
     public struct Sample { public Vector2 p; public int line; public int group; public float clarity; public bool distinct; }
+    // The edge of ground nobody can enter (houses, gardens, olive green, lakes): clear to see.
+    // small = a house or a plot, which has a shape of its own; the map edge or a big lake does not.
+    public struct AreaEdge { public Vector2 p; public int area; public bool small; }
+    // A hill top with at least 12 m rise over the ground round it. size = how far from the top you still feel on it.
+    public struct Hill { public Vector2 p; public float height; public float clarity; public float size; }
 
     public static List<Point> points = new List<Point>();
     public static List<Sample> samples = new List<Sample>();
+    public static List<AreaEdge> areas = new List<AreaEdge>();
+    public static List<Hill> hills = new List<Hill>();
+    static float[,] speed, heights;
+    static int rows, cols; static float cellMetres;
     public static bool Ready { get; private set; }
 
     // Spatial hash, 25 m buckets
     const float Bucket = 25f;
     static readonly Dictionary<long, List<int>> pointBuckets = new Dictionary<long, List<int>>();
     static readonly Dictionary<long, List<int>> sampleBuckets = new Dictionary<long, List<int>>();
+    static readonly Dictionary<long, List<int>> areaBuckets = new Dictionary<long, List<int>>();
     public const int LineGroupOffset = 10000;   // signature keys: points by group, lines by group + this
 
     // World position <-> metres (1 world unit = metresPerUnit metres, the grid's cell size times 100)
@@ -102,7 +112,7 @@ public static class MapFeatureIndex
     }
 
     // Runs in a background thread
-    public static void Build(List<byte[]> files, Mapping map, float mpu)
+    public static void Build(List<byte[]> files, Mapping map, float mpu, float[,] speedGrid, float[,] heightGrid)
     {
         Ready = false;
         var pts = new List<Point>(); var smp = new List<Sample>();
@@ -167,11 +177,151 @@ public static class MapFeatureIndex
                 Sample q = smp[i]; q.distinct = distinct; smp[i] = q;
             }
             readability.Clear();
+            BuildGround(speedGrid, heightGrid, map.cellSize * mpu);
+            // A place on a line next to a house or a plot is one you can be sure of too
+            for (int i = 0; i < smp.Count; i++)
+            {
+                if (smp[i].distinct) continue;
+                QueryAreas(smp[i].p, 25f, near);
+                foreach (int j in near) if (areas[j].small) { Sample q = smp[i]; q.distinct = true; smp[i] = q; break; }
+            }
         }
         Ready = true;
     }
 
     public static void Clear() { Ready = false; }
+
+    // ---- from the grid: areas you cannot enter, hills, how open the ground is ----
+    public static Vector2 CellMetres(int r, int c)
+        => new Vector2((c + 0.5f - cols / 2f) * cellMetres, (r + 0.5f - rows / 2f) * cellMetres);
+    static bool CellOf(Vector2 m, out int r, out int c)
+    {
+        c = Mathf.FloorToInt(m.x / cellMetres + cols / 2f); r = Mathf.FloorToInt(m.y / cellMetres + rows / 2f);
+        bool inside = r >= 0 && c >= 0 && r < rows && c < cols;
+        r = Mathf.Clamp(r, 0, rows - 1); c = Mathf.Clamp(c, 0, cols - 1);
+        return inside;
+    }
+
+    static void BuildGround(float[,] grid, float[,] height, float cellM)
+    {
+        speed = grid; cellMetres = cellM;
+        areas = new List<AreaEdge>(); hills = new List<Hill>(); areaBuckets.Clear();
+        if (grid == null) { heights = null; return; }
+        rows = grid.GetLength(0); cols = grid.GetLength(1);
+        heights = height != null && height.GetLength(0) == rows && height.GetLength(1) == cols ? height : null;
+        // Closed ground in pieces (4-neighbour flood fill)
+        int[,] label = new int[rows, cols];
+        var size = new List<int> { 0 };
+        var stack = new Stack<int>();
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                if (grid[r, c] > 0.05f || label[r, c] != 0) continue;
+                int id = size.Count, n = 0; size.Add(0);
+                label[r, c] = id; stack.Push(r * cols + c);
+                while (stack.Count > 0)
+                {
+                    int k = stack.Pop(), rr = k / cols, cc = k % cols; n++;
+                    if (rr > 0 && label[rr - 1, cc] == 0 && grid[rr - 1, cc] <= 0.05f) { label[rr - 1, cc] = id; stack.Push(k - cols); }
+                    if (rr < rows - 1 && label[rr + 1, cc] == 0 && grid[rr + 1, cc] <= 0.05f) { label[rr + 1, cc] = id; stack.Push(k + cols); }
+                    if (cc > 0 && label[rr, cc - 1] == 0 && grid[rr, cc - 1] <= 0.05f) { label[rr, cc - 1] = id; stack.Push(k - 1); }
+                    if (cc < cols - 1 && label[rr, cc + 1] == 0 && grid[rr, cc + 1] <= 0.05f) { label[rr, cc + 1] = id; stack.Push(k + 1); }
+                }
+                size[id] = n;
+            }
+        for (int r = 1; r < rows - 1; r++)
+            for (int c = 1; c < cols - 1; c++)
+            {
+                int id = label[r, c];
+                if (id == 0 || size[id] < 3) continue;
+                if (grid[r - 1, c] > 0.05f || grid[r + 1, c] > 0.05f || grid[r, c - 1] > 0.05f || grid[r, c + 1] > 0.05f)
+                    areas.Add(new AreaEdge { p = CellMetres(r, c), area = id, small = size[id] < 2000 });
+            }
+        Fill(areaBuckets, areas.Count, i => areas[i].p);
+        if (heights == null) return;
+        // Hill tops: highest within 100 m, at least 12 m over the lowest ground within 200 m
+        float[,] high = Filter(heights, 10, true), low = Filter(heights, 20, false);
+        var tops = new List<Hill>();
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                float h = heights[r, c], rise = h - low[r, c];
+                if (grid[r, c] <= 0.05f || h < high[r, c] - 0.01f || rise < 12f) continue;
+                Vector2 p = CellMetres(r, c);
+                bool dup = false;
+                foreach (var t in tops) if ((t.p - p).sqrMagnitude < 60f * 60f) { dup = true; break; }
+                if (dup) continue;
+                tops.Add(new Hill { p = p, height = h, clarity = Mathf.Min(0.95f, rise / 30f), size = Mathf.Clamp(rise * 2.5f, 30f, 80f) });
+            }
+        hills = tops;
+    }
+
+    // Max (or min) over a square window of +-w cells, done one direction at a time
+    static float[,] Filter(float[,] a, int w, bool max)
+    {
+        int R = a.GetLength(0), C = a.GetLength(1);
+        var t = new float[R, C]; var o = new float[R, C];
+        for (int r = 0; r < R; r++)
+            for (int c = 0; c < C; c++)
+            {
+                float v = a[r, c];
+                for (int k = Mathf.Max(0, c - w); k <= Mathf.Min(C - 1, c + w); k++) v = max ? Mathf.Max(v, a[r, k]) : Mathf.Min(v, a[r, k]);
+                t[r, c] = v;
+            }
+        for (int c = 0; c < C; c++)
+            for (int r = 0; r < R; r++)
+            {
+                float v = t[r, c];
+                for (int k = Mathf.Max(0, r - w); k <= Mathf.Min(R - 1, r + w); k++) v = max ? Mathf.Max(v, t[k, c]) : Mathf.Min(v, t[k, c]);
+                o[r, c] = v;
+            }
+        return o;
+    }
+
+    public static float HeightAt(Vector2 m)
+    {
+        if (heights == null) return 0f;
+        CellOf(m, out int r, out int c); return heights[r, c];
+    }
+    // Open ground (fields, open land): the mean speed round it is high
+    public static bool Open(Vector2 m)
+    {
+        if (speed == null) return false;
+        CellOf(m, out int r, out int c);
+        float sum = 0f; int n = 0;
+        for (int dr = -2; dr <= 2; dr++)
+            for (int dc = -2; dc <= 2; dc++)
+            {
+                int y = r + dr, x = c + dc;
+                if (y < 0 || x < 0 || y >= rows || x >= cols) continue;
+                sum += speed[y, x]; n++;
+            }
+        return n > 0 && sum / n >= 1.15f;
+    }
+    // How hilly it is right here (0 flat .. 1 clear slopes and knolls): the contours you can read
+    public static float Relief(Vector2 m)
+    {
+        if (heights == null) return 0f;
+        CellOf(m, out int r, out int c);
+        float sum = 0f, sq = 0f; int n = 0;
+        for (int dr = -2; dr <= 2; dr++)
+            for (int dc = -2; dc <= 2; dc++)
+            {
+                int y = r + dr, x = c + dc;
+                if (y < 0 || x < 0 || y >= rows || x >= cols) continue;
+                float h = heights[y, x]; sum += h; sq += h * h; n++;
+            }
+        if (n == 0) return 0f;
+        float mean = sum / n, sd = Mathf.Sqrt(Mathf.Max(0f, sq / n - mean * mean));
+        return Mathf.Min(1f, sd / 4f);
+    }
+    // How far away a thing of clarity c at q can be seen from p: further in open ground and from high ground
+    public static float Sight(Vector2 p, Vector2 q, float c, float groundSpeed)
+    {
+        float baseRange = (6f + 18f * c) * (Open(p) ? 2.5f : Mathf.Min(1f, groundSpeed));
+        float dh = HeightAt(p) - HeightAt(q);
+        return baseRange * Mathf.Clamp(1f + dh / 8f, 0.6f, 2.5f);
+    }
 
     static long Key(int x, int y) => ((long)x << 32) ^ (uint)y;
     static void Fill(Dictionary<long, List<int>> buckets, int n, Func<int, Vector2> pos)
@@ -199,6 +349,7 @@ public static class MapFeatureIndex
     }
     public static void QueryPoints(Vector2 c, float r, List<int> result) => Query(pointBuckets, i => points[i].p, c, r, result);
     public static void QuerySamples(Vector2 c, float r, List<int> result) => Query(sampleBuckets, i => samples[i].p, c, r, result);
+    public static void QueryAreas(Vector2 c, float r, List<int> result) => Query(areaBuckets, i => areas[i].p, c, r, result);
 
     // ---- how easy the ground round a place is to read (clear, unique things within 40 m) ----
     static readonly Dictionary<long, float> readability = new Dictionary<long, float>();
