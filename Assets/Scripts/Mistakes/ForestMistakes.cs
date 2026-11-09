@@ -72,7 +72,7 @@ public class ForestMistakes
     {
         if (busy != null) { agent.StopCoroutine(busy); busy = null; agent.isWaiting = false; }
         waitingForPath = false;
-        mode = Mode.Route; U = 8f; sinceFix = 0f; travel = 0f; quietUntil = 0f; smallDone = false; misses = 0; nextContour = 25f;
+        mode = Mode.Route; U = 8f; sinceFix = 0f; travel = 0f; quietUntil = 0f; smallDone = false; lastSide = 0; nextSideCheck = 0f; misses = 0; nextContour = 25f;
         skill = baseSkill = Mathf.Clamp01(1f - agent.runnerStatTec);
         seen.Clear(); lostTargets.Clear();
     }
@@ -106,6 +106,7 @@ public class ForestMistakes
         if (d <= 0f) return;
         travel += d; sinceFix += d; runSinceAim += d;
         Vector2 pos = Pos;
+        if (CrossedToWrongSide(pos)) return;
 
         if (mode != Mode.Route && Vector2.Distance(pos, Control) < FlagSight())
         {
@@ -202,6 +203,25 @@ public class ForestMistakes
 
     bool Noticed(float clarity, float boost) => Rand() < Mathf.Min(1f, clarity * (0.55f + 0.45f * skill) * boost);
 
+    int lastSide; float nextSideCheck; Vector2 lastRightSidePos;
+    // Crossing a road or a big path you didn't have to cross: "this side is wrong, back over it".
+    // You may still not know where on it you are, but you never search on the wrong side of it.
+    bool CrossedToWrongSide(Vector2 pos)
+    {
+        if (travel < nextSideCheck) return false;
+        nextSideCheck = travel + 4f;
+        int side = MapFeatureIndex.SideOf(pos), controlSide = MapFeatureIndex.SideOf(Control);
+        if (side == 0 || controlSide == 0) return false;
+        bool wrong = lastSide == controlSide && side != controlSide;
+        lastSide = side;
+        if (side == controlSide) { lastRightSidePos = pos; return false; }
+        if (!wrong || mode == Mode.Lost || mode == Mode.Safe || mode == Mode.Route) return false;
+        Log("korsade stigen/vägen – fel sida, vänder");
+        Vector2 target = MapFeatureIndex.SameSide(aim, Control) ? aim : lastRightSidePos;
+        mode = Mode.Drift;
+        SetAim(target);
+        return true;
+    }
     float quietUntil;
     bool smallDone;
     void Observe(float boost)
@@ -413,7 +433,7 @@ public class ForestMistakes
                 float a = ang + turn * (0.9f + 0.7f * Rand()), r = 25f + 20f * Rand();
                 Vector2 q = centre + r * new Vector2(Mathf.Cos(a), Mathf.Sin(a));
                 float g = GroundSpeed(q);
-                if (g <= 0.05f) continue;
+                if (g <= 0.05f || !MapFeatureIndex.SameSide(q, Control)) continue;
                 float sc = 1f / (1f + Mathf.Abs(g - controlSpeed) * 3f) + 0.3f * Rand();
                 if (sc > best) { best = sc; bestAng = a; bestPoint = q; }
             }

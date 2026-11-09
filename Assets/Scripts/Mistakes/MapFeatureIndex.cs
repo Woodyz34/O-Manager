@@ -290,7 +290,7 @@ public static class MapFeatureIndex
         hills = tops;
     }
 
-    // ---- sides of roads: crossing a road is something you always notice, so you know which side of it you are on
+    // ---- sides of roads and big paths: crossing one is something you always notice, so you know which side of it you are on
     static int[,] side;
     static void BuildSides(List<Sample> smp)
     {
@@ -299,7 +299,7 @@ public static class MapFeatureIndex
         var road = new bool[rows, cols];
         foreach (var s in smp)
         {
-            if (s.group != 501 && s.group != 503 && s.group != 504) continue;
+            if (s.group != 501 && s.group != 503 && s.group != 504 && s.group != 505) continue;   // roads and big paths
             CellOf(s.p, out int r, out int c);
             for (int dr = -1; dr <= 1; dr++)
                 for (int dc = -1; dc <= 1; dc++)
@@ -338,7 +338,7 @@ public static class MapFeatureIndex
             if (smp[k].line == smp[i].line && (smp[k].p - smp[i].p).sqrMagnitude > best) { best = (smp[k].p - smp[i].p).sqrMagnitude; far = smp[k].p; }
         return best > 0f ? (far - smp[i].p).normalized : Vector2.zero;
     }
-    static int SideOf(Vector2 m)
+    public static int SideOf(Vector2 m)
     {
         if (side == null) return 0;
         CellOf(m, out int r, out int c);
