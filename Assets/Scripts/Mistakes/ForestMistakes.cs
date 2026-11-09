@@ -27,7 +27,7 @@ public class ForestMistakes
 {
     enum Mode { Route, Drift, Circle, Lost, Safe }
 
-    const float H0 = 1f / 1500f;           // direction errors per metre at technique 0 in average ground
+    const float H0 = 1f / 2800f;           // direction errors per metre at technique 0 in average ground
     const float RealSpeed100 = 3.6f;       // m/s on speed-1 ground for a speed-100 runner in the real world
 
     readonly AgentMovement agent;
@@ -72,7 +72,7 @@ public class ForestMistakes
     {
         if (busy != null) { agent.StopCoroutine(busy); busy = null; agent.isWaiting = false; }
         waitingForPath = false;
-        mode = Mode.Route; U = 8f; sinceFix = 0f; travel = 0f; quietUntil = 0f; misses = 0; nextContour = 25f;
+        mode = Mode.Route; U = 8f; sinceFix = 0f; travel = 0f; quietUntil = 0f; smallDone = false; misses = 0; nextContour = 25f;
         skill = baseSkill = Mathf.Clamp01(1f - agent.runnerStatTec);
         seen.Clear(); lostTargets.Clear();
     }
@@ -116,10 +116,29 @@ public class ForestMistakes
         switch (mode)
         {
             case Mode.Route:
+                if (!smallDone && Vector2.Distance(pos, Control) < 60f)
+                {
+                    // A small mistake at the control: aim a bit beside it, then look round there
+                    smallDone = true;
+                    float dc = 0.6f + Mathf.Max(0f, 1.2f - MapFeatureIndex.Readability(Control) / 3f);
+                    if (Rand() < 0.5f * Mathf.Pow(1f - skill, 1.2f) * dc)
+                    {
+                        Vector2 v = (Control - pos).normalized, n = new Vector2(-v.y, v.x) * (Rand() < 0.5f ? -1f : 1f);
+                        Vector2 off = Control + n * (25f + 20f * Rand()) + v * (-10f + 25f * Rand());
+                        if (GroundSpeed(off) > 0.05f)
+                        {
+                            Log("liten miss vid kontrollen");
+                            mode = Mode.Drift; sinceFix = 0f; U = 15f;
+                            SetAim(off);
+                            return;
+                        }
+                    }
+                }
                 if (!MapFeatureIndex.OnHandrail(pos))
                 {
                     float left = Vector2.Distance(pos, Control);
-                    float diff = 0.6f + Mathf.Max(0f, 1.2f - MapFeatureIndex.Readability(pos) / 3f);
+                    // Unsure on the leg (few details to read, or a mess of them): direction errors are more common
+                    float diff = 0.4f + Mathf.Max(0f, 2f - MapFeatureIndex.Readability(pos) / 2f);
                     float nearControl = left < 70f ? 1.3f : 1f;   // drifting off happens all along the leg
                     float perMetre = H0 * Mathf.Pow(1f - skill, 0.65f) * diff * nearControl + 1f / 250000f;
                     if (Rand() < perMetre * d) DirectionError();
@@ -184,6 +203,7 @@ public class ForestMistakes
     bool Noticed(float clarity, float boost) => Rand() < Mathf.Min(1f, clarity * (0.55f + 0.45f * skill) * boost);
 
     float quietUntil;
+    bool smallDone;
     void Observe(float boost)
     {
         // Right after a direction error or a surprise you run on with your idea: nothing makes you change it yet

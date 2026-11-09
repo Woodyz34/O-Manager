@@ -99,13 +99,13 @@ def sight(p, q, c):
     return base * float(np.clip(1 + dh/8.0, 0.6, 2.5))
 
 class Runner:
-    H0 = 1/1500.0
+    H0 = 1/2800.0
     def __init__(s, leg, tech, speed=80, rng=None):
         s.leg, s.s, s.P = leg, tech/100.0, speed
         s.rng = rng or random.Random()
         s.pos = leg.a.copy(); s.t = 0.0; s.track = [s.pos.copy()]; s.events = []
         s.seen = {}; s.travel = 0.0; s.since_fix = 0.0; s.U = 8.0; s.next_contour = 25.0
-        s.quiet = 0.0; s.nomiss = False; s.mode = 'route'; s.misses = 0
+        s.quiet = 0.0; s.small_done = False; s.nomiss = False; s.mode = 'route'; s.misses = 0
         s.set_aim(leg.b.copy(), plan=leg.path_from(s.pos))
     @property
     def bel(s): return s.lost_bel if s.mode == 'lost' else s.leg.b - (s.aim - s.pos)
@@ -237,9 +237,19 @@ class Runner:
                 s.U = min(60.0, 12 + 0.18*s.since_fix)
                 if s.run_since_aim > (1.15 + 0.35*(1-s.s))*s.expect + 20:
                     s.ev('for_langt'); s.go_lost(); continue
+            if s.mode == 'route' and not s.nomiss and not s.small_done and np.hypot(*(leg.b - s.pos)) < 60:
+                # small mistake at the control: aim a bit beside it, then look round there
+                s.small_done = True
+                dc = 0.6 + max(0.0, 1.2 - readability(leg.b)/3.0)
+                if s.rng.random() < 0.5*(1-s.s)**1.2*dc:
+                    v = leg.b - s.pos; v = v/max(1e-6, np.hypot(*v)); nrm = np.array([-v[1], v[0]])*s.rng.choice((-1,1))
+                    off = leg.b + nrm*s.rng.uniform(25, 45) + v*s.rng.uniform(-10, 15)
+                    if OPEN[cell(off)]:
+                        s.ev('smabom'); s.mode = 'drift'; s.since_fix = 0; s.U = 15
+                        s.set_aim(off); continue
             if s.mode == 'route' and not s.nomiss and not handrail(s.pos):
                 left = np.hypot(*(leg.b - s.pos))
-                diff = 0.6 + max(0.0, 1.2 - readability(s.pos)/3.0)
+                diff = 0.4 + max(0.0, 2.0 - readability(s.pos)/2.0)   # unsure in hard, detail-poor or detail-rich ground
                 near = 1.3 if left < 70 else 1.0
                 if s.rng.random() < 2.0*(s.H0*(1-s.s)**0.65*diff*near + 1/250000):
                     bad = 1 - s.s

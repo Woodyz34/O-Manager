@@ -30,3 +30,6 @@ sim6.py: elite direction errors 8-16 deg, technique 0 20-40; after a direction e
 
 ## v10 (2026-11-09)
 User found technique 51 made almost no mistakes in Unity. Now: H0 1/1500, 80 m on the wrong idea after a direction error, right-feature bonus 1+4*skill, a stone among many (unique<0.5) is ignored half the time. About 1.5x the technique-scale targets on purpose (T0 43, T60 21, T80 10, T90 4 s/control).
+
+## v11 (2026-11-09)
+More small mistakes: once per leg within 60 m of the control, chance 0.5*(1-s)^1.2*difficulty to aim 25-45 m beside it and look round there. Direction errors depend more on the ground (diff = 0.4 + max(0, 2 - readability/2)). H0 1/2800. Calibration N=8: T0 61 (38% of legs, median 100 s), T40 25, T60 24, T80 8, T90 4 s/control.
