@@ -83,8 +83,8 @@ public class ForestMistakes
     void Surprise(string what)
     {
         Log(what);
-        // A bit more careful after each surprise (technique 51 -> 61 -> 69 ...), and committed to the new idea for a while
-        skill = 1f - (1f - skill) * 0.8f;
+        // A bit more careful after each surprise (technique 51 -> 61 -> 69 -> 71 at most), and committed to the new idea for a while
+        skill = Mathf.Min(1f - (1f - skill) * 0.8f, baseSkill + 0.2f);   // at most 20 better than the card
         quietUntil = travel + 40f;
     }
 
