@@ -27,7 +27,7 @@ public class ForestMistakes
 {
     enum Mode { Route, Drift, Circle, Lost, Safe }
 
-    const float H0 = 1f / 2300f;           // direction errors per metre at technique 0 in average ground
+    const float H0 = 1f / 1500f;           // direction errors per metre at technique 0 in average ground
     const float RealSpeed100 = 3.6f;       // m/s on speed-1 ground for a speed-100 runner in the real world
 
     readonly AgentMovement agent;
@@ -177,7 +177,7 @@ public class ForestMistakes
         Vector2 wrong = new Vector2(toControl.x * cos - toControl.y * sin, toControl.x * sin + toControl.y * cos) * k;
         Log($"riktningsfel {a:F0}°");
         mode = Mode.Drift; sinceFix = 0f;
-        quietUntil = travel + 50f;   // you only start to wonder once you have run a bit the wrong way
+        quietUntil = travel + 80f;   // you only start to wonder once you have run a bit the wrong way
         SetAim(Pos + wrong);
     }
 
@@ -201,6 +201,8 @@ public class ForestMistakes
             if (seen.TryGetValue(key, out float at) && at > travel - 200f) continue;
             seen[key] = travel;
             if (!Noticed(c, boost)) continue;
+            // One stone among many: often you just run on without thinking about it
+            if (pts[j].unique < 0.5f && Rand() < 0.5f) continue;
             var cands = new List<Vector2>(); var ids = new List<long>();
             MapFeatureIndex.QueryPoints(Belief, U + 25f, near);
             foreach (int k in near) if (pts[k].group == pts[j].group) { cands.Add(pts[k].p); ids.Add(k); }
@@ -330,7 +332,7 @@ public class ForestMistakes
         {
             w[i] = Mathf.Exp(-(cands[i] - bel).sqrMagnitude / (2f * u * u)) + 1e-12f;
             // Reading the detail round it: the right one gets a bonus that grows with technique
-            if (ids[i] == trueId) w[i] *= 1f + 8f * skill;
+            if (ids[i] == trueId) w[i] *= 1f + 4f * skill;
             sum += w[i];
         }
         for (int i = 0; i < w.Length; i++) { w[i] /= sum; max = Mathf.Max(max, w[i]); }

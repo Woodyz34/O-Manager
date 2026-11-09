@@ -99,7 +99,7 @@ def sight(p, q, c):
     return base * float(np.clip(1 + dh/8.0, 0.6, 2.5))
 
 class Runner:
-    H0 = 1/2300.0
+    H0 = 1/1500.0
     def __init__(s, leg, tech, speed=80, rng=None):
         s.leg, s.s, s.P = leg, tech/100.0, speed
         s.rng = rng or random.Random()
@@ -138,7 +138,7 @@ class Runner:
             key = ('p', j)
             if s.seen.get(key, -1e9) > s.travel - 200: continue
             s.seen[key] = s.travel
-            if s.noticed(c, boost):
+            if s.noticed(c, boost) and not (Pu[j] < 0.5 and s.rng.random() < 0.5):
                 grp = F['Pg'][j]
                 ks = [k for k in F['Pt'].query_ball_point(s.bel, s.U+25) if F['Pg'][k] == grp]
                 if s.resolve([F['P'][k] for k in ks], F['P'][j], c, ids=ks, true_id=j): return
@@ -198,7 +198,7 @@ class Runner:
         w = np.array([math.exp(-np.sum((c-s.bel)**2)/(2*U*U)) for c in cands]) + 1e-12
         isright = [ids[i] == true_id for i in range(len(cands))]
         for i in range(len(cands)):
-            if isright[i]: w[i] *= 1 + 8*sk
+            if isright[i]: w[i] *= 1 + 4*sk
         w /= w.sum()
         k = s.rng.choices(range(len(cands)), w)[0]; ch = cands[k]
         if w.max() < 0.75 and s.rng.random() < sk*(1-w.max())*1.5:
@@ -245,7 +245,7 @@ class Runner:
                     bad = 1 - s.s
                     a = math.radians(min(8 + 12*bad + abs(s.rng.gauss(0,1))*(8 + 8*bad), 16 + 24*bad)) * s.rng.choice((-1,1))
                     k = 1 + s.rng.gauss(0, 0.03 + 0.09*bad)
-                    s.ev('riktningsfel', math.degrees(a)); s.mode = 'drift'; s.since_fix = 0; s.quiet = s.travel + 50
+                    s.ev('riktningsfel', math.degrees(a)); s.mode = 'drift'; s.since_fix = 0; s.quiet = s.travel + 80
                     c, sn = math.cos(a), math.sin(a); v = leg.b - s.pos
                     s.set_aim(s.pos + np.array([v[0]*c - v[1]*sn, v[0]*sn + v[1]*c]) * k)
             if s.mode != 'route': s.observe()

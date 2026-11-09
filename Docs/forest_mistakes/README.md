@@ -27,3 +27,6 @@ Junctions are sure only when no other junction lies within 300 m or a clear poin
 
 ## v9 (2026-11-09)
 sim6.py: elite direction errors 8-16 deg, technique 0 20-40; after a direction error the runner sees nothing new for 50 m, after a surprise 40 m (no instant parallel error + fix in the same second); surprise makes the runner only a bit more careful (1-(1-s)*0.8); hazard (1-skill)^0.65. Calibration N=10: T0 33, T40 15, T60 11, T80 8, T90 1.3, T99 1.4 s/control.
+
+## v10 (2026-11-09)
+User found technique 51 made almost no mistakes in Unity. Now: H0 1/1500, 80 m on the wrong idea after a direction error, right-feature bonus 1+4*skill, a stone among many (unique<0.5) is ignored half the time. About 1.5x the technique-scale targets on purpose (T0 43, T60 21, T80 10, T90 4 s/control).
