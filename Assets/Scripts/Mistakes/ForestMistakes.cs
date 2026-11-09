@@ -72,7 +72,7 @@ public class ForestMistakes
     {
         if (busy != null) { agent.StopCoroutine(busy); busy = null; agent.isWaiting = false; }
         waitingForPath = false;
-        mode = Mode.Route; U = 8f; sinceFix = 0f; travel = 0f; misses = 0; nextContour = 25f;
+        mode = Mode.Route; U = 8f; sinceFix = 0f; travel = 0f; quietUntil = 0f; misses = 0; nextContour = 25f;
         skill = baseSkill = Mathf.Clamp01(1f - agent.runnerStatTec);
         seen.Clear(); lostTargets.Clear();
     }
@@ -83,7 +83,9 @@ public class ForestMistakes
     void Surprise(string what)
     {
         Log(what);
-        skill = 1f - (1f - skill) * 0.4f;
+        // A bit more careful after each surprise (technique 51 -> 61 -> 69 ...), and committed to the new idea for a while
+        skill = 1f - (1f - skill) * 0.8f;
+        quietUntil = travel + 40f;
     }
 
     float Rand() => (float)rng.NextDouble();
@@ -119,7 +121,7 @@ public class ForestMistakes
                     float left = Vector2.Distance(pos, Control);
                     float diff = 0.6f + Mathf.Max(0f, 1.2f - MapFeatureIndex.Readability(pos) / 3f);
                     float nearControl = left < 70f ? 1.3f : 1f;   // drifting off happens all along the leg
-                    float perMetre = H0 * Mathf.Pow(1f - skill, 0.15f) * diff * nearControl + 1f / 250000f;
+                    float perMetre = H0 * Mathf.Pow(1f - skill, 0.65f) * diff * nearControl + 1f / 250000f;
                     if (Rand() < perMetre * d) DirectionError();
                 }
                 return;
@@ -175,13 +177,17 @@ public class ForestMistakes
         Vector2 wrong = new Vector2(toControl.x * cos - toControl.y * sin, toControl.x * sin + toControl.y * cos) * k;
         Log($"riktningsfel {a:F0}°");
         mode = Mode.Drift; sinceFix = 0f;
+        quietUntil = travel + 50f;   // you only start to wonder once you have run a bit the wrong way
         SetAim(Pos + wrong);
     }
 
     bool Noticed(float clarity, float boost) => Rand() < Mathf.Min(1f, clarity * (0.55f + 0.45f * skill) * boost);
 
+    float quietUntil;
     void Observe(float boost)
     {
+        // Right after a direction error or a surprise you run on with your idea: nothing makes you change it yet
+        if (travel < quietUntil) return;
         Vector2 pos = Pos;
         float g = GroundSpeed(pos);
         var pts = MapFeatureIndex.points;

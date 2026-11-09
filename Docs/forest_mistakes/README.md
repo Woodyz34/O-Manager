@@ -24,3 +24,6 @@ Road junctions (with another road or big path, not the other edge line of the sa
 
 ## v8 (2026-11-09, C# only)
 Junctions are sure only when no other junction lies within 300 m or a clear point (clarity >= 0.6) is within 15 m; otherwise the runner picks among the junctions near where it thinks it is (parallel error possible). Roads by houses stay sure.
+
+## v9 (2026-11-09)
+sim6.py: elite direction errors 8-16 deg, technique 0 20-40; after a direction error the runner sees nothing new for 50 m, after a surprise 40 m (no instant parallel error + fix in the same second); surprise makes the runner only a bit more careful (1-(1-s)*0.8); hazard (1-skill)^0.65. Calibration N=10: T0 33, T40 15, T60 11, T80 8, T90 1.3, T99 1.4 s/control.
