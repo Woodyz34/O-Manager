@@ -73,11 +73,13 @@ public class ForestMistakes
         if (busy != null) { agent.StopCoroutine(busy); busy = null; agent.isWaiting = false; }
         waitingForPath = false;
         mode = Mode.Route; U = 8f; sinceFix = 0f; travel = 0f; misses = 0; nextContour = 25f;
-        skill = Mathf.Clamp01(1f - agent.runnerStatTec);
+        skill = baseSkill = Mathf.Clamp01(1f - agent.runnerStatTec);
         seen.Clear(); lostTargets.Clear();
     }
 
-    void Log(string what) { Debug.Log($"[Bom] {agent.runnerName}: {what} (teknik nu {skill * 100f:F0})"); }
+    float baseSkill;
+    // After each surprise the runner gets more careful for the rest of the leg; the card's technique comes back next leg
+    void Log(string what) { Debug.Log($"[Bom] {agent.runnerName}: {what} (teknik {baseSkill * 100f:F0}, försiktig nu som {skill * 100f:F0})"); }
     void Surprise(string what)
     {
         Log(what);
