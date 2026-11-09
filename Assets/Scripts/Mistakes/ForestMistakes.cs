@@ -165,8 +165,8 @@ public class ForestMistakes
     {
         // Good runners make small direction errors, poor ones can be far off
         float bad = 1f - skill;
-        // Technique 0: mostly 20-40 degrees off; technique 99: a few degrees
-        float a = Mathf.Min(2f + 18f * bad + Mathf.Abs(Gauss()) * (3f + 8f * bad), 4f + 36f * bad) * (Rand() < 0.5f ? -1f : 1f);
+        // Technique 0: 20-40 degrees off; the elite 8-16 degrees, so you can see they run a bit off
+        float a = Mathf.Min(8f + 12f * bad + Mathf.Abs(Gauss()) * (8f + 8f * bad), 16f + 24f * bad) * (Rand() < 0.5f ? -1f : 1f);
         float k = 1f + Gauss() * (0.03f + 0.09f * bad);
         Vector2 toControl = Control - Pos;
         float rad = a * Mathf.Deg2Rad, cos = Mathf.Cos(rad), sin = Mathf.Sin(rad);
