@@ -178,6 +178,7 @@ public static class MapFeatureIndex
             }
             readability.Clear();
             BuildGround(speedGrid, heightGrid, map.cellSize * mpu);
+            BuildSides(smp);
             // A place on a line next to a house or a plot is one you can be sure of too
             for (int i = 0; i < smp.Count; i++)
             {
@@ -254,6 +255,66 @@ public static class MapFeatureIndex
                 tops.Add(new Hill { p = p, height = h, clarity = Mathf.Min(0.95f, rise / 30f), size = Mathf.Clamp(rise * 2.5f, 30f, 80f) });
             }
         hills = tops;
+    }
+
+    // ---- sides of roads: crossing a road is something you always notice, so you know which side of it you are on
+    static int[,] side;
+    static void BuildSides(List<Sample> smp)
+    {
+        side = null;
+        if (speed == null) return;
+        var road = new bool[rows, cols];
+        foreach (var s in smp)
+        {
+            if (s.group != 501 && s.group != 503 && s.group != 504) continue;
+            CellOf(s.p, out int r, out int c);
+            for (int dr = -1; dr <= 1; dr++)
+                for (int dc = -1; dc <= 1; dc++)
+                {
+                    int y = r + dr, x = c + dc;
+                    if (y >= 0 && x >= 0 && y < rows && x < cols) road[y, x] = true;
+                }
+        }
+        var lab = new int[rows, cols]; int next = 0;
+        var stack = new Stack<int>();
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                if (lab[r, c] != 0 || road[r, c] || speed[r, c] <= 0.05f) continue;
+                int id = ++next; lab[r, c] = id; stack.Push(r * cols + c);
+                while (stack.Count > 0)
+                {
+                    int k = stack.Pop(), rr = k / cols, cc = k % cols;
+                    for (int d = 0; d < 4; d++)
+                    {
+                        int y = rr + (d == 0 ? -1 : d == 1 ? 1 : 0), x = cc + (d == 2 ? -1 : d == 3 ? 1 : 0);
+                        if (y < 0 || x < 0 || y >= rows || x >= cols || lab[y, x] != 0 || road[y, x] || speed[y, x] <= 0.05f) continue;
+                        lab[y, x] = id; stack.Push(y * cols + x);
+                    }
+                }
+            }
+        side = lab;
+    }
+    static int SideOf(Vector2 m)
+    {
+        if (side == null) return 0;
+        CellOf(m, out int r, out int c);
+        var count = new Dictionary<int, int>(); int best = 0, bestN = 0;
+        for (int dr = -3; dr <= 3; dr++)
+            for (int dc = -3; dc <= 3; dc++)
+            {
+                int y = r + dr, x = c + dc;
+                if (y < 0 || x < 0 || y >= rows || x >= cols || side[y, x] == 0) continue;
+                int id = side[y, x]; count.TryGetValue(id, out int n); count[id] = ++n;
+                if (n > bestN) { bestN = n; best = id; }
+            }
+        return best;
+    }
+    // On the same side of every road (unknown counts as the same)
+    public static bool SameSide(Vector2 a, Vector2 b)
+    {
+        int sa = SideOf(a), sb = SideOf(b);
+        return sa == 0 || sb == 0 || sa == sb;
     }
 
     // Max (or min) over a square window of +-w cells, done one direction at a time

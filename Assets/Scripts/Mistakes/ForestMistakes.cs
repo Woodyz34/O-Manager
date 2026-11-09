@@ -116,7 +116,7 @@ public class ForestMistakes
                 {
                     float left = Vector2.Distance(pos, Control);
                     float diff = 0.6f + Mathf.Max(0f, 1.2f - MapFeatureIndex.Readability(pos) / 3f);
-                    float nearControl = left < 70f ? 2.5f : 1f;
+                    float nearControl = left < 70f ? 1.3f : 1f;   // drifting off happens all along the leg
                     float perMetre = H0 * Mathf.Pow(1f - skill, 0.15f) * diff * nearControl + 1f / 250000f;
                     if (Rand() < perMetre * d) DirectionError();
                 }
@@ -280,6 +280,9 @@ public class ForestMistakes
     bool Resolve(List<Vector2> cands, List<long> ids, long trueId, Vector2 truePos, float clarity, float tol, bool hill)
     {
         if (mode == Mode.Route) return false;
+        // You always notice crossing a road, so it can't be one on the other side of a road
+        for (int i = cands.Count - 1; i >= 0; i--)
+            if (!MapFeatureIndex.SameSide(cands[i], Pos)) { cands.RemoveAt(i); ids.RemoveAt(i); }
         float frac = runSinceAim / Mathf.Max(expect, 1f);
         if (cands.Count == 0)
         {
@@ -313,7 +316,8 @@ public class ForestMistakes
         }
         Vector2 chosen = cands[pick];
         bool right = ids[pick] == trueId;
-        if (right && !hill && Vector2.Distance(truePos, pos) < tol && Vector2.Distance(chosen, truePos) < tol)
+        // A house or a plot you know is the right one: you see its corner and know exactly where you are
+        if (right && !hill && (tol >= 25f || Vector2.Distance(truePos, pos) < tol && Vector2.Distance(chosen, truePos) < tol))
         {
             Fix();
             return true;
@@ -342,6 +346,7 @@ public class ForestMistakes
         circleSimilarity = MapFeatureIndex.Similarity(MapFeatureIndex.Signature(Pos), MapFeatureIndex.Signature(Control));
         Surprise($"ingen skärm här (likhet med kontrollområdet {circleSimilarity:F2})");
         lostBelief = Belief;
+        if (!MapFeatureIndex.SameSide(Pos, Control)) circleSimilarity = 0f;   // the control is over the road: no doubt
         if (circleSimilarity <= 0.3f) { Run(PauseThen(2f + 5f * (1f - skill), GoLost)); return; }
         // Looks like the control's ground: look round here, a loose loop of 4-5 stops 25-45 m out on ground like
         // the control's (green, open ...), while what you see still fits
@@ -406,7 +411,7 @@ public class ForestMistakes
     {
         Vector2 pos = Pos;
         float d = Vector2.Distance(q, pos);
-        if (d < 40f) return 0f;
+        if (d < 40f || !MapFeatureIndex.SameSide(q, Control)) return 0f;   // search on the control's side of roads
         for (int i = 0; i < visited.Count; i++) if (Vector2.Distance(q, visited[i]) < 70f) return 0f;
         float f = 1f;
         Vector2 r = pos - lostCentre; float rn = r.magnitude;

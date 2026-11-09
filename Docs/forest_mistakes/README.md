@@ -15,3 +15,6 @@ sim4.py: right/wrong feature by id (road side), overshoot 1.15-1.5x, direction e
 
 ## v5 (2026-11-09)
 Bug fix: skimage traceback returns the path from the cost source to the point, so every simulated path was reversed (jump straight to the target, then walk back). That made the star shapes, straight lines and olive crossings in v2-v4 images. The game uses its own A*, so it never had this bug. Recalibrated: H0 1/2300, hazard (1-skill)^0.15. Runner stops 3.5 s when it relocates.
+
+## v6 (2026-11-09)
+sim5.py: roads split the map into sides (you always notice crossing a road): candidates and lost-search targets must be on the right side, wrong side at the control is known at once. Right house/plot = exact fix (you see the corner). Direction errors spread along the whole leg (near-control factor 1.3). Runner stops 3.5 s when relocating.
