@@ -207,6 +207,8 @@ public class ForestMistakes
             if (seen.TryGetValue(key, out float at) && at > travel - 120f) continue;
             seen[key] = travel;
             float c = smp[j].clarity;
+            // A road junction, or a road by houses and gardens: you know exactly where you are
+            if (smp[j].roadSure && mode != Mode.Route) { Fix(); return; }
             if (!Noticed(c, boost * 1.1f)) continue;
             bool distinct = smp[j].distinct && Rand() < 0.4f + 0.5f * skill;
             var best = new Dictionary<int, (float, Vector2)>();

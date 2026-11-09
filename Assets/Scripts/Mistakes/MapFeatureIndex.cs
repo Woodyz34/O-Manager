@@ -12,10 +12,10 @@ using UnityEngine;
 public static class MapFeatureIndex
 {
     public struct Point { public Vector2 p; public int group; public float clarity; public float unique; }
-    public struct Sample { public Vector2 p; public int line; public int group; public float clarity; public bool distinct; }
+    public struct Sample { public Vector2 p; public int line; public int group; public float clarity; public bool distinct; public bool roadSure; }
     // The edge of ground nobody can enter (houses, gardens, olive green, lakes): clear to see.
     // small = a house or a plot, which has a shape of its own; the map edge or a big lake does not.
-    public struct AreaEdge { public Vector2 p; public int area; public bool small; }
+    public struct AreaEdge { public Vector2 p; public int area; public bool small; public int size; }
     // A hill top with at least 12 m rise over the ground round it. size = how far from the top you still feel on it.
     public struct Hill { public Vector2 p; public float height; public float clarity; public float size; }
 
@@ -179,6 +179,27 @@ public static class MapFeatureIndex
             readability.Clear();
             BuildGround(speedGrid, heightGrid, map.cellSize * mpu);
             BuildSides(smp);
+            // Places on a road you are 100 % sure of: a crossing road or big path, or houses and gardens right by it
+            for (int i = 0; i < smp.Count; i++)
+            {
+                if (!IsRoad(smp[i].group)) continue;
+                bool sure = false;
+                Vector2 ti = Tangent(smp, i);
+                QuerySamples(smp[i].p, 12f, near);
+                foreach (int j in near)
+                {
+                    if (smp[j].line == smp[i].line || !(IsRoad(smp[j].group) || smp[j].group == 505)) continue;
+                    Vector2 tj = Tangent(smp, j);
+                    // not the other edge line of the same road
+                    if (ti != Vector2.zero && tj != Vector2.zero && Mathf.Abs(Vector2.Dot(ti, tj)) < 0.8f) { sure = true; break; }
+                }
+                if (!sure)
+                {
+                    QueryAreas(smp[i].p, 25f, near);
+                    foreach (int j in near) if (areas[j].size < 300) { sure = true; break; }
+                }
+                if (sure) { Sample q = smp[i]; q.roadSure = true; smp[i] = q; }
+            }
             // A place on a line next to a house or a plot is one you can be sure of too
             for (int i = 0; i < smp.Count; i++)
             {
@@ -236,7 +257,7 @@ public static class MapFeatureIndex
                 int id = label[r, c];
                 if (id == 0 || size[id] < 3) continue;
                 if (grid[r - 1, c] > 0.05f || grid[r + 1, c] > 0.05f || grid[r, c - 1] > 0.05f || grid[r, c + 1] > 0.05f)
-                    areas.Add(new AreaEdge { p = CellMetres(r, c), area = id, small = size[id] < 2000 });
+                    areas.Add(new AreaEdge { p = CellMetres(r, c), area = id, small = size[id] < 2000, size = size[id] });
             }
         Fill(areaBuckets, areas.Count, i => areas[i].p);
         if (heights == null) return;
@@ -294,6 +315,16 @@ public static class MapFeatureIndex
                 }
             }
         side = lab;
+    }
+    static bool IsRoad(int group) => group == 501 || group == 503 || group == 504;
+    static readonly List<int> tanNear = new List<int>();
+    static Vector2 Tangent(List<Sample> smp, int i)
+    {
+        QuerySamples(smp[i].p, 15f, tanNear);
+        Vector2 far = smp[i].p; float best = 0f;
+        foreach (int k in tanNear)
+            if (smp[k].line == smp[i].line && (smp[k].p - smp[i].p).sqrMagnitude > best) { best = (smp[k].p - smp[i].p).sqrMagnitude; far = smp[k].p; }
+        return best > 0f ? (far - smp[i].p).normalized : Vector2.zero;
     }
     static int SideOf(Vector2 m)
     {

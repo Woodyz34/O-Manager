@@ -36,6 +36,20 @@ def side(p):
 def same_side(a, b):
     sa, sb = side(a), side(b); return sa == 0 or sb == 0 or sa == sb
 
+# --- places on a road you are 100 % sure of: a junction with another road / big path, or houses and plots right by it
+_big = np.array([g in ('vag', 'stig') for g in F['Sg']])
+road_sure = np.zeros(len(_S), bool)
+def _tan(j):
+    ks = [k for k in F['St'].query_ball_point(_S[j], 15) if _Sl[k] == _Sl[j] and k != j]
+    if not ks: return None
+    v = _S[max(ks, key=lambda k: np.hypot(*(_S[k]-_S[j])))] - _S[j]; return v/max(1e-6, np.hypot(*v))
+for j in np.nonzero(np.array([g == 'vag' for g in F['Sg']]))[0]:
+    tj = _tan(j)
+    # a road or big path that crosses this one (not the other edge line of the same road)
+    if tj is not None and any(_Sl[k] != _Sl[j] and _big[k] and (lambda tk: tk is not None and abs(float(tk @ tj)) < 0.8)(_tan(k))
+                              for k in F['St'].query_ball_point(_S[j], 12)): road_sure[j] = True
+    elif any(sizes[Aid[k]-1] < 300 for k in At.query_ball_point(_S[j], 25)): road_sure[j] = True   # houses, gardens
+
 # --- hills: tops with at least 10 m rise over the ground round them
 mx = ndimage.maximum_filter(HH, size=21); lo = ndimage.percentile_filter(HH, 10, size=41)
 top = (HH >= mx-0.01) & (HH-lo >= 10) & OPEN
@@ -131,6 +145,8 @@ class Runner:
             l = _Sl[j]; key = ('l', l)
             if s.seen.get(key, -1e9) > s.travel - 120: continue
             s.seen[key] = s.travel; c = _Sc[j]
+            if road_sure[j] and s.mode != 'route':
+                s.fix('vag_saker'); return
             if s.noticed(c, boost*1.1):
                 grp = F['Sg'][j]; distinct = (dist_flag[j] or len(At.query_ball_point(_S[j], 25)) > 0) and s.rng.random() < 0.4 + 0.5*s.s
                 best = {}

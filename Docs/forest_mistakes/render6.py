@@ -52,7 +52,7 @@ def render(li, seed, out):
                     d.rectangle((q[0]-6,q[1]-6,q[0]+6,q[1]+6), fill=(255,255,255,255), outline=col+(255,), width=3)
                 elif kind == 'ingen_skarm': d.ellipse((q[0]-10,q[1]-10,q[0]+10,q[1]+10), fill=(255,255,255,200), outline=(0,0,0,255), width=3); d.text((q[0]-4,q[1]-13),'?',fill=(0,0,0),font=f3)
                 elif kind == "sakert": d.rectangle((q[0]-8,q[1]-8,q[0]+8,q[1]+8), fill=(0,0,0,255))
-                elif kind in ("fix", "hojdkurvor", "lasin_ungefar"): d.ellipse((q[0]-7,q[1]-7,q[0]+7,q[1]+7), fill=(20,160,60,255), outline=(255,255,255,255), width=2)
+                elif kind in ("fix", "vag_saker", "hojdkurvor", "lasin_ungefar"): d.ellipse((q[0]-7,q[1]-7,q[0]+7,q[1]+7), fill=(20,160,60,255), outline=(255,255,255,255), width=2)
         R = 30*m; s0 = T_(leg.a); e0 = T_(leg.b)
         d.polygon([(s0[0], s0[1]-R*1.1), (s0[0]-R*0.95, s0[1]+R*0.55), (s0[0]+R*0.95, s0[1]+R*0.55)], outline=(190,30,160,255), width=4)
         d.ellipse((e0[0]-R, e0[1]-R, e0[0]+R, e0[1]+R), outline=(190,30,160,255), width=4)

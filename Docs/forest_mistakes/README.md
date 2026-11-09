@@ -18,3 +18,6 @@ Bug fix: skimage traceback returns the path from the cost source to the point, s
 
 ## v6 (2026-11-09)
 sim5.py: roads split the map into sides (you always notice crossing a road): candidates and lost-search targets must be on the right side, wrong side at the control is known at once. Right house/plot = exact fix (you see the corner). Direction errors spread along the whole leg (near-control factor 1.3). Runner stops 3.5 s when relocating.
+
+## v7 (2026-11-09)
+Road junctions (with another road or big path, not the other edge line of the same road) and roads by houses/gardens (closed areas < 300 cells within 25 m) give a 100 % sure fix (Sample.roadSure).
