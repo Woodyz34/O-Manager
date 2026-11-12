@@ -183,7 +183,7 @@ public static class MapImportMenu
                 }
                 string folder = PackagesFolder + "/" + info.id;
                 Directory.CreateDirectory(folder);
-                foreach (string name in new[] { "grid.bytes", "points.json", "lines.json", "picture.png", "thumb.png", "map.json" })
+                foreach (string name in new[] { "grid.bytes", "kinds.bytes", "points.json", "lines.json", "picture.png", "thumb.png", "map.json" })
                 {
                     string from = Path.Combine(source, name);
                     if (File.Exists(from)) File.Copy(from, Path.Combine(folder, name), true);
