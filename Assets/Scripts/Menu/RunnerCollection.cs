@@ -48,9 +48,21 @@ public static class RunnerCollection
         if (data == null)
         {
             string json = PlayerPrefs.GetString(Key(), "");
-            data = string.IsNullOrEmpty(json) ? null : JsonUtility.FromJson<SaveData>(json);
+            try
+            {
+                data = string.IsNullOrEmpty(json) ? null : JsonUtility.FromJson<SaveData>(json);
+            }
+            catch (Exception e)
+            {
+                // A damaged save must not stop the game from starting. The damaged text is kept under another
+                // name, so it can be looked at (and maybe mended) afterwards.
+                Debug.LogError("RunnerCollection: the saved runners could not be read: " + e.Message);
+                PlayerPrefs.SetString(Key() + ".Damaged", json);
+                data = null;
+            }
             if (data == null) data = new SaveData();
             if (data.runners == null) data.runners = new List<Entry>();
+            data.runners.RemoveAll(e => e == null || string.IsNullOrEmpty(e.name));
             if (MoveRenamed(data))
             {
                 PlayerPrefs.SetString(Key(), JsonUtility.ToJson(data));

@@ -22,6 +22,10 @@ public class ReturnToLobby : MonoBehaviour
     public void GoToLobby()
     {
         NetworkRunner runner = FindObjectOfType<NetworkRunner>();
+        if (runner == null)
+        {
+            return;
+        }
 
         // Bara värden (master client i Shared Mode) får avsluta tävlingen och ladda lobbyn åt alla
         if (!runner.IsSharedModeMasterClient)
@@ -59,6 +63,11 @@ public class ReturnToLobby : MonoBehaviour
         foreach (var player in players)
         {
             var networkPlayer = player.GetComponent<NetworkPlayer>();
+            // A player who has just left can still be found for a moment; it has nothing to reset
+            if (networkPlayer == null || networkPlayer.Object == null || !networkPlayer.Object.IsValid)
+            {
+                continue;
+            }
             networkPlayer.RPC_ResetTimer();
             DontDestroyOnLoad(player);
         }

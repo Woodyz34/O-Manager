@@ -53,20 +53,32 @@ public static class SessionGuard
         {
             return;
         }
-        // A single-player game has no connection to lose
-        if (runner != null && runner.GameMode == GameMode.Single)
+        string scene = SceneManager.GetActiveScene().name;
+        // A single-player game has no connection to lose (its own page says so when it can not start)
+        if (scene == "SingelPlayer" || IsSingle(runner))
         {
             return;
         }
         handling = true;
 
-        string scene = SceneManager.GetActiveScene().name;
         bool connecting = scene == "MultiPlayer";
         Debug.LogWarning("SessionGuard: the network game ended (" + reason + ") in " + scene);
         pendingMessage = Describe(reason, connecting);
         // Creating or joining failed: the lobby list again, so the player can try once more.
         // In a lobby or a competition: the main menu.
         SceneManager.LoadScene(connecting ? "MultiPlayer" : "MainMenu");
+    }
+
+    static bool IsSingle(NetworkRunner runner)
+    {
+        try
+        {
+            return runner != null && runner.GameMode == GameMode.Single;
+        }
+        catch
+        {
+            return false;   // a runner that never got started
+        }
     }
 
     static string Describe(ShutdownReason reason, bool connecting)

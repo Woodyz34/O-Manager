@@ -78,10 +78,14 @@ public class MultiPlayerHandler : MonoBehaviour
     }
     public void OnFindGameClicked()
     {
-        PlayerPrefs.SetString("PlayerNickName", playerNameinputField.text);
+        // The name is shown on every player's screen: one line, no formatting tags, at most the 16 characters the game sends
+        string nickName = CourseData.SafeText(playerNameinputField.text, 16);
+        if (nickName.Length == 0) nickName = "Player";
+        playerNameinputField.text = nickName;
+        PlayerPrefs.SetString("PlayerNickName", nickName);
         PlayerPrefs.Save();
 
-        GameManager.Instance.playerNickName = playerNameinputField.text;
+        GameManager.Instance.playerNickName = nickName;
 
         NetworkRunnerHandler networkRunnerHandler = FindObjectOfType<NetworkRunnerHandler>();
 
