@@ -36,7 +36,7 @@ public static class SharedMaps
     // Every player's game downloads and builds what other players share, so what one player can make everybody
     // else's computer do is limited: how many maps of one player are taken, how big a file may be, and how many
     // maps are fetched in one go (the rest come the next time the game looks).
-    const int MaxMapsPerOwner = 20;
+    const int MaxMapsPerOwner = 100;   // Unity keeps at most 200 files per player, two per map: no real limit
     const int MaxDownloadsPerSync = 15;
     public const long MaxSourceBytes = 150L * 1024 * 1024;
     public const long MaxPictureBytes = 80L * 1024 * 1024;
