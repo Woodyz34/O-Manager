@@ -26,6 +26,7 @@ public class CourseRenderer : MonoBehaviour
     public static float SizeFor(MapDefinition map) => map != null && map.IsSprint ? SprintSize : 1f;
 
     readonly List<GameObject> marks = new List<GameObject>();
+    float widthFactor = 1f;     // for the mark being drawn (Mark.thick)
     static Material lineMaterial;
 
     float Scale => MapDefinition.WorldUnitsPerMeter * sizeFactor;
@@ -161,6 +162,8 @@ public class CourseRenderer : MonoBehaviour
         public string label;
         public Color color;
         public Vector3 toward;     // start only: where the triangle points
+        public float grow;         // 0 = normal size, otherwise times this (a ring around a mark is a bigger control circle)
+        public float thick;        // 0 = normal line width, otherwise times this
     }
 
     public struct Line
@@ -177,21 +180,24 @@ public class CourseRenderer : MonoBehaviour
         {
             Vector3 position = mark.position;
             position.z = -1.2f;
+            float grow = mark.grow > 0f ? mark.grow : 1f;
+            widthFactor = mark.thick > 0f ? mark.thick : 1f;
             switch (mark.kind)
             {
                 case MarkKind.Start:
                     AddStart(position, mark.toward.sqrMagnitude > 0f ? mark.toward : Vector3.up, mark.color);
                     break;
                 case MarkKind.Finish:
-                    AddCircle(position, finishInnerRadiusMeters * Scale, mark.color, "Finish inner");
-                    AddCircle(position, finishOuterRadiusMeters * Scale, mark.color, "Finish outer");
+                    AddCircle(position, finishInnerRadiusMeters * Scale * grow, mark.color, "Finish inner");
+                    AddCircle(position, finishOuterRadiusMeters * Scale * grow, mark.color, "Finish outer");
                     break;
                 default:
-                    AddCircle(position, controlRadiusMeters * Scale, mark.color, "Control " + mark.label);
+                    AddCircle(position, controlRadiusMeters * Scale * grow, mark.color, "Control " + mark.label);
                     if (!string.IsNullOrEmpty(mark.label)) AddNumber(position, mark.label, mark.color);
                     break;
             }
         }
+        widthFactor = 1f;
         foreach (Line line in lines)
         {
             float fromGap = (line.fromKind == MarkKind.Start ? startSideMeters * 0.6f : line.fromKind == MarkKind.Finish ? finishOuterRadiusMeters : controlRadiusMeters) * Scale;
@@ -297,7 +303,7 @@ public class CourseRenderer : MonoBehaviour
         line.sharedMaterial = lineMaterial;
         line.useWorldSpace = true;
         line.loop = loop;
-        line.widthMultiplier = lineWidthMeters * Scale;
+        line.widthMultiplier = lineWidthMeters * Scale * widthFactor;
         line.startColor = color;
         line.endColor = color;
         line.numCornerVertices = 2;
