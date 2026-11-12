@@ -21,6 +21,7 @@ namespace MapImport
         public double minE, minN;       // ground coordinates (metres) of the grid's lower left corner
         public float[] speed;           // rows * cols, row 0 at the south
         public float[] height;          // metres, relative
+        public byte[] kind;             // rows * cols, what the ground is (GroundKind): marsh, open land, green ...
         public bool hasHeights;
 
         public float Speed(int row, int col) => speed[row * cols + col];
@@ -64,6 +65,7 @@ namespace MapImport
             g.rows = Math.Max(2, (int)Math.Ceiling(extent.Height * mpm / cellSize));
             int n = g.rows * g.cols;
             g.speed = new float[n];
+            g.kind = new byte[n];
             var hard = new bool[n];           // buildings, out of bounds, impassable lines: paths don't open them
             var path = new bool[n];
             var building = new bool[n];
@@ -80,7 +82,9 @@ namespace MapImport
             {
                 if (o.kind != SymbolKind.Area) continue;
                 TerrainRule rule = SymbolRules.For(o.symbol, sprint);
-                if (rule.role != TerrainRole.Ground && rule.role != TerrainRole.Blocked) continue;
+                // Areas that only tell what the ground looks like (broken ground, a boulder field) are kept for the
+                // runners' map reading even when they do not change the speed
+                if (rule.role != TerrainRole.Ground && rule.role != TerrainRole.Blocked && GroundKind.Of(o.symbol) == GroundKind.Forest) continue;
                 areas.Add((TopColor(o.symbol), order++, o, rule));
             }
             areas.Sort((a, b) => a.prio != b.prio ? b.prio.CompareTo(a.prio) : a.order.CompareTo(b.order));
@@ -88,8 +92,13 @@ namespace MapImport
             {
                 bool isBuilding = a.rule.role == TerrainRole.Blocked && SymbolRules.IsBuilding(a.obj.symbol);
                 bool isHard = a.rule.role == TerrainRole.Blocked && (isBuilding || SymbolRules.IsOutOfBounds(a.obj.symbol));
+                bool setsSpeed = a.rule.role == TerrainRole.Ground || a.rule.role == TerrainRole.Blocked;
+                byte kind = GroundKind.Of(a.obj.symbol);
                 FillArea(g, a.obj.parts, ox, oy, scale, (idx) =>
                 {
+                    // Plain forest (white) drawn over something else takes its place; a pattern without a meaning does not
+                    if (setsSpeed || kind != GroundKind.Forest) g.kind[idx] = kind;
+                    if (!setsSpeed) return;
                     g.speed[idx] = a.rule.speed;
                     hard[idx] = isHard;
                     building[idx] = isBuilding;
