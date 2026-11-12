@@ -1733,7 +1733,7 @@ public class CourseBuilder : MonoBehaviour
         // always visible: the two lists give up room first (down to their minimum heights) when space runs short
         CourseUI.Column(panel.gameObject, 8, new RectOffset(28, 28, 20, 20));
 
-        // The title, with New course in the top-right corner, so the buttons at the bottom have room for their names
+        // The title, with Import map in the top-right corner (New course is the big button at the bottom left)
         RectTransform titleRow = CourseUI.Rect("Title row", panel.transform);
         CourseUI.Row(titleRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
         CourseUI.Size(titleRow, 44);
@@ -1741,8 +1741,8 @@ public class CourseBuilder : MonoBehaviour
         title.alignment = TextAlignmentOptions.MidlineLeft;
         title.enableWordWrapping = false;
         CourseUI.Size(title, 44, -1, 1);
-        Button newCourse = CourseUI.Button("New", titleRow, "New course", CourseUI.ButtonKind.Light, ClearCourse, 20);
-        CourseUI.Size(newCourse, 40, 150);
+        Button importMap = CourseUI.Button("Import map", titleRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 20);
+        CourseUI.Size(importMap, 40, 160);
 
         RectTransform mapRow = CourseUI.Rect("Map row", panel.transform);
         CourseUI.Row(mapRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
@@ -1812,8 +1812,9 @@ public class CourseBuilder : MonoBehaviour
 
         RectTransform bottomRow = CourseUI.Rect("Bottom", panel.transform);
         CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
-        CourseUI.Size(bottomRow, 52);
-        CourseUI.Button("Import map", bottomRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 22);
+        CourseUI.Size(bottomRow, 58);
+        Button newCourse = CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Secondary, ClearCourse, 24);
+        CourseUI.Size(newCourse, -1, -1, 1.4f);
         // Opened from the multiplayer lobby: back to the lobby, the network game is still running
         if (LobbyVisit.Active) CourseUI.Button("Back", bottomRow, "Back to lobby", CourseUI.ButtonKind.Light, LobbyVisit.Close, 22);
         else CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
