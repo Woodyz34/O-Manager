@@ -5,8 +5,10 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// The AI course's "Choose the area" window: the map, and the player holds the left mouse button and draws a ring
-// round the part they want the course in. Letting go closes the ring. Outside the ring is dimmed.
+// The AI course's "Choose the area" window: the map, and the player holds the left mouse button and draws a line
+// round the part they want the course in. The player may let go, zoom and move the map, and carry on drawing from
+// where the line ended; the area is finished only when the line closes into a loop (it reaches its own start, or
+// crosses itself). Outside the ring is dimmed.
 // The wheel (or + and -) zooms round the mouse, as in the map import's Map edge window; dragging with the right or
 // middle mouse button moves the map. Zoomed in, the full-size map picture is used so it stays sharp.
 // The ring is drawn like a route in the race (a red line with a dark edge) and kept in map coordinates, so it fits
@@ -18,6 +20,8 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
     const int MaxPoints = 1500;
     const float MinShare = 0.0005f;      // a ring smaller than this share of the picture is a slip, not an area
     const float MaxZoom = 16f;
+    const float CloseDistance = 18f;     // the line closes when it comes this close to its start, on the screen
+    const float MinLoopReach = 70f;      // ...after having been at least this far away from it
     const float SharpFromZoom = 1.8f;    // from this zoom on, the full-size picture is shown instead of the thumbnail
 
     MapDefinition map;
@@ -40,6 +44,7 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
     readonly List<Vector2> stroke = new List<Vector2>();   // 0..1 on the picture, while drawing or the closed ring
     bool drawing, panning;
     bool closed;
+    bool warnOpen;                       // Use was pressed while the line was still open
 
     static readonly Color32 Clear = new Color32(0, 0, 0, 0);
     static readonly Color32 Dim = new Color32(18, 30, 22, 140);
@@ -61,7 +66,8 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "Choose the area", 36, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Place(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -26), new Vector2(600, 48));
         TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform,
-            "Hold the left mouse button and draw a ring round the part of the map you find most fun; let go to close it. Draw again to start over. "
+            "Hold the left mouse button and draw a line round the part of the map you find most fun. You may let go, zoom and move the map, and carry on from where the line ended: "
+            + "the area is chosen when the line meets its own start. Draw a new line after that to start over. "
             + "The wheel or + and - zoom; drag with the right mouse button to move the map. The controls stay inside the ring; routes may leave it.", 20, CourseUI.InkMuted);
         CourseUI.Place(hint.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -76), new Vector2(1480, 56));
 
@@ -117,10 +123,17 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
         CourseUI.Row(buttons.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
         CourseUI.Size(CourseUI.Button("Zoom out", buttons, "-", CourseUI.ButtonKind.Light, () => drawer.Zoom(Vector2.zero, 0.67f), 28), 60, 70);
         CourseUI.Size(CourseUI.Button("Zoom in", buttons, "+", CourseUI.ButtonKind.Light, () => drawer.Zoom(Vector2.zero, 1.5f), 28), 60, 70);
-        CourseUI.Size(CourseUI.Button("Whole map", buttons, "Whole map", CourseUI.ButtonKind.Light, () => { drawer.stroke.Clear(); drawer.closed = false; drawer.Redraw(); }, 22), 60, -1, 1);
+        CourseUI.Size(CourseUI.Button("Whole map", buttons, "Whole map", CourseUI.ButtonKind.Light, () => { drawer.stroke.Clear(); drawer.closed = false; drawer.warnOpen = false; drawer.Redraw(); }, 22), 60, -1, 1);
         CourseUI.Size(CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, () => Destroy(shade.gameObject), 22), 60, -1, 1);
         CourseUI.Size(CourseUI.Button("Use", buttons, "Use", CourseUI.ButtonKind.Primary, () =>
         {
+            if (!drawer.closed && drawer.stroke.Count > 0)
+            {
+                // An unfinished line is neither an area nor the whole map: ask the player which
+                drawer.warnOpen = true;
+                drawer.ShowInfo();
+                return;
+            }
             List<CoursePoint> ring = drawer.closed ? drawer.ToMap() : null;
             Destroy(shade.gameObject);
             onDone?.Invoke(ring);
@@ -151,11 +164,22 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
             return;
         }
         if (!ToUV(eventData.position, eventData.pressEventCamera, out Vector2 uv)) return;
-        stroke.Clear();
-        stroke.Add(Clamp(uv));
+        warnOpen = false;
+        if (closed || stroke.Count == 0)
+        {
+            // A new line (a finished ring is replaced)
+            stroke.Clear();
+            stroke.Add(Clamp(uv));
+            closed = false;
+        }
+        else
+        {
+            // Carry on from where the line ended
+            AddPoint(Clamp(uv));
+        }
         drawing = true;
-        closed = false;
         Redraw();
+        if (closed) Finish();
     }
 
     public void OnDrag(PointerEventData eventData)
@@ -165,15 +189,70 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
             if (panning) PanBy(eventData.position, eventData.delta, eventData.pressEventCamera);
             return;
         }
-        if (!drawing || stroke.Count >= MaxPoints) return;
+        if (!drawing) return;
         if (!ToUV(eventData.position, eventData.pressEventCamera, out Vector2 uv)) return;
-        uv = Clamp(uv);
-        // A new point every few pixels on the screen, so the ring is as fine when zoomed in as out
-        Vector2 last = stroke[stroke.Count - 1];
+        if (AddPoint(Clamp(uv))) UpdateLines();
+        if (closed) Finish();
+    }
+
+    // A new point every few pixels on the screen, so the line is as fine when zoomed in as out. True if one was added.
+    bool AddPoint(Vector2 uv)
+    {
+        if (stroke.Count >= MaxPoints) return false;
         Vector2 shown = content.rect.size;
-        if (Vector2.Distance(new Vector2(uv.x * shown.x, uv.y * shown.y), new Vector2(last.x * shown.x, last.y * shown.y)) < MinStepPixels) return;
+        Vector2 last = stroke[stroke.Count - 1];
+        if (Vector2.Distance(Px(uv, shown), Px(last, shown)) < MinStepPixels) return false;
         stroke.Add(uv);
-        UpdateLines();
+        TryClose();
+        return true;
+    }
+
+    static Vector2 Px(Vector2 uv, Vector2 shown) => new Vector2(uv.x * shown.x, uv.y * shown.y);
+
+    // The line is a loop when its end reaches its start, or when it crosses itself (the tail before the crossing is cut off)
+    void TryClose()
+    {
+        int n = stroke.Count;
+        if (n < 4) return;
+        Vector2 shown = content.rect.size;
+        Vector2 a = Px(stroke[n - 2], shown), b = Px(stroke[n - 1], shown);
+        for (int k = 0; k + 3 < n; k++)
+        {
+            if (!Cross(Px(stroke[k], shown), Px(stroke[k + 1], shown), a, b, out Vector2 at)) continue;
+            Vector2 cut = new Vector2(at.x / shown.x, at.y / shown.y);
+            List<Vector2> ring = new List<Vector2> { cut };
+            for (int i = k + 1; i <= n - 2; i++) ring.Add(stroke[i]);
+            if (ring.Count < 3 || Mathf.Abs(SignedArea(ring)) < MinShare) return;
+            stroke.Clear();
+            stroke.AddRange(ring);
+            closed = true;
+            return;
+        }
+        Vector2 start = Px(stroke[0], shown);
+        if (Vector2.Distance(b, start) > CloseDistance) return;
+        float reach = 0f;
+        foreach (Vector2 uv in stroke) reach = Mathf.Max(reach, Vector2.Distance(Px(uv, shown), start));
+        if (reach < MinLoopReach || Mathf.Abs(SignedArea(stroke)) < MinShare) return;
+        closed = true;
+    }
+
+    static bool Cross(Vector2 p, Vector2 p2, Vector2 q, Vector2 q2, out Vector2 at)
+    {
+        at = default;
+        Vector2 r = p2 - p, s = q2 - q;
+        float d = r.x * s.y - r.y * s.x;
+        if (Mathf.Abs(d) < 1e-6f) return false;
+        Vector2 qp = q - p;
+        float t = (qp.x * s.y - qp.y * s.x) / d, u = (qp.x * r.y - qp.y * r.x) / d;
+        if (t < 0f || t > 1f || u < 0f || u > 1f) return false;
+        at = p + t * r;
+        return true;
+    }
+
+    void Finish()
+    {
+        drawing = false;
+        Redraw();
     }
 
     public void OnPointerUp(PointerEventData eventData)
@@ -185,15 +264,14 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
         }
         if (!drawing) return;
         drawing = false;
-        // A ring needs a few points and some size; a click or a short line is forgotten
-        closed = stroke.Count >= 3 && Mathf.Abs(SignedArea(stroke)) >= MinShare;
-        if (!closed) stroke.Clear();
+        // Letting go does not end the line: it may be carried on after zooming or moving the map.
+        // A lone click leaves nothing behind.
+        if (!closed && stroke.Count < 2) stroke.Clear();
         Redraw();
     }
 
     public void OnScroll(PointerEventData eventData)
     {
-        if (drawing) return;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(frameRect, eventData.position, eventData.enterEventCamera, out Vector2 at)) at = Vector2.zero;
         Zoom(at, eventData.scrollDelta.y > 0 ? 1.25f : 0.8f);
     }
@@ -296,13 +374,20 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
     {
         edgeLine.Set(stroke, closed);
         routeLine.Set(stroke, closed);
-        if (drawing && info != null) info.text = "Drawing... let go to close the ring.";
+        if (drawing && info != null) info.text = "Drawing... bring the line back to its start to close the ring.";
     }
 
     void ShowInfo()
     {
         if (info == null) return;
-        if (drawing) { info.text = "Drawing... let go to close the ring."; return; }
+        if (drawing) { info.text = "Drawing... bring the line back to its start to close the ring."; return; }
+        if (!closed && stroke.Count > 0)
+        {
+            info.text = warnOpen
+                ? "<b>The line is not closed.</b> Carry on drawing to its start, or press Whole map."
+                : "The line is not closed yet. Zoom or move the map and carry on from its end; close it at the start.";
+            return;
+        }
         info.text = closed
             ? "<b>Your area:</b> about " + AreaText(ToMap()) + ". Press Use to lay the AI course in it."
             : "<b>Whole map.</b> The course can go anywhere on the map.";
