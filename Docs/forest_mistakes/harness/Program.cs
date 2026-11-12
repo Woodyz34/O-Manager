@@ -163,6 +163,7 @@ static class Program
             // the event list gets the place of each new event
             for (; n0 < events.Count; n0++) { float[] q = ToPackage((Vector2)agent.transform.position * Mpu); events[n0] = $"{q[0]:F0},{q[1]:F0} {agent.time * GameSpeed / RealSpeed:F0}s {events[n0]}"; }
             if (agent.time * GameSpeed / RealSpeed > best * GameSpeed / RealSpeed + 2400f) { timedOut = true; break; }
+            UnityEngine.Time.time = agent.time;
             float next = agent.Pump();
             if (agent.isWaiting)
             {
@@ -183,6 +184,7 @@ static class Program
             Vector2 to = (Vector2)from + d.normalized * (step / Mpu);
             Vector2Int cell = agent.WorldToGridPositionCentered(to);
             float v = Math.Max(0.3f, speed[cell.y, cell.x]);
+            if (agent.time < agent.readingSlowUntil) v *= agent.readingSlowFactor;   // reading on the run
             agent.time += step / (GameSpeed * v);
             agent.transform.position = to;
             if (step >= dist - 1e-4f) agent.pathIndex++;

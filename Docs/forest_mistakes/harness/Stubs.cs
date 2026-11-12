@@ -70,6 +70,7 @@ namespace UnityEngine
         public static void LogError(object o) { Console.Error.WriteLine(o); }
     }
     public class Coroutine { public Stack<IEnumerator> stack = new Stack<IEnumerator>(); public bool stopped; public float wake; }
+    public static class Time { public static float time; }
     public class WaitForSeconds { public float seconds; public WaitForSeconds(float s) { seconds = s; } }
     public class Transform { public Vector3 position; }
 }
@@ -98,6 +99,7 @@ public class AgentMovement
     public float runnerStatTec;
     public string runnerName = "Test";
     public bool isWaiting;
+    public float readingSlowUntil = -1f, readingSlowFactor = 1f;
     public float UnscaledBaseSpeed = 0.36f;   // world units per second: 36 m/s, the game runs 10 x real time
     public List<UnityEngine.Vector2Int> path;
     public float time;                        // game seconds

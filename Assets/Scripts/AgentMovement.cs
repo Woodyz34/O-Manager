@@ -51,6 +51,10 @@ public class AgentMovement : NetworkBehaviour
    
     [HideInInspector]
     public bool isWaiting = false;
+    // Reading the map on the run (forest mistakes): slower for a few seconds instead of standing still
+    [System.NonSerialized] public float readingSlowUntil = -1f;
+    [System.NonSerialized] public float readingSlowFactor = 1f;
+    float ReadingFactor => Time.time < readingSlowUntil ? readingSlowFactor : 1f;
     private bool isInitialized = false;
     private Vector2Int lastGridCell;
     [HideInInspector]
@@ -140,6 +144,7 @@ public class AgentMovement : NetworkBehaviour
             StopAllCoroutines();
             isWaiting = false;
             doingSlowMovingCoroutine = false;
+            readingSlowUntil = -1f;
             if (originalBaseSpeed > 0f)
             {
                 // En avbruten bom kan ha lämnat hastigheten sänkt
@@ -548,7 +553,7 @@ public class AgentMovement : NetworkBehaviour
 
 
                 // Kombinera bas-hastighet och lutning
-                float targetSpeed2 = (baseSpeed * cellSpeed2) * slopeFactor2 * TerrainSpeedModel.RaceSpeedScale();
+                float targetSpeed2 = (baseSpeed * cellSpeed2) * slopeFactor2 * TerrainSpeedModel.RaceSpeedScale() * ReadingFactor;
 
                 // Lerp mot mål-hastighet för mjuk acceleration/deceleration
                 float maxDelta2 = acceleration * Time.deltaTime;
@@ -728,7 +733,7 @@ public class AgentMovement : NetworkBehaviour
 
             // Kombinera bas-hastighet och lutning
             // Sprint courses run slower than the grid alone says (see TerrainSpeedModel.SprintSpeedScale)
-            float targetSpeed = (baseSpeed * cellSpeed) * slopeFactor * TerrainSpeedModel.RaceSpeedScale();
+            float targetSpeed = (baseSpeed * cellSpeed) * slopeFactor * TerrainSpeedModel.RaceSpeedScale() * ReadingFactor;
             // Relays: a runner just ahead helps, hanging on sets the pace, and a tired runner is slower
             if (packRunning != null)
             {
