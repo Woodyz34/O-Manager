@@ -65,9 +65,22 @@ public class SceneLoader : MonoBehaviour
     // loading it while the runner is still leaving made Photon kick the player and log an error.
     public static async void LeaveSession(NetworkRunner runner, string scene)
     {
-        if (runner != null && runner.IsRunning)
+        // Leaving on purpose: not a lost connection (SessionGuard)
+        SessionGuard.Leaving = true;
+        try
         {
-            await runner.Shutdown();
+            if (runner != null && runner.IsRunning)
+            {
+                await runner.Shutdown();
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("SceneLoader: leaving the session failed: " + e.Message);
+        }
+        finally
+        {
+            SessionGuard.Leaving = false;
         }
         SceneManager.LoadScene(scene);
     }

@@ -116,9 +116,16 @@ public class MultiPlayerHandler : MonoBehaviour
         }
         NetworkRunnerHandler networkRunnerHandler = FindObjectOfType<NetworkRunnerHandler>();
 
-        PlayerPrefs.SetString("LobbyName", sessionNameinputField.text);
+        // A lobby without a name would be matched with any open lobby by the game servers, so it always gets one
+        string sessionName = sessionNameinputField.text != null ? sessionNameinputField.text.Trim() : "";
+        if (sessionName.Length == 0)
+        {
+            string host = GameManager.Instance != null ? GameManager.Instance.playerNickName : "";
+            sessionName = (string.IsNullOrWhiteSpace(host) ? "Player" : host.Trim()) + "'s lobby";
+        }
+        PlayerPrefs.SetString("LobbyName", sessionName);
         PlayerPrefs.Save();
-        networkRunnerHandler.CreateGame(sessionNameinputField.text, "Lobby");
+        networkRunnerHandler.CreateGame(sessionName, "Lobby");
 
         HideAllPanels();
 
