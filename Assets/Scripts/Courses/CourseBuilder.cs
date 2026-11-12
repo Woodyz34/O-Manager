@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -10,13 +11,17 @@ using UnityEngine.UI;
 // The course builder page: pick a map, click out the start, the controls and the finish, check that every
 // control can be reached, then save the course and publish it so other players can run it.
 //
-// Mouse: left click places a mark (or drags one that is already there), right click on a mark removes it,
-// right or middle drag moves the map, the wheel zooms.
+// Mouse: the mark that the next click places follows the mouse (a triangle, a numbered circle or a double circle).
+// Left click places it, or drags a mark that is already there; clicking a line between two marks puts a control in
+// between; right click on a mark removes it; right or middle drag moves the map, the wheel zooms. Shift places
+// freely (no grabbing, no clicking into place), Ctrl+Z takes the last change back.
 //
 // A course can also be a relay (the panel on the left): up to 10 legs, each with its own course (or the same course
 // as the leg before). A control can be turned into a fork: a stretch between the common control before and the common
 // control after it that can be run along different branches, each with any number of controls (or none). The forks
-// of other legs are shown faded; clicking one puts the whole fork, with its common controls, on the leg being laid.
+// and controls of other legs are shown faded, and the mark at the mouse clicks into place on them: on a plain control
+// it becomes the same control (shared by the legs, and moved together from then on), on a fork's control the whole
+// fork, with its common controls, is put on the leg being laid.
 // A fork on several legs is "Farsta" forked: every team runs every branch once over those legs.
 public class CourseBuilder : MonoBehaviour
 {
@@ -94,11 +99,54 @@ public class CourseBuilder : MonoBehaviour
         public int index = -1;
         public Vector3 position;
         public string label;
+        public CourseRenderer.MarkKind kind;   // shadows: what is drawn there
     }
 
     readonly List<Mark> marks = new List<Mark>();
     readonly List<Mark> shadows = new List<Mark>();
     Mark dragging;
+
+    // The drag: where the mark was grabbed, where it came from, and the same control on other legs (moved with it)
+    Vector3 dragGrab, dragFrom, dragMouse;
+    bool dragMoved, dragUndo;
+    readonly List<(EditCourse course, int slot)> dragLinks = new List<(EditCourse, int)>();   // slot: -1 start, -2 finish, else item
+    readonly List<Vector3> dragSnaps = new List<Vector3>();   // other legs' controls the dragged mark clicks onto
+
+    // The mark at the mouse: what the next click does
+    enum HoverKind { None, Mark, Fork, Shared, Insert, Free }
+
+    struct InsertSpot
+    {
+        public int item;       // where in the course's items the new control goes (fork -1)
+        public int fork, branch, index;   // or where in a fork's branch
+    }
+
+    struct Hover
+    {
+        public HoverKind kind;
+        public Mark mark;          // the mark or the faded control under the mouse
+        public Vector3 point;      // where the click puts the mark
+        public int fork;
+        public InsertSpot spot;
+        public string problem;     // why nothing can be put there, or null
+    }
+
+    CourseRenderer cursorRenderer;
+    RectTransform cursorTip;
+    TextMeshProUGUI cursorTipText;
+    string cursorKey;              // what the cursor shows now, so it is only drawn again when it changes
+    int drawnVersion;
+
+    // Filled by BuildMarks: the lines of the leg being laid (a click on one adds a control there), and where the
+    // next control is joined on
+    readonly List<(Vector3 from, Vector3 to, InsertSpot spot)> ownLines = new List<(Vector3, Vector3, InsertSpot)>();
+    readonly List<(Vector3 point, CourseRenderer.MarkKind kind)> courseTail = new List<(Vector3, CourseRenderer.MarkKind)>();
+    readonly List<(Vector3 point, CourseRenderer.MarkKind kind)> branchTail = new List<(Vector3, CourseRenderer.MarkKind)>();
+    (Vector3 point, CourseRenderer.MarkKind kind)? branchExit;
+    string branchNextLabel = "";
+    bool showOtherLegs = true;
+    Button otherLegsButton;
+    Button undoButton;
     Vector3 lastPanMouse;
     bool panning;
     bool busy;
@@ -123,7 +171,6 @@ public class CourseBuilder : MonoBehaviour
     Button sameCourseButton;
     Button forkModeButton;
     TextMeshProUGUI relayInfo;
-    GameObject forkPopup;
     GameObject canvasObject;
 
     const float PanelWidth = 560f;
@@ -155,8 +202,11 @@ public class CourseBuilder : MonoBehaviour
             mapRenderer = new GameObject("Map").AddComponent<SpriteRenderer>();
             courseRenderer = new GameObject("Course").AddComponent<CourseRenderer>();
             areaRenderer = new GameObject("Out-of-bounds areas").AddComponent<ForbiddenAreaRenderer>();
+            cursorRenderer = new GameObject("Mark at the mouse").AddComponent<CourseRenderer>();
+            cursorRenderer.sortingOrder = courseRenderer.sortingOrder + 2;
         }
         courseRenderer.sizeFactor = CourseRenderer.SizeFor(map);
+        cursorRenderer.sizeFactor = courseRenderer.sizeFactor;
         areaRenderer.SetMapType(map.IsSprint);
         MapBackground background = map.GetBackground(map.defaultBackground);
         if (background != null)
@@ -168,6 +218,8 @@ public class CourseBuilder : MonoBehaviour
         }
         if (mapButton != null) CourseUI.SetButtonText(mapButton, "Map: " + map.displayName + (MapDefinition.All.Count > 1 ? "  (change)" : ""));
         ClearCourse();
+        undo.Clear();
+        RefreshUndoButton();
         FitCamera();
     }
 
@@ -318,7 +370,11 @@ public class CourseBuilder : MonoBehaviour
 
     void Update()
     {
-        if (map == null || busy || forkPopup != null || MapImportPanel.IsOpen || MapEditPanel.IsOpen || mapPicker != null || coursesPopup != null) return;
+        if (map == null || busy || MapImportPanel.IsOpen || MapEditPanel.IsOpen || mapPicker != null || coursesPopup != null)
+        {
+            ShowCursor(default);
+            return;
+        }
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
         bool typing = EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null
                       && EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>() != null;
@@ -360,15 +416,37 @@ public class CourseBuilder : MonoBehaviour
             mapCamera.transform.position += keys * mapCamera.orthographicSize * Time.unscaledDeltaTime;
         }
 
+        bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl) || Input.GetKey(KeyCode.LeftCommand) || Input.GetKey(KeyCode.RightCommand);
+        if (!typing && ctrl && Input.GetKeyDown(KeyCode.Z))
+        {
+            Undo();
+            return;
+        }
+
         if (tool == Tool.Forbidden)
         {
+            ShowCursor(default);
             UpdateForbidden(mouseWorld, overUI, typing);
             return;
         }
 
+        // Shift: place freely, without grabbing a mark, clicking into place on another leg or adding on a line
+        bool free = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+
+        if (dragging != null)
+        {
+            UpdateDrag(mouseWorld, free);
+            return;
+        }
+
+        // What the mouse is over decides what a click does, and it is shown at the mouse before the click
+        bool movingMap = panning && (Input.GetMouseButton(1) || Input.GetMouseButton(2));
+        Hover hover = overUI || movingMap ? default : FindHover(mouseWorld, free);
+        ShowCursor(hover);
+
         if (moveType.HasValue)
         {
-            if (Input.GetMouseButtonDown(0) && !overUI) FinishMove(mouseWorld);
+            if (Input.GetMouseButtonDown(0) && !overUI) FinishMove(hover.kind == HoverKind.None ? mouseWorld : hover.point);
             else if (Input.GetMouseButtonUp(1) && !panning && !overUI) CancelMove();
             return;
         }
@@ -380,49 +458,549 @@ public class CourseBuilder : MonoBehaviour
             if (hit != null) RemoveMark(hit);
         }
 
-        // Left click: drag a mark that is already there, use a faded fork, or place a new mark
+        // Left click: drag a mark that is already there, use a faded fork, add a control on a line, or place a new mark
         if (Input.GetMouseButtonDown(0) && !overUI)
         {
-            Mark hit = tool == Tool.Branch ? null : Hit(marks, mouseWorld);
-            Mark shadow = relay && hit == null ? Hit(shadows, mouseWorld, 1.6f) : null;
-            if (hit != null)
+            switch (hover.kind)
             {
-                dragging = hit;
+                case HoverKind.Mark: BeginDrag(hover.mark, mouseWorld, true); break;
+                case HoverKind.Fork: UseFork(hover.fork); break;
+                case HoverKind.Insert: InsertOnLine(hover, mouseWorld); break;
+                case HoverKind.None: break;
+                default: Place(hover.point); break;
             }
-            else if (shadow != null)
+        }
+    }
+
+    // ---- The mark at the mouse ----
+
+    static bool Same(Vector3 a, Vector3 b) => Vector2.Distance(a, b) < 0.01f;   // within a metre: the same control
+
+    Hover FindHover(Vector3 mouseWorld, bool free)
+    {
+        Hover hover = new Hover { kind = HoverKind.Free, point = mouseWorld, fork = -1 };
+        bool laying = !moveType.HasValue && (tool == Tool.Control || tool == Tool.Branch);
+        if (!free)
+        {
+            Mark own = moveType.HasValue ? null : Hit(marks, mouseWorld);
+            if (own != null)
             {
-                AskUseFork(shadow.fork, mouseWorld);
+                hover.kind = HoverKind.Mark;
+                hover.mark = own;
+                hover.point = own.position;
+                return hover;
+            }
+            Mark shadow = relay ? Hit(shadows, mouseWorld, 1.3f) : null;
+            if (shadow != null && shadow.fork >= 0)
+            {
+                // A fork's own control: with a control at the mouse, the whole fork clicks in
+                if (!moveType.HasValue && tool == Tool.Control)
+                {
+                    hover.kind = HoverKind.Fork;
+                    hover.mark = shadow;
+                    hover.fork = shadow.fork;
+                    hover.point = shadow.position;
+                    return hover;
+                }
+                shadow = HitShared(mouseWorld, 1.3f);
+            }
+            if (shadow != null)
+            {
+                hover.kind = HoverKind.Shared;
+                hover.mark = shadow;
+                hover.point = shadow.position;
+            }
+            else if (laying && FindLine(mouseWorld, out InsertSpot spot, out Vector3 onLine))
+            {
+                hover.kind = HoverKind.Insert;
+                hover.spot = spot;
+                hover.point = onLine;
+            }
+        }
+        hover.point.z = -1f;
+        hover.problem = CheckPlace(hover.point);
+        return hover;
+    }
+
+    // The faded plain control (not a fork's own) of another leg under the mouse
+    Mark HitShared(Vector3 world, float reach)
+    {
+        return Hit(shadows.FindAll(s => s.fork < 0), world, reach);
+    }
+
+    // The line of this leg under the mouse, away from the marks at its ends
+    bool FindLine(Vector3 world, out InsertSpot spot, out Vector3 onLine)
+    {
+        spot = default;
+        onLine = world;
+        float best = Mathf.Max(courseRenderer.ControlRadiusWorld * 0.35f, mapCamera.orthographicSize * 0.012f);
+        float clear = courseRenderer.ControlRadiusWorld * 1.7f;
+        bool found = false;
+        foreach (var line in ownLines)
+        {
+            Vector2 a = line.from, b = line.to;
+            float length = Vector2.Distance(a, b);
+            if (length < clear * 2f) continue;
+            Vector2 direction = (b - a) / length;
+            float along = Vector2.Dot((Vector2)world - a, direction);
+            if (along < clear || along > length - clear) continue;
+            Vector2 nearest = a + direction * along;
+            float distance = Vector2.Distance(nearest, world);
+            if (distance >= best) continue;
+            best = distance;
+            spot = line.spot;
+            onLine = new Vector3(nearest.x, nearest.y, -1f);
+            found = true;
+        }
+        return found;
+    }
+
+    static readonly Color GhostPurple = new Color(0.50f, 0.04f, 0.58f, 0.8f);
+    static readonly Color RubberPurple = new Color(0.50f, 0.04f, 0.58f, 0.4f);
+    static readonly Color FaintPurple = new Color(0.66f, 0.13f, 0.75f, 0.3f);
+
+    // Draws what the next click does: the mark at the mouse with the line it will get, a ring round the mark that can
+    // be dragged, the fork that clicks in. A small label next to the mouse says it in words.
+    void ShowCursor(Hover hover)
+    {
+        if (cursorRenderer == null) return;
+        string tip = "";
+        bool tipIsError = false;
+        List<CourseRenderer.Mark> drawn = new List<CourseRenderer.Mark>();
+        List<CourseRenderer.Line> lines = new List<CourseRenderer.Line>();
+        Color accent = CourseUI.Accent;
+        EditCourse course = Cur;
+
+        if (hover.kind == HoverKind.Mark)
+        {
+            drawn.Add(Ring(hover.mark, accent));
+            string also = relay && hover.mark.type != MarkType.BranchControl ? LegsText(LinksAt(hover.mark.position)) : "";
+            tip = MarkName(hover.mark) + ": drag to move, right-click to remove" + (also.Length > 0 ? "\nSame control on " + also + ": it moves there too (hold Alt for this leg only)" : "");
+        }
+        else if (hover.kind == HoverKind.Fork)
+        {
+            if (FindForkSource(hover.fork, out Vector3 entry, out Vector3 exit, out bool entryIsStart, out bool exitIsFinish, out int sourceLeg))
+            {
+                AddForkDrawing(hover.fork, accent, entry, exit, entryIsStart, exitIsFinish, true, drawn, lines);
+                tip = "Fork " + (hover.fork + 1) + " from leg " + (sourceLeg + 1) + ": click to run it on leg " + (selectedLeg + 1) + " too";
+            }
+        }
+        else if (hover.kind != HoverKind.None)
+        {
+            bool snapped = hover.kind == HoverKind.Shared || hover.kind == HoverKind.Insert;
+            Color color = hover.problem != null ? CourseRenderer.ErrorRed : snapped ? accent : GhostPurple;
+            Color rubber = hover.problem != null ? new Color(0.86f, 0.12f, 0.12f, 0.4f) : snapped ? new Color(accent.r, accent.g, accent.b, 0.55f) : RubberPurple;
+            CourseRenderer.MarkKind kind = CourseRenderer.MarkKind.Control;
+            string label = "";
+            List<(Vector3 point, CourseRenderer.MarkKind kind)> from = null;
+            (Vector3 point, CourseRenderer.MarkKind kind)? to = null;
+            if (moveType.HasValue)
+            {
+                kind = moveType == MarkType.Start ? CourseRenderer.MarkKind.Start : moveType == MarkType.Finish ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control;
+            }
+            else if (hover.kind == HoverKind.Insert)
+            {
+                label = "+";
+            }
+            else if (tool == Tool.Start)
+            {
+                kind = CourseRenderer.MarkKind.Start;
+            }
+            else if (tool == Tool.Finish)
+            {
+                kind = CourseRenderer.MarkKind.Finish;
+                if (!course.finish.HasValue) from = courseTail;
+            }
+            else if (tool == Tool.Branch)
+            {
+                label = branchNextLabel;
+                from = branchTail;
+                to = branchExit;
             }
             else
             {
-                Place(mouseWorld);
+                label = (course.items.Count + 1).ToString();
+                from = courseTail;
+                if (course.finish.HasValue) to = (course.finish.Value, CourseRenderer.MarkKind.Finish);
+            }
+            Vector3 toward = Vector3.up;
+            if (kind == CourseRenderer.MarkKind.Start)
+            {
+                Mark first = marks.Find(m => m.type != MarkType.Start);
+                if (first != null && !Same(first.position, hover.point)) toward = first.position - hover.point;
+            }
+            drawn.Add(new CourseRenderer.Mark { position = hover.point, kind = kind, color = color, label = label, toward = toward });
+            if (hover.kind == HoverKind.Shared)
+            {
+                drawn.Add(new CourseRenderer.Mark { position = hover.point, kind = CourseRenderer.MarkKind.Control, color = color, label = "", grow = kind == CourseRenderer.MarkKind.Start ? 1.9f : 1.45f, thick = 0.7f });
+            }
+            if (from != null)
+            {
+                foreach (var tail in from) lines.Add(new CourseRenderer.Line { from = tail.point, to = hover.point, fromKind = tail.kind, toKind = kind, color = rubber });
+            }
+            if (to.HasValue) lines.Add(new CourseRenderer.Line { from = hover.point, to = to.Value.point, fromKind = kind, toKind = to.Value.kind, color = rubber });
+
+            if (hover.problem != null)
+            {
+                tip = hover.problem;
+                tipIsError = true;
+            }
+            else if (hover.kind == HoverKind.Shared)
+            {
+                string legsHere = LegsText(LinksAt(hover.point));
+                tip = "Clicks into place: the same " + (hover.mark.kind == CourseRenderer.MarkKind.Start ? "start" : hover.mark.kind == CourseRenderer.MarkKind.Finish ? "finish" : "control")
+                    + " as " + (legsHere.Length > 0 ? legsHere : "another leg");
+            }
+            else if (hover.kind == HoverKind.Insert)
+            {
+                tip = "Click to add a control here, in between";
             }
         }
+        DrawCursor(drawn, lines, tip, tipIsError, hover.kind + " " + hover.point.x + " " + hover.point.y + " " + hover.fork + " " + tool + " " + moveType);
+    }
+
+    void DrawCursor(List<CourseRenderer.Mark> drawn, List<CourseRenderer.Line> lines, string tip, bool tipIsError, string what)
+    {
+        // Drawn again only when something changed
+        string key = what + "|" + tip + "|" + drawnVersion;
+        if (key != cursorKey)
+        {
+            cursorKey = key;
+            cursorRenderer.DrawMarks(drawn, lines);
+            if (cursorTip != null)
+            {
+                cursorTip.gameObject.SetActive(tip.Length > 0);
+                cursorTipText.text = tip;
+                cursorTipText.color = tipIsError ? CourseUI.Danger : CourseUI.Ink;
+            }
+        }
+        if (cursorTip != null && cursorTip.gameObject.activeSelf)
+        {
+            // Next to the mouse, on the left of it when it would run into the panel or off the screen
+            float uiScale = Mathf.Min(Screen.width / ScreenSettings.ReferenceResolution.x, Screen.height / ScreenSettings.ReferenceResolution.y);
+            bool left = Input.mousePosition.x > Screen.width - (PanelWidth + 470f) * uiScale;
+            cursorTip.pivot = new Vector2(left ? 1f : 0f, 1f);
+            cursorTip.position = Input.mousePosition + new Vector3(left ? -26f : 26f, -30f, 0f) * uiScale;
+        }
+    }
+
+    // A ring round a mark: it can be grabbed, or it is being dragged
+    CourseRenderer.Mark Ring(Mark mark, Color color)
+    {
+        float grow = mark.type == MarkType.Start ? 1.9f : mark.type == MarkType.Finish ? 1.45f : 1.35f;
+        return new CourseRenderer.Mark { position = mark.position, kind = CourseRenderer.MarkKind.Control, color = color, label = "", grow = grow, thick = 1.5f };
+    }
+
+    // ---- Dragging a mark ----
+
+    // The same control on other legs: starts, finishes and plain controls at this spot
+    List<(EditCourse course, int slot)> LinksAt(Vector3 position)
+    {
+        List<(EditCourse, int)> links = new List<(EditCourse, int)>();
+        if (!relay) return links;
+        EditCourse current = Cur;
+        List<EditCourse> seen = new List<EditCourse>();
+        for (int leg = 0; leg < legs && leg < legCourse.Count; leg++)
+        {
+            EditCourse other = courses[legCourse[leg]];
+            if (other == current || seen.Contains(other)) continue;
+            seen.Add(other);
+            if (other.start.HasValue && Same(other.start.Value, position)) links.Add((other, -1));
+            if (other.finish.HasValue && Same(other.finish.Value, position)) links.Add((other, -2));
+            for (int i = 0; i < other.items.Count; i++)
+            {
+                if (other.items[i].fork < 0 && Same(other.items[i].point, position)) links.Add((other, i));
+            }
+        }
+        return links;
+    }
+
+    // "leg 2" or "legs 2, 3"
+    string LegsText(List<(EditCourse course, int slot)> links)
+    {
+        List<int> numbers = new List<int>();
+        foreach (var link in links)
+        {
+            foreach (int leg in LegsWithCourse(link.course)) if (!numbers.Contains(leg + 1)) numbers.Add(leg + 1);
+        }
+        if (numbers.Count == 0) return "";
+        numbers.Sort();
+        return (numbers.Count == 1 ? "leg " : "legs ") + string.Join(", ", numbers);
+    }
+
+    static void MoveLinks(List<(EditCourse course, int slot)> links, Vector3 world)
+    {
+        foreach (var link in links)
+        {
+            if (link.slot == -1) link.course.start = world;
+            else if (link.slot == -2) link.course.finish = world;
+            else if (link.slot < link.course.items.Count) link.course.items[link.slot].point = world;
+        }
+    }
+
+    void BeginDrag(Mark mark, Vector3 mouseWorld, bool pushUndo)
+    {
+        dragging = mark;
+        dragFrom = mark.position;
+        dragGrab = mark.position - mouseWorld;
+        dragGrab.z = 0f;
+        dragMouse = Input.mousePosition;
+        dragMoved = false;
+        dragUndo = pushUndo;
+        if (pushUndo) PushUndo();
+        // A control that other legs have too is moved on all of them, unless Alt is held
+        bool alone = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+        dragLinks.Clear();
+        if (!alone && mark.type != MarkType.BranchControl) dragLinks.AddRange(LinksAt(mark.position));
+        // The other legs' controls it can click onto (not the ones that move with it)
+        dragSnaps.Clear();
+        foreach (Mark shadow in shadows)
+        {
+            if (shadow.fork >= 0 || (dragLinks.Count > 0 && Same(shadow.position, dragFrom))) continue;
+            dragSnaps.Add(shadow.position);
+        }
+    }
+
+    void MoveDragged(Vector3 world)
+    {
+        world.z = -1f;
+        SetMarkPosition(dragging, world);
+        MoveLinks(dragLinks, world);
+    }
+
+    void EndDrag(bool takeBack)
+    {
+        if (takeBack)
+        {
+            MoveDragged(dragFrom);
+            if (dragUndo) DropUndo();
+        }
+        dragging = null;
+        dragLinks.Clear();
+        dragSnaps.Clear();
+        cursorKey = null;
+    }
+
+    void UpdateDrag(Vector3 mouseWorld, bool free)
+    {
+        // Right click while dragging: back where it was
+        if (Input.GetMouseButtonDown(1))
+        {
+            string name = MarkName(dragging);
+            bool moved = dragMoved;
+            EndDrag(true);
+            SetStatus(moved ? name + " was put back." : "", false);
+            Redraw();
+            return;
+        }
+        if (!dragMoved && (Input.mousePosition - dragMouse).sqrMagnitude > 16f) dragMoved = true;
+
+        Vector3 target = mouseWorld + dragGrab;
+        target.z = -1f;
+        bool snapped = false;
+        if (dragMoved && !free)
+        {
+            float best = Mathf.Max(courseRenderer.ControlRadiusWorld, mapCamera.orthographicSize * 0.02f);
+            Vector3 raw = target;
+            foreach (Vector3 snap in dragSnaps)
+            {
+                float distance = Vector2.Distance(snap, raw);
+                if (distance >= best) continue;
+                best = distance;
+                target = snap;
+                snapped = true;
+            }
+        }
+
+        if (Input.GetMouseButton(0))
+        {
+            if (dragMoved && (Vector2)target != (Vector2)dragging.position)
+            {
+                MoveDragged(target);
+                RedrawMap();
+            }
+            string problem = dragMoved ? CheckPlace(dragging.position) : null;
+            string also = LegsText(dragLinks);
+            string tip = problem != null ? problem
+                : snapped ? "Clicks into place: the same control as " + LegsText(LinksAt(dragging.position))
+                : also.Length > 0 ? "Moves on " + also + " too" : "";
+            List<CourseRenderer.Mark> drawn = new List<CourseRenderer.Mark> { Ring(dragging, problem != null ? CourseRenderer.ErrorRed : CourseUI.Accent) };
+            DrawCursor(drawn, new List<CourseRenderer.Line>(), tip, problem != null, "drag " + dragging.position.x + " " + dragging.position.y + " " + (problem != null));
+            return;
+        }
+
+        // Dropped: it must be somewhere a runner can stand, otherwise it goes back
+        if (!dragMoved)
+        {
+            EndDrag(false);
+            if (dragUndo) DropUndo();
+            return;
+        }
+        string markName = MarkName(dragging);
+        string where = LegsText(dragLinks);
+        string dropProblem = CheckPlace(dragging.position);
+        errorPoint = null;
+        if (dropProblem != null)
+        {
+            EndDrag(true);
+            SetStatus(markName + " can't go there: " + dropProblem + " It was put back.", true);
+        }
+        else
+        {
+            EndDrag(false);
+            SetStatus(where.Length > 0 ? markName + " was moved on " + where + " too, since it is the same control." : "", false);
+        }
+        Redraw();
+    }
+
+    // A click on a line of this leg: a new control there, which can be dragged on in the same press
+    void InsertOnLine(Hover hover, Vector3 mouseWorld)
+    {
+        if (hover.problem != null)
+        {
+            SetStatus(hover.problem, true);
+            return;
+        }
+        EditCourse course = Cur;
+        if (ControlCount(course) >= CourseData.MaxControls)
+        {
+            SetStatus("A course can have at most " + CourseData.MaxControls + " controls.", true);
+            return;
+        }
+        InsertSpot spot = hover.spot;
+        PushUndo();
+        if (spot.fork >= 0)
+        {
+            List<Vector3> branch = forks[spot.fork].branches[spot.branch];
+            branch.Insert(Mathf.Clamp(spot.index, 0, branch.Count), hover.point);
+        }
+        else
+        {
+            course.items.Insert(Mathf.Clamp(spot.item, 0, course.items.Count), new EditItem { point = hover.point });
+        }
+        errorPoint = null;
+        SetStatus("", false);
+        Redraw();
+        Mark added = marks.Find(m => m.type != MarkType.Start && m.type != MarkType.Finish && Same(m.position, hover.point));
+        if (added != null)
+        {
+            SetStatus("Control " + added.label + " was added. Drag it where it should be.", false);
+            BeginDrag(added, mouseWorld, false);
+        }
+    }
+
+    // ---- Undo ----
+
+    class Snapshot
+    {
+        public List<EditCourse> courses;
+        public List<EditFork> forks;
+        public List<int> legCourse;
+        public List<List<Vector3>> areas, boundaries;
+        public List<Vector3> openArea;
+        public bool relay, forkEveryVariant, openIsLine;
+        public int legs, selectedLeg;
+        public string terrain, name;
+        public CourseData editing;
+    }
+
+    readonly List<Snapshot> undo = new List<Snapshot>();
+
+    // Called before every change to what is laid
+    void PushUndo()
+    {
+        Snapshot snapshot = new Snapshot
+        {
+            courses = new List<EditCourse>(), forks = new List<EditFork>(), legCourse = new List<int>(legCourse),
+            areas = areas.ConvertAll(a => new List<Vector3>(a)), boundaries = boundaries.ConvertAll(b => new List<Vector3>(b)),
+            openArea = openArea != null ? new List<Vector3>(openArea) : null,
+            relay = relay, forkEveryVariant = forkEveryVariant, openIsLine = openIsLine, legs = legs, selectedLeg = selectedLeg,
+            terrain = terrain, name = nameField != null ? nameField.text : "", editing = editing
+        };
+        foreach (EditCourse course in courses)
+        {
+            EditCourse copy = new EditCourse { start = course.start, finish = course.finish };
+            foreach (EditItem item in course.items) copy.items.Add(new EditItem { fork = item.fork, point = item.point });
+            snapshot.courses.Add(copy);
+        }
+        foreach (EditFork fork in forks)
+        {
+            EditFork copy = new EditFork();
+            foreach (List<Vector3> branch in fork.branches) copy.branches.Add(new List<Vector3>(branch));
+            snapshot.forks.Add(copy);
+        }
+        undo.Add(snapshot);
+        if (undo.Count > 200) undo.RemoveAt(0);
+        RefreshUndoButton();
+    }
+
+    // The change that was about to be made didn't happen after all
+    void DropUndo()
+    {
+        if (undo.Count > 0) undo.RemoveAt(undo.Count - 1);
+        RefreshUndoButton();
+    }
+
+    void RefreshUndoButton()
+    {
+        if (undoButton != null) undoButton.interactable = undo.Count > 0;
+    }
+
+    void Undo()
+    {
+        if (busy) return;
         if (dragging != null)
         {
-            if (Input.GetMouseButton(0))
-            {
-                SetMarkPosition(dragging, mouseWorld);
-                Redraw();
-            }
-            else
-            {
-                // Dropped: it must be somewhere a runner can stand
-                string problem = CheckPlace(dragging.position);
-                errorPoint = null;
-                if (problem != null)
-                {
-                    SetStatus(MarkName(dragging) + ": " + problem, true);
-                    errorPoint = dragging.position;
-                }
-                else
-                {
-                    SetStatus("", false);
-                }
-                dragging = null;
-                Redraw();
-            }
+            // Ctrl+Z while dragging: the mark just goes back
+            EndDrag(true);
+            SetStatus("", false);
+            Redraw();
+            return;
         }
+        draggingCorner = false;
+        moveType = null;
+        if (undo.Count == 0)
+        {
+            SetStatus("Nothing to undo.", false);
+            RefreshUndoButton();
+            Redraw();
+            return;
+        }
+        Snapshot snapshot = undo[undo.Count - 1];
+        undo.RemoveAt(undo.Count - 1);
+        courses.Clear();
+        courses.AddRange(snapshot.courses);
+        forks.Clear();
+        forks.AddRange(snapshot.forks);
+        legCourse.Clear();
+        legCourse.AddRange(snapshot.legCourse);
+        areas.Clear();
+        areas.AddRange(snapshot.areas);
+        boundaries.Clear();
+        boundaries.AddRange(snapshot.boundaries);
+        openArea = snapshot.openArea;
+        openIsLine = snapshot.openIsLine;
+        forkEveryVariant = snapshot.forkEveryVariant;
+        legs = snapshot.legs;
+        selectedLeg = snapshot.selectedLeg;
+        editing = snapshot.editing;
+        if (nameField != null) nameField.text = snapshot.name;
+        SetTerrain(snapshot.terrain);
+        errorPoint = null;
+        // The tool that fits what is there now (an open area keeps the out-of-bounds tool; it is never closed here)
+        if (openArea != null)
+        {
+            drawLine = openIsLine;
+            tool = Tool.Forbidden;
+        }
+        Tool fits = tool == Tool.Forbidden ? Tool.Forbidden : Tool.Control;
+        relay = snapshot.relay;
+        if (fits != Tool.Forbidden && !Cur.start.HasValue) fits = Tool.Start;
+        SetTool(fits);
+        SetRelay(snapshot.relay);
+        SetStatus("Undone." + (undo.Count > 0 ? "" : " Nothing more to undo."), false);
+        RefreshUndoButton();
+        Redraw();
     }
 
     Mark Hit(List<Mark> list, Vector3 world, float reach = 1.2f)
@@ -483,6 +1061,7 @@ public class CourseBuilder : MonoBehaviour
         }
         if (!typing && Input.GetKeyDown(KeyCode.Backspace) && openArea != null)
         {
+            PushUndo();
             openArea.RemoveAt(openArea.Count - 1);
             if (openArea.Count == 0) openArea = null;
             Redraw();
@@ -500,6 +1079,7 @@ public class CourseBuilder : MonoBehaviour
                     Redraw();
                     return;
                 }
+                PushUndo();
                 dragArea = a;
                 dragCorner = c;
                 draggingCorner = true;
@@ -528,6 +1108,7 @@ public class CourseBuilder : MonoBehaviour
         {
             if (HitCorner(mouseWorld, out int a, out int c))
             {
+                PushUndo();
                 List<Vector3> shape = a < 0 ? openArea : Shape(a);
                 shape.RemoveAt(c);
                 if (a < 0 && shape.Count == 0) openArea = null;
@@ -540,6 +1121,7 @@ public class CourseBuilder : MonoBehaviour
                 int hit = boundaries.FindLastIndex(line => ForbiddenAreas.DistanceToLine(line, mouseWorld, false) < reach);
                 if (hit >= 0)
                 {
+                    PushUndo();
                     boundaries.RemoveAt(hit);
                     SetStatus("The uncrossable boundary was removed.", false);
                 }
@@ -548,6 +1130,7 @@ public class CourseBuilder : MonoBehaviour
                     int inside = areas.FindLastIndex(area => ForbiddenAreas.Contains(area, mouseWorld));
                     if (inside >= 0)
                     {
+                        PushUndo();
                         areas.RemoveAt(inside);
                         SetStatus("The out-of-bounds area was removed.", false);
                     }
@@ -572,12 +1155,10 @@ public class CourseBuilder : MonoBehaviour
                 SetStatus("A course can have at most " + ForbiddenArea.MaxAreas + " out-of-bounds areas and boundaries together.", true);
                 return;
             }
-            openArea = new List<Vector3>();
-            openIsLine = drawLine;
         }
-        if (openArea.Count >= ForbiddenArea.MaxCorners)
+        if (openArea != null && openArea.Count >= ForbiddenArea.MaxCorners)
         {
-            SetStatus("An " + OpenName + " can have at most " + ForbiddenArea.MaxCorners + " corners. "
+            SetStatus("An " + (openIsLine ? "uncrossable boundary" : "out-of-bounds area") + " can have at most " + ForbiddenArea.MaxCorners + " corners. "
                 + (openIsLine ? "Click the last corner again to finish it." : "Click the first corner to close it."), true);
             return;
         }
@@ -587,6 +1168,12 @@ public class CourseBuilder : MonoBehaviour
             return;
         }
         world.z = -1f;
+        PushUndo();
+        if (openArea == null)
+        {
+            openArea = new List<Vector3>();
+            openIsLine = drawLine;
+        }
         openArea.Add(world);
         SetStatus("", false);
         Redraw();
@@ -596,6 +1183,7 @@ public class CourseBuilder : MonoBehaviour
     void CloseOpenArea()
     {
         if (openArea == null) return;
+        PushUndo();
         if (openIsLine)
         {
             if (openArea.Count >= 2)
@@ -719,10 +1307,20 @@ public class CourseBuilder : MonoBehaviour
         bool gone = moveType == MarkType.Start ? !course.start.HasValue
             : moveType == MarkType.Finish ? !course.finish.HasValue
             : moveItem < 0 || moveItem >= course.items.Count || course.items[moveItem].fork >= 0;
-        if (!gone) SetMarkPosition(new Mark { type = moveType.Value, item = moveItem }, world);
+        string also = "";
+        if (!gone)
+        {
+            Vector3 from = moveType == MarkType.Start ? course.start.Value : moveType == MarkType.Finish ? course.finish.Value : course.items[moveItem].point;
+            bool alone = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+            List<(EditCourse course, int slot)> links = alone ? new List<(EditCourse, int)>() : LinksAt(from);
+            PushUndo();
+            SetMarkPosition(new Mark { type = moveType.Value, item = moveItem }, world);
+            MoveLinks(links, world);
+            also = LegsText(links);
+        }
         moveType = null;
         errorPoint = null;
-        SetStatus(gone ? "" : moveName + " was moved.", false);
+        SetStatus(gone ? "" : moveName + " was moved" + (also.Length > 0 ? " on " + also + " too, since it is the same control." : "."), false);
         Redraw();
     }
 
@@ -736,7 +1334,19 @@ public class CourseBuilder : MonoBehaviour
         }
         SetStatus("", false);
         errorPoint = null;
+        world.z = -1f;
         EditCourse course = Cur;
+        if ((tool == Tool.Control || tool == Tool.Branch) && ControlCount(course) >= CourseData.MaxControls)
+        {
+            SetStatus("A course can have at most " + CourseData.MaxControls + " controls.", true);
+            return;
+        }
+        if (tool == Tool.Branch && (branchFork < 0 || branchFork >= forks.Count || branchIndex >= forks[branchFork].branches.Count))
+        {
+            SetTool(Tool.Control);
+            return;
+        }
+        PushUndo();
         switch (tool)
         {
             case Tool.Start:
@@ -744,24 +1354,9 @@ public class CourseBuilder : MonoBehaviour
                 SetTool(Tool.Control);
                 break;
             case Tool.Control:
-                if (ControlCount(course) >= CourseData.MaxControls)
-                {
-                    SetStatus("A course can have at most " + CourseData.MaxControls + " controls.", true);
-                    return;
-                }
                 course.items.Add(new EditItem { point = world });
                 break;
             case Tool.Branch:
-                if (branchFork < 0 || branchFork >= forks.Count || branchIndex >= forks[branchFork].branches.Count)
-                {
-                    SetTool(Tool.Control);
-                    return;
-                }
-                if (ControlCount(course) >= CourseData.MaxControls)
-                {
-                    SetStatus("A course can have at most " + CourseData.MaxControls + " controls.", true);
-                    return;
-                }
                 forks[branchFork].branches[branchIndex].Add(world);
                 break;
             case Tool.Finish:
@@ -799,6 +1394,7 @@ public class CourseBuilder : MonoBehaviour
 
     void RemoveMark(Mark mark)
     {
+        PushUndo();
         EditCourse course = Cur;
         switch (mark.type)
         {
@@ -829,16 +1425,38 @@ public class CourseBuilder : MonoBehaviour
     {
         marks.Clear();
         shadows.Clear();
+        ownLines.Clear();
+        courseTail.Clear();
+        branchTail.Clear();
+        branchExit = null;
+        branchNextLabel = "";
         drawn = new List<CourseRenderer.Mark>();
         lines = new List<CourseRenderer.Line>();
+        List<CourseRenderer.Line> made = lines;
         EditCourse course = Cur;
         Color purple = CourseRenderer.CoursePurple;
+        bool laysBranch = tool == Tool.Branch && branchFork >= 0 && branchFork < forks.Count && branchIndex >= 0 && branchIndex < forks[branchFork].branches.Count;
 
-        List<(Vector3 point, CourseRenderer.MarkKind kind)> previous = new List<(Vector3, CourseRenderer.MarkKind)>();
+        // A line of this leg, and where a control goes that is added by clicking on it
+        void AddLine(Vector3 from, CourseRenderer.MarkKind fromKind, Vector3 to, CourseRenderer.MarkKind toKind, InsertSpot spot)
+        {
+            made.Add(new CourseRenderer.Line { from = from, to = to, fromKind = fromKind, toKind = toKind, color = purple });
+            ownLines.Add((from, to, spot));
+        }
+
+        // The ends the next mark is joined to. branch: the fork branch an end belongs to (a control clicked in on the
+        // line after it goes last on that branch), or -1 for a common control
+        List<(Vector3 point, CourseRenderer.MarkKind kind, int fork, int branch)> previous = new List<(Vector3, CourseRenderer.MarkKind, int, int)>();
         if (course.start.HasValue)
         {
             marks.Add(new Mark { type = MarkType.Start, position = course.start.Value, label = "Start" });
-            previous.Add((course.start.Value, CourseRenderer.MarkKind.Start));
+            previous.Add((course.start.Value, CourseRenderer.MarkKind.Start, -1, -1));
+        }
+        InsertSpot After(int item, int fork, int branch)
+        {
+            return fork >= 0
+                ? new InsertSpot { item = -1, fork = fork, branch = branch, index = forks[fork].branches[branch].Count }
+                : new InsertSpot { item = item, fork = -1 };
         }
         int number = 0;
         for (int i = 0; i < course.items.Count; i++)
@@ -848,31 +1466,46 @@ public class CourseBuilder : MonoBehaviour
             if (item.fork < 0)
             {
                 marks.Add(new Mark { type = MarkType.Control, item = i, position = item.point, label = number.ToString() });
-                foreach (var from in previous) lines.Add(new CourseRenderer.Line { from = from.point, to = item.point, fromKind = from.kind, toKind = CourseRenderer.MarkKind.Control, color = purple });
-                previous = new List<(Vector3, CourseRenderer.MarkKind)> { (item.point, CourseRenderer.MarkKind.Control) };
+                foreach (var from in previous) AddLine(from.point, from.kind, item.point, CourseRenderer.MarkKind.Control, After(i, from.fork, from.branch));
+                previous = new List<(Vector3, CourseRenderer.MarkKind, int, int)> { (item.point, CourseRenderer.MarkKind.Control, -1, -1) };
                 continue;
             }
             EditFork fork = forks[item.fork];
-            List<(Vector3, CourseRenderer.MarkKind)> ends = new List<(Vector3, CourseRenderer.MarkKind)>();
+            var ends = new List<(Vector3 point, CourseRenderer.MarkKind kind, int fork, int branch)>();
             for (int b = 0; b < fork.branches.Count; b++)
             {
-                List<(Vector3 point, CourseRenderer.MarkKind kind)> branchPrevious = previous;
+                var branchPrevious = previous;
                 for (int k = 0; k < fork.branches[b].Count; k++)
                 {
                     Vector3 point = fork.branches[b][k];
                     string label = number + CourseData.BranchLetter(b) + (k > 0 ? (k + 1).ToString() : "");
                     marks.Add(new Mark { type = MarkType.BranchControl, item = i, fork = item.fork, branch = b, index = k, position = point, label = label });
-                    foreach (var from in branchPrevious) lines.Add(new CourseRenderer.Line { from = from.point, to = point, fromKind = from.kind, toKind = CourseRenderer.MarkKind.Control, color = purple });
-                    branchPrevious = new List<(Vector3, CourseRenderer.MarkKind)> { (point, CourseRenderer.MarkKind.Control) };
+                    foreach (var from in branchPrevious) AddLine(from.point, from.kind, point, CourseRenderer.MarkKind.Control, new InsertSpot { item = -1, fork = item.fork, branch = b, index = k });
+                    branchPrevious = new List<(Vector3, CourseRenderer.MarkKind, int, int)> { (point, CourseRenderer.MarkKind.Control, item.fork, b) };
                 }
-                foreach (var end in branchPrevious) if (!ends.Contains(end)) ends.Add(end);
+                if (laysBranch && item.fork == branchFork && b == branchIndex)
+                {
+                    // Where the branch being laid goes on from, and the common control it comes back to
+                    foreach (var end in branchPrevious) branchTail.Add((end.point, end.kind));
+                    int count = fork.branches[b].Count;
+                    branchNextLabel = number + CourseData.BranchLetter(b) + (count > 0 ? (count + 1).ToString() : "");
+                    if (i + 1 < course.items.Count && course.items[i + 1].fork < 0) branchExit = (course.items[i + 1].point, CourseRenderer.MarkKind.Control);
+                    else if (i + 1 >= course.items.Count && course.finish.HasValue) branchExit = (course.finish.Value, CourseRenderer.MarkKind.Finish);
+                }
+                foreach (var end in branchPrevious)
+                {
+                    // A branch without controls goes straight on from the common control before the fork
+                    var tagged = (end.point, end.kind, item.fork, b);
+                    if (!ends.Exists(e => e.point == end.point)) ends.Add(tagged);
+                }
             }
             previous = ends;
         }
+        foreach (var end in previous) courseTail.Add((end.point, end.kind));
         if (course.finish.HasValue)
         {
             marks.Add(new Mark { type = MarkType.Finish, position = course.finish.Value, label = "Finish" });
-            foreach (var from in previous) lines.Add(new CourseRenderer.Line { from = from.point, to = course.finish.Value, fromKind = from.kind, toKind = CourseRenderer.MarkKind.Finish, color = purple });
+            foreach (var from in previous) AddLine(from.point, from.kind, course.finish.Value, CourseRenderer.MarkKind.Finish, After(course.items.Count, from.fork, from.branch));
         }
 
         Mark bad = null;
@@ -902,12 +1535,13 @@ public class CourseBuilder : MonoBehaviour
             });
         }
 
-        if (relay) AddShadowForks(drawn, lines);
+        if (relay) AddOtherLegs(drawn, lines);
     }
 
-    // The forks of other legs that this leg doesn't have yet, faded, with the common controls around them.
-    // Clicking one of their controls offers to put the whole fork on this leg.
-    void AddShadowForks(List<CourseRenderer.Mark> drawn, List<CourseRenderer.Line> lines)
+    // The other legs, faded: their forks that this leg doesn't have yet (with lines and names), the common controls
+    // around those forks, and (when shown) the rest of their starts, controls and finishes. The mark at the mouse
+    // clicks into place on them: a fork's own control puts the whole fork on this leg, any other becomes the same control.
+    void AddOtherLegs(List<CourseRenderer.Mark> drawn, List<CourseRenderer.Line> lines)
     {
         Color faded = CourseRenderer.ShadowPurple;
         EditCourse course = Cur;
@@ -915,28 +1549,71 @@ public class CourseBuilder : MonoBehaviour
         {
             if (course.items.Exists(item => item.fork == f)) continue;
             if (!FindForkSource(f, out Vector3 entry, out Vector3 exit, out bool entryIsStart, out bool exitIsFinish, out int sourceLeg)) continue;
+            AddForkDrawing(f, faded, entry, exit, entryIsStart, exitIsFinish, false, drawn, lines);
             EditFork fork = forks[f];
-            drawn.Add(new CourseRenderer.Mark { position = entry, kind = entryIsStart ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control, color = faded, label = "", toward = Vector3.up });
-            drawn.Add(new CourseRenderer.Mark { position = exit, kind = exitIsFinish ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control, color = faded, label = "" });
-            // The common controls before and after the fork can be clicked too (this leg's own marks win where they overlap)
-            shadows.Add(new Mark { type = MarkType.Shadow, fork = f, position = entry, label = "" });
-            shadows.Add(new Mark { type = MarkType.Shadow, fork = f, position = exit, label = "" });
             for (int b = 0; b < fork.branches.Count; b++)
             {
-                Vector3 from = entry;
-                CourseRenderer.MarkKind fromKind = entryIsStart ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control;
                 for (int k = 0; k < fork.branches[b].Count; k++)
                 {
-                    Vector3 point = fork.branches[b][k];
-                    string label = "F" + (f + 1) + CourseData.BranchLetter(b) + (k > 0 ? (k + 1).ToString() : "");
-                    shadows.Add(new Mark { type = MarkType.Shadow, fork = f, branch = b, index = k, position = point, label = label });
-                    drawn.Add(new CourseRenderer.Mark { position = point, kind = CourseRenderer.MarkKind.Control, color = faded, label = label });
-                    lines.Add(new CourseRenderer.Line { from = from, to = point, fromKind = fromKind, toKind = CourseRenderer.MarkKind.Control, color = faded });
-                    from = point;
-                    fromKind = CourseRenderer.MarkKind.Control;
+                    shadows.Add(new Mark { type = MarkType.Shadow, fork = f, branch = b, index = k, position = fork.branches[b][k], kind = CourseRenderer.MarkKind.Control, label = "" });
                 }
-                lines.Add(new CourseRenderer.Line { from = from, to = exit, fromKind = fromKind, toKind = exitIsFinish ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control, color = faded });
             }
+            AddSharedShadow(entry, entryIsStart ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control, faded, drawn);
+            AddSharedShadow(exit, exitIsFinish ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control, faded, drawn);
+        }
+        if (!showOtherLegs) return;
+        List<EditCourse> seen = new List<EditCourse> { course };
+        for (int leg = 0; leg < legs && leg < legCourse.Count; leg++)
+        {
+            EditCourse other = courses[legCourse[leg]];
+            if (seen.Contains(other)) continue;
+            seen.Add(other);
+            if (other.start.HasValue) AddSharedShadow(other.start.Value, CourseRenderer.MarkKind.Start, FaintPurple, drawn);
+            foreach (EditItem item in other.items)
+            {
+                if (item.fork < 0) AddSharedShadow(item.point, CourseRenderer.MarkKind.Control, FaintPurple, drawn);
+            }
+            if (other.finish.HasValue) AddSharedShadow(other.finish.Value, CourseRenderer.MarkKind.Finish, FaintPurple, drawn);
+        }
+    }
+
+    // A start, plain control or finish of another leg. Under one of this leg's own marks it is not drawn (it is the
+    // same control already), but it is still there to click onto.
+    void AddSharedShadow(Vector3 position, CourseRenderer.MarkKind kind, Color color, List<CourseRenderer.Mark> drawn)
+    {
+        if (shadows.Exists(s => s.fork < 0 && Same(s.position, position))) return;
+        shadows.Add(new Mark { type = MarkType.Shadow, fork = -1, position = position, kind = kind, label = "" });
+        if (marks.Exists(m => Same(m.position, position))) return;
+        drawn.Add(new CourseRenderer.Mark { position = position, kind = kind, color = color, label = "", toward = Vector3.up });
+    }
+
+    // A fork as it lies on another leg: its controls with their names and the lines through every branch, and (ends)
+    // the common marks before and after it
+    void AddForkDrawing(int f, Color color, Vector3 entry, Vector3 exit, bool entryIsStart, bool exitIsFinish, bool ends,
+                        List<CourseRenderer.Mark> drawn, List<CourseRenderer.Line> lines)
+    {
+        EditFork fork = forks[f];
+        CourseRenderer.MarkKind entryKind = entryIsStart ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control;
+        CourseRenderer.MarkKind exitKind = exitIsFinish ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control;
+        if (ends)
+        {
+            drawn.Add(new CourseRenderer.Mark { position = entry, kind = entryKind, color = color, label = "", toward = Vector3.up });
+            drawn.Add(new CourseRenderer.Mark { position = exit, kind = exitKind, color = color, label = "" });
+        }
+        for (int b = 0; b < fork.branches.Count; b++)
+        {
+            Vector3 from = entry;
+            CourseRenderer.MarkKind fromKind = entryKind;
+            for (int k = 0; k < fork.branches[b].Count; k++)
+            {
+                Vector3 point = fork.branches[b][k];
+                string label = "F" + (f + 1) + CourseData.BranchLetter(b) + (k > 0 ? (k + 1).ToString() : "");
+                drawn.Add(new CourseRenderer.Mark { position = point, kind = CourseRenderer.MarkKind.Control, color = color, label = label });
+                lines.Add(new CourseRenderer.Line { from = from, to = point, fromKind = fromKind, toKind = CourseRenderer.MarkKind.Control, color = color });
+                from = point;
+                fromKind = CourseRenderer.MarkKind.Control;
+            }
+            lines.Add(new CourseRenderer.Line { from = from, to = exit, fromKind = fromKind, toKind = exitKind, color = color });
         }
     }
 
@@ -964,10 +1641,17 @@ public class CourseBuilder : MonoBehaviour
         return false;
     }
 
-    void Redraw()
+    // Only the marks on the map (while a mark is dragged; the lists in the panels wait until it is dropped)
+    void RedrawMap()
     {
         BuildMarks(out List<CourseRenderer.Mark> drawn, out List<CourseRenderer.Line> lines);
         courseRenderer.DrawMarks(drawn, lines);
+        drawnVersion++;
+    }
+
+    void Redraw()
+    {
+        RedrawMap();
         RedrawAreas();
         RefreshPointList();
         RefreshHint();
@@ -992,6 +1676,7 @@ public class CourseBuilder : MonoBehaviour
             SetStatus("A fork needs at least two legs.", true);
             return;
         }
+        PushUndo();
         EditFork fork = new EditFork();
         fork.branches.Add(new List<Vector3> { course.items[i].point });
         fork.branches.Add(new List<Vector3>());
@@ -1009,6 +1694,7 @@ public class CourseBuilder : MonoBehaviour
                 + " legs, and every team runs every branch once. Add legs, or choose random branches.", true);
             return;
         }
+        PushUndo();
         forks[f].branches.Add(new List<Vector3>());
         if (direct)
         {
@@ -1029,6 +1715,7 @@ public class CourseBuilder : MonoBehaviour
 
     void RemoveBranch(int f, int b)
     {
+        PushUndo();
         forks[f].branches.RemoveAt(b);
         if (tool == Tool.Branch) SetTool(Tool.Control);
         // A fork with one branch left is just controls, if no other leg has it
@@ -1049,6 +1736,7 @@ public class CourseBuilder : MonoBehaviour
 
     void RemoveForkFromLeg(int i)
     {
+        PushUndo();
         Cur.items.RemoveAt(i);
         if (tool == Tool.Branch) SetTool(Tool.Control);
         Redraw();
@@ -1074,39 +1762,7 @@ public class CourseBuilder : MonoBehaviour
         return result;
     }
 
-    // A faded fork was clicked: put the whole fork on this leg, or just a control where it was clicked
-    void AskUseFork(int f, Vector3 clicked)
-    {
-        if (!FindForkSource(f, out Vector3 entry, out Vector3 exit, out bool entryIsStart, out bool exitIsFinish, out int sourceLeg)) return;
-        Transform canvas = canvasObject.transform;
-        Image dim = CourseUI.Panel("Fork question", canvas, new Color(0f, 0f, 0f, 0.35f), false);
-        CourseUI.Stretch(dim.rectTransform);
-        forkPopup = dim.gameObject;
-        Image card = CourseUI.CardPanel("Card", dim.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-200, 0), new Vector2(700, 330));
-        CourseUI.Column(card.gameObject, 14, new RectOffset(32, 32, 28, 28));
-        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "Fork " + (f + 1) + " from leg " + (sourceLeg + 1), 32, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Size(title, 42);
-        int branches = forks[f].branches.Count;
-        TextMeshProUGUI text = CourseUI.Text("Text", card.transform,
-            "Put the whole fork on leg " + (selectedLeg + 1) + "? It has " + branches + " branches, and comes with the common "
-            + (entryIsStart ? "start" : "control") + " before it and the common " + (exitIsFinish ? "finish" : "control") + " after it.", 22, CourseUI.InkMuted);
-        CourseUI.Size(text, 96);
-        Button use = CourseUI.Button("Use", card.transform, "Use the whole fork", CourseUI.ButtonKind.Primary, () => { CloseForkPopup(); UseFork(f); }, 24);
-        CourseUI.Size(use, 54);
-        RectTransform row = CourseUI.Rect("Row", card.transform);
-        CourseUI.Row(row.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
-        CourseUI.Size(row, 50);
-        CourseUI.Button("New control", row, "New control here instead", CourseUI.ButtonKind.Light, () => { CloseForkPopup(); Place(clicked); }, 20);
-        CourseUI.Button("Cancel", row, "Cancel", CourseUI.ButtonKind.Light, CloseForkPopup, 20);
-    }
-
-    void CloseForkPopup()
-    {
-        if (forkPopup != null) Destroy(forkPopup);
-        forkPopup = null;
-    }
-
+    // A faded fork's control was clicked: the whole fork goes on this leg, with the common controls around it
     void UseFork(int f)
     {
         if (!FindForkSource(f, out Vector3 entry, out Vector3 exit, out bool entryIsStart, out bool exitIsFinish, out int _)) return;
@@ -1116,23 +1772,25 @@ public class CourseBuilder : MonoBehaviour
             SetStatus("This leg already has fork " + (f + 1) + ".", true);
             return;
         }
-        if (course.items.Count > 0 && course.items[course.items.Count - 1].fork >= 0 && !entryIsStart)
+        if (entryIsStart && course.items.Count > 0)
         {
-            // The common control before the fork is added below, so two forks are kept apart
+            SetStatus("Fork " + (f + 1) + " starts at the start, so it has to be the first thing on the leg. Remove this leg's controls first, or hold Shift to lay a new control here.", true);
+            return;
         }
+        if (ControlCount(course) + 2 + forks[f].branches.ConvertAll(branch => branch.Count).Sum() > CourseData.MaxControls)
+        {
+            SetStatus("A course can have at most " + CourseData.MaxControls + " controls, and the fork does not fit.", true);
+            return;
+        }
+        PushUndo();
         if (entryIsStart)
         {
-            if (course.items.Count > 0)
-            {
-                SetStatus("Fork " + (f + 1) + " starts at the start, so it has to be the first thing on the leg. Remove this leg's controls first, or lay a new control.", true);
-                return;
-            }
             course.start = entry;
         }
         else
         {
             Vector3? last = course.items.Count == 0 ? course.start : course.items[course.items.Count - 1].fork < 0 ? course.items[course.items.Count - 1].point : (Vector3?)null;
-            if (!last.HasValue || Vector2.Distance(last.Value, entry) > 0.02f)
+            if (!last.HasValue || !Same(last.Value, entry))
             {
                 course.items.Add(new EditItem { point = entry });
             }
@@ -1149,7 +1807,7 @@ public class CourseBuilder : MonoBehaviour
             SetTool(Tool.Control);
         }
         errorPoint = null;
-        SetStatus("Fork " + (f + 1) + " is now on leg " + (selectedLeg + 1) + " too, with the common controls around it." + (exitIsFinish ? " It ends at the finish." : " Carry on from the control after it."), false);
+        SetStatus("Fork " + (f + 1) + " is now on leg " + (selectedLeg + 1) + " too, with the common controls around it." + (exitIsFinish ? " It ends at the finish." : " Carry on from the control after it.") + " Ctrl+Z takes it back.", false);
         Redraw();
     }
 
@@ -1169,6 +1827,7 @@ public class CourseBuilder : MonoBehaviour
 
     void ChangeLegs(int delta)
     {
+        PushUndo();
         legs = Mathf.Clamp(legs + delta, CourseData.MinLegs, CourseData.MaxLegs);
         // Every new leg gets its own course
         while (legCourse.Count < legs)
@@ -1189,6 +1848,7 @@ public class CourseBuilder : MonoBehaviour
     void ToggleSameCourse()
     {
         if (selectedLeg == 0) return;
+        PushUndo();
         if (legCourse[selectedLeg] == legCourse[selectedLeg - 1])
         {
             EditCourse shared = Cur;
@@ -1208,6 +1868,7 @@ public class CourseBuilder : MonoBehaviour
 
     void ToggleForkMode()
     {
+        PushUndo();
         forkEveryVariant = !forkEveryVariant;
         Redraw();
     }
@@ -1255,8 +1916,9 @@ public class CourseBuilder : MonoBehaviour
         bool same = selectedLeg > 0 && legCourse[selectedLeg] == legCourse[selectedLeg - 1];
         CourseUI.SetButtonText(sameCourseButton, same ? "Give leg " + (selectedLeg + 1) + " its own course" : "Same course as leg " + selectedLeg);
         CourseUI.SetButtonText(forkModeButton, forkEveryVariant ? "Every team runs every branch" : "Branches are random");
+        CourseUI.SetButtonText(otherLegsButton, showOtherLegs ? "Other legs: shown faded" : "Other legs: only their forks");
         relayInfo.text = "Each leg has its own course. Turn a control into a fork with \"Fork\" in the control list; a branch can have several controls, or none.\n"
-            + "Faded controls are forks on other legs: click one to put the whole fork on this leg. "
+            + "Faded marks are the other legs. Bring a control to one and it clicks into place: on a plain control it becomes the same control, on a fork's control (F1A...) the whole fork goes on this leg. "
             + (forkEveryVariant ? "Every team runs every branch of a fork once, so a fork needs as many legs as branches." : "Each team gets a random branch of every fork.");
     }
 
@@ -1614,6 +2276,8 @@ public class CourseBuilder : MonoBehaviour
         SetRelay(relay);
         SetTool(Tool.Control);
         SetStatus("Editing \"" + course.name + "\". Save to update it.", false);
+        undo.Clear();
+        RefreshUndoButton();
         Redraw();
     }
 
@@ -1689,7 +2353,7 @@ public class CourseBuilder : MonoBehaviour
         else text = "Click on the map where the finish should be.";
         hintText.text = text + (tool == Tool.Forbidden
             ? "\nDrag a corner to move it, right-click it to remove it, right-click inside an area or on a line to remove it."
-            : "\nDrag a mark to move it, right-click it to remove it. Right-drag moves the map, the wheel zooms.");
+            : "\nDrag a mark to move it, right-click it to remove it. Click a line to add a control in between. Ctrl+Z undoes. Right-drag moves the map, the wheel zooms.");
 
         if (summaryText != null)
         {
@@ -1740,7 +2404,13 @@ public class CourseBuilder : MonoBehaviour
         TextMeshProUGUI title = CourseUI.Text("Title", titleRow, "Course builder", 38, CourseUI.Ink, FontStyles.Bold);
         title.alignment = TextAlignmentOptions.MidlineLeft;
         title.enableWordWrapping = false;
+        title.enableAutoSizing = true;
+        title.fontSizeMin = 24;
+        title.fontSizeMax = 38;
         CourseUI.Size(title, 44, -1, 1);
+        undoButton = CourseUI.Button("Undo", titleRow, "Undo", CourseUI.ButtonKind.Light, Undo, 20);
+        CourseUI.Size(undoButton, 40, 104);
+        undoButton.interactable = false;
         Button importMap = CourseUI.Button("Import map", titleRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 20);
         CourseUI.Size(importMap, 40, 160);
 
@@ -1748,7 +2418,7 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Row(mapRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(mapRow, 48);
         mapButton = CourseUI.Button("Map", mapRow, "Map", CourseUI.ButtonKind.Light, OpenMapPicker, 22);
-        typeButton = CourseUI.Button("Type", mapRow, "Type: Individual", CourseUI.ButtonKind.Light, () => SetRelay(!relay), 22);
+        typeButton = CourseUI.Button("Type", mapRow, "Type: Individual", CourseUI.ButtonKind.Light, () => { PushUndo(); SetRelay(!relay); }, 22);
 
         nameField = CourseUI.Input("Course name", panel.transform, "Course name", CourseData.MaxNameLength, null);
         CourseUI.Size(nameField, 54);
@@ -1772,7 +2442,10 @@ public class CourseBuilder : MonoBehaviour
 
         // Room for four lines: the tool's own hint can take two, the mouse help after it two more
         hintText = CourseUI.Text("Hint", panel.transform, "", 19, CourseUI.InkMuted);
-        CourseUI.Size(hintText, 92);
+        CourseUI.Size(hintText, 100);
+        hintText.enableAutoSizing = true;
+        hintText.fontSizeMin = 14;
+        hintText.fontSizeMax = 19;
 
         summaryText = CourseUI.Text("Summary", panel.transform, "", 24, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(summaryText, 32);
@@ -1813,19 +2486,34 @@ public class CourseBuilder : MonoBehaviour
         RectTransform bottomRow = CourseUI.Rect("Bottom", panel.transform);
         CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(bottomRow, 58);
-        Button newCourse = CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Secondary, ClearCourse, 24);
+        Button newCourse = CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Secondary, () => { PushUndo(); ClearCourse(); }, 24);
         CourseUI.Size(newCourse, -1, -1, 1.4f);
         // Opened from the multiplayer lobby: back to the lobby, the network game is still running
         if (LobbyVisit.Active) CourseUI.Button("Back", bottomRow, "Back to lobby", CourseUI.ButtonKind.Light, LobbyVisit.Close, 22);
         else CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
 
         BuildRelayPanel(canvasObject.transform);
+
+        // The label next to the mouse; it never takes clicks
+        Image tip = CourseUI.Panel("Mouse label", canvasObject.transform, CourseUI.CardSolid);
+        tip.raycastTarget = false;
+        cursorTip = tip.rectTransform;
+        cursorTip.anchorMin = cursorTip.anchorMax = Vector2.zero;
+        cursorTip.pivot = new Vector2(0f, 1f);
+        CourseUI.Row(tip.gameObject, 0, new RectOffset(14, 14, 8, 8));
+        ContentSizeFitter fitter = tip.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        cursorTipText = CourseUI.Text("Text", tip.transform, "", 18, CourseUI.Ink, FontStyles.Bold);
+        cursorTipText.enableWordWrapping = false;
+        cursorTipText.overflowMode = TextOverflowModes.Overflow;
+        tip.gameObject.SetActive(false);
     }
 
     void BuildRelayPanel(Transform canvas)
     {
         relayPanel = CourseUI.CardPanel("Relay panel", canvas);
-        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 600));
+        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 654));
         CourseUI.Column(relayPanel.gameObject, 10, new RectOffset(22, 22, 20, 20));
 
         TextMeshProUGUI title = CourseUI.Text("Title", relayPanel.transform, "Relay", 32, CourseUI.Ink, FontStyles.Bold);
@@ -1858,6 +2546,9 @@ public class CourseBuilder : MonoBehaviour
         forkModeButton = CourseUI.Button("Fork mode", relayPanel.transform, "", CourseUI.ButtonKind.Secondary, ToggleForkMode, 20);
         CourseUI.Size(forkModeButton, 44);
 
+        otherLegsButton = CourseUI.Button("Other legs", relayPanel.transform, "", CourseUI.ButtonKind.Light, () => { showOtherLegs = !showOtherLegs; Redraw(); }, 19);
+        CourseUI.Size(otherLegsButton, 44);
+
         relayInfo = CourseUI.Text("Info", relayPanel.transform, "", 17, CourseUI.InkMuted);
         CourseUI.Size(relayInfo, 150);
 
@@ -1874,7 +2565,7 @@ public class CourseBuilder : MonoBehaviour
         {
             AddRow("Start", 38, MovingColor(MarkType.Start, -1), FontStyles.Normal, 6,
                 ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Start, -1, "The start")),
-                ("Remove", CourseUI.ButtonKind.Light, () => { course.start = null; Redraw(); }));
+                ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.start = null; Redraw(); }));
         }
         int number = 0;
         for (int i = 0; i < course.items.Count; i++)
@@ -1893,13 +2584,13 @@ public class CourseBuilder : MonoBehaviour
                     AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
                         ("Fork", CourseUI.ButtonKind.Secondary, () => MakeFork(index)),
                         ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
-                        ("Remove", CourseUI.ButtonKind.Light, () => { course.items.RemoveAt(index); Redraw(); }));
+                        ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
                 }
                 else
                 {
                     AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
                         ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
-                        ("Remove", CourseUI.ButtonKind.Light, () => { course.items.RemoveAt(index); Redraw(); }));
+                        ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
                 }
                 previous = item.point;
                 continue;
@@ -1933,19 +2624,19 @@ public class CourseBuilder : MonoBehaviour
         {
             AddRow("Finish" + Meters(previous, course.finish.Value), 38, MovingColor(MarkType.Finish, -1), FontStyles.Normal, 6,
                 ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Finish, -1, "The finish")),
-                ("Remove", CourseUI.ButtonKind.Light, () => { course.finish = null; Redraw(); }));
+                ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.finish = null; Redraw(); }));
         }
         for (int a = 0; a < areas.Count; a++)
         {
             int index = a;
             AddRow("<color=#8A0A94>Out-of-bounds area " + (a + 1) + "</color>  <color=#5B7563>" + areas[a].Count + " corners</color>", 38, CourseUI.Ink, FontStyles.Normal, 6,
-                ("Remove", CourseUI.ButtonKind.Light, () => { areas.RemoveAt(index); Redraw(); }));
+                ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); areas.RemoveAt(index); Redraw(); }));
         }
         for (int b = 0; b < boundaries.Count; b++)
         {
             int index = b;
             AddRow("<color=#8A0A94>Uncrossable boundary " + (b + 1) + "</color>  <color=#5B7563>" + boundaries[b].Count + " corners</color>", 38, CourseUI.Ink, FontStyles.Normal, 6,
-                ("Remove", CourseUI.ButtonKind.Light, () => { boundaries.RemoveAt(index); Redraw(); }));
+                ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); boundaries.RemoveAt(index); Redraw(); }));
         }
     }
 
