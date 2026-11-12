@@ -64,6 +64,34 @@ public static class RouteChoiceGame
         return false;
     }
 
+    // Held down, the route lines are hidden so the clean map shows. Two keys (right mouse button and Tab at first),
+    // both changeable in the Esc menu; a mouse button works too.
+    static readonly KeyCode[] DefaultHideKeys = { KeyCode.Mouse1, KeyCode.Tab };
+
+    public static KeyCode HideKey(int which)
+    {
+        string saved = PlayerPrefs.GetString("RouteChoice.HideKey." + which, "");
+        if (saved.Length > 0 && System.Enum.TryParse(saved, out KeyCode key)) return key;
+        return DefaultHideKeys[which];
+    }
+
+    public static void SetHideKey(int which, KeyCode key)
+    {
+        PlayerPrefs.SetString("RouteChoice.HideKey." + which, key.ToString());
+        PlayerPrefs.Save();
+        KeysChanged?.Invoke();
+    }
+
+    public static bool HideHeld()
+    {
+        return Input.GetKey(HideKey(0)) || Input.GetKey(HideKey(1));
+    }
+
+    public static bool IsHideKeyDown()
+    {
+        return Input.GetKeyDown(HideKey(0)) || Input.GetKeyDown(HideKey(1));
+    }
+
     public static string KeyName(KeyCode key)
     {
         if (key >= KeyCode.Alpha0 && key <= KeyCode.Alpha9) return ((int)(key - KeyCode.Alpha0)).ToString();
@@ -74,7 +102,10 @@ public static class RouteChoiceGame
             case KeyCode.RightArrow: return "Right";
             case KeyCode.UpArrow: return "Up";
             case KeyCode.DownArrow: return "Down";
+            case KeyCode.Mouse1: return "Right mouse";
+            case KeyCode.Mouse2: return "Middle mouse";
         }
+        if (key >= KeyCode.Mouse3 && key <= KeyCode.Mouse6) return "Mouse " + (int)(key - KeyCode.Mouse0 + 1);
         return key.ToString();
     }
 
@@ -423,10 +454,10 @@ public class RouteChoiceView : MonoBehaviour
         }
     }
 
-    // The route lines are shown at first; hold Tab or the right mouse button to hide them and see the clean map
+    // The route lines are shown at first; hold a hide key (right mouse button or Tab at first) to see the clean map
     static bool PeekHeld()
     {
-        return Input.GetKey(KeyCode.Tab) || Input.GetMouseButton(1);
+        return RouteChoiceGame.HideHeld();
     }
 
     void ApplyPeek()
@@ -442,7 +473,7 @@ public class RouteChoiceView : MonoBehaviour
     static bool AnyKeyForNext()
     {
         if (!Input.anyKeyDown) return false;
-        if (Input.GetKeyDown(KeyCode.Tab)) return false;
+        if (Input.GetKeyDown(KeyCode.Tab) || RouteChoiceGame.IsHideKeyDown()) return false;
         if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2)) return false;
         return !Input.GetKeyDown(KeyCode.Escape);
     }

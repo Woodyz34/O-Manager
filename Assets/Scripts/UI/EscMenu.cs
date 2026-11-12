@@ -43,6 +43,7 @@ public class EscMenu : MonoBehaviour
         public Color? colour;
         public System.Func<KeyCode> get;
         public System.Action<KeyCode> set;
+        public bool allowMouse; // a mouse button other than the left one may be chosen too
         public Button button;
     }
 
@@ -60,6 +61,17 @@ public class EscMenu : MonoBehaviour
                 colour = RouteChoiceGame.Colours[c],
                 get = () => RouteChoiceGame.Key(c),
                 set = key => RouteChoiceGame.SetKey(c, key),
+            });
+        }
+        for (int which = 0; which < 2; which++)
+        {
+            int w = which;
+            routeChoice.Add(new KeyRow
+            {
+                label = which == 0 ? "Hide routes (hold)" : "Hide routes, other key",
+                get = () => RouteChoiceGame.HideKey(w),
+                set = key => RouteChoiceGame.SetHideKey(w, key),
+                allowMouse = true,
             });
         }
         groups.Add(("Route choice game", routeChoice));
@@ -368,9 +380,11 @@ public class EscMenu : MonoBehaviour
         }
         foreach (KeyCode key in System.Enum.GetValues(typeof(KeyCode)))
         {
-            if (key == KeyCode.None || key == KeyCode.Escape || key >= KeyCode.Mouse0)
+            // No joystick buttons; the left mouse button clicks the menu, other mouse buttons only where allowed
+            bool mouse = key >= KeyCode.Mouse1 && key <= KeyCode.Mouse6 && rebinding.allowMouse;
+            if (key == KeyCode.None || key == KeyCode.Escape || (key >= KeyCode.Mouse0 && !mouse))
             {
-                continue; // no mouse or joystick buttons (the mouse clicks the menu)
+                continue;
             }
             if (!Input.GetKeyDown(key))
             {
