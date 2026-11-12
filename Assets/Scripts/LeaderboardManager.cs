@@ -42,7 +42,9 @@ public class LeaderboardManager : NetworkBehaviour
             return;
         }
 
+        // A player who has just left is still found for a moment, but its networked values can not be read any more
         var players = FindObjectsOfType<NetworkPlayer>()
+            .Where(p => p.Object != null && p.Object.IsValid)
             .OrderBy(p => p.hourCount * 3600 + p.minuterCount * 60 + p.secoundCount)
             .ToList();
 

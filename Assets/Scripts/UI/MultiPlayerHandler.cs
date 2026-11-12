@@ -78,10 +78,14 @@ public class MultiPlayerHandler : MonoBehaviour
     }
     public void OnFindGameClicked()
     {
-        PlayerPrefs.SetString("PlayerNickName", playerNameinputField.text);
+        // The name is shown on every player's screen: one line, no formatting tags, at most the 16 characters the game sends
+        string nickName = CourseData.SafeText(playerNameinputField.text, 16);
+        if (nickName.Length == 0) nickName = "Player";
+        playerNameinputField.text = nickName;
+        PlayerPrefs.SetString("PlayerNickName", nickName);
         PlayerPrefs.Save();
 
-        GameManager.Instance.playerNickName = playerNameinputField.text;
+        GameManager.Instance.playerNickName = nickName;
 
         NetworkRunnerHandler networkRunnerHandler = FindObjectOfType<NetworkRunnerHandler>();
 
@@ -116,9 +120,16 @@ public class MultiPlayerHandler : MonoBehaviour
         }
         NetworkRunnerHandler networkRunnerHandler = FindObjectOfType<NetworkRunnerHandler>();
 
-        PlayerPrefs.SetString("LobbyName", sessionNameinputField.text);
+        // A lobby without a name would be matched with any open lobby by the game servers, so it always gets one
+        string sessionName = sessionNameinputField.text != null ? sessionNameinputField.text.Trim() : "";
+        if (sessionName.Length == 0)
+        {
+            string host = GameManager.Instance != null ? GameManager.Instance.playerNickName : "";
+            sessionName = (string.IsNullOrWhiteSpace(host) ? "Player" : host.Trim()) + "'s lobby";
+        }
+        PlayerPrefs.SetString("LobbyName", sessionName);
         PlayerPrefs.Save();
-        networkRunnerHandler.CreateGame(sessionNameinputField.text, "Lobby");
+        networkRunnerHandler.CreateGame(sessionName, "Lobby");
 
         HideAllPanels();
 

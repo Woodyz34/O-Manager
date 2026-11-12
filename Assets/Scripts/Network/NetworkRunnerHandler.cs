@@ -73,13 +73,13 @@ public class NetworkRunnerHandler : MonoBehaviour
         
         Debug.Log($"Host migration started");
     }
-    protected virtual Task InitializeNetworkRunner(NetworkRunner runner, GameMode gameMode, byte[] connectionToken, string sessionName, NetAddress address, SceneRef  scene, Action<NetworkRunner> initialized)
+    protected virtual async Task InitializeNetworkRunner(NetworkRunner runner, GameMode gameMode, byte[] connectionToken, string sessionName, NetAddress address, SceneRef  scene, Action<NetworkRunner> initialized)
     {
         var sceneManager = GetSceneManager(runner);
 
         runner.ProvideInput = true; // Notera: ProvideInput används oftast för Host mode, men spelar ingen roll om det är True.
 
-        return runner.StartGame(new StartGameArgs
+        StartGameResult result = await runner.StartGame(new StartGameArgs
         {
             Address = address,
             GameMode = gameMode, // Nu kommer detta vara GameMode.Shared
@@ -89,6 +89,13 @@ public class NetworkRunnerHandler : MonoBehaviour
             SceneManager = sceneManager,
             ConnectionToken = connectionToken
         });
+        if (!result.Ok)
+        {
+            // Full, already racing, gone, or no internet: back to the lobby list with the reason
+            // (the page used to stay on "Creating lobby" forever)
+            Debug.LogWarning($"Could not start or join {sessionName}: {result.ShutdownReason} {result.ErrorMessage}");
+            SessionGuard.OnShutdown(runner, result.ShutdownReason);
+        }
     }
 
     protected virtual Task InitializeNetworkRunnerHostMigration(NetworkRunner runner, HostMigrationToken hostMigrationToken)
@@ -203,7 +210,8 @@ public class NetworkRunnerHandler : MonoBehaviour
 
         if (!result.Ok)
         {
-            Debug.Log("$Unable to join lobby{lobbyID}");
+            Debug.Log($"Unable to join lobby {lobbyID}: {result.ShutdownReason}");
+            UIToast.Show("Could not reach the game servers. Check the internet connection and try again.");
         }
         else
         {
