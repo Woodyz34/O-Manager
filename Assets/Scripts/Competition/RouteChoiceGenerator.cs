@@ -388,8 +388,27 @@ public class RouteChoiceGenerator
             // Turning right round (out and back) is never a route anyone would choose
             // (unless the fastest route has to turn as sharply too, e.g. on a zigzag path up a hill)
             if (c.sharpestTurn > Mathf.Max(MaxTurn, candidates[0].sharpestTurn + 10f)) continue;
+            // Forest: a way that swings out further than MaxOutShare of the leg from the straight line is a long
+            // way round nobody would take (unless it is the fastest)
+            if (forest && usable.Count > 0 && MaxFromLine(c.cells, from, to) * cellMeters > straightMeters * MaxOutShare) continue;
             c.side = Side(c.cells, from, along);
             usable.Add(c);
+        }
+        // Forest: the bends of every choice are made tight before picking (a route found through a point far out
+        // can swing out and back, touch a road for no reason or run on past a corner), so each one is the natural
+        // way on its side and the choices are compared as a runner would run them
+        if (forest && usable.Count > 1)
+        {
+            List<RouteChoice> fastestOnly = new List<RouteChoice> { usable[0] };
+            for (int i = 1; i < usable.Count; i++)
+            {
+                RouteChoice relaxed = Relax(usable[i], fastestOnly, from, to, bestCost, endCells, sameCells, usable[0].seconds + gap);
+                if (relaxed == usable[i]) continue;
+                relaxed.side = Side(relaxed.cells, from, along);
+                usable[i] = relaxed;
+            }
+            usable.Sort((x, y) => x.seconds.CompareTo(y.seconds));
+            fastest = usable[0].seconds;
         }
         List<RouteChoice> picked = new List<RouteChoice>();
         if (usable.Count > 0) picked.Add(usable[0]);
@@ -410,7 +429,8 @@ public class RouteChoiceGenerator
                             && Shared(c.cells, p.cells, from, to, endCells, sameCells) >= VariantShare)
                         || (VariantSlower > 0f && c.seconds > p.seconds && Meets(c.cells, p.cells, from, to, endCells, sameCells))
                         || (VariantSlower > 0f && NothingBetween(c.cells, p.cells))
-                        || (forest && c.seconds > p.seconds * ForestSlower(c.cells, p.cells, straightMeters)))
+                        || (forest && c.seconds > p.seconds * ForestSlower(c.cells, p.cells, straightMeters))
+                        || (forest && c.seconds > p.seconds && SameWay(c, p, straightMeters)))
                     {
                         ok = false;
                         break;
@@ -444,7 +464,8 @@ public class RouteChoiceGenerator
                 {
                     if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells)
                         || Detour(c.cells, p.cells, from, to, endCells, sameCells)
-                        || (forest && c.seconds > p.seconds * ForestSlower(c.cells, p.cells, straightMeters) * OtherSideSlower)) { ok = false; break; }
+                        || (forest && c.seconds > p.seconds * ForestSlower(c.cells, p.cells, straightMeters) * OtherSideSlower)
+                        || (forest && c.seconds > p.seconds && SameWay(c, p, straightMeters))) { ok = false; break; }
                 }
                 if (!ok) continue;
                 picked.Add(c); // usable is fastest first, so this is the fastest on that side
@@ -453,27 +474,49 @@ public class RouteChoiceGenerator
             }
         }
         // Forest: straight on is nearly always worth showing. When no choice runs near the straight line, the
-        // fastest way close to it is added (when it is not too slow and differs from the others)
-        if (forest && picked.Count < most && picked.Count > 0)
+        // fastest way close to it is added (when it is not too slow and differs from the others). When the choices
+        // spread far to both sides (or all far to one side), straight on is shown even when clearly slower, to
+        // see how much a straight line through the forest loses against the ways round
+        if (forest && picked.Count > 0 && picked.Count < most)
         {
             float near = spreadCells * 0.6f;
             bool hasStraight = false;
-            foreach (RouteChoice p in picked) if (MaxFromLine(p.cells, from, to) <= near) { hasStraight = true; break; }
+            float widest = 0f;
+            foreach (RouteChoice p in picked)
+            {
+                float off = MaxFromLine(p.cells, from, to);
+                if (off <= near) { hasStraight = true; break; }
+                widest = Mathf.Max(widest, off);
+            }
             if (!hasStraight)
             {
-                RouteChoice straight = FastestNear(from, to, new List<Vector2> { from, to }, Mathf.Max(1, Mathf.RoundToInt(near * 0.5f)));
-                if (straight != null && straight.seconds <= fastest * WideSlower)
+                bool wide = picked.Count >= 2 && widest * cellMeters >= straightMeters * StraightWideShare;
+                float limit = wide ? StraightSlower : WideSlower;
+                int radius = Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(near * 0.5f, StraightBandShare * straightMeters / cellMeters)));
+                RouteChoice straight = FastestNear(from, to, new List<Vector2> { from, to }, radius);
+                if (straight != null && straight.seconds <= fastest * limit)
                 {
                     bool ok = straight.sharpestTurn <= MaxTurn;
+                    straight.side = Side(straight.cells, from, along);
+                    RouteChoice replaced = null;
                     foreach (RouteChoice p in picked)
                     {
                         if (!ok) break;
-                        if (Mathf.Abs(straight.seconds - p.seconds) < gap || !Different(straight.cells, p.cells, from, to, endCells, sameCells)
-                            || (straight.seconds > p.seconds * ForestSlower(straight.cells, p.cells, straightMeters))) ok = false;
+                        // A slower choice that is only a wider bend of the straight way gives way to the straight one
+                        if (replaced == null && p.seconds > straight.seconds + gap * 0.5f && picked.Count >= 2 && SameWay(p, straight, straightMeters))
+                        {
+                            replaced = p;
+                            continue;
+                        }
+                        // (half the usual gap is enough here: straight on against a way round is easy to tell apart)
+                        if (Mathf.Abs(straight.seconds - p.seconds) < gap * 0.5f || !Different(straight.cells, p.cells, from, to, endCells, sameCells)
+                            || (!wide && straight.seconds > p.seconds * ForestSlower(straight.cells, p.cells, straightMeters))
+                            || (straight.seconds > p.seconds ? SameWay(straight, p, straightMeters) : SameWay(p, straight, straightMeters))
+                            || Apart(straight, p, straightMeters) < StraightCloseShare) ok = false;
                     }
                     if (ok)
                     {
-                        straight.side = Side(straight.cells, from, along);
+                        if (replaced != null) picked.Remove(replaced);
                         picked.Add(straight);
                     }
                 }
@@ -506,6 +549,146 @@ public class RouteChoiceGenerator
         }
         float share = Mathf.Sqrt(apart) * cellMeters / Mathf.Max(1f, straightMeters);
         return share < BubbleShare ? BubbleSlower : share < WideShare ? MiddleSlower : WideSlower;
+    }
+
+    // Forest: straight on is offered when the choices go this far (share of the leg) from the straight line, and it
+    // may then be up to StraightSlower x the fastest. It is the fastest way within StraightBandShare of the leg of
+    // the line (so it may bend round a hill, but it runs about straight).
+    const float StraightWideShare = 0.2f;
+    const float MaxOutShare = 0.45f;
+    const float StraightSlower = 1.3f;
+    const float StraightBandShare = 0.07f;
+    const float StraightCloseShare = 0.12f; // never closer than this to another choice (whatever the ground)
+    // Forest: two choices over the same kind of ground (no road or path against forest where they differ) are
+    // the same way when they never get further apart than CloseShare of the leg, or run on the same side of the
+    // straight line closer than SameSideShare of the leg. Only the faster one is shown, unless the slower one is
+    // within SameWaySlower, and never when they run this close (CloseShare).
+    const float CloseShare = 0.2f;
+    const float TouchingShare = 0.1f;   // closer than this they are the same way whatever the ground
+    const float SameSideShare = 0.3f;
+    const float SameWaySlower = 1.03f;
+    const float GroundDiffers = 1.06f;   // mean ground speed on the parts where they differ, faster / slower
+
+    // True when route c (slower than p) is no way of its own next to p in the forest
+    bool SameWay(RouteChoice c, RouteChoice p, float straightMeters)
+    {
+        // (measured on the lines as drawn: the cells zigzag, so two lines on top of each other can have cells 50 m apart)
+        float apart = Apart(c, p, straightMeters);
+        if (apart < TouchingShare) return true;
+        if (!SameKindOfGround(c.cells, p.cells)) return false;
+        if (apart < CloseShare) return true;
+        if (c.seconds <= p.seconds * SameWaySlower) return false;
+        bool sameSide = Mathf.Sign(c.side) == Mathf.Sign(p.side) && Mathf.Min(Mathf.Abs(c.side), Mathf.Abs(p.side)) > spreadCells * 0.5f;
+        return apart < WideShare || (sameSide && apart < SameSideShare);
+    }
+
+    // How far two choices ever get from each other, as a share of the leg
+    float Apart(RouteChoice c, RouteChoice p, float straightMeters)
+    {
+        List<Vector2> lc = Dense(c.points), lp = Dense(p.points);
+        return Mathf.Max(FurthestFrom(lc, lp), FurthestFrom(lp, lc)) * cellMeters / Mathf.Max(1f, straightMeters);
+    }
+
+    // How far (cells) line a ever gets from line b
+    static float FurthestFrom(List<Vector2> a, List<Vector2> b)
+    {
+        float apart = 0f;
+        foreach (Vector2 c in a)
+        {
+            float best = float.MaxValue;
+            foreach (Vector2 o in b) best = Mathf.Min(best, (o - c).sqrMagnitude);
+            apart = Mathf.Max(apart, best);
+        }
+        return Mathf.Sqrt(apart);
+    }
+
+    // A line with a point at least every half cell
+    static List<Vector2> Dense(List<Vector2> line)
+    {
+        List<Vector2> dense = new List<Vector2>();
+        for (int i = 0; i + 1 < line.Count; i++)
+        {
+            Vector2 ab = line[i + 1] - line[i];
+            int steps = Mathf.Max(1, Mathf.CeilToInt(ab.magnitude * 2f));
+            for (int k = 0; k < steps; k++) dense.Add(line[i] + ab * ((float)k / steps));
+        }
+        if (line.Count > 0) dense.Add(line[line.Count - 1]);
+        return dense;
+    }
+
+    // Whether two routes run over the same kind of ground where they differ (forest against forest, path against
+    // path). A path round against a straight line through the forest is a real choice even when close.
+    bool SameKindOfGround(List<Vector2Int> a, List<Vector2Int> b)
+    {
+        float near = Mathf.Max(1.5f, spreadCells * 0.3f);
+        float ga = OwnSpeed(a, b, near * near), gb = OwnSpeed(b, a, near * near);
+        if (ga <= 0f || gb <= 0f) return true;
+        return Mathf.Max(ga, gb) <= Mathf.Min(ga, gb) * GroundDiffers;
+    }
+
+    // Mean ground speed of the cells of a away from b (0 when a never leaves b)
+    float OwnSpeed(List<Vector2Int> a, List<Vector2Int> b, float near2)
+    {
+        float sum = 0f;
+        int n = 0;
+        foreach (Vector2Int c in a)
+        {
+            if (NearbySquared(c, b) <= near2) continue;
+            sum += speed[c.y, c.x];
+            n++;
+        }
+        return n > 0 ? sum / n : 0f;
+    }
+
+    // Forest: makes a choice's bends tight. Every bit of the route (about RelaxShare of the leg's time) is replaced by
+    // the fastest way between its ends when that is clearly faster, as long as the route still runs its own way
+    // (Different from every other choice) and takes at least minSeconds. That takes out a swing outwards and back,
+    // a dip down to a road and up again, or running on past the place to turn. Returns the same object when
+    // nothing changed.
+    const float RelaxShare = 0.3f;
+
+    RouteChoice Relax(RouteChoice choice, List<RouteChoice> others, Vector2Int from, Vector2Int to, float bestCost, int endCells, float sameCells,
+                      float minSeconds)
+    {
+        List<Vector2Int> route = choice.cells;
+        RouteChoice result = choice;
+        foreach (float share in new[] { RelaxShare * 0.5f, RelaxShare })
+        {
+            float reach = bestCost * share;
+            float start = 0f;
+            for (int guard = 0; guard < 40; guard++)
+            {
+                float[] along = new float[route.Count];
+                for (int i = 1; i < route.Count; i++) along[i] = along[i - 1] + StepCost(route[i - 1], route[i]);
+                if (start >= along[route.Count - 1]) break;
+                int a = 0;
+                while (a < route.Count - 1 && along[a] < start) a++;
+                int b = a;
+                while (b < route.Count - 1 && along[b] - along[a] < reach) b++;
+                start += reach * 0.34f;
+                if (b - a < 3) continue;
+                List<Vector2Int> shortcut = Path(route[a], route[b]);
+                if (shortcut == null || shortcut.Count < 2) continue;
+                if (RouteCost(shortcut) >= (along[b] - along[a]) * 0.98f) continue;
+                List<Vector2Int> next = new List<Vector2Int>(route.GetRange(0, a));
+                next.AddRange(shortcut);
+                if (b + 1 < route.Count) next.AddRange(route.GetRange(b + 1, route.Count - b - 1));
+                next = RemoveLoops(next);
+                bool own = true;
+                foreach (RouteChoice o in others)
+                {
+                    if (o == choice) continue;
+                    if (!Different(next, o.cells, from, to, endCells, sameCells)) { own = false; break; }
+                }
+                if (!own) continue;
+                // (it must stay clearly slower than the fastest route, or the two could not be told apart)
+                RouteChoice timed = Evaluate(next);
+                if (timed.seconds < minSeconds) continue;
+                route = next;
+                result = timed;
+            }
+        }
+        return result;
     }
 
     // How far (cells) a route gets from the straight line between the controls
@@ -1161,6 +1344,7 @@ public class RouteChoiceGenerator
 
     const float LookAheadMeters = 120f;   // longest straight piece tried at once
     const float CornerMeters = 10f;       // corners are rounded over at most this distance on each side
+    const float ForestCornerCells = 0.6f;
 
     List<Vector2> Smooth(List<Vector2Int> cells)
     {
@@ -1202,7 +1386,9 @@ public class RouteChoiceGenerator
         }
 
         // Round the corners: a curve from a bit before each corner to a bit after it, if nothing is in the way
-        float most = Mathf.Max(1.5f, CornerMeters / cellMeters);
+        // (in the forest, with its 10 m cells, at most about half a cell: a runner turns sharply round a corner of a
+        // field or a fence there, and the time lost in a sharp turn is small at forest pace)
+        float most = forest ? ForestCornerCells : Mathf.Max(1.5f, CornerMeters / cellMeters);
         List<Vector2> round = new List<Vector2> { line[0] };
         for (int k = 1; k < line.Count - 1; k++)
         {
