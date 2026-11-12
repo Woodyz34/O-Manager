@@ -117,10 +117,7 @@ public class Spawner : MonoBehaviour, INetworkRunnerCallbacks
 
         if (isLobbyScene)
         {
-            if (runner.SessionInfo.MaxPlayers - player.PlayerId == 1)
-                spawnPosition = new Vector3(-1 * 3, 1, 0);
-            else
-                spawnPosition = new Vector3(player.PlayerId * 3, 1, 0);
+            spawnPosition = NetworkPlayer.LobbySpot(runner, player);
         }
         else
         {
