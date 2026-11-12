@@ -45,6 +45,8 @@ namespace MapImport
         public string created;                // ISO date
         public bool permissionConfirmed;      // the uploader says the map's owner allows it
         public double[] boundary;             // the edge of the finished map the player chose (paper mm), or empty for all of it
+        // How quick the kinds of ground are (the sliders at import). All in the middle = the game's normal speeds.
+        public TerrainSpeeds terrain = new TerrainSpeeds();
         // A copy of a map another player shared through Unity Cloud (see SharedMaps): their player id and when they
         // shared it (unix seconds). Empty for maps imported on this computer and for maps built into the game.
         public string sharedBy;
@@ -146,6 +148,7 @@ namespace MapImport
                 refNorth = map.refNorth,
                 gridAngle = (float)map.gridAngle,
                 boundary = map.boundary != null && map.boundary.Length >= 6 ? map.boundary : null,
+                terrain = map.terrain != null ? map.terrain.Copy() : new TerrainSpeeds(),
                 crs = map.crsCode,
                 created = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
             };

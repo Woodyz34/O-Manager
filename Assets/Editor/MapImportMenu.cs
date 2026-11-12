@@ -100,6 +100,7 @@ public static class MapImportMenu
             MapFile mapFile = MapPackageBuilder.ReadMapFile(bytes);
             if (sent != null && sent.contourInterval > 0) mapFile.contourInterval = sent.contourInterval;
             if (sent?.boundary != null && sent.boundary.Length >= 6) mapFile.boundary = sent.boundary;   // the edge the sender chose
+            if (sent?.terrain != null) mapFile.terrain = sent.terrain;   // the terrain sliders the sender chose
             bool isSprint = sprint ?? SymbolRules.LooksLikeSprint(mapFile);
             if (sprint == null)
             {
