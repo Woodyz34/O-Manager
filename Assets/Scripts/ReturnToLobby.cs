@@ -89,16 +89,8 @@ public class ReturnToLobby : MonoBehaviour
         int rank = LeaderboardManager.Instance.GetPlayerRankByNickname(NetworkPlayer.Local.nickName.ToString());
         YourPositionText.text = $"You came {rank}th";
 
-        int trophy = 0;
-
-        if (rank == 1)
-        {
-            trophy = 1;
-        }
-
-        Money.Instance.AddTrophy(trophy);
-
-        TrophyText.text = $"+{trophy} trophy";
+        // No trophies any more
+        if (TrophyText != null) TrophyText.text = "";
     }
 
     public void SeeBetResult()
@@ -127,16 +119,8 @@ public class ReturnToLobby : MonoBehaviour
         int yourRank = LeaderboardManager.Instance.GetPlayerRankByNickname(NetworkPlayer.Local.nickName.ToString());
         BetYourPositionText.text = $"You came {yourRank}th";
 
-        int trophy = 0;
-
-        if(yourRank == 1)
-        {
-            trophy = 1;
-        }
-
-        Money.Instance.AddTrophy(trophy);
-
-        BetTrophyText.text = $"+{trophy} trophy";
+        // No trophies any more
+        if (BetTrophyText != null) BetTrophyText.text = "";
         
         string playerName = NetworkPlayer.Local.nickName.ToString();
         CardData cardData = Betting.Instance.GetSelectedCard(playerName);

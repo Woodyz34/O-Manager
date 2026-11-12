@@ -386,6 +386,7 @@ public class RouteChoiceView : MonoBehaviour
     void Update()
     {
         if (failed) return;
+        ApplyPeek();
         if (rebinding >= 0) ListenForKey();
         else if (keysPanel != null && Input.GetKeyDown(KeyCode.Escape)) ToggleKeys();
         bool keysOpen = keysPanel != null; // while the keys are being changed, key presses do not answer
@@ -445,10 +446,26 @@ public class RouteChoiceView : MonoBehaviour
         RefreshEndButton();
     }
 
+    // The route lines are shown at first; hold Tab or the right mouse button to hide them and see the clean map
+    static bool PeekHeld()
+    {
+        return Input.GetKey(KeyCode.Tab) || Input.GetMouseButton(1);
+    }
+
+    void ApplyPeek()
+    {
+        bool hide = PeekHeld();
+        foreach (GameObject go in drawn)
+        {
+            if (go != null && go.activeSelf == hide) go.SetActive(!hide);
+        }
+    }
+
     // A key on the keyboard, not a mouse button (clicks are for the buttons) and not Escape (the menu)
     static bool AnyKeyForNext()
     {
         if (!Input.anyKeyDown) return false;
+        if (Input.GetKeyDown(KeyCode.Tab)) return false;
         if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2)) return false;
         return !Input.GetKeyDown(KeyCode.Escape);
     }
@@ -510,8 +527,8 @@ public class RouteChoiceView : MonoBehaviour
             label.enableWordWrapping = false;
             choiceButtons.Add(button);
         }
-        TextMeshProUGUI note = CourseUI.Text("Note", body, "A runner with speed 100 runs every route. Ground, slope and turns all count, so the shortest route is not always the fastest.", 18, CourseUI.InkMuted);
-        CourseUI.Size(note, 70);
+        TextMeshProUGUI note = CourseUI.Text("Note", body, "A runner with speed 100 runs every route. Ground, slope and turns all count, so the shortest route is not always the fastest.\nHold Tab or the right mouse button to hide the lines and see the map.", 18, CourseUI.InkMuted);
+        CourseUI.Size(note, 100);
         ShowTimer(true);
     }
 
@@ -1043,7 +1060,6 @@ public class RouteChoiceView : MonoBehaviour
     int paidPlace;
     int paidPlaceOf;
     int paidForPlace;
-    bool paidTrophy;
     int balanceBefore;
     Coroutine prizeShow;
 
@@ -1056,12 +1072,10 @@ public class RouteChoiceView : MonoBehaviour
         paidPlace = finished ? place : 0;
         paidPlaceOf = players;
         paidForPlace = finished && place > 0 ? RouteChoiceGame.ForPlace(place, players) : 0;
-        paidTrophy = finished && place == 1 && players >= 2;
         if (Money.Instance != null)
         {
             balanceBefore = Money.Instance.GetMoney();
             Money.Instance.AddMoney(paidTookPart + paidForPlace);
-            if (paidTrophy) Money.Instance.AddTrophy(1);
         }
     }
 
@@ -1087,7 +1101,6 @@ public class RouteChoiceView : MonoBehaviour
         float y = -70f;
         lines.Add(PrizeLine(card.transform, ref y, "Took part", "+" + paidTookPart + " kr"));
         if (paidPlace > 0) lines.Add(PrizeLine(card.transform, ref y, CompetitionFlow.Ordinal(paidPlace) + " place of " + paidPlaceOf, "+" + paidForPlace + " kr"));
-        if (paidTrophy) lines.Add(PrizeLine(card.transform, ref y, "Trophy for the win", "+1 trophy"));
 
         int total = paidTookPart + paidForPlace;
         TextMeshProUGUI totalLabel = CourseUI.Text("Total label", card.transform, "Total", 24, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.MidlineRight);

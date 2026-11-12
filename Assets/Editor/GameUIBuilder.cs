@@ -320,7 +320,6 @@ public static class GameUIBuilder
         TextMeshProUGUI balanceLabel = UI.Text(balanceRow, "Label", "Your money", 26, UI.InkMuted, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
         Flexible(balanceLabel.gameObject, 80);
         TextMeshProUGUI balance = UI.Text(balanceRow, "Value", "0 kr", 34, UI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
-        TextMeshProUGUI trophy = UI.Text(reward, "Trophy", "", 24, UI.Forest, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
 
         Transform vote = UI.Child(side, "Vote panel");
         UI.Stretch((RectTransform)vote, 40, 36, 40, 36);
@@ -362,7 +361,6 @@ public static class GameUIBuilder
         ui.rewardLineParent = lines;
         ui.rewardLineTemplate = line.gameObject;
         ui.balanceText = balance;
-        ui.trophyText = trophy;
         ui.votePanel = vote.gameObject;
         ui.voteTitleText = voteTitle;
         ui.voteHintText = voteHint;
