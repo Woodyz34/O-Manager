@@ -54,7 +54,12 @@ public class RouteChoiceGenerator
     // Choices slower than this x the fastest are too easy to rule out. In the forest a slow choice is usually a
     // long way round that nobody would take, so there the cap is tighter (two good choices are enough)
     const float MaxSlowerSprint = 1.2f;
-    const float MaxSlowerForest = 1.07f;
+    const float MaxSlowerForest = 1.12f;
+    // Forest: how much slower a choice may be than a faster one depends on how far apart they run. Only a small
+    // bubble off the other way (never further apart than BubbleShare of the leg) must be nearly as fast, since it is
+    // easy to see which is best; a choice that goes clearly its own way (WideShare) may be slower.
+    const float BubbleShare = 0.12f, WideShare = 0.25f;
+    const float BubbleSlower = 1.03f, MiddleSlower = 1.07f, WideSlower = 1.12f;
     // A way round on the other side (left when all choices go right, or the other way round) may be this much slower
     // again: a left-or-right question is the best kind to practise, even when one side is clearly worse
     const float OtherSideSlower = 1.1f;
@@ -85,6 +90,7 @@ public class RouteChoiceGenerator
     readonly float gameSecondsPerSecond;
     readonly int width, height;
     readonly float MaxSlower;
+    readonly bool forest;
     // How fast ground nobody can run on counts when a line goes over it anyway (only drawn lines in route analysis do)
     public float BlockedSpeed { get; set; } = 0.05f;
     // Every user of the generator (route choice game, AI course, route analysis) uses the same rules: Variants.
@@ -101,6 +107,7 @@ public class RouteChoiceGenerator
                                 float baseSpeed, float gameSecondsPerSecond, bool sprint)
     {
         MaxSlower = sprint ? MaxSlowerSprint : MaxSlowerForest;
+        forest = !sprint;
         speed = speedGrid;
         height = speedGrid.GetLength(0);
         width = speedGrid.GetLength(1);
@@ -146,6 +153,7 @@ public class RouteChoiceGenerator
         baseSpeed = full.baseSpeed;
         gameSecondsPerSecond = full.gameSecondsPerSecond;
         MaxSlower = full.MaxSlower;
+        forest = full.forest;
         BlockedSpeed = full.BlockedSpeed;
         VariantSlower = full.VariantSlower;
     }
@@ -401,7 +409,8 @@ public class RouteChoiceGenerator
                         || (VariantSlower > 0f && c.seconds > p.seconds * VariantSlower
                             && Shared(c.cells, p.cells, from, to, endCells, sameCells) >= VariantShare)
                         || (VariantSlower > 0f && c.seconds > p.seconds && Meets(c.cells, p.cells, from, to, endCells, sameCells))
-                        || (VariantSlower > 0f && NothingBetween(c.cells, p.cells)))
+                        || (VariantSlower > 0f && NothingBetween(c.cells, p.cells))
+                        || (forest && c.seconds > p.seconds * ForestSlower(c.cells, p.cells, straightMeters)))
                     {
                         ok = false;
                         break;
@@ -434,12 +443,40 @@ public class RouteChoiceGenerator
                 foreach (RouteChoice p in picked)
                 {
                     if (Mathf.Abs(c.seconds - p.seconds) < gap || !Different(c.cells, p.cells, from, to, endCells, sameCells)
-                        || Detour(c.cells, p.cells, from, to, endCells, sameCells)) { ok = false; break; }
+                        || Detour(c.cells, p.cells, from, to, endCells, sameCells)
+                        || (forest && c.seconds > p.seconds * ForestSlower(c.cells, p.cells, straightMeters) * OtherSideSlower)) { ok = false; break; }
                 }
                 if (!ok) continue;
                 picked.Add(c); // usable is fastest first, so this is the fastest on that side
                 if (left) noLeft = false; else noRight = false;
                 if (picked.Count >= most) break;
+            }
+        }
+        // Forest: straight on is nearly always worth showing. When no choice runs near the straight line, the
+        // fastest way close to it is added (when it is not too slow and differs from the others)
+        if (forest && picked.Count < most && picked.Count > 0)
+        {
+            float near = spreadCells * 0.6f;
+            bool hasStraight = false;
+            foreach (RouteChoice p in picked) if (MaxFromLine(p.cells, from, to) <= near) { hasStraight = true; break; }
+            if (!hasStraight)
+            {
+                RouteChoice straight = FastestNear(from, to, new List<Vector2> { from, to }, Mathf.Max(1, Mathf.RoundToInt(near * 0.5f)));
+                if (straight != null && straight.seconds <= fastest * WideSlower)
+                {
+                    bool ok = straight.sharpestTurn <= MaxTurn;
+                    foreach (RouteChoice p in picked)
+                    {
+                        if (!ok) break;
+                        if (Mathf.Abs(straight.seconds - p.seconds) < gap || !Different(straight.cells, p.cells, from, to, endCells, sameCells)
+                            || (straight.seconds > p.seconds * ForestSlower(straight.cells, p.cells, straightMeters))) ok = false;
+                    }
+                    if (ok)
+                    {
+                        straight.side = Side(straight.cells, from, along);
+                        picked.Add(straight);
+                    }
+                }
             }
         }
         if (picked.Count < 2)
@@ -455,6 +492,33 @@ public class RouteChoiceGenerator
         for (int i = 0; i < picked.Count; i++) picked[i].colour = order[i];
         result.choices = picked;
         return result;
+    }
+
+    // Forest: how much slower route a may be than the faster route b, from how far a ever gets from b
+    float ForestSlower(List<Vector2Int> a, List<Vector2Int> b, float straightMeters)
+    {
+        float apart = 0f;
+        foreach (Vector2Int c in a)
+        {
+            float best = float.MaxValue;
+            foreach (Vector2Int o in b) best = Mathf.Min(best, (o - c).sqrMagnitude);
+            apart = Mathf.Max(apart, best);
+        }
+        float share = Mathf.Sqrt(apart) * cellMeters / Mathf.Max(1f, straightMeters);
+        return share < BubbleShare ? BubbleSlower : share < WideShare ? MiddleSlower : WideSlower;
+    }
+
+    // How far (cells) a route gets from the straight line between the controls
+    static float MaxFromLine(List<Vector2Int> route, Vector2Int from, Vector2Int to)
+    {
+        Vector2 a = from, ab = (Vector2)(to - from);
+        float len2 = Mathf.Max(0.001f, ab.sqrMagnitude), most = 0f;
+        foreach (Vector2Int c in route)
+        {
+            float t = Mathf.Clamp01(Vector2.Dot((Vector2)c - a, ab) / len2);
+            most = Mathf.Max(most, Vector2.Distance(c, a + ab * t));
+        }
+        return most;
     }
 
     // True when a route is only another route with costly detours: wherever it leaves the other one, it is much
