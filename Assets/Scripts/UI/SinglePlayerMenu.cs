@@ -137,8 +137,8 @@ public class SinglePlayerMenu : MonoBehaviour
             : "Pick any runner in the game.";
 
         foreach (Transform child in courseList) Destroy(child.gameObject);
-        List<CourseData> courses = new List<CourseData>(CourseLibrary.BuiltIn);
-        courses.AddRange(CourseLibrary.Mine());
+        // No built-in courses: the player's own and the community's
+        List<CourseData> courses = new List<CourseData>(CourseLibrary.Mine());
         foreach (CourseData course in CourseLibrary.Community) if (!courses.Exists(c => c.id == course.id)) courses.Add(course);
         string search = searchField != null ? searchField.text : "";
         int shown = 0;
