@@ -172,6 +172,20 @@ public class AICoursePanel : MonoBehaviour
         panel.generateButton = CourseUI.Button("Generate", left, "Make course", CourseUI.ButtonKind.Secondary, panel.Generate, 26);
         CourseUI.Size(panel.generateButton, 60);
 
+        // While the course is laid: a bar that fills up and the seconds left at most
+        panel.progressRow = CourseUI.Rect("Progress", left);
+        CourseUI.Size(panel.progressRow, 34);
+        Image track = CourseUI.Panel("Track", panel.progressRow, new Color(0.12f, 0.24f, 0.17f, 0.15f));
+        CourseUI.Place(track.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(330, 18));
+        Image fill = CourseUI.Panel("Fill", track.transform, CourseUI.Accent);
+        panel.progressFill = fill.rectTransform;
+        panel.progressFill.anchorMin = Vector2.zero;
+        panel.progressFill.anchorMax = new Vector2(0f, 1f);
+        panel.progressFill.offsetMin = panel.progressFill.offsetMax = Vector2.zero;
+        panel.progressText = CourseUI.Text("Seconds", panel.progressRow, "", 20, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+        CourseUI.Stretch(panel.progressText.rectTransform, 340, 0, 0, 0);
+        panel.progressRow.gameObject.SetActive(false);
+
         // Right: preview and the result
         Image frame = CourseUI.Panel("Preview", card.transform, CourseUI.CardSolid);
         CourseUI.Place(frame.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -40), new Vector2(560, 456));
@@ -193,6 +207,27 @@ public class AICoursePanel : MonoBehaviour
 
         panel.SetMap(MapDefinition.All.Count > 0 ? MapDefinition.All[0] : null);
         return panel;
+    }
+
+    RectTransform progressRow;
+    RectTransform progressFill;
+    TextMeshProUGUI progressText;
+    CourseGenerator.Progress progress;
+
+    // The loading bar: time so far against the most the generator may take. It is done early when a good course
+    // turns up, and the bar then jumps to the end.
+    void Update()
+    {
+        if (!busy || progress == null || progressRow == null) return;
+        if (!progress.Started) { progressText.text = "Starting..."; return; }
+        double elapsed = progress.Elapsed, budget = Math.Max(1.0, progress.Budget);
+        float share = (float)Math.Min(1.0, elapsed / budget);
+        // Past the budget the last checks are still running: creep on slowly instead of standing full
+        if (elapsed > budget) share = 0.95f + 0.05f * (1f - Mathf.Exp(-(float)(elapsed - budget) / 5f));
+        else share *= 0.95f;
+        progressFill.anchorMax = new Vector2(share, 1f);
+        int left = Mathf.CeilToInt((float)(budget - elapsed));
+        progressText.text = left > 0 ? "At most " + left + " s left" : "Last checks...";
     }
 
     TextMeshProUGUI kindHint;
@@ -449,12 +484,19 @@ public class AICoursePanel : MonoBehaviour
             controls = controls,
             barriers = barriers && kind == CourseGenerator.Kind.Sprint,
             region = region,
-            seed = Environment.TickCount
+            seed = Environment.TickCount,
+            progress = new CourseGenerator.Progress()
         };
+        progress = settings.progress;
+        progressFill.anchorMax = new Vector2(0f, 1f);
+        progressText.text = "Starting...";
+        progressRow.gameObject.SetActive(true);
         MapDefinition chosenMap = map;
         CourseGenerator.Result result = await Task.Run(() => CourseGenerator.Generate(chosenMap, grid, settings));
         if (this == null) return;
 
+        progressRow.gameObject.SetActive(false);
+        progress = null;
         busy = false;
         generateButton.interactable = true;
         CourseUI.SetButtonText(generateButton, "Make another");
