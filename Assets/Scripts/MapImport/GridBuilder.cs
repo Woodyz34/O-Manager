@@ -6,9 +6,11 @@ using System.Collections.Generic;
 //
 // Order of work, each step on top of the one before:
 //   1. areas (forest, open land, marsh, lakes, buildings ...), the colour drawn on top wins, like on the paper
+//   1b. stony ground and boulder fields slow down the ground under them
 //   2. walls and fences that take a moment to cross
 //   3. paths and roads: every cell a path line passes through gets the path's speed, so a path has no slow gaps
-//   4. impassable lines (cliffs, high fences, impassable walls): no way through
+//   4. impassable lines (cliffs, high fences, impassable walls): no way through, except where a path crosses one
+//      on a forest map (there is a gate, even if it is not drawn)
 //   5. bridges and crossing points open the way again
 //   6. everything outside the map is closed: beyond the edge of what is drawn, and under white "mask" areas that
 //      mappers put over the parts that are not part of the map
@@ -21,6 +23,7 @@ namespace MapImport
         public double minE, minN;       // ground coordinates (metres) of the grid's lower left corner
         public float[] speed;           // rows * cols, row 0 at the south
         public float[] height;          // metres, relative
+        public byte[] kind;             // rows * cols, what the ground is (GroundKind): marsh, open land, green ...
         public bool hasHeights;
 
         public float Speed(int row, int col) => speed[row * cols + col];
@@ -28,6 +31,9 @@ namespace MapImport
 
     public static class GridBuilder
     {
+        // The most cells a map's grid may have (the sprint pass uses cells half the size, so four times as many)
+        const double MaxCells = 400e6;
+
         public static MapGrid2 Build(MapFile map, MapExtent extent, bool sprint, float cellSize, Action<string> log = null)
         {
             MapGrid2 g = BuildSpeed(map, extent, sprint, cellSize, log);
@@ -60,10 +66,21 @@ namespace MapImport
                 minE = extent.minX * mpm,
                 minN = extent.minY * mpm
             };
-            g.cols = Math.Max(2, (int)Math.Ceiling(extent.Width * mpm / cellSize));
-            g.rows = Math.Max(2, (int)Math.Ceiling(extent.Height * mpm / cellSize));
+            double colsWanted = Math.Ceiling(extent.Width * mpm / cellSize);
+            double rowsWanted = Math.Ceiling(extent.Height * mpm / cellSize);
+            // A map file with something drawn far away from the rest (or a damaged file) would ask for a grid of
+            // billions of cells: say so instead of running out of memory
+            if (double.IsNaN(colsWanted) || double.IsNaN(rowsWanted) || colsWanted * rowsWanted > MaxCells)
+            {
+                throw new System.IO.InvalidDataException("The map is too big for the game (" +
+                    Math.Round(extent.Width * mpm / 1000.0, 1) + " x " + Math.Round(extent.Height * mpm / 1000.0, 1) +
+                    " km). Is something drawn far outside the map? Set a map edge around the part to use.");
+            }
+            g.cols = Math.Max(2, (int)colsWanted);
+            g.rows = Math.Max(2, (int)rowsWanted);
             int n = g.rows * g.cols;
             g.speed = new float[n];
+            g.kind = new byte[n];
             var hard = new bool[n];           // buildings, out of bounds, impassable lines: paths don't open them
             var path = new bool[n];
             var building = new bool[n];
@@ -79,8 +96,10 @@ namespace MapImport
             foreach (MapObject o in map.objects)
             {
                 if (o.kind != SymbolKind.Area) continue;
-                TerrainRule rule = SymbolRules.For(o.symbol, sprint);
-                if (rule.role != TerrainRole.Ground && rule.role != TerrainRole.Blocked) continue;
+                TerrainRule rule = SymbolRules.For(o.symbol, sprint, map.terrain);
+                // Areas that only tell what the ground looks like (broken ground, a boulder field) are kept for the
+                // runners' map reading even when they do not change the speed
+                if (rule.role != TerrainRole.Ground && rule.role != TerrainRole.Blocked && GroundKind.Of(o.symbol) == GroundKind.Forest) continue;
                 areas.Add((TopColor(o.symbol), order++, o, rule));
             }
             areas.Sort((a, b) => a.prio != b.prio ? b.prio.CompareTo(a.prio) : a.order.CompareTo(b.order));
@@ -88,11 +107,28 @@ namespace MapImport
             {
                 bool isBuilding = a.rule.role == TerrainRole.Blocked && SymbolRules.IsBuilding(a.obj.symbol);
                 bool isHard = a.rule.role == TerrainRole.Blocked && (isBuilding || SymbolRules.IsOutOfBounds(a.obj.symbol));
+                bool setsSpeed = a.rule.role == TerrainRole.Ground || a.rule.role == TerrainRole.Blocked;
+                byte kind = GroundKind.Of(a.obj.symbol);
                 FillArea(g, a.obj.parts, ox, oy, scale, (idx) =>
                 {
+                    // Plain forest (white) drawn over something else takes its place; a pattern without a meaning does not
+                    if (setsSpeed || kind != GroundKind.Forest) g.kind[idx] = kind;
+                    if (!setsSpeed) return;
                     g.speed[idx] = a.rule.speed;
                     hard[idx] = isHard;
                     building[idx] = isBuilding;
+                });
+            }
+
+            // 1b. Stony ground: slower than the ground it lies on
+            foreach (MapObject o in map.objects)
+            {
+                if (o.kind != SymbolKind.Area) continue;
+                TerrainRule rule = SymbolRules.For(o.symbol, sprint, map.terrain);
+                if (rule.role != TerrainRole.SlowArea) continue;
+                FillArea(g, o.parts, ox, oy, scale, (idx) =>
+                {
+                    if (g.speed[idx] > 0f) g.speed[idx] = Math.Max(0.05f, g.speed[idx] * rule.speed);
                 });
             }
 
@@ -113,14 +149,21 @@ namespace MapImport
                 path[idx] = true;
             });
 
-            // 4. Impassable lines. On forest maps a path through the line wins (the gate is rarely drawn);
-            //    on sprint maps the cells are small enough that a path beside a wall is its own cell.
+            // 4. Impassable lines. On forest maps a path that crosses the line goes through it (the gate is rarely
+            //    drawn), but only in the cell where the two lines really cross: a path that runs along a fence must not
+            //    open the whole fence. On sprint maps the cells are small enough that a path beside a wall is its own cell.
+            var lineSpeed = new Dictionary<int, float>();
             ForLines(map, sprint, TerrainRole.BlockingLine, g, ox, oy, scale, (idx, rule) =>
             {
-                if (!sprint && path[idx]) return;
+                if (!sprint && path[idx] && !lineSpeed.ContainsKey(idx)) lineSpeed[idx] = g.speed[idx];
                 g.speed[idx] = 0f;
                 hard[idx] = true;
             });
+            if (!sprint && lineSpeed.Count > 0)
+            {
+                int gates = OpenPathCrossings(map, g, ox, oy, scale, lineSpeed, hard, path);
+                log?.Invoke($"Paths through impassable lines: {gates} crossings opened");
+            }
 
             // 5. Bridges and crossing points
             ForLines(map, sprint, TerrainRole.Bridge, g, ox, oy, scale, (idx, rule) =>
@@ -131,7 +174,7 @@ namespace MapImport
             foreach (MapObject o in map.objects)
             {
                 if (o.kind != SymbolKind.Point) continue;
-                TerrainRule rule = SymbolRules.For(o.symbol, sprint);
+                TerrainRule rule = SymbolRules.For(o.symbol, sprint, map.terrain);
                 if (rule.role != TerrainRole.Crossing) continue;
                 int c = (int)Math.Floor((o.parts[0][0] - ox) * scale);
                 int r = (int)Math.Floor((o.parts[0][1] - oy) * scale);
@@ -294,7 +337,7 @@ namespace MapImport
             foreach (MapObject o in map.objects)
             {
                 if (o.kind != SymbolKind.Line && o.kind != SymbolKind.Area) continue;
-                TerrainRule rule = SymbolRules.For(o.symbol, sprint);
+                TerrainRule rule = SymbolRules.For(o.symbol, sprint, map.terrain);
                 if (o.kind == SymbolKind.Area)
                 {
                     // An area's outline can be a blocking line (lake shore drawn as part of a combined symbol)
@@ -331,6 +374,97 @@ namespace MapImport
                     }
                 }
             }
+        }
+
+        // Forest maps: where a path crosses an impassable line (fence, wall, cliff), the cell of the crossing is opened
+        // again with the path's speed. lineSpeed: the cells of impassable lines that a path also passes through, with
+        // the speed they had before the line closed them; path: the cells paths pass through. Returns the number of cells opened.
+        static int OpenPathCrossings(MapFile map, MapGrid2 g, double ox, double oy, double scale, Dictionary<int, float> lineSpeed, bool[] hard, bool[] path)
+        {
+            // The impassable lines' segments (cell units), listed by the cells they pass through
+            var segs = new List<double[]>();
+            var byCell = new Dictionary<int, List<int>>();
+            var pathSegs = new List<(double[] seg, float speed)>();
+            foreach (MapObject o in map.objects)
+            {
+                if (o.kind != SymbolKind.Line) continue;
+                TerrainRule rule = SymbolRules.For(o.symbol, false, map.terrain);
+                bool blocking = rule.role == TerrainRole.BlockingLine;
+                if (!blocking && rule.role != TerrainRole.Path) continue;
+                foreach (double[] p in o.parts)
+                {
+                    for (int i = 0; i + 3 < p.Length; i += 2)
+                    {
+                        double[] seg = { (p[i] - ox) * scale, (p[i + 1] - oy) * scale, (p[i + 2] - ox) * scale, (p[i + 3] - oy) * scale };
+                        if (!blocking)
+                        {
+                            pathSegs.Add((seg, rule.speed));
+                            continue;
+                        }
+                        int k = segs.Count;
+                        segs.Add(seg);
+                        Supercover(seg[0], seg[1], seg[2], seg[3], g.cols, g.rows, (c, r) =>
+                        {
+                            int idx = r * g.cols + c;
+                            if (!path[idx]) return;   // only where a path could cross it
+                            if (!byCell.TryGetValue(idx, out List<int> list)) byCell[idx] = list = new List<int>();
+                            if (list.Count == 0 || list[list.Count - 1] != k) list.Add(k);
+                        });
+                    }
+                }
+            }
+            int opened = 0;
+            var crossings = new List<(double x, double y)>();
+            var seen = new HashSet<int>();
+            foreach (var (seg, speed) in pathSegs)
+            {
+                // Where this bit of path crosses an impassable line
+                crossings.Clear();
+                seen.Clear();
+                Supercover(seg[0], seg[1], seg[2], seg[3], g.cols, g.rows, (c, r) =>
+                {
+                    if (!byCell.TryGetValue(r * g.cols + c, out List<int> list)) return;
+                    foreach (int k in list)
+                    {
+                        if (!seen.Add(k)) continue;
+                        if (Cross(seg, segs[k], out double x, out double y)) crossings.Add((x, y));
+                    }
+                });
+                if (crossings.Count == 0) continue;
+                // Open the line's closed cells this bit of path passes through right at a crossing. A path chain of
+                // cells has to go through at least one cell of the line to get across it, and that cell is close to
+                // where the two lines cross.
+                Supercover(seg[0], seg[1], seg[2], seg[3], g.cols, g.rows, (c, r) =>
+                {
+                    int idx = r * g.cols + c;
+                    if (g.speed[idx] > 0f || !lineSpeed.TryGetValue(idx, out float before)) return;
+                    double cx = c + 0.5, cy = r + 0.5;
+                    foreach (var (x, y) in crossings)
+                    {
+                        if ((cx - x) * (cx - x) + (cy - y) * (cy - y) > 1.6 * 1.6) continue;
+                        g.speed[idx] = Math.Max(before, speed);
+                        hard[idx] = false;
+                        opened++;
+                        break;
+                    }
+                });
+            }
+            return opened;
+        }
+
+        // Where two segments cross, if they do
+        static bool Cross(double[] a, double[] b, out double x, out double y)
+        {
+            x = y = 0;
+            double rx = a[2] - a[0], ry = a[3] - a[1], sx = b[2] - b[0], sy = b[3] - b[1];
+            double den = rx * sy - ry * sx;
+            if (Math.Abs(den) < 1e-12) return false;
+            double qx = b[0] - a[0], qy = b[1] - a[1];
+            double t = (qx * sy - qy * sx) / den, u = (qx * ry - qy * rx) / den;
+            if (t < 0 || t > 1 || u < 0 || u > 1) return false;
+            x = a[0] + t * rx;
+            y = a[1] + t * ry;
+            return true;
         }
 
         // How wide a line symbol is drawn on paper, mm

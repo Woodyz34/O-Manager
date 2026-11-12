@@ -25,8 +25,11 @@ public static class CloudCourses
     public const int MaxPublicBytes = 5 * 1024 * 1024;
     const int SafetyMargin = 16 * 1024;
 
-    const int MaxPlayersPerFetch = 100;   // the newest 100 players who published something
-    const int MaxCommunityCourses = 100;  // and at most 100 courses from them in the lobby
+    // No limit on how many courses one player publishes (user's wish 2026-11-12: every course made is welcome); only
+    // Unity's own 5 MiB per player. The lobby reads the players page by page (Unity gives at most 100 per query).
+    const int PlayersPerPage = 100;
+    const int MaxPages = 20;                // the newest 2000 players who published something
+    const int MaxCommunityCourses = 2000;   // a guard so the lobby list stays quick
 
     static Task signInTask;
 
@@ -86,12 +89,19 @@ public static class CloudCourses
     public static async Task<List<CourseData>> FetchCommunityAsync()
     {
         await SignInAsync();
-        Query query = new Query(
-            new List<FieldFilter> { new FieldFilter(UpdatedKey, 0, FieldFilter.OpOptions.GT, false) },
-            new HashSet<string> { CoursesKey, SharedMaps.SharedKey },
-            0,
-            MaxPlayersPerFetch);
-        List<EntityData> results = await CloudSaveService.Instance.Data.Player.QueryAsync(query, new PlayerData.QueryOptions());
+        List<EntityData> results = new List<EntityData>();
+        for (int page = 0; page < MaxPages; page++)
+        {
+            Query query = new Query(
+                new List<FieldFilter> { new FieldFilter(UpdatedKey, 0, FieldFilter.OpOptions.GT, false) },
+                new HashSet<string> { CoursesKey, SharedMaps.SharedKey },
+                page * PlayersPerPage,
+                PlayersPerPage);
+            List<EntityData> got = await CloudSaveService.Instance.Data.Player.QueryAsync(query, new PlayerData.QueryOptions());
+            if (got == null) break;
+            results.AddRange(got);
+            if (got.Count < PlayersPerPage) break;
+        }
 
         string me = PlayerId;
         List<CourseData> courses = new List<CourseData>();
@@ -117,14 +127,26 @@ public static class CloudCourses
                 {
                     List<CourseData> theirs = JsonConvert.DeserializeObject<List<CourseData>>(item.Value.GetAs<string>());
                     if (theirs == null) continue;
+                    List<CourseData> usable = new List<CourseData>();
                     foreach (CourseData course in theirs)
                     {
                         if (course == null || course.controls == null) continue;
-                        course.builtIn = false;
-                        course.authorId = entity.Id;
-                        course.Normalize();
-                        courses.Add(course);
+                        // One unreadable or oversized course must not take the player's other courses with it,
+                        // and nothing another player wrote is trusted as it is (CourseData.MakeSafe)
+                        try
+                        {
+                            course.builtIn = false;
+                            course.authorId = entity.Id;
+                            if (!course.MakeSafe()) continue;
+                            course.Normalize();
+                            usable.Add(course);
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogWarning("CloudCourses: skipped a course from " + entity.Id + ": " + e.Message);
+                        }
                     }
+                    courses.AddRange(usable);
                 }
                 catch (Exception e)
                 {

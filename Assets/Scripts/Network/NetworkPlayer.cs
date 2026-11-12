@@ -46,7 +46,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int secoundCount { get; set; }
     [Networked] public int minuterCount { get; set; }
     [Networked] public int hourCount { get; set; }
-    [Networked] public string gameMode { get; set; }
+    // 64 characters: "Same stats" with values for every relay leg is longer than the default 16
+    [Networked, Capacity(64)] public string gameMode { get; set; }
     [Networked, Capacity(32)]
     public NetworkDictionary<int, PlayerRef> CardOwner => default;
     
@@ -263,9 +264,38 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
        
     }
 
+    // ---- Places in the lobby ----
+    // Players stand in a row from the host, in the order they came in. When someone leaves, everyone after them moves
+    // one step closer to the host, so there is never a gap in the row.
+
+    public static Vector3 LobbySpot(NetworkRunner runner, PlayerRef player)
+    {
+        int index = 0;
+        if (runner != null)
+        {
+            foreach (PlayerRef other in runner.ActivePlayers)
+            {
+                if (other.PlayerId < player.PlayerId) index++;
+            }
+        }
+        return new Vector3((index + 1) * 3, 1, 0);
+    }
+
+    float nextSpotCheck;
+
     void Update()
     {
-
+        if (Object == null || !Object.IsValid || !Object.HasStateAuthority || Runner == null) return;
+        if (Time.unscaledTime < nextSpotCheck) return;
+        nextSpotCheck = Time.unscaledTime + 0.5f;
+        if (SceneManager.GetActiveScene().name != "Lobby") return;
+        Vector3 spot = LobbySpot(Runner, Runner.LocalPlayer);
+        if ((transform.position - spot).sqrMagnitude < 0.01f) return;
+        // Someone before us left: step into the free place
+        TrailRenderer trail = GetComponent<TrailRenderer>();
+        if (trail != null) trail.Clear();
+        agentMovement.NetPosition = spot;
+        transform.position = spot;
     }
 
     public override void Render()
@@ -344,14 +374,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             Runner.SessionInfo.IsOpen = true;
 
-            if (Runner.SessionInfo.MaxPlayers - Runner.LocalPlayer.PlayerId == 1)
-            {
-                spawnPosition = new Vector3(-1 * 3, 1, 0);
-            }
-            else
-            {
-                spawnPosition = new Vector3(Runner.LocalPlayer.PlayerId * 3, 1, 0);
-            }
+            spawnPosition = LobbySpot(Runner, Runner.LocalPlayer);
             if (Object.HasStateAuthority)
             {
                 agentMovement.NetPosition = spawnPosition;
@@ -379,7 +402,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             Local = this;
             RPC_SetNickName(GameManager.Instance.playerNickName);
             playerColor = PlayerColor.SavedPacked();
-            ownedRunners = GameModes.OwnedRunnerCount();
+            ownedRunners = GameModes.RaceRunnerCount();
 
             if (isReadyScene)
             {
@@ -553,11 +576,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             GameModeRuntime.StartIfNeeded(this);
         }
 
-        GameModes.SameStats = null;
-
-        // (Set before any early return, so a mode without runners never keeps an old game's same stats)
-        bool sameStats = GameModes.TryGetSameStats(effectiveGameMode, out int sameSpeed, out int sameTechnique);
-        GameModes.SameStats = sameStats ? new Vector2(sameSpeed, sameTechnique) : (Vector2?)null;
+        // (Set before any early return, so a mode without runners never keeps an old game's same stats.
+        // A relay gets one pair of values per leg.)
+        bool sameStats = GameModes.TryGetSameStatsLegs(effectiveGameMode, out List<Vector2Int> sameStatsLegs);
+        GameModes.SameStatsLegs = sameStats ? sameStatsLegs : null;
 
         // Route analysis: nobody picks a runner, everyone runs with the same one
         if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteAnalysis) && RelayRace.Active == null)
@@ -702,15 +724,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             if (Object.HasStateAuthority)
             {
-                Vector3 spawnPosition;
-                if (Runner.SessionInfo.MaxPlayers - Runner.LocalPlayer.PlayerId == 1)
-                {
-                    spawnPosition = new Vector3(-1 * 3, 1, 0);
-                }
-                else
-                {
-                    spawnPosition = new Vector3(Runner.LocalPlayer.PlayerId * 3, 1, 0);
-                }
+                Vector3 spawnPosition = LobbySpot(Runner, Runner.LocalPlayer);
                 StartCoroutine(AlignCameraNextFrame());
                 gameMode = "";
                 HasChoosenRunner = false;

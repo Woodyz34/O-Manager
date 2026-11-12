@@ -33,6 +33,14 @@ public static class SharedMaps
     const string ScriptName = "SharedMapFiles";
     const string HaveSharedPref = "SharedMaps.HaveShared";   // this player has shared a map (so there may be something to tidy)
 
+    // Every player's game downloads and builds what other players share, so what one player can make everybody
+    // else's computer do is limited: how many maps of one player are taken, how big a file may be, and how many
+    // maps are fetched in one go (the rest come the next time the game looks).
+    const int MaxMapsPerOwner = 100;   // Unity keeps at most 200 files per player, two per map: no real limit
+    const int MaxDownloadsPerSync = 15;
+    public const long MaxSourceBytes = 150L * 1024 * 1024;
+    public const long MaxPictureBytes = 80L * 1024 * 1024;
+
     [Serializable]
     public class SharedMap
     {
@@ -45,6 +53,7 @@ public static class SharedMaps
         public long sourceBytes;
         public double contourInterval;
         public double[] boundary;         // paper mm, or null for the whole map
+        public TerrainSpeeds terrain;     // the terrain sliders, or null for the normal speeds (maps shared before them)
         public long sharedAt;             // unix seconds
         [JsonIgnore] public string ownerId;
     }
@@ -77,6 +86,7 @@ public static class SharedMaps
             sourceBytes = sourceBytes,
             contourInterval = info.contourInterval,
             boundary = info.boundary != null && info.boundary.Length >= 6 ? info.boundary : null,
+            terrain = info.terrain != null && !info.terrain.IsDefault() ? info.terrain.Copy() : null,
             sharedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         });
         await SaveMineAsync(mine);
@@ -142,9 +152,24 @@ public static class SharedMaps
             List<SharedMap> list = JsonConvert.DeserializeObject<List<SharedMap>>(json);
             if (list == null) return;
             listedOwners.Add(ownerId);
+            list.RemoveAll(m => m == null);
+            list.Sort((a, b) => b.sharedAt.CompareTo(a.sharedAt));   // the newest first, in case there are too many
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            int taken = 0;
             foreach (SharedMap m in list)
             {
-                if (m == null || !ValidId(m.id) || m.sourceKey == null || !m.sourceKey.StartsWith("map-" + m.id + "-source.", StringComparison.Ordinal)) continue;
+                if (!ValidId(m.id) || !ValidSourceKey(m.id, m.sourceKey)) continue;
+                if (!string.IsNullOrEmpty(m.pictureKey) && m.pictureKey != "map-" + m.id + "-picture.png") continue;
+                if (m.sourceBytes > MaxSourceBytes) continue;
+                if (taken >= MaxMapsPerOwner) break;
+                taken++;
+                // Written by the other player's game: nothing is shown or used as it is
+                m.name = CourseData.SafeText(m.name, 40);
+                if (m.name.Length == 0) m.name = m.id;
+                m.author = CourseData.SafeText(m.author, 40);
+                if (m.sharedAt > now) m.sharedAt = now;
+                if (double.IsNaN(m.contourInterval) || m.contourInterval < 0 || m.contourInterval > 100) m.contourInterval = 0;
+                if (m.boundary != null && (m.boundary.Length > 400 || Array.Exists(m.boundary, v => double.IsNaN(v) || double.IsInfinity(v)))) m.boundary = null;
                 m.ownerId = ownerId;
                 others.Add(m);
             }
@@ -153,6 +178,16 @@ public static class SharedMaps
         {
             Debug.LogWarning("SharedMaps: skipped unreadable shared maps from " + ownerId + ": " + e.Message);
         }
+    }
+
+    // map-<id>-source.ocd / .omap / .xmap and nothing else
+    static bool ValidSourceKey(string id, string key)
+    {
+        if (key == null) return false;
+        string start = "map-" + id + "-source.";
+        if (!key.StartsWith(start, StringComparison.Ordinal)) return false;
+        string extension = key.Substring(start.Length);
+        return extension == "ocd" || extension == "omap" || extension == "xmap";
     }
 
     static bool ValidId(string id)
@@ -193,9 +228,11 @@ public static class SharedMaps
             RemoveBuiltInCopies();
             await CleanUpMineAsync();
             string me = CloudCourses.PlayerId;
+            int downloads = 0;
             foreach (SharedMap m in new List<SharedMap>(others))
             {
                 if (m.ownerId == me || IsBuiltIn(m.id) || failed.Contains(m.ownerId + "/" + m.id)) continue;
+                if (downloads >= MaxDownloadsPerSync) break;   // the rest the next time
                 MapPackageInfo local = ReadLocal(m.id);
                 if (local != null)
                 {
@@ -204,6 +241,7 @@ public static class SharedMaps
                 }
                 try
                 {
+                    downloads++;
                     Downloading = m.name;
                     Changed?.Invoke();
                     await DownloadAndBuild(m);
@@ -247,7 +285,7 @@ public static class SharedMaps
         if (!string.IsNullOrEmpty(m.pictureKey)) keys.Add(m.pictureKey);
         JObject links = await FileLinks(m.ownerId, keys);
         byte[] source = await Download(links, m.sourceKey);
-        byte[] ownPng = string.IsNullOrEmpty(m.pictureKey) ? null : await Download(links, m.pictureKey);
+        byte[] ownPng = string.IsNullOrEmpty(m.pictureKey) ? null : await Download(links, m.pictureKey, null, MaxPictureBytes);
 
         string target = Path.Combine(MapPackages.LocalRoot, m.id);
         string building = target + ".download";
@@ -257,6 +295,7 @@ public static class SharedMaps
             MapFile file = MapPackageBuilder.ReadMapFile(source);
             if (m.contourInterval > 0) file.contourInterval = m.contourInterval;
             if (m.boundary != null && m.boundary.Length >= 6) file.boundary = m.boundary;
+            file.terrain = m.terrain;
             string type = m.mapType == "sprint" || m.mapType == "both" ? m.mapType : "forest";
             MapPackage package = MapImportPanel.BuildPackage(file, m.name, type, ownPng, null);
             package.info.id = m.id;
@@ -383,7 +422,8 @@ public static class SharedMaps
         return null;
     }
 
-    internal static async Task<byte[]> Download(JObject links, string key, Action<float> progress = null)
+    // maxBytes: a download that grows past this is cut off (a file far bigger than any real map)
+    internal static async Task<byte[]> Download(JObject links, string key, Action<float> progress = null, long maxBytes = MaxSourceBytes)
     {
         if (!(links[key] is JObject link) || string.IsNullOrEmpty((string)link["signedUrl"]))
             throw new Exception("No download link for " + key + " (the file is not in the cloud any more?)");
@@ -399,11 +439,20 @@ public static class SharedMaps
                 }
             }
             UnityWebRequestAsyncOperation operation = request.SendWebRequest();
+            bool tooBig = false;
             while (!operation.isDone)
             {
                 progress?.Invoke(request.downloadProgress);
+                if ((long)request.downloadedBytes > maxBytes)
+                {
+                    tooBig = true;
+                    request.Abort();
+                    break;
+                }
                 await Task.Yield();
             }
+            if (tooBig || (long)request.downloadedBytes > maxBytes)
+                throw new Exception("Download of " + key + " was stopped: the file is bigger than " + (maxBytes / (1024 * 1024)) + " MB");
             if (request.result != UnityWebRequest.Result.Success)
                 throw new Exception("Download of " + key + " failed: " + request.responseCode + " " + request.error);
             return request.downloadHandler.data;

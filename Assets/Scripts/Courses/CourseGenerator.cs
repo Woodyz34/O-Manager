@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -307,6 +308,7 @@ public static class CourseGenerator
         public int controls = 12;
         public int seed;
         public bool barriers;   // sprint: out-of-bounds barriers that close the obvious straight way on some legs
+        public Progress progress;   // read by the AI course panel while the course is laid (another thread)
         // The part of the map the player drew round (map coordinates); null or fewer than 3 corners: the whole map
         public List<CoursePoint> region;
         public bool HasRegion => region != null && region.Count >= 3;
@@ -330,6 +332,22 @@ public static class CourseGenerator
     const double ChoiceBudgetSeconds = 12.0;    // all route choice checks of one course together
 
     // What PlacePoints needs to check route choices on sprint legs
+    // How far the laying has got, for the loading bar. The generator works against a time budget, so the time it
+    // can take at most is known when it starts; it often finishes sooner, when a good enough course is found.
+    public class Progress
+    {
+        long startedTicks;
+        long budgetTicks;
+        public void Start(double budgetSeconds)
+        {
+            Interlocked.Exchange(ref budgetTicks, TimeSpan.FromSeconds(budgetSeconds).Ticks);
+            Interlocked.Exchange(ref startedTicks, DateTime.UtcNow.Ticks);
+        }
+        public bool Started => Interlocked.Read(ref startedTicks) > 0;
+        public double Elapsed => Started ? new TimeSpan(DateTime.UtcNow.Ticks - Interlocked.Read(ref startedTicks)).TotalSeconds : 0;
+        public double Budget => new TimeSpan(Interlocked.Read(ref budgetTicks)).TotalSeconds;
+    }
+
     class ChoiceCheck
     {
         public RouteChoiceGenerator generator;
@@ -403,27 +421,29 @@ public static class CourseGenerator
         AStarPathfinder pathfinder = new AStarPathfinder(grid.speed, grid.slopes);
         DateTime started = DateTime.UtcNow;
         ChoiceCheck choices = null;
-        if (settings.kind == Kind.Sprint)
+        // Sprint and forest alike: the same route choices as the route choice game (speed and clock do not matter:
+        // only how much slower one choice is than the other). In the forest the generator uses its forest rules
+        // (path round or straight through, left or right of a hill or a marsh); no barriers there.
+        bool sprintKind = settings.kind == Kind.Sprint;
+        choices = new ChoiceCheck
         {
-            // The same route choices as the route choice game (speed and clock do not matter: only how much slower
-            // one choice is than the other)
-            choices = new ChoiceCheck
-            {
-                generator = new RouteChoiceGenerator(grid.speed, grid.slopes, map.CellSize, 1f, 20f, true) { VariantSlower = VariantSlower },
-                started = DateTime.UtcNow
-            };
-        }
+            generator = new RouteChoiceGenerator(grid.speed, grid.slopes, map.CellSize, 1f, 20f, sprintKind) { VariantSlower = VariantSlower },
+            started = DateTime.UtcNow
+        };
         Result best = null;
         // Sprint with barriers: every course laid gets barriers on its dull legs, and the course is laid again
         // (keeping the best) while too few legs are fun even with barriers
         bool withBarriers = settings.barriers && settings.kind == Kind.Sprint;
         int barrierCourses = 0;
         double budget = withBarriers ? BarrierTotalSeconds : TimeBudgetSeconds;
+        // The most it takes: the budget, plus the last attempt (and its route choice checks) that started before the
+        // budget ran out
+        settings.progress?.Start(withBarriers ? BarrierTotalSeconds + 4.0 : TimeBudgetSeconds + ChoiceBudgetSeconds);
         for (int attempt = 0; attempt < Attempts && (DateTime.UtcNow - started).TotalSeconds < budget; attempt++)
         {
             List<float> legs = PlanLegs(settings.kind, length, controls + 1, random);
             if (choices != null) choices.goodLegs = 0;
-            List<CoursePoint> points = PlacePoints(map, area, pathfinder, legs, settings.kind == Kind.Sprint, choices, random);
+            List<CoursePoint> points = PlacePoints(map, area, pathfinder, legs, sprintKind, choices, random, withBarriers);
             if (points == null)
             {
                 continue;
@@ -467,8 +487,11 @@ public static class CourseGenerator
                 // Lay the course, then make its dull legs fun with barriers; lay it again when that is not enough
                 result = WithBarriers(map, grid, result, settings);
                 barrierCourses++;
-                if (best == null || result.routeChoiceLegs > best.routeChoiceLegs) best = result;
-                if (best.routeChoiceLegs >= enough || barrierCourses >= MaxBarrierCourses) return best;
+                // The best: the most legs with a close choice, then the most barriers (that is why they were ticked)
+                if (best == null || result.routeChoiceLegs > best.routeChoiceLegs
+                    || (result.routeChoiceLegs == best.routeChoiceLegs && result.barriers > best.barriers)) best = result;
+                if ((best.routeChoiceLegs >= enough && best.barriers >= SprintBarriers.Wanted(controls) * 2 / 3)
+                    || barrierCourses >= MaxBarrierCourses || (DateTime.UtcNow - started).TotalSeconds > budget - BarrierBudgetSeconds) return best;
                 continue;
             }
             // Sprint: keep the course with the most fun legs; try again while too few are fun and there is time
@@ -480,9 +503,9 @@ public static class CourseGenerator
         return new Result { error = "Could not make a course with these settings. Try a shorter course or fewer controls." };
     }
 
-    const double BarrierBudgetSeconds = 12.0;    // barriers on one course
-    const int MaxBarrierCourses = 3;             // courses laid and given barriers before the best is kept
-    const double BarrierTotalSeconds = 40.0;     // all of it together
+    const double BarrierBudgetSeconds = 20.0;    // barriers on one course (about 1.5 per control, each one tried with the route choice search)
+    const int MaxBarrierCourses = 2;             // courses laid and given barriers before the best is kept
+    const double BarrierTotalSeconds = 50.0;     // all of it together
     // Same rule as the route choice game: a variant of a faster choice must be close in time to count
     const float VariantSlower = RouteChoiceGenerator.Variants;
 
@@ -615,17 +638,19 @@ public static class CourseGenerator
     // Walks the legs across the map: each control at the planned distance from the one before, in a direction
     // that stays inside the map, keeps away from earlier controls and, in the second half, turns back towards the start.
     // All distances are in metres, so the same rules work on 10 m forest grids and 2 m sprint grids.
-    // On sprint each leg is also checked for route choices: of the best few places for the control, the first that
+    // Each leg is also checked for route choices (sprint and forest): of the best few places for the control, the first that
     // gives a close route choice is taken (else the best place), so most legs are fun and a few may be plain.
     static List<CoursePoint> PlacePoints(MapDefinition map, MapPlayArea area, AStarPathfinder pathfinder, List<float> legs, bool sprint,
-                                         ChoiceCheck choices, System.Random random)
+                                         ChoiceCheck choices, System.Random random, bool barriers = false)
     {
         float startRoom = sprint ? 40f : 150f;        // the start this far inside the map edge
         float roomWanted = sprint ? 60f : 250f;       // controls further inside than this score no better
         float spacing = sprint ? SprintMinControlSpacing : MinControlSpacing;
         float maxDetour = sprint ? SprintMaxDetour : MaxDetour;
         int blockedRadius = Mathf.Max(1, Mathf.RoundToInt((sprint ? 20f : 50f) / area.CellMeters));
-        float blockedWeight = sprint ? 0.5f : 1.5f;   // houses are everywhere on a sprint map
+        // Houses are everywhere on a sprint map. With barriers the course goes among the houses rather than in the
+        // parks: barriers need narrow passages to close, and an open park has none.
+        float blockedWeight = barriers ? -0.3f : sprint ? 0.5f : 1.5f;
 
         // Start somewhere with room around it (in a small drawn area: with as much room as there is)
         CoursePoint start = default;

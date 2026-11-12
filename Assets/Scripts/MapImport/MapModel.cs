@@ -121,6 +121,8 @@ namespace MapImport
         public double contourInterval;      // metres between contours, given by the player (0 = guess from the scale)
         // The edge of the finished map (x,y pairs, paper mm), or null for all of it. See MapBoundary.
         public double[] boundary;
+        // How quick the kinds of ground are on this map (the sliders at import), or null for the game's normal speeds
+        public TerrainSpeeds terrain;
 
         public double MetersPerMm => scale / 1000.0;
 

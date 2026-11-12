@@ -117,10 +117,7 @@ public class Spawner : MonoBehaviour, INetworkRunnerCallbacks
 
         if (isLobbyScene)
         {
-            if (runner.SessionInfo.MaxPlayers - player.PlayerId == 1)
-                spawnPosition = new Vector3(-1 * 3, 1, 0);
-            else
-                spawnPosition = new Vector3(player.PlayerId * 3, 1, 0);
+            spawnPosition = NetworkPlayer.LobbySpot(runner, player);
         }
         else
         {
@@ -291,6 +288,10 @@ public class Spawner : MonoBehaviour, INetworkRunnerCallbacks
             return;
         }
 
+        // The list has arrived, so a lobby can be created now. (This was only done when the list was empty,
+        // so nobody could create a lobby while someone else had one open.)
+        sessionListUIHandler.dontCreateGame = false;
+
         if(sessionList.Count == 0)
         {
             Debug.Log("Joined lobby no sessions found");
@@ -327,6 +328,8 @@ public class Spawner : MonoBehaviour, INetworkRunnerCallbacks
     public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
     {
         Debug.Log("OnShoutDown" + " " + shutdownReason);
+        // A lost connection or a lobby that could not be joined: take the player to a page that works
+        SessionGuard.OnShutdown(runner, shutdownReason);
     }
 
     public void OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message)

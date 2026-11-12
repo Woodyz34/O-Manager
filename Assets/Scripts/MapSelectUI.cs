@@ -62,7 +62,6 @@ public class MapSelectUI : MonoBehaviour
         CourseUI.Place(tabRow, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(1700, 64));
         CourseUI.Row(tabRow.gameObject, 16, new RectOffset(0, 0, 0, 0)).childAlignment = TextAnchor.MiddleCenter;
         AddTab(tabRow, Filter.All, "All");
-        AddTab(tabRow, Filter.BuiltIn, "Built-in");
         AddTab(tabRow, Filter.Mine, "My courses");
         AddTab(tabRow, Filter.Community, "Community");
         Button ai = CourseUI.Button("AI course", tabRow, "AI course", CourseUI.ButtonKind.Secondary, OpenAICourse, 24);
@@ -120,8 +119,7 @@ public class MapSelectUI : MonoBehaviour
         // A course made by the AI only exists until another one is picked, so it is shown first while chosen
         if (filter == Filter.All && IsAICourse(mapHandler.course))
             list.Add((mapHandler.course, "AI"));
-        if (filter == Filter.All || filter == Filter.BuiltIn)
-            foreach (CourseData course in CourseLibrary.BuiltIn) list.Add((course, "Built-in"));
+        // No built-in courses are listed (the game has none to offer): only the players' own, the community's and AI courses
         if (filter == Filter.All || filter == Filter.Mine)
             foreach (CourseData course in CourseLibrary.Mine()) list.Add((course, "Yours"));
         if (filter == Filter.All || filter == Filter.Community)

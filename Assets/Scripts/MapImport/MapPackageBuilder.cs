@@ -45,6 +45,8 @@ namespace MapImport
         public string created;                // ISO date
         public bool permissionConfirmed;      // the uploader says the map's owner allows it
         public double[] boundary;             // the edge of the finished map the player chose (paper mm), or empty for all of it
+        // How quick the kinds of ground are (the sliders at import). All in the middle = the game's normal speeds.
+        public TerrainSpeeds terrain = new TerrainSpeeds();
         // A copy of a map another player shared through Unity Cloud (see SharedMaps): their player id and when they
         // shared it (unix seconds). Empty for maps imported on this computer and for maps built into the game.
         public string sharedBy;
@@ -63,6 +65,7 @@ namespace MapImport
         public byte[] grid;            // GridBinary version 2
         public string pointsJson;      // GeoJSON, same layer names as the old Illern files
         public string linesJson;
+        public byte[] kinds;            // one GroundKind per grid cell, for the runners' map reading
         public byte[] pictureRgba;     // row 0 at the top
         // On the paper, in mm: the grid, and every object of the map (an exported PNG of the whole map covers that)
         public MapExtent gridExtent;
@@ -145,11 +148,13 @@ namespace MapImport
                 refNorth = map.refNorth,
                 gridAngle = (float)map.gridAngle,
                 boundary = map.boundary != null && map.boundary.Length >= 6 ? map.boundary : null,
+                terrain = map.terrain != null ? map.terrain.Copy() : new TerrainSpeeds(),
                 crs = map.crsCode,
                 created = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
             };
             pkg.info = info;
             pkg.grid = WriteGrid(grid, info);
+            pkg.kinds = grid.kind;
 
             progress?.Invoke("Picking out stones, paths and streams", 0.35f);
             WriteLayers(map, offE, offN, out pkg.pointsJson, out pkg.linesJson);
@@ -211,7 +216,7 @@ namespace MapImport
 
         public const int ThumbnailSide = 768;
 
-        // Writes map.json, grid.bytes, points.json, lines.json, picture.png and (for a drawn picture) thumb.png.
+        // Writes map.json, grid.bytes, kinds.bytes, points.json, lines.json, picture.png and (for a drawn picture) thumb.png.
         // Safe on a background thread. ownPng: a picture the player gave (FitOwnPicture first); its thumbnail is made by the caller.
         public static void WriteFolder(string folder, MapPackage pkg, byte[] ownPng, Action<string, float> progress = null)
         {
@@ -219,6 +224,7 @@ namespace MapImport
             File.WriteAllBytes(Path.Combine(folder, "grid.bytes"), pkg.grid);
             File.WriteAllText(Path.Combine(folder, "points.json"), pkg.pointsJson);
             File.WriteAllText(Path.Combine(folder, "lines.json"), pkg.linesJson);
+            if (pkg.kinds != null) File.WriteAllBytes(Path.Combine(folder, "kinds.bytes"), pkg.kinds);
             if (ownPng != null)
             {
                 File.WriteAllBytes(Path.Combine(folder, "picture.png"), ownPng);
@@ -306,8 +312,10 @@ namespace MapImport
 
         public static string LayerName(MapSymbol s)
         {
-            string name = SwedishNames.TryGetValue(s.major, out string sv) ? sv : s.name;
-            return (s.major * 1000 + Math.Min(s.minor, 999)).ToString("000000", CultureInfo.InvariantCulture) + " " + name;
+            // Always the ISOM 2017 number, also for maps drawn with the old numbering, so the game reads every map alike
+            int major = SymbolRules.Isom2017Major(s);
+            string name = SwedishNames.TryGetValue(major, out string sv) ? sv : s.name;
+            return (major * 1000 + Math.Min(s.minor, 999)).ToString("000000", CultureInfo.InvariantCulture) + " " + name;
         }
 
         public static void WriteLayers(MapFile map, double offsetEast, double offsetNorth, out string pointsJson, out string linesJson)

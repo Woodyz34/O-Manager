@@ -100,6 +100,7 @@ public static class MapImportMenu
             MapFile mapFile = MapPackageBuilder.ReadMapFile(bytes);
             if (sent != null && sent.contourInterval > 0) mapFile.contourInterval = sent.contourInterval;
             if (sent?.boundary != null && sent.boundary.Length >= 6) mapFile.boundary = sent.boundary;   // the edge the sender chose
+            if (sent?.terrain != null) mapFile.terrain = sent.terrain;   // the terrain sliders the sender chose
             bool isSprint = sprint ?? SymbolRules.LooksLikeSprint(mapFile);
             if (sprint == null)
             {
@@ -182,7 +183,7 @@ public static class MapImportMenu
                 }
                 string folder = PackagesFolder + "/" + info.id;
                 Directory.CreateDirectory(folder);
-                foreach (string name in new[] { "grid.bytes", "points.json", "lines.json", "picture.png", "thumb.png", "map.json" })
+                foreach (string name in new[] { "grid.bytes", "kinds.bytes", "points.json", "lines.json", "picture.png", "thumb.png", "map.json" })
                 {
                     string from = Path.Combine(source, name);
                     if (File.Exists(from)) File.Copy(from, Path.Combine(folder, name), true);

@@ -138,10 +138,12 @@ public class RelayRace : MonoBehaviour, IRaceStats
 
         // Runners not picked yet, or everyone again when there are more legs than runners.
         // In "Your runners" only the player's own runners can be picked, each once.
-        List<CardData> all = pathfinding.YourRunnersMode ? RunnerCollection.OwnedCards() : RunnerCards.InPacks();
+        List<CardData> all = pathfinding.YourRunnersMode ? RunnerCollection.CardsForRace() : RunnerCards.InPacks();
         if (all.Count == 0) all = RunnerCards.InPacks();
-        all = GameModes.WithSameStats(all);
-        List<CardData> left = all.FindAll(c => !picks.Contains(c));
+        // "Same stats": this leg's values (a relay can have other values on each leg)
+        all = GameModes.WithSameStats(all, picks.Count);
+        // By name: with other values on each leg, the same runner is another copy on every leg
+        List<CardData> left = all.FindAll(c => !picks.Exists(p => p.RunnerName == c.RunnerName));
         if (left.Count == 0) left = new List<CardData>(all);
         bool showAll = pathfinding.ChooseWhomeverYouWantMode || pathfinding.YourRunnersMode;
         List<CardData> show = new List<CardData>(left);
@@ -198,7 +200,10 @@ public class RelayRace : MonoBehaviour, IRaceStats
         }
         pickHeader.transform.parent.gameObject.SetActive(true);
         string team = picks.Count > 0 ? "\n<size=90%><color=#5B7563>Team so far:  " + PickedList() + "</color></size>" : "\n<size=90%><color=#5B7563>Speed decides how long a runner can hang on to someone faster.</color></size>";
-        pickHeader.text = "<b><size=120%>" + LegDescription(picks.Count) + "</size></b>" + team;
+        // "Same stats": the values every runner gets on this leg
+        Vector2Int? values = GameModes.SameStatsForLeg(picks.Count);
+        string stats = values != null ? "   <color=#E8742A>Speed " + values.Value.x + ", technique " + values.Value.y + "</color>" : "";
+        pickHeader.text = "<b><size=120%>" + LegDescription(picks.Count) + "</size></b>" + stats + team;
     }
 
     string PickedList()

@@ -324,6 +324,13 @@ public class CourseBuilder : MonoBehaviour
         MapEditPanel.Open(canvasObject.transform, chosen, (saved, rebuilt) =>
         {
             FillMapPicker();
+            // The map on screen was deleted: show another one
+            if (saved == null && map != null && map.id == chosen.id)
+            {
+                MapDefinition other = MapDefinition.All.Find(m => m.id != chosen.id);
+                if (other != null) SelectMap(other);
+                return;
+            }
             if (saved == null || map == null || saved.id != map.id) return;
             // The map on screen changed: show the new version (a new edge means a new grid, so the course starts again)
             if (!rebuilt)
@@ -2184,7 +2191,7 @@ public class CourseBuilder : MonoBehaviour
             return;
         }
 
-        PlayerPrefs.SetString("PlayerNickName", authorField.text.Trim());
+        PlayerPrefs.SetString(LocalPrefs.Key("PlayerNickName"), authorField.text.Trim());
         PlayerPrefs.Save();
 
         busy = true;
@@ -2390,7 +2397,7 @@ public class CourseBuilder : MonoBehaviour
         // always visible: the two lists give up room first (down to their minimum heights) when space runs short
         CourseUI.Column(panel.gameObject, 8, new RectOffset(28, 28, 20, 20));
 
-        // The title, with New course in the top-right corner, so the buttons at the bottom have room for their names
+        // The title, with Import map in the top-right corner (New course is the big button at the bottom left)
         RectTransform titleRow = CourseUI.Rect("Title row", panel.transform);
         CourseUI.Row(titleRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
         CourseUI.Size(titleRow, 44);
@@ -2404,8 +2411,8 @@ public class CourseBuilder : MonoBehaviour
         undoButton = CourseUI.Button("Undo", titleRow, "Undo", CourseUI.ButtonKind.Light, Undo, 20);
         CourseUI.Size(undoButton, 40, 104);
         undoButton.interactable = false;
-        Button newCourse = CourseUI.Button("New", titleRow, "New course", CourseUI.ButtonKind.Light, () => { PushUndo(); ClearCourse(); }, 20);
-        CourseUI.Size(newCourse, 40, 142);
+        Button importMap = CourseUI.Button("Import map", titleRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 20);
+        CourseUI.Size(importMap, 40, 160);
 
         RectTransform mapRow = CourseUI.Rect("Map row", panel.transform);
         CourseUI.Row(mapRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
@@ -2417,7 +2424,7 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Size(nameField, 54);
         authorField = CourseUI.Input("Your name", panel.transform, "Your name", CourseData.MaxAuthorLength, null);
         CourseUI.Size(authorField, 54);
-        authorField.text = PlayerPrefs.GetString("PlayerNickName", GameManager.Instance != null ? GameManager.Instance.playerNickName : "");
+        authorField.text = PlayerPrefs.GetString(LocalPrefs.Key("PlayerNickName"), GameManager.Instance != null ? GameManager.Instance.playerNickName : "");
 
         RectTransform toolRow = CourseUI.Rect("Tools", panel.transform);
         CourseUI.Row(toolRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
@@ -2478,8 +2485,9 @@ public class CourseBuilder : MonoBehaviour
 
         RectTransform bottomRow = CourseUI.Rect("Bottom", panel.transform);
         CourseUI.Row(bottomRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
-        CourseUI.Size(bottomRow, 52);
-        CourseUI.Button("Import map", bottomRow, "Import map", CourseUI.ButtonKind.Light, OpenMapImport, 22);
+        CourseUI.Size(bottomRow, 58);
+        Button newCourse = CourseUI.Button("New", bottomRow, "New course", CourseUI.ButtonKind.Secondary, () => { PushUndo(); ClearCourse(); }, 24);
+        CourseUI.Size(newCourse, -1, -1, 1.4f);
         // Opened from the multiplayer lobby: back to the lobby, the network game is still running
         if (LobbyVisit.Active) CourseUI.Button("Back", bottomRow, "Back to lobby", CourseUI.ButtonKind.Light, LobbyVisit.Close, 22);
         else CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);

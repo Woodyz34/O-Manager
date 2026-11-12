@@ -25,7 +25,6 @@ public class EndScreenUI : MonoBehaviour
     public Transform rewardLineParent;
     public GameObject rewardLineTemplate;
     public TextMeshProUGUI balanceText;
-    public TextMeshProUGUI trophyText;
 
     [Header("Imposter vote")]
     public GameObject votePanel;
@@ -91,7 +90,6 @@ public class EndScreenUI : MonoBehaviour
         lobbyButton.gameObject.SetActive(false);
         revealNowButton.gameObject.SetActive(false);
         waitingText.text = "";
-        trophyText.text = "";
 
         lobbyButton.onClick.AddListener(CompetitionFlow.HostReturnToLobby);
         revealNowButton.onClick.AddListener(CompetitionFlow.HostRevealImposter);
@@ -431,11 +429,6 @@ public class EndScreenUI : MonoBehaviour
         if (Money.Instance != null)
         {
             Money.Instance.AddMoney(total);
-            if (me.finished && me.place == 1 && !amImposter)
-            {
-                Money.Instance.AddTrophy(1);
-                trophyText.text = "+1 trophy for the win";
-            }
         }
         balanceText.text = Balance();
         StartCoroutine(CountUp(total));

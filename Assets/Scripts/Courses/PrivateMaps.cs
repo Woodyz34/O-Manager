@@ -47,6 +47,7 @@ public static class PrivateMaps
         public long sourceBytes;
         public double contourInterval;
         public double[] boundary;         // paper mm, or null for the whole map
+        public TerrainSpeeds terrain;     // the terrain sliders, or null for the normal speeds
         public long sharedAt;             // unix seconds, when the map file was uploaded
         public List<string> guests = new List<string>();
         public long until;                // unix seconds
@@ -113,6 +114,7 @@ public static class PrivateMaps
                 sourceBytes = new FileInfo(SourceFile(folder, info)).Length,
                 contourInterval = info.contourInterval,
                 boundary = info.boundary != null && info.boundary.Length >= 6 ? info.boundary : null,
+                terrain = info.terrain != null && !info.terrain.IsDefault() ? info.terrain.Copy() : null,
                 sharedAt = info.sharedAt,
                 guests = new List<string>(guestIds),
                 until = until
@@ -279,6 +281,7 @@ public static class PrivateMaps
             MapFile file = MapPackageBuilder.ReadMapFile(source);
             if (entry.contourInterval > 0) file.contourInterval = entry.contourInterval;
             if (entry.boundary != null && entry.boundary.Length >= 6) file.boundary = entry.boundary;
+            file.terrain = entry.terrain;
             string type = entry.mapType == "sprint" || entry.mapType == "both" ? entry.mapType : "forest";
             MapPackage package = MapImportPanel.BuildPackage(file, entry.name, type, ownPng,
                 (step, share) => GuestProgress = 60 + Mathf.RoundToInt(share * 39));

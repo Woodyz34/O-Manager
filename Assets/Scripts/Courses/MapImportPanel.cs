@@ -36,6 +36,7 @@ public class MapImportPanel : MonoBehaviour
     bool contourTyped;   // the player wrote the contour interval: changing the type no longer changes it
     bool permission;
     bool isPrivate;      // Public is the default
+    TerrainSpeeds terrain = new TerrainSpeeds();   // the terrain sliders; all in the middle = normal speeds
     bool working;
 
     // Written by the background thread, shown in Update
@@ -46,8 +47,8 @@ public class MapImportPanel : MonoBehaviour
     TMP_InputField pathField, pictureField, nameField, contourField;
     TMP_InputField senderField, clubField, contactField;   // who sends the map in, so the game's owner can reach them
     Button typeButton, pictureButton, permissionButton, importButton, cancelButton, edgeButton;
-    Button publicButton, privateButton;
-    TextMeshProUGUI edgeText, visibilityText;
+    Button publicButton, privateButton, terrainButton;
+    TextMeshProUGUI edgeText, visibilityText, terrainText;
     RectTransform contactRow;
     Image permissionBox;
 
@@ -137,6 +138,17 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.Size(edgeText, -1, -1, 1);
         edgeButton = CourseUI.Button("Edge button", edgeRow, "Check map edge...", CourseUI.ButtonKind.Secondary, OpenEdge, 20);
         CourseUI.Size(edgeButton, -1, 300);
+
+        // How quick the kinds of ground are on this map (sliders, normal in the middle)
+        RectTransform terrainRow = CourseUI.Rect("Terrain row", card.transform);
+        CourseUI.Row(terrainRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(terrainRow, 52);
+        terrainText = CourseUI.Text("Terrain", terrainRow, "", 20, CourseUI.Ink);
+        terrainText.alignment = TextAlignmentOptions.MidlineLeft;
+        terrainText.textWrappingMode = TextWrappingModes.Normal;
+        CourseUI.Size(terrainText, -1, -1, 1);
+        terrainButton = CourseUI.Button("Terrain button", terrainRow, "Terrain speeds...", CourseUI.ButtonKind.Secondary, OpenTerrain, 20);
+        CourseUI.Size(terrainButton, -1, 300);
 
         // Who can use the map: everyone (Public, the default) or only this player (Private)
         RectTransform visibilityRow = CourseUI.Rect("Visibility row", card.transform);
@@ -350,6 +362,12 @@ public class MapImportPanel : MonoBehaviour
         MapEdgeEditor.Open(transform, preview, edge, guessedEdge, chosen => { edge = chosen; Refresh(); });
     }
 
+    void OpenTerrain()
+    {
+        if (working) return;
+        TerrainSpeedPanel.Open(transform, terrain, chosen => { terrain = chosen; Refresh(); });
+    }
+
     // "Tranås_sprint_20190125 ocad9 (1)" -> "Tranås sprint": no copy numbers, dates or OCAD versions
     static string NiceName(string file)
     {
@@ -388,6 +406,9 @@ public class MapImportPanel : MonoBehaviour
             : "Map edge: your own edge. Everything outside it is left out.";
         edgeText.color = edge != null && edge == guessedEdge ? CourseUI.Accent : CourseUI.Ink;
         edgeButton.interactable = !working && preview != null;
+        terrainText.text = TerrainSpeedPanel.Describe(terrain);
+        terrainText.color = terrain.IsDefault() ? CourseUI.Ink : CourseUI.Accent;
+        terrainButton.interactable = !working;
         permissionBox.enabled = permission;
         CourseUI.SetButtonColor(publicButton, isPrivate ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Primary);
         CourseUI.SetButtonColor(privateButton, isPrivate ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
@@ -492,12 +513,13 @@ public class MapImportPanel : MonoBehaviour
         // Things that need Unity are worked out here, on the main thread
         string id = MapPackages.MakeId(name);
         string target = Path.Combine(MapPackages.LocalRoot, id);
-        string author = PlayerPrefs.GetString("PlayerNickName", "");
+        string author = PlayerPrefs.GetString(LocalPrefs.Key("PlayerNickName"), "");
         string picture = picturePath;
         MapFile source = mapFile;
         string type = mapType;
         source.contourInterval = contours;
         source.boundary = edge;
+        source.terrain = terrain.Copy();
         string sourceName = Path.GetFileName(mapPath);
         string sourcePath = mapPath;
         MapPackage package = null;

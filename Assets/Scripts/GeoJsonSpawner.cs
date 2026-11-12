@@ -208,9 +208,13 @@ public class GeoJsonSpawner : MonoBehaviour
                 ? pathfindingManager.gridData.grid_size / pathfindingManager.cellSize : 100f;
             float[,] speedGrid = pathfindingManager.speedGrid2D;
             float[,] heightGrid = GridBinary.LastHeights;
+            // What every cell's ground is (marsh, field, green ...), from maps imported since November 2026
+            byte[] kinds = null;
+            if (map != null && !string.IsNullOrEmpty(map.gridName) && map.gridName.EndsWith("grid") && pathfindingManager.jsonFileName == map.gridName + ".json")
+                kinds = MapPackages.LoadBytes(map.gridName.Substring(0, map.gridName.Length - 4) + "kinds", ".bytes");
             Task.Run(() =>
             {
-                try { MapFeatureIndex.Build(indexFiles, indexMap, metresPerUnit, speedGrid, heightGrid); }
+                try { MapFeatureIndex.Build(indexFiles, indexMap, metresPerUnit, speedGrid, heightGrid, kinds); }
                 catch (System.Exception e) { Debug.LogError("MapFeatureIndex: " + e); }
             });
         }

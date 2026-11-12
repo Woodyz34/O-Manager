@@ -12,7 +12,7 @@ using UnityEngine;
 public static class MapFeatureIndex
 {
     public struct Point { public Vector2 p; public int group; public float clarity; public float unique; }
-    public struct Sample { public Vector2 p; public int line; public int group; public float clarity; public bool distinct; public bool roadSure; public bool junction; }
+    public struct Sample { public Vector2 p; public int line; public int group; public float clarity; public float see; public bool distinct; public bool roadSure; public bool junction; }
     // The edge of ground nobody can enter (houses, gardens, olive green, lakes): clear to see.
     // small = a house or a plot, which has a shape of its own; the map edge or a big lake does not.
     public struct AreaEdge { public Vector2 p; public int area; public bool small; public int size; }
@@ -37,66 +37,113 @@ public static class MapFeatureIndex
     // World position <-> metres (1 world unit = metresPerUnit metres, the grid's cell size times 100)
     public static float metresPerUnit = 100f;
 
-    // ---- the kinds of objects, by ISOM code (the first three digits of the layer name) ----
-    static bool Classify(string layer, bool line, out int group, out float clarity)
+    // ---- the kinds of objects, by ISOM 2017 code (the first three digits of the layer name) ----
+    // Every point and line symbol of ISOM 2017-2 has a row here. see = from how far (metres) a line is noticed;
+    // most lines only when you cross or run on them.
+    static bool Classify(string layer, bool line, out int group, out float clarity, out float see)
     {
-        group = 0; clarity = 0f;
+        group = 0; clarity = 0f; see = 4f;
         if (string.IsNullOrEmpty(layer) || layer.Length < 3 || !int.TryParse(layer.Substring(0, 3), out int code)) return false;
         int full = 0;
         if (layer.Length >= 6) int.TryParse(layer.Substring(0, 6), out full);
+        group = code;
         if (!line)
         {
             switch (code)
             {
-                case 204: group = 204; clarity = 0.35f; return true;            // stone
-                case 205: group = 205; clarity = 0.6f; return true;             // large stone
-                case 206: group = 205; clarity = 0.75f; return true;            // very large stone
-                case 207: group = 207; clarity = 0.5f; return true;             // group of stones
-                case 109: case 110: group = 109; clarity = 0.45f; return true;  // knoll
-                case 111: case 112: group = 111; clarity = 0.3f; return true;   // pit
-                case 526: group = 526; clarity = full == 526300 ? 0.2f : 0.3f; return true;   // cairn
-                case 312: group = 312; clarity = 0.25f; return true;            // spring
-                case 524: group = 524; clarity = 0.9f; return true;             // high tower
-                case 525: group = 525; clarity = 0.6f; return true;             // small tower
-                case 523: group = 523; clarity = 0.55f; return true;            // ruin
-                case 530: case 531: case 527: group = 531; clarity = 0.4f; return true;   // special man-made
-                case 115: case 419: group = 115; clarity = 0.35f; return true;  // special feature
-                case 417: case 418: group = 417; clarity = 0.35f; return true;  // distinct tree
-                case 308: group = 308; clarity = 0.3f; return true;             // small marsh
-                case 311: group = 311; clarity = 0.4f; return true;             // well
-                case 303: group = 303; clarity = 0.4f; return true;             // waterhole
-                case 203: group = 203; clarity = 0.5f; return true;             // stony pit
+                // land forms
+                case 104: clarity = 0.3f; return true;                          // earth bank (shortest size)
+                case 109: clarity = 0.45f; return true;                         // small knoll
+                case 110: group = 109; clarity = 0.45f; return true;            // small elongated knoll
+                case 111: clarity = 0.3f; return true;                          // small depression
+                case 112: clarity = 0.35f; return true;                         // pit
+                case 113: clarity = 0.2f; return true;                          // broken ground
+                case 115: clarity = 0.35f; return true;                         // prominent landform feature
+                // rock and boulders
+                case 202: clarity = 0.35f; return true;                         // cliff (shortest size)
+                case 203: clarity = 0.5f; return true;                          // rocky pit, cave
+                case 204: clarity = 0.35f; return true;                         // boulder
+                case 205: clarity = 0.6f; return true;                          // large boulder
+                case 206: group = 205; clarity = 0.75f; return true;            // gigantic boulder
+                case 207: clarity = 0.5f; return true;                          // boulder cluster
+                case 208: case 209: group = 208; clarity = 0.2f; return true;   // boulder field
+                // water and marsh
+                case 303: clarity = 0.4f; return true;                          // waterhole
+                case 308: clarity = 0.3f; return true;                          // marsh (smallest size)
+                case 311: clarity = 0.4f; return true;                          // well, fountain, water tank
+                case 312: clarity = 0.25f; return true;                         // spring
+                case 313: clarity = 0.35f; return true;                         // prominent water feature
+                // vegetation
+                case 417: clarity = 0.35f; return true;                         // prominent large tree
+                case 418: clarity = 0.25f; return true;                         // prominent bush or tree
+                case 419: clarity = 0.35f; return true;                         // prominent vegetation feature
+                // man-made
+                case 512: clarity = 0.7f; return true;                          // footbridge
+                case 519: clarity = 0.5f; return true;                          // crossing point
+                case 521: clarity = 0.9f; return true;                          // building (smallest size)
+                case 522: group = 521; clarity = 0.8f; return true;             // canopy
+                case 523: clarity = 0.55f; return true;                         // ruin
+                case 524: clarity = 0.9f; return true;                          // high tower
+                case 525: clarity = 0.6f; return true;                          // small tower
+                case 526: clarity = full == 526000 ? 0.3f : 0.2f; return true;  // cairn
+                case 527: clarity = 0.5f; return true;                          // fodder rack
+                case 530: clarity = 0.4f; return true;                          // prominent man-made feature (ring)
+                case 531: clarity = 0.4f; return true;                          // prominent man-made feature (x)
             }
             return false;
         }
         switch (code)
         {
-            case 501: case 502: group = 501; clarity = 1.0f; return true;   // big road
-            case 503: group = 503; clarity = 0.9f; return true;             // road
-            case 504: group = 504; clarity = 0.9f; return true;             // vehicle track
-            case 505: group = 505; clarity = 0.8f; return true;             // footpath
-            case 506: group = 506; clarity = 0.6f; return true;             // small path
-            case 507: group = 507; clarity = 0.35f; return true;            // less distinct path
-            case 508: group = 508; clarity = 0.4f; return true;             // ride / firebreak
-            case 510: group = 510; clarity = 0.9f; return true;             // power line
-            case 304: group = 304; clarity = 0.8f; return true;             // stream
-            case 305: group = 305; clarity = 0.5f; return true;             // small stream
-            case 306: group = 306; clarity = 0.4f; return true;             // ditch
-            case 309: group = 309; clarity = 0.25f; return true;            // narrow marsh
-            case 513: group = 513; clarity = 0.6f; return true;             // stone wall
-            case 514: group = 513; clarity = 0.4f; return true;             // ruined wall
-            case 516: group = 516; clarity = 0.7f; return true;             // fence
-            case 517: group = 516; clarity = 0.5f; return true;             // ruined fence
-            case 518: group = 516; clarity = 0.9f; return true;             // high fence
-            case 416: group = 416; clarity = 0.15f; return true;            // vegetation boundary
-            case 415: group = 415; clarity = 0.45f; return true;            // cultivation boundary
-            case 201: group = 201; clarity = 0.75f; return true;            // impassable cliff
-            case 202: group = 202; clarity = 0.4f; return true;             // passable cliff
-            case 301: group = 301; clarity = 1.0f; return true;             // lake shore
-            case 105: group = 105; clarity = 0.4f; return true;             // earth bank
+            // land forms
+            case 104: clarity = 0.4f; return true;                              // earth bank
+            case 105: clarity = 0.5f; return true;                              // earth wall
+            case 106: group = 105; clarity = 0.3f; return true;                 // ruined earth wall
+            case 107: clarity = 0.5f; return true;                              // erosion gully
+            case 108: group = 107; clarity = 0.3f; return true;                 // small erosion gully
+            // rock
+            case 201: clarity = 0.75f; see = 8f; return true;                   // impassable cliff
+            case 202: clarity = 0.4f; return true;                              // cliff
+            case 215: clarity = 0.5f; return true;                              // trench
+            // water
+            case 301: clarity = 1.0f; see = 25f; return true;                   // lake shore, uncrossable river
+            case 304: clarity = 0.8f; return true;                              // crossable watercourse
+            case 305: clarity = 0.5f; return true;                              // small crossable watercourse
+            case 306: clarity = 0.3f; return true;                              // minor / seasonal water channel
+            case 307: clarity = 0.6f; return true;                              // uncrossable marsh edge
+            case 309: clarity = 0.25f; return true;                             // narrow marsh
+            // vegetation
+            case 415: clarity = 0.45f; return true;                             // distinct cultivation boundary
+            case 416: clarity = 0.2f; return true;                              // distinct vegetation boundary
+            // roads and paths
+            case 501: case 502: group = 501; clarity = 1.0f; see = 10f; return true;   // wide road
+            case 503: clarity = 0.9f; see = 8f; return true;                    // road
+            case 504: clarity = 0.9f; see = 6f; return true;                    // vehicle track
+            case 505: clarity = 0.8f; return true;                              // footpath
+            case 506: clarity = 0.6f; return true;                              // small footpath
+            case 507: clarity = 0.35f; return true;                             // less distinct small footpath
+            case 508: clarity = 0.4f; return true;                              // narrow ride
+            case 509: clarity = 1.0f; see = 15f; return true;                   // railway
+            case 510: clarity = 0.8f; see = 20f; return true;                   // power line, cableway, ski lift
+            case 511: clarity = 1.0f; see = 40f; return true;                   // major power line
+            case 512: clarity = 0.8f; return true;                              // bridge, tunnel
+            // walls and fences
+            case 513: clarity = 0.6f; return true;                              // wall
+            case 514: group = 513; clarity = 0.4f; return true;                 // ruined wall
+            case 515: clarity = 0.9f; see = 8f; return true;                    // impassable wall
+            case 516: clarity = 0.7f; return true;                              // fence
+            case 517: group = 516; clarity = 0.4f; return true;                 // ruined fence
+            case 518: clarity = 0.9f; see = 8f; return true;                    // impassable fence
+            case 523: clarity = 0.5f; return true;                              // ruin
+            case 528: clarity = 0.6f; return true;                              // prominent line feature
+            case 529: clarity = 0.85f; see = 8f; return true;                   // prominent impassable line feature
+            case 532: clarity = 0.7f; return true;                              // stairway
         }
         return false;
     }
+    public const int BigCliff = 2010;      // an impassable cliff, or a passable one at least 40 m long
+    public const int Pylon = 5100;         // a pylon of a power line
+    // Lines whose corners you can tell where you are from (a field corner, a bend of a wall or a fence)
+    static bool HasCorners(int g) => g == 415 || g == 513 || g == 515 || g == 516 || g == 518 || g == 529 || g == 105;
 
     public struct Mapping
     {
@@ -112,7 +159,7 @@ public static class MapFeatureIndex
     }
 
     // Runs in a background thread
-    public static void Build(List<byte[]> files, Mapping map, float mpu, float[,] speedGrid, float[,] heightGrid)
+    public static void Build(List<byte[]> files, Mapping map, float mpu, float[,] speedGrid, float[,] heightGrid, byte[] kinds = null)
     {
         Ready = false;
         var pts = new List<Point>(); var smp = new List<Sample>();
@@ -127,24 +174,53 @@ public static class MapFeatureIndex
                 string layer = f["properties"]?["Layer"]?.ToString();
                 JArray c = f["geometry"]?["coordinates"] as JArray;
                 if (c == null) continue;
-                if (type == "Point" && Classify(layer, false, out int g, out float cl))
+                if (type == "Point" && Classify(layer, false, out int g, out float cl, out float _))
                 {
                     pts.Add(new Point { p = map.ToMetres((float)c[0], (float)c[1], mpu), group = g, clarity = cl });
                 }
-                else if (type == "LineString" && c.Count >= 2 && Classify(layer, true, out int lg, out float lc))
+                else if (type == "LineString" && c.Count >= 2 && Classify(layer, true, out int lg, out float lc, out float see))
                 {
                     int id = lineId++;
-                    Vector2 prev = map.ToMetres((float)c[0][0], (float)c[0][1], mpu);
-                    for (int i = 1; i < c.Count; i++)
+                    var corners = new List<Vector2>(c.Count);
+                    float length = 0f;
+                    for (int i = 0; i < c.Count; i++)
                     {
-                        Vector2 next = map.ToMetres((float)c[i][0], (float)c[i][1], mpu);
+                        corners.Add(map.ToMetres((float)c[i][0], (float)c[i][1], mpu));
+                        if (i > 0) length += Vector2.Distance(corners[i - 1], corners[i]);
+                    }
+                    // A big cliff is something else than the many small ones
+                    if (lg == 201 || (lg == 202 && length >= 40f)) { lg = BigCliff; lc = Mathf.Max(lc, 0.65f); see = 8f; }
+                    int first = smp.Count;
+                    Vector2 prev = corners[0];
+                    for (int i = 1; i < corners.Count; i++)
+                    {
+                        Vector2 next = corners[i];
                         float d = Vector2.Distance(prev, next);
                         int k = Mathf.Max(1, (int)(d / 5f));
                         for (int s = 0; s < k; s++)
-                            smp.Add(new Sample { p = Vector2.Lerp(prev, next, s / (float)k), line = id, group = lg, clarity = lc });
+                            smp.Add(new Sample { p = Vector2.Lerp(prev, next, s / (float)k), line = id, group = lg, clarity = lc, see = see });
                         prev = next;
                     }
-                    smp.Add(new Sample { p = prev, line = id, group = lg, clarity = lc });
+                    smp.Add(new Sample { p = prev, line = id, group = lg, clarity = lc, see = see });
+                    // A sharp bend (a field corner, a corner of a fence): a place on the line you can tell
+                    if (HasCorners(lg))
+                        for (int k = first + 3; k < smp.Count - 3; k++)
+                        {
+                            Vector2 a = smp[k].p - smp[k - 3].p, b = smp[k + 3].p - smp[k].p;
+                            if (a.sqrMagnitude < 36f || b.sqrMagnitude < 36f) continue;
+                            if (Vector2.Dot(a.normalized, b.normalized) < 0.55f) { Sample q = smp[k]; q.distinct = true; smp[k] = q; }
+                        }
+                    // The pylons of a power line stand where the line is drawn with a corner point
+                    if (lg == 510 || lg == 511)
+                    {
+                        Vector2 last = new Vector2(float.MaxValue, 0f);
+                        foreach (Vector2 v in corners)
+                        {
+                            if ((v - last).sqrMagnitude < 20f * 20f) continue;
+                            pts.Add(new Point { p = v, group = Pylon, clarity = 0.7f });
+                            last = v;
+                        }
+                    }
                 }
             }
         }
@@ -166,7 +242,7 @@ public static class MapFeatureIndex
             // A place on a line you can be sure of: a junction, or something clear right by it
             for (int i = 0; i < smp.Count; i++)
             {
-                bool distinct = false;
+                bool distinct = smp[i].distinct;   // a corner of the line itself
                 QuerySamples(smp[i].p, 12f, near);
                 foreach (int j in near) if (smp[j].line != smp[i].line && smp[j].clarity >= 0.35f) { distinct = true; break; }
                 if (!distinct)
@@ -178,6 +254,7 @@ public static class MapFeatureIndex
             }
             readability.Clear();
             BuildGround(speedGrid, heightGrid, map.cellSize * mpu);
+            BuildZones(kinds, smp);
             BuildSides(smp);
             // Places on a road you are 100 % sure of: houses and gardens right by it, or a junction that is the only
             // one round here or has something clear right by it. Other junctions can be mixed up with each other.
@@ -290,7 +367,212 @@ public static class MapFeatureIndex
         hills = tops;
     }
 
-    // ---- sides of roads: crossing a road is something you always notice, so you know which side of it you are on
+    // ---- zones: pieces of ground that look different from the forest round them (a marsh, a field, a green
+    // thicket, a boulder field). You notice when you come to one, and on the map you ask "which marsh is this?".
+    // From the package's kinds.bytes (written by the map import); maps imported before that get it from the speeds.
+    public struct ZoneEdge { public Vector2 p; public int zone; }
+    public struct Zone { public int cls; public int size; public float clarity; public float see; }
+    public static List<ZoneEdge> zoneEdges = new List<ZoneEdge>();
+    public static List<Zone> zones = new List<Zone>();
+    public const int ZoneKeyOffset = 20000;   // signature keys of zones: this + the class
+    static int[,] zoneOf;
+    static readonly Dictionary<long, List<int>> zoneBuckets = new Dictionary<long, List<int>>();
+
+    // Kinds that read as the same thing on the map (0 = nothing to read: forest, and closed ground which has its own rules)
+    static int ZoneClass(byte kind)
+    {
+        switch (kind)
+        {
+            case MapImport.GroundKind.Open: case MapImport.GroundKind.Cultivated: return 1;
+            case MapImport.GroundKind.RoughOpen: case MapImport.GroundKind.OpenTrees: return 3;
+            case MapImport.GroundKind.LightGreen: return 5;
+            case MapImport.GroundKind.Green: return 6;
+            case MapImport.GroundKind.DarkGreen: return 7;
+            case MapImport.GroundKind.Marsh: case MapImport.GroundKind.UncrossableMarsh: return 8;
+            case MapImport.GroundKind.IndistinctMarsh: return 9;
+            case MapImport.GroundKind.ShallowWater: return 12;
+            case MapImport.GroundKind.Paved: return 15;
+            case MapImport.GroundKind.Stony: return 16;
+            case MapImport.GroundKind.BoulderField: return 17;
+            case MapImport.GroundKind.BareRock: return 18;
+            case MapImport.GroundKind.Sand: return 19;
+            case MapImport.GroundKind.BrokenGround: return 20;
+            case MapImport.GroundKind.Orchard: return 21;
+        }
+        return 0;
+    }
+    // How easy a zone is to notice and be sure of, and from how far. A field is seen from far away; a marsh you
+    // often have to stand in to know it is one; light green without a clear edge is hard to tell from the forest.
+    static void ZoneLook(int cls, out float clarity, out float see)
+    {
+        switch (cls)
+        {
+            case 1: clarity = 0.9f; see = 30f; return;
+            case 3: clarity = 0.7f; see = 20f; return;
+            case 5: clarity = 0.2f; see = 2f; return;
+            case 6: clarity = 0.35f; see = 3f; return;
+            case 7: clarity = 0.5f; see = 5f; return;
+            case 8: clarity = 0.35f; see = 4f; return;
+            case 9: clarity = 0.2f; see = 2f; return;
+            case 12: clarity = 0.6f; see = 10f; return;
+            case 15: clarity = 0.9f; see = 15f; return;
+            case 16: clarity = 0.25f; see = 3f; return;
+            case 17: clarity = 0.4f; see = 8f; return;
+            case 18: clarity = 0.3f; see = 6f; return;
+            case 19: clarity = 0.5f; see = 8f; return;
+            case 20: clarity = 0.25f; see = 3f; return;
+            case 21: clarity = 0.7f; see = 15f; return;
+        }
+        clarity = 0f; see = 0f;
+    }
+
+    static void BuildZones(byte[] kinds, List<Sample> smp)
+    {
+        zoneEdges = new List<ZoneEdge>(); zones = new List<Zone> { new Zone() }; zoneOf = null; zoneBuckets.Clear();
+        if (speed == null) return;
+        var cls = new byte[rows, cols];
+        if (kinds != null && kinds.Length == rows * cols)
+        {
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++)
+                    if (speed[r, c] > 0.05f) cls[r, c] = (byte)ZoneClass(kinds[r * cols + c]);
+        }
+        else
+        {
+            // An older package: the import gave every kind of ground its own speed, so the speed tells the kind,
+            // except in the cells a path, a wall or a fence runs through
+            var onLine = new bool[rows, cols];
+            foreach (var s in smp)
+            {
+                int g = s.group;
+                if (!((g >= 501 && g <= 509) || g == 513 || g == 516 || g == 532)) continue;
+                if (CellOf(s.p, out int r, out int c)) onLine[r, c] = true;
+            }
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++)
+                {
+                    float v = speed[r, c];
+                    if (onLine[r, c] || v <= 0.05f) continue;
+                    byte k = 0;
+                    if (Mathf.Abs(v - 1.3f) < 0.02f) k = 1;
+                    else if (Mathf.Abs(v - 1.2f) < 0.02f) k = 3;
+                    else if (Mathf.Abs(v - 0.7f) < 0.02f) k = 5;
+                    else if (Mathf.Abs(v - 0.6f) < 0.02f) k = 6;
+                    else if (Mathf.Abs(v - 0.8f) < 0.02f) k = 8;
+                    else if (Mathf.Abs(v - 0.9f) < 0.02f) k = 9;
+                    else if (Mathf.Abs(v - 0.85f) < 0.02f) k = 16;
+                    cls[r, c] = k;
+                }
+            // Under a path: the ground is what it is on both sides of it
+            for (int r = 1; r < rows - 1; r++)
+                for (int c = 1; c < cols - 1; c++)
+                {
+                    if (!onLine[r, c]) continue;
+                    byte a = cls[r - 1, c], b = cls[r + 1, c], l = cls[r, c - 1], rt = cls[r, c + 1];
+                    if (a != 0 && a == b && !onLine[r - 1, c] && !onLine[r + 1, c]) cls[r, c] = a;
+                    else if (l != 0 && l == rt && !onLine[r, c - 1] && !onLine[r, c + 1]) cls[r, c] = l;
+                }
+        }
+        var id = new int[rows, cols];
+        var stack = new Stack<int>();
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                byte k = cls[r, c];
+                if (k == 0 || id[r, c] != 0) continue;
+                int z = zones.Count, n = 0;
+                id[r, c] = z; stack.Push(r * cols + c);
+                while (stack.Count > 0)
+                {
+                    int q = stack.Pop(), rr = q / cols, cc = q % cols; n++;
+                    if (rr > 0 && id[rr - 1, cc] == 0 && cls[rr - 1, cc] == k) { id[rr - 1, cc] = z; stack.Push(q - cols); }
+                    if (rr < rows - 1 && id[rr + 1, cc] == 0 && cls[rr + 1, cc] == k) { id[rr + 1, cc] = z; stack.Push(q + cols); }
+                    if (cc > 0 && id[rr, cc - 1] == 0 && cls[rr, cc - 1] == k) { id[rr, cc - 1] = z; stack.Push(q - 1); }
+                    if (cc < cols - 1 && id[rr, cc + 1] == 0 && cls[rr, cc + 1] == k) { id[rr, cc + 1] = z; stack.Push(q + 1); }
+                }
+                ZoneLook(k, out float clarity, out float see);
+                zones.Add(new Zone { cls = k, size = n, clarity = clarity, see = see });
+            }
+        var near = new List<int>();
+        var clearEdge = new bool[zones.Count];
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                int z = id[r, c];
+                if (z == 0) continue;
+                bool edge = r == 0 || c == 0 || r == rows - 1 || c == cols - 1
+                            || id[r - 1, c] != z || id[r + 1, c] != z || id[r, c - 1] != z || id[r, c + 1] != z;
+                if (!edge) continue;
+                Vector2 p = CellMetres(r, c);
+                zoneEdges.Add(new ZoneEdge { p = p, zone = z });
+                // Green with a drawn vegetation boundary has an edge you can see
+                int k = zones[z].cls;
+                if ((k == 5 || k == 6 || k == 7) && !clearEdge[z])
+                {
+                    QuerySamples(p, cellMetres, near);
+                    foreach (int j in near) if (smp[j].group == 416 || smp[j].group == 415) { clearEdge[z] = true; break; }
+                }
+            }
+        for (int z = 1; z < zones.Count; z++)
+            if (clearEdge[z]) { Zone q = zones[z]; q.clarity = Mathf.Max(q.clarity, 0.5f); q.see = Mathf.Max(q.see, 6f); zones[z] = q; }
+        zoneOf = id;
+        Fill(zoneBuckets, zoneEdges.Count, i => zoneEdges[i].p);
+    }
+    public static void QueryZones(Vector2 c, float r, List<int> result) => Query(zoneBuckets, i => zoneEdges[i].p, c, r, result);
+    // The zone you stand in (0 = none)
+    public static int ZoneAt(Vector2 m)
+    {
+        if (zoneOf == null) return 0;
+        return CellOf(m, out int r, out int c) ? zoneOf[r, c] : 0;
+    }
+    public static float CellSizeMetres => cellMetres;
+
+    // ---- the shape of the ground ----
+    // Which way and how steeply the ground rises (metres per metre), over about 40 m
+    public static Vector2 Slope(Vector2 m)
+    {
+        if (heights == null) return Vector2.zero;
+        float d = Mathf.Max(20f, 2f * cellMetres);
+        return new Vector2(HeightAt(m + new Vector2(d, 0f)) - HeightAt(m - new Vector2(d, 0f)),
+                           HeightAt(m + new Vector2(0f, d)) - HeightAt(m - new Vector2(0f, d))) / (2f * d);
+    }
+    // Running along the top of a ridge or the bottom of a valley: the ground itself shows the way, like a path does.
+    // You would have to run down off the ridge (or up out of the valley) to go wrong.
+    public static bool OnTerrainLine(Vector2 m, Vector2 direction)
+    {
+        if (heights == null || direction.sqrMagnitude < 1e-6f) return false;
+        Vector2 n = new Vector2(-direction.y, direction.x).normalized;
+        float h = HeightAt(m);
+        float a = HeightAt(m + n * 25f) - h, b = HeightAt(m - n * 25f) - h;
+        return (a <= -2.5f && b <= -2.5f) || (a >= 2.5f && b >= 2.5f);
+    }
+
+    // Is there a thing of this kind (a signature key: a point group, a line group + LineGroupOffset, a zone class
+    // + ZoneKeyOffset) within r of a place?
+    static readonly List<int> hasTmp = new List<int>();
+    public static bool HasKind(int key, Vector2 p, float r)
+    {
+        if (key >= ZoneKeyOffset)
+        {
+            int cls = key - ZoneKeyOffset;
+            int z = ZoneAt(p);
+            if (z != 0 && zones[z].cls == cls) return true;
+            QueryZones(p, r, hasTmp);
+            foreach (int i in hasTmp) if (zones[zoneEdges[i].zone].cls == cls) return true;
+            return false;
+        }
+        if (key >= LineGroupOffset)
+        {
+            QuerySamples(p, r, hasTmp);
+            foreach (int i in hasTmp) if (samples[i].group == key - LineGroupOffset) return true;
+            return false;
+        }
+        QueryPoints(p, r, hasTmp);
+        foreach (int i in hasTmp) if (points[i].group == key) return true;
+        return false;
+    }
+
+    // ---- sides of roads and big paths: crossing one is something you always notice, so you know which side of it you are on
     static int[,] side;
     static void BuildSides(List<Sample> smp)
     {
@@ -299,7 +581,7 @@ public static class MapFeatureIndex
         var road = new bool[rows, cols];
         foreach (var s in smp)
         {
-            if (s.group != 501 && s.group != 503 && s.group != 504) continue;
+            if (s.group != 501 && s.group != 503 && s.group != 504 && s.group != 505 && s.group != 509) continue;   // roads, big paths, railways
             CellOf(s.p, out int r, out int c);
             for (int dr = -1; dr <= 1; dr++)
                 for (int dc = -1; dc <= 1; dc++)
@@ -338,7 +620,7 @@ public static class MapFeatureIndex
             if (smp[k].line == smp[i].line && (smp[k].p - smp[i].p).sqrMagnitude > best) { best = (smp[k].p - smp[i].p).sqrMagnitude; far = smp[k].p; }
         return best > 0f ? (far - smp[i].p).normalized : Vector2.zero;
     }
-    static int SideOf(Vector2 m)
+    public static int SideOf(Vector2 m)
     {
         if (side == null) return 0;
         CellOf(m, out int r, out int c);
@@ -470,6 +752,11 @@ public static class MapFeatureIndex
         QuerySamples(c, 40f, tmp);
         foreach (int i in tmp) if (!best.TryGetValue(samples[i].line, out float b) || samples[i].clarity > b) best[samples[i].line] = samples[i].clarity;
         foreach (float b in best.Values) r += b;
+        // A marsh, a field or a thicket to read on, and ground with clear slopes
+        var zs = new HashSet<int>();
+        QueryZones(c, 40f, tmp);
+        foreach (int i in tmp) if (zs.Add(zoneEdges[i].zone)) r += 0.7f * zones[zoneEdges[i].zone].clarity;
+        r += 1.5f * Relief(c);
         readability[k] = r;
         return r;
     }
@@ -479,6 +766,9 @@ public static class MapFeatureIndex
     {
         QuerySamples(m, 7f, tmp);
         foreach (int i in tmp) if (samples[i].clarity >= 0.5f) return true;
+        // The edge of a field
+        QueryZones(m, cellMetres, tmp);
+        foreach (int i in tmp) if (zones[zoneEdges[i].zone].clarity >= 0.7f) return true;
         return false;
     }
 
@@ -498,6 +788,13 @@ public static class MapFeatureIndex
         foreach (int g in lines.Values)
         {
             sig.TryGetValue(g + LineGroupOffset, out int n); sig[g + LineGroupOffset] = n + 1;
+        }
+        // The control stands by a marsh, in green, on a field ...
+        QueryZones(m, r, tmp);
+        foreach (int i in tmp)
+        {
+            Zone z = zones[zoneEdges[i].zone];
+            if (z.clarity >= 0.3f) sig[z.cls + ZoneKeyOffset] = 1;
         }
         return sig;
     }

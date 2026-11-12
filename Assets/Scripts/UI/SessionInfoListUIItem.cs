@@ -29,6 +29,12 @@ public class SessionInfoListUIItem : MonoBehaviour
         {
             isJoinButtonActive = false;
         }
+        // A lobby that is out on a competition can not be joined until it is back in the lobby
+        if (!sessionInfo.IsOpen)
+        {
+            isJoinButtonActive = false;
+            playerCountText.text += " · racing";
+        }
 
         joinButton.gameObject.SetActive(isJoinButtonActive);
     }

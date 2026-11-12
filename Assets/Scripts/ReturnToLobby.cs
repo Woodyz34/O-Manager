@@ -22,6 +22,10 @@ public class ReturnToLobby : MonoBehaviour
     public void GoToLobby()
     {
         NetworkRunner runner = FindObjectOfType<NetworkRunner>();
+        if (runner == null)
+        {
+            return;
+        }
 
         // Bara värden (master client i Shared Mode) får avsluta tävlingen och ladda lobbyn åt alla
         if (!runner.IsSharedModeMasterClient)
@@ -59,6 +63,11 @@ public class ReturnToLobby : MonoBehaviour
         foreach (var player in players)
         {
             var networkPlayer = player.GetComponent<NetworkPlayer>();
+            // A player who has just left can still be found for a moment; it has nothing to reset
+            if (networkPlayer == null || networkPlayer.Object == null || !networkPlayer.Object.IsValid)
+            {
+                continue;
+            }
             networkPlayer.RPC_ResetTimer();
             DontDestroyOnLoad(player);
         }
@@ -80,16 +89,8 @@ public class ReturnToLobby : MonoBehaviour
         int rank = LeaderboardManager.Instance.GetPlayerRankByNickname(NetworkPlayer.Local.nickName.ToString());
         YourPositionText.text = $"You came {rank}th";
 
-        int trophy = 0;
-
-        if (rank == 1)
-        {
-            trophy = 1;
-        }
-
-        Money.Instance.AddTrophy(trophy);
-
-        TrophyText.text = $"+{trophy} trophy";
+        // No trophies any more
+        if (TrophyText != null) TrophyText.text = "";
     }
 
     public void SeeBetResult()
@@ -118,16 +119,8 @@ public class ReturnToLobby : MonoBehaviour
         int yourRank = LeaderboardManager.Instance.GetPlayerRankByNickname(NetworkPlayer.Local.nickName.ToString());
         BetYourPositionText.text = $"You came {yourRank}th";
 
-        int trophy = 0;
-
-        if(yourRank == 1)
-        {
-            trophy = 1;
-        }
-
-        Money.Instance.AddTrophy(trophy);
-
-        BetTrophyText.text = $"+{trophy} trophy";
+        // No trophies any more
+        if (BetTrophyText != null) BetTrophyText.text = "";
         
         string playerName = NetworkPlayer.Local.nickName.ToString();
         CardData cardData = Betting.Instance.GetSelectedCard(playerName);
