@@ -27,6 +27,7 @@ public static class CloudCourses
 
     const int MaxPlayersPerFetch = 100;   // the newest 100 players who published something
     const int MaxCommunityCourses = 100;  // and at most 100 courses from them in the lobby
+    const int MaxCoursesPerAuthor = 25;   // of which at most this many (the newest) from one player, so nobody fills the list alone
 
     static Task signInTask;
 
@@ -117,14 +118,28 @@ public static class CloudCourses
                 {
                     List<CourseData> theirs = JsonConvert.DeserializeObject<List<CourseData>>(item.Value.GetAs<string>());
                     if (theirs == null) continue;
+                    List<CourseData> usable = new List<CourseData>();
                     foreach (CourseData course in theirs)
                     {
                         if (course == null || course.controls == null) continue;
-                        course.builtIn = false;
-                        course.authorId = entity.Id;
-                        course.Normalize();
-                        courses.Add(course);
+                        // One unreadable or oversized course must not take the player's other courses with it,
+                        // and nothing another player wrote is trusted as it is (CourseData.MakeSafe)
+                        try
+                        {
+                            course.builtIn = false;
+                            course.authorId = entity.Id;
+                            if (!course.MakeSafe()) continue;
+                            course.Normalize();
+                            usable.Add(course);
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogWarning("CloudCourses: skipped a course from " + entity.Id + ": " + e.Message);
+                        }
                     }
+                    usable.Sort((a, b) => b.createdAt.CompareTo(a.createdAt));
+                    if (usable.Count > MaxCoursesPerAuthor) usable.RemoveRange(MaxCoursesPerAuthor, usable.Count - MaxCoursesPerAuthor);
+                    courses.AddRange(usable);
                 }
                 catch (Exception e)
                 {

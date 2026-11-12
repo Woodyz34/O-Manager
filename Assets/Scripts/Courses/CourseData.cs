@@ -568,12 +568,14 @@ public class CourseData
             if (v5)
             {
                 ReadRelayV5(course, parts[9], points);
+                if (!course.MakeSafe()) return null;
                 course.Normalize();
                 return course;
             }
             if (v4)
             {
                 ReadRelayV4(course, parts[9], points);
+                if (!course.MakeSafe()) return null;
                 course.Normalize();
                 return course;
             }
@@ -612,8 +614,9 @@ public class CourseData
                     course.forks[k].variants = points.GetRange(next, count - 1);
                     next += count - 1;
                 }
-                course.Normalize();
             }
+            if (!course.MakeSafe()) return null;
+            if (v3) course.Normalize();
             return course;
         }
         catch (Exception e)
@@ -726,6 +729,152 @@ public class CourseData
     static string Clean(string value)
     {
         return string.IsNullOrEmpty(value) ? "" : value.Replace("|", "/").Replace(";", ",");
+    }
+
+    // ---- Courses from other players ----
+    // A course that comes from the cloud or from the host of a lobby was written by somebody else's game, and that
+    // game can be an old version, a broken one or a tampered one. MakeSafe tidies such a course before it is shown
+    // or run: texts are cut to their normal length and can not carry formatting, missing lists become empty, and a
+    // course that is too big or has impossible coordinates is refused (false). Call it before Normalize.
+    public const int MaxRelayForks = 64;    // a fork's number is one symbol in the lobby text
+    const int MaxForkBranches = 63;         // and so is the number of branches
+    const double MaxCoordinate = 1e8;   // metres; far outside any map
+
+    public bool MakeSafe()
+    {
+        id = (id ?? "").Trim();
+        if (!SafeToken(id, 64)) return false;
+        mapId = (mapId ?? "").Trim();
+        if (mapId.Length == 0 || mapId.Length > 64) return false;
+        mapId = SafeText(mapId, 64);
+        name = SafeText(name, MaxNameLength);
+        if (name.Length == 0) name = "Course";
+        author = SafeText(author, MaxAuthorLength);
+        authorId = SafeText(authorId, 64);
+        background = SafeText(background, 64);
+        if (terrain != Forest && terrain != Sprint) terrain = null;
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (createdAt < 0) createdAt = 0;
+        if (createdAt > now + 86400) createdAt = now;   // a date in the future would keep the course on top of the list for ever
+
+        if (controls == null) controls = new List<CoursePoint>();
+        if (controls.Count > MaxControls) return false;
+        if (!Finite(start) || !Finite(finish) || !Finite(controls)) return false;
+
+        if (forbidden == null) forbidden = new List<ForbiddenArea>();
+        forbidden.RemoveAll(a => a == null || a.corners == null);
+        if (forbidden.Count > ForbiddenArea.MaxAreas) forbidden.RemoveRange(ForbiddenArea.MaxAreas, forbidden.Count - ForbiddenArea.MaxAreas);
+        foreach (ForbiddenArea area in forbidden)
+        {
+            if (area.corners.Count > ForbiddenArea.MaxCorners) area.corners.RemoveRange(ForbiddenArea.MaxCorners, area.corners.Count - ForbiddenArea.MaxCorners);
+            if (!Finite(area.corners)) return false;
+        }
+
+        if (legCourse == null) legCourse = new List<int>();
+        if (relayCourses == null) relayCourses = new List<RelayLegCourse>();
+        if (relayForks == null) relayForks = new List<RelayFork>();
+        if (forks == null) forks = new List<ControlFork>();
+        if (extraCourses == null) extraCourses = new List<RelayCourse>();
+        if (forkedLegs == null) forkedLegs = new List<bool>();
+        if (!IsRelay())
+        {
+            // An individual course has no use for the relay parts
+            legCourse.Clear();
+            relayCourses.Clear();
+            relayForks.Clear();
+            forks.Clear();
+            extraCourses.Clear();
+            forkedLegs.Clear();
+            return true;
+        }
+
+        if (legCourse.Count > MaxLegs || forkedLegs.Count > MaxLegs) return false;
+        if (relayCourses.Count > MaxLegs || extraCourses.Count > MaxLegs) return false;
+        if (relayForks.Count > MaxRelayForks || forks.Count > MaxControls) return false;
+        foreach (RelayFork fork in relayForks)
+        {
+            if (fork == null) return false;
+            if (fork.branches == null) fork.branches = new List<RelayBranch>();
+            if (fork.branches.Count > MaxForkBranches) return false;
+            foreach (RelayBranch branch in fork.branches)
+            {
+                if (branch == null) return false;
+                if (branch.controls == null) branch.controls = new List<CoursePoint>();
+                if (branch.controls.Count > MaxControls || !Finite(branch.controls)) return false;
+            }
+        }
+        foreach (RelayLegCourse course in relayCourses)
+        {
+            if (course == null) return false;
+            if (course.items == null) course.items = new List<RelayItem>();
+            if (course.items.Count > 2 * MaxControls || !Finite(course.start) || !Finite(course.finish)) return false;
+            foreach (RelayItem item in course.items)
+            {
+                if (item == null || item.fork < -1 || item.fork >= relayForks.Count) return false;
+                if (item.fork < 0 && !Finite(item.point)) return false;
+            }
+        }
+        // Relays from earlier versions of the builder
+        foreach (ControlFork fork in forks)
+        {
+            if (fork == null) return false;
+            if (fork.variants == null) fork.variants = new List<CoursePoint>();
+            if (fork.variants.Count > MaxForkBranches || !Finite(fork.variants)) return false;
+        }
+        foreach (RelayCourse course in extraCourses)
+        {
+            if (course == null) return false;
+            if (course.controls == null) course.controls = new List<CoursePoint>();
+            if (course.forks == null) course.forks = new List<ControlFork>();
+            if (course.controls.Count > MaxControls || course.forks.Count > MaxControls) return false;
+            if (!Finite(course.start) || !Finite(course.finish) || !Finite(course.controls)) return false;
+            foreach (ControlFork fork in course.forks)
+            {
+                if (fork == null) return false;
+                if (fork.variants == null) fork.variants = new List<CoursePoint>();
+                if (fork.variants.Count > MaxForkBranches || !Finite(fork.variants)) return false;
+            }
+        }
+        return true;
+    }
+
+    static bool Finite(CoursePoint point)
+    {
+        return !double.IsNaN(point.e) && !double.IsNaN(point.n) && Math.Abs(point.e) < MaxCoordinate && Math.Abs(point.n) < MaxCoordinate;
+    }
+
+    static bool Finite(List<CoursePoint> points)
+    {
+        foreach (CoursePoint point in points)
+        {
+            if (!Finite(point)) return false;
+        }
+        return true;
+    }
+
+    // Letters, digits, '-' and '_' only (ids)
+    static bool SafeToken(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length > maxLength) return false;
+        foreach (char c in value)
+        {
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_')) return false;
+        }
+        return true;
+    }
+
+    // A text another player wrote: one line, no formatting tags (the pages show names as rich text), not too long
+    public static string SafeText(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        StringBuilder sb = new StringBuilder(Math.Min(value.Length, maxLength));
+        foreach (char c in value)
+        {
+            if (c == '<' || c == '>' || char.IsControl(c)) continue;
+            sb.Append(c);
+            if (sb.Length >= maxLength) break;
+        }
+        return sb.ToString().Trim();
     }
 }
 

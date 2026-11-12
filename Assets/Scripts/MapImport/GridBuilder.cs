@@ -28,6 +28,9 @@ namespace MapImport
 
     public static class GridBuilder
     {
+        // The most cells a map's grid may have (the sprint pass uses cells half the size, so four times as many)
+        const double MaxCells = 400e6;
+
         public static MapGrid2 Build(MapFile map, MapExtent extent, bool sprint, float cellSize, Action<string> log = null)
         {
             MapGrid2 g = BuildSpeed(map, extent, sprint, cellSize, log);
@@ -60,8 +63,18 @@ namespace MapImport
                 minE = extent.minX * mpm,
                 minN = extent.minY * mpm
             };
-            g.cols = Math.Max(2, (int)Math.Ceiling(extent.Width * mpm / cellSize));
-            g.rows = Math.Max(2, (int)Math.Ceiling(extent.Height * mpm / cellSize));
+            double colsWanted = Math.Ceiling(extent.Width * mpm / cellSize);
+            double rowsWanted = Math.Ceiling(extent.Height * mpm / cellSize);
+            // A map file with something drawn far away from the rest (or a damaged file) would ask for a grid of
+            // billions of cells: say so instead of running out of memory
+            if (double.IsNaN(colsWanted) || double.IsNaN(rowsWanted) || colsWanted * rowsWanted > MaxCells)
+            {
+                throw new System.IO.InvalidDataException("The map is too big for the game (" +
+                    Math.Round(extent.Width * mpm / 1000.0, 1) + " x " + Math.Round(extent.Height * mpm / 1000.0, 1) +
+                    " km). Is something drawn far outside the map? Set a map edge around the part to use.");
+            }
+            g.cols = Math.Max(2, (int)colsWanted);
+            g.rows = Math.Max(2, (int)rowsWanted);
             int n = g.rows * g.cols;
             g.speed = new float[n];
             var hard = new bool[n];           // buildings, out of bounds, impassable lines: paths don't open them
