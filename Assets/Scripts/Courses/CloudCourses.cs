@@ -25,9 +25,11 @@ public static class CloudCourses
     public const int MaxPublicBytes = 5 * 1024 * 1024;
     const int SafetyMargin = 16 * 1024;
 
-    const int MaxPlayersPerFetch = 100;   // the newest 100 players who published something
-    const int MaxCommunityCourses = 100;  // and at most 100 courses from them in the lobby
-    const int MaxCoursesPerAuthor = 25;   // of which at most this many (the newest) from one player, so nobody fills the list alone
+    // No limit on how many courses one player publishes (user's wish 2026-11-12: every course made is welcome); only
+    // Unity's own 5 MiB per player. The lobby reads the players page by page (Unity gives at most 100 per query).
+    const int PlayersPerPage = 100;
+    const int MaxPages = 20;                // the newest 2000 players who published something
+    const int MaxCommunityCourses = 2000;   // a guard so the lobby list stays quick
 
     static Task signInTask;
 
@@ -87,12 +89,19 @@ public static class CloudCourses
     public static async Task<List<CourseData>> FetchCommunityAsync()
     {
         await SignInAsync();
-        Query query = new Query(
-            new List<FieldFilter> { new FieldFilter(UpdatedKey, 0, FieldFilter.OpOptions.GT, false) },
-            new HashSet<string> { CoursesKey, SharedMaps.SharedKey },
-            0,
-            MaxPlayersPerFetch);
-        List<EntityData> results = await CloudSaveService.Instance.Data.Player.QueryAsync(query, new PlayerData.QueryOptions());
+        List<EntityData> results = new List<EntityData>();
+        for (int page = 0; page < MaxPages; page++)
+        {
+            Query query = new Query(
+                new List<FieldFilter> { new FieldFilter(UpdatedKey, 0, FieldFilter.OpOptions.GT, false) },
+                new HashSet<string> { CoursesKey, SharedMaps.SharedKey },
+                page * PlayersPerPage,
+                PlayersPerPage);
+            List<EntityData> got = await CloudSaveService.Instance.Data.Player.QueryAsync(query, new PlayerData.QueryOptions());
+            if (got == null) break;
+            results.AddRange(got);
+            if (got.Count < PlayersPerPage) break;
+        }
 
         string me = PlayerId;
         List<CourseData> courses = new List<CourseData>();
@@ -137,8 +146,6 @@ public static class CloudCourses
                             Debug.LogWarning("CloudCourses: skipped a course from " + entity.Id + ": " + e.Message);
                         }
                     }
-                    usable.Sort((a, b) => b.createdAt.CompareTo(a.createdAt));
-                    if (usable.Count > MaxCoursesPerAuthor) usable.RemoveRange(MaxCoursesPerAuthor, usable.Count - MaxCoursesPerAuthor);
                     courses.AddRange(usable);
                 }
                 catch (Exception e)

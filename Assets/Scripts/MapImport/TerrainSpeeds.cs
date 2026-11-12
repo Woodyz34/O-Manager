@@ -23,8 +23,10 @@ namespace MapImport
         MidGreen,   // difficult to run
         DarkGreen,  // very difficult to run
         Marsh,
-        Open,       // open land, fields: only the overall slider
-        Stony       // stony ground and boulder fields: slows down whatever ground it lies on
+        Open,       // open land, fields (yellow)
+        Stony,      // stony ground and boulder fields: slows down whatever ground it lies on
+        RoughOpen,  // rough open land: clear-cuts (hygge) are usually drawn with it
+        Paved       // paved areas (asphalt), squares: the sprint map's streets
     }
 
     [Serializable]
@@ -39,6 +41,9 @@ namespace MapImport
         public float darkGreen = 0.5f;   // 0 = nobody gets through, 1 = as quick as mid green
         public float marsh = 0.5f;       // 0 = very heavy, 1 = as quick as white forest
         public float stony = 0.5f;       // 0 = very slow, 1 = no slower than the ground under it
+        public float open = 0.5f;        // 0 = as slow as white forest, 1 = as quick as a paved area
+        public float roughOpen = 0.5f;   // clear-cut / rough open: 0 = as slow as mid green, 1 = as quick as open land
+        public float paved = 0.5f;       // 0 = as slow as open land, 1 = a bit quicker than normal asphalt
 
         public const float Middle = 0.5f;
 
@@ -48,6 +53,9 @@ namespace MapImport
         public const float NormalMid = 0.6f;
         public const float NormalDark = 0.35f;
         public const float NormalMarsh = 0.8f;
+        public const float NormalOpen = 1.3f;
+        public const float NormalRoughOpen = 1.3f;
+        public const float NormalPaved = 1.5f;
 
         public static TerrainSpeeds Default => new TerrainSpeeds();
 
@@ -55,7 +63,7 @@ namespace MapImport
 
         public bool IsDefault() =>
             Same(overall) && Same(roads) && Same(paths) && Same(forest) && Same(lightGreen)
-            && Same(midGreen) && Same(darkGreen) && Same(marsh) && Same(stony);
+            && Same(midGreen) && Same(darkGreen) && Same(marsh) && Same(stony) && Same(open) && Same(roughOpen) && Same(paved);
 
         static bool Same(float v) => Math.Abs(v - Middle) < 0.005f;
 
@@ -65,7 +73,8 @@ namespace MapImport
             return Math.Abs(overall - o.overall) < 0.005f && Math.Abs(roads - o.roads) < 0.005f && Math.Abs(paths - o.paths) < 0.005f
                    && Math.Abs(forest - o.forest) < 0.005f && Math.Abs(lightGreen - o.lightGreen) < 0.005f
                    && Math.Abs(midGreen - o.midGreen) < 0.005f && Math.Abs(darkGreen - o.darkGreen) < 0.005f
-                   && Math.Abs(marsh - o.marsh) < 0.005f && Math.Abs(stony - o.stony) < 0.005f;
+                   && Math.Abs(marsh - o.marsh) < 0.005f && Math.Abs(stony - o.stony) < 0.005f
+                   && Math.Abs(open - o.open) < 0.005f && Math.Abs(roughOpen - o.roughOpen) < 0.005f && Math.Abs(paved - o.paved) < 0.005f;
         }
 
         // A slider: lo at 0, normal in the middle, hi at 1, straight lines in between
@@ -93,6 +102,10 @@ namespace MapImport
         float MidShare() => Slide(midGreen, NormalDark, NormalMid, NormalLight);
         float MarshShare() => Slide(marsh, 0.4f, NormalMarsh, NormalForest);
 
+        // Open land and rough open land (clear-cuts), before the overall factor
+        public float OpenBase() => Slide(open, NormalForest, NormalOpen, NormalPaved);
+        float RoughOpenBase() => Slide(roughOpen, NormalMid, NormalRoughOpen, OpenBase());
+
         // Dark green: the very left of the slider means nobody gets through (0)
         float DarkShare() => darkGreen <= 0.03f ? 0f : Slide(darkGreen, 0.06f, NormalDark, NormalMid);
 
@@ -110,7 +123,9 @@ namespace MapImport
                 case TerrainKind.MidGreen: return normal * (MidShare() / NormalMid) * w * f;
                 case TerrainKind.DarkGreen: return normal * (DarkShare() / NormalDark) * w * f;
                 case TerrainKind.Marsh: return normal * (MarshShare() / NormalMarsh) * w * f;
-                case TerrainKind.Open: return normal * f;
+                case TerrainKind.Open: return normal * (OpenBase() / NormalOpen) * f;
+                case TerrainKind.RoughOpen: return normal * (RoughOpenBase() / NormalRoughOpen) * f;
+                case TerrainKind.Paved: return normal * Slide(paved, NormalOpen, NormalPaved, NormalPaved * 1.12f) / NormalPaved;
                 default: return normal;
             }
         }

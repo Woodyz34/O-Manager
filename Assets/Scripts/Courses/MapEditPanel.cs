@@ -14,6 +14,9 @@ using UnityEngine.UI;
 //  - A public map that changes is sent in again, so the other players get the new version.
 //  - A new map edge or new terrain speeds build the map again from the map file kept with it. Maps imported before the file was kept get
 //    it back from the player's own Cloud Save Files when they are public.
+//  - Forest or Sprint can be changed; the map is built again, since the symbols mean different things on a sprint map.
+//  - Delete removes the map from this computer and from the cloud, so no player gets it any more (other players'
+//    copies are deleted the next time they look for shared maps). It asks once more first.
 // Courses on the map stay where they are: the map's coordinates do not depend on the edge (MapPackageBuilder.Build).
 public class MapEditPanel : MonoBehaviour
 {
@@ -27,12 +30,16 @@ public class MapEditPanel : MonoBehaviour
     bool edgeChanged;
     TerrainSpeeds terrain;
     bool terrainChanged;
+    string mapType;
+    float deleteConfirmUntil = -1f;
     bool working;
     volatile string progressStep;
     volatile float progressShare;
 
     TMP_InputField nameField, clubField, senderField, contactField;
     Button publicButton, privateButton, edgeButton, terrainButton, saveButton, cancelButton;
+    Button forestButton, sprintButton, deleteButton;
+    TextMeshProUGUI typeText;
     TextMeshProUGUI visibilityText, edgeText, terrainText, statusText;
     RectTransform contactRow;
 
@@ -54,6 +61,7 @@ public class MapEditPanel : MonoBehaviour
         panel.isPrivate = info.isPrivate;
         panel.edge = info.boundary != null && info.boundary.Length >= 6 ? info.boundary : null;
         panel.terrain = info.terrain != null ? info.terrain.Copy() : new TerrainSpeeds();
+        panel.mapType = string.IsNullOrEmpty(info.mapType) ? "forest" : info.mapType;
         panel.Build(dim.transform);
         IsOpen = true;
     }
@@ -81,7 +89,7 @@ public class MapEditPanel : MonoBehaviour
     void Build(Transform root)
     {
         Image card = CourseUI.CardPanel("Card", root);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 790));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 860));
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
 
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Edit map", 36, CourseUI.Ink, FontStyles.Bold), 44);
@@ -112,6 +120,19 @@ public class MapEditPanel : MonoBehaviour
         senderField.SetTextWithoutNotify(!string.IsNullOrEmpty(info.sender) ? info.sender : PlayerPrefs.GetString("MapImport.Sender", ""));
         contactField.SetTextWithoutNotify(!string.IsNullOrEmpty(info.contact) ? info.contact : PlayerPrefs.GetString("MapImport.Contact", ""));
 
+        // Forest or sprint map
+        RectTransform typeRow = CourseUI.Rect("Type row", card.transform);
+        CourseUI.Row(typeRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(typeRow, 56);
+        forestButton = CourseUI.Button("Forest", typeRow, "Forest", CourseUI.ButtonKind.Primary, () => { mapType = "forest"; Refresh(); }, 20);
+        CourseUI.Size(forestButton, -1, 150);
+        sprintButton = CourseUI.Button("Sprint", typeRow, "Sprint", CourseUI.ButtonKind.Light, () => { mapType = "sprint"; Refresh(); }, 20);
+        CourseUI.Size(sprintButton, -1, 150);
+        typeText = CourseUI.Text("Type", typeRow, "", 17, CourseUI.InkMuted);
+        typeText.alignment = TextAlignmentOptions.MidlineLeft;
+        typeText.textWrappingMode = TextWrappingModes.Normal;
+        CourseUI.Size(typeText, -1, -1, 1);
+
         RectTransform edgeRow = CourseUI.Rect("Edge row", card.transform);
         CourseUI.Row(edgeRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
         CourseUI.Size(edgeRow, 52);
@@ -138,6 +159,7 @@ public class MapEditPanel : MonoBehaviour
         RectTransform buttons = CourseUI.Rect("Buttons", card.transform);
         CourseUI.Row(buttons.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(buttons, 58);
+        deleteButton = CourseUI.Button("Delete", buttons, "Delete map", CourseUI.ButtonKind.Danger, Delete, 24);
         cancelButton = CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, Close, 24);
         saveButton = CourseUI.Button("Save", buttons, "Save", CourseUI.ButtonKind.Primary, Save, 24);
 
@@ -172,12 +194,22 @@ public class MapEditPanel : MonoBehaviour
         edgeText.text = edge == null ? "Map edge: the whole map file is used."
             : edgeChanged ? "Map edge: changed. The map is built again when you save."
             : "Map edge: only the part inside the edge is used.";
+        bool sprint = mapType == "sprint" || mapType == "both";
+        CourseUI.SetButtonColor(forestButton, sprint ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Primary);
+        CourseUI.SetButtonColor(sprintButton, sprint ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        typeText.text = (sprint ? "Sprint map: 2 m cells, sprint courses." : "Forest map.")
+                        + (TypeChanged ? " The map is built again when you save." : "");
+        typeText.color = TypeChanged ? CourseUI.Accent : CourseUI.InkMuted;
+        bool confirming = Time.unscaledTime < deleteConfirmUntil;
+        CourseUI.SetButtonText(deleteButton, confirming ? "Sure? Click again" : "Delete map");
         terrainText.text = TerrainSpeedPanel.Describe(terrain) + (terrainChanged ? " The map is built again when you save." : "");
         terrainText.color = terrainChanged ? CourseUI.Accent : CourseUI.Ink;
-        foreach (Selectable s in new Selectable[] { publicButton, privateButton, edgeButton, terrainButton, cancelButton, nameField, clubField, senderField, contactField })
+        foreach (Selectable s in new Selectable[] { publicButton, privateButton, forestButton, sprintButton, deleteButton, edgeButton, terrainButton, cancelButton, nameField, clubField, senderField, contactField })
             s.interactable = !working;
         saveButton.interactable = !working && (isPrivate || ContactGiven());
     }
+
+    bool TypeChanged => mapType != (string.IsNullOrEmpty(info.mapType) ? "forest" : info.mapType);
 
     bool ContactGiven()
     {
@@ -193,6 +225,65 @@ public class MapEditPanel : MonoBehaviour
     void Update()
     {
         if (working && progressStep != null) SetStatus($"{progressStep} ... {Mathf.RoundToInt(progressShare * 100)} %", false);
+        // The "Sure? Click again" on the delete button goes back after a while
+        if (deleteConfirmUntil > 0f && Time.unscaledTime >= deleteConfirmUntil)
+        {
+            deleteConfirmUntil = -1f;
+            Refresh();
+        }
+    }
+
+    // ---- Deleting ----
+
+    async void Delete()
+    {
+        if (working) return;
+        // Deleting for everyone cannot be undone, so the button asks once more
+        if (Time.unscaledTime >= deleteConfirmUntil)
+        {
+            deleteConfirmUntil = Time.unscaledTime + 5f;
+            SetStatus("Deleting removes the map from this computer and from the cloud, so no player can use it any more. Click again to delete.", true);
+            Refresh();
+            return;
+        }
+        deleteConfirmUntil = -1f;
+        working = true;
+        Refresh();
+        string cloudNote = "";
+        try
+        {
+            SetStatus("Taking the map out of the cloud ...", false);
+            try
+            {
+                await CloudCourses.SignInAsync();
+                if (!info.isPrivate) await CloudMaps.WithdrawAsync(info.id);
+                await CloudMaps.DeleteFilesAsync("private-" + info.id + "-");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("MapEditPanel: could not take the map out of the cloud: " + e);
+                cloudNote = " It could not be taken out of the cloud (" + CloudCourses.Describe(e) + "), so other players may still have it.";
+            }
+            string folder = map.folder;
+            await Task.Run(() => { if (Directory.Exists(folder)) Directory.Delete(folder, true); });
+            MapGrid.Forget(map.gridName);
+            MapPlayArea.Forget(map.id);
+            MapPackages.ForgetCached(folder);
+            PrivateMaps.MapChanged();
+            MapDefinition.Refresh();
+            UIToast.Show("Deleted " + info.name + "." + cloudNote, 7f);
+            working = false;
+            onSaved?.Invoke(null, true);
+            Destroy(gameObject);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("MapEditPanel: " + e);
+            if (this == null) return;
+            working = false;
+            SetStatus("Could not delete the map: " + CloudCourses.Describe(e), true);
+            Refresh();
+        }
     }
 
     void Close()
@@ -316,7 +407,7 @@ public class MapEditPanel : MonoBehaviour
         string sender = senderField.text.Trim(), contact = contactField.text.Trim();
         bool goPrivate = isPrivate && !info.isPrivate;
         bool goPublic = !isPrivate && info.isPrivate;
-        bool rebuild = edgeChanged || terrainChanged;
+        bool rebuild = edgeChanged || terrainChanged || TypeChanged;
         bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild
                        || (!isPrivate && (sender != (info.sender ?? "") || contact != (info.contact ?? "")));
         if (!changed && !goPrivate && !goPublic)
@@ -340,6 +431,7 @@ public class MapEditPanel : MonoBehaviour
                 MapPackageInfo old = info;
                 double[] newEdge = edge;
                 TerrainSpeeds newTerrain = terrain.Copy();
+                string newType = mapType;
                 string building = folder + ".rebuild";
                 string sourceCopy = PrivateMaps.SourceFile(folder, info);
                 updated = await Task.Run(() =>
@@ -348,7 +440,7 @@ public class MapEditPanel : MonoBehaviour
                     if (old.contourInterval > 0) file.contourInterval = old.contourInterval;
                     file.boundary = newEdge;
                     file.terrain = newTerrain;
-                    MapPackage package = MapImportPanel.BuildPackage(file, name, old.mapType, ownPng,
+                    MapPackage package = MapImportPanel.BuildPackage(file, name, newType, ownPng,
                         (step, share) => { progressShare = share; progressStep = step; });
                     MapPackageInfo i = package.info;
                     i.id = old.id;

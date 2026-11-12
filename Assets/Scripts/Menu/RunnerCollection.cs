@@ -152,6 +152,52 @@ public static class RunnerCollection
         return owned;
     }
 
+    // ---- Runners on loan ----
+    // "Your runners" with fewer than 10 runners of your own: the game lends random runners up to 10 for this round
+    // (none if you have 10 or more). They are not added to the collection and are gone after the round.
+    public const int RaceMinimum = 10;
+    static List<CardData> loans;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void InitLoans()
+    {
+        loans = null;
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    // Back on a menu or in the lobby: the round is over, the runners on loan go back
+    static void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        if (mode == UnityEngine.SceneManagement.LoadSceneMode.Additive) return;
+        string n = scene.name;
+        if (n == "Lobby" || n == "MainMenu" || n == "SingelPlayer" || n == "NewCompetition" || n == "MultiPlayer") loans = null;
+    }
+
+    public static bool IsOnLoan(string runnerName) => loans != null && loans.Exists(c => c.RunnerName == runnerName);
+
+    // The runners the player can race with in "Your runners": their own, plus random ones on loan up to 10
+    public static List<CardData> CardsForRace()
+    {
+        List<CardData> owned = OwnedCards();
+        if (owned.Count >= RaceMinimum) return owned;
+        if (loans == null)
+        {
+            List<CardData> free = RunnerCards.InPacks().FindAll(c => !Owns(c.RunnerName));
+            System.Random random = new System.Random();
+            loans = new List<CardData>();
+            while (loans.Count < RaceMinimum - owned.Count && free.Count > 0)
+            {
+                int i = random.Next(free.Count);
+                loans.Add(free[i]);
+                free.RemoveAt(i);
+            }
+        }
+        List<CardData> all = new List<CardData>(owned);
+        all.AddRange(loans);
+        return all;
+    }
+
     // Adds one copy from a pack. Returns true when the runner is new to the collection.
     public static bool AddFromPack(string runnerName)
     {

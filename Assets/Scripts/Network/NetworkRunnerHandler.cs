@@ -211,7 +211,8 @@ public class NetworkRunnerHandler : MonoBehaviour
         if (!result.Ok)
         {
             Debug.Log($"Unable to join lobby {lobbyID}: {result.ShutdownReason}");
-            UIToast.Show("Could not reach the game servers. Check the internet connection and try again.");
+            if (result.ShutdownReason == ShutdownReason.MaxCcuReached) SessionGuard.MultiplayerIsFull();
+            else UIToast.Show("Could not reach the game servers. Check the internet connection and try again.");
         }
         else
         {

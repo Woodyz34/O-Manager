@@ -513,7 +513,7 @@ public class MapImportPanel : MonoBehaviour
         // Things that need Unity are worked out here, on the main thread
         string id = MapPackages.MakeId(name);
         string target = Path.Combine(MapPackages.LocalRoot, id);
-        string author = PlayerPrefs.GetString("PlayerNickName", "");
+        string author = PlayerPrefs.GetString(LocalPrefs.Key("PlayerNickName"), "");
         string picture = picturePath;
         MapFile source = mapFile;
         string type = mapType;

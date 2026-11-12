@@ -78,17 +78,20 @@ namespace MapImport
                     case 408: case 409: case 411: return TerrainKind.MidGreen;
                     case 410: return TerrainKind.DarkGreen;
                     case 310: return TerrainKind.Marsh;
-                    case 401: case 402: case 403: case 404: case 412: return TerrainKind.Open;
+                    case 401: case 402: case 412: return TerrainKind.Open;
+                    case 403: case 404: return TerrainKind.RoughOpen;
                     case 208: case 210: return TerrainKind.Stony;
                 }
                 if (s.oldNumbers)
                 {
                     if (m == 308 || m == 309 || m == 311) return TerrainKind.Marsh;
                     if (m == 415) return TerrainKind.Open;
+                    if (m == 529) return TerrainKind.Paved;
                 }
                 else
                 {
                     if (m == 308) return TerrainKind.Marsh;
+                    if (m == 501 || m == 503) return TerrainKind.Paved;
                     if (m == 209 || m == 211 || m == 212) return TerrainKind.Stony;
                 }
                 return TerrainKind.Other;

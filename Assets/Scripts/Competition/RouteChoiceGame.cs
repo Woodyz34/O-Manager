@@ -28,7 +28,7 @@ public static class RouteChoiceGame
     public static readonly string[] ColourNames = { "Red", "Blue", "Green", "Yellow" };
 
     // Each colour always sits in the same place, left to right blue, green, yellow, red, and has its own key
-    // (1 to 4 at first, changeable with the Keys button; saved per computer)
+    // (1 to 4 at first, changeable in the Esc menu under Key bindings; saved per computer)
     public static readonly int[] LeftToRight = { 1, 2, 3, 0 };
     static readonly KeyCode[] DefaultKeys = { KeyCode.Alpha4, KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3 };
 
@@ -49,7 +49,11 @@ public static class RouteChoiceGame
         }
         PlayerPrefs.SetString("RouteChoice.Key." + ColourNames[colour], key.ToString());
         PlayerPrefs.Save();
+        KeysChanged?.Invoke();
     }
+
+    // A key was changed (in the Esc menu): the route boxes on screen show the new key
+    public static event System.Action KeysChanged;
 
     // True when the colour's key was pressed this frame (the number keys also work on the number pad)
     public static bool Pressed(int colour)
@@ -58,6 +62,34 @@ public static class RouteChoiceGame
         if (Input.GetKeyDown(key)) return true;
         if (key >= KeyCode.Alpha0 && key <= KeyCode.Alpha9) return Input.GetKeyDown(KeyCode.Keypad0 + (key - KeyCode.Alpha0));
         return false;
+    }
+
+    // Held down, the route lines are hidden so the clean map shows. Two keys (right mouse button and Tab at first),
+    // both changeable in the Esc menu; a mouse button works too.
+    static readonly KeyCode[] DefaultHideKeys = { KeyCode.Mouse1, KeyCode.Tab };
+
+    public static KeyCode HideKey(int which)
+    {
+        string saved = PlayerPrefs.GetString("RouteChoice.HideKey." + which, "");
+        if (saved.Length > 0 && System.Enum.TryParse(saved, out KeyCode key)) return key;
+        return DefaultHideKeys[which];
+    }
+
+    public static void SetHideKey(int which, KeyCode key)
+    {
+        PlayerPrefs.SetString("RouteChoice.HideKey." + which, key.ToString());
+        PlayerPrefs.Save();
+        KeysChanged?.Invoke();
+    }
+
+    public static bool HideHeld()
+    {
+        return Input.GetKey(HideKey(0)) || Input.GetKey(HideKey(1));
+    }
+
+    public static bool IsHideKeyDown()
+    {
+        return Input.GetKeyDown(HideKey(0)) || Input.GetKeyDown(HideKey(1));
     }
 
     public static string KeyName(KeyCode key)
@@ -70,7 +102,10 @@ public static class RouteChoiceGame
             case KeyCode.RightArrow: return "Right";
             case KeyCode.UpArrow: return "Up";
             case KeyCode.DownArrow: return "Down";
+            case KeyCode.Mouse1: return "Right mouse";
+            case KeyCode.Mouse2: return "Middle mouse";
         }
+        if (key >= KeyCode.Mouse3 && key <= KeyCode.Mouse6) return "Mouse " + (int)(key - KeyCode.Mouse0 + 1);
         return key.ToString();
     }
 
@@ -175,9 +210,6 @@ public class RouteChoiceView : MonoBehaviour
     float answeredAt;
     int[] picks;       // per leg: the route picked, -1 time ran out, -2 no question
     Page page;
-    Button endButton;  // the host sends everyone back to the lobby, at any time
-    Button keysButton;
-    float endConfirmUntil;
     bool paid;
     int lastPlace;     // the place among the others the last time the standings were looked at (0 = unknown)
     int lastPlayers;
@@ -192,12 +224,6 @@ public class RouteChoiceView : MonoBehaviour
     Button nextButton;
     Button previousLegButton, nextLegButton;
     readonly List<Button> choiceButtons = new List<Button>();
-    GameObject keysPanel;
-    readonly List<Button> keyButtons = new List<Button>();
-    int rebinding = -1; // the colour waiting for a new key, or -1
-    // The Esc menu leaves Escape alone while the keys are being changed (and on the frame the panel closes)
-    public static bool KeysOpen;
-    public static int KeysClosedFrame = -1;
     readonly List<GameObject> hiddenHud = new List<GameObject>();
     bool fitted;
     float fittedSize;
@@ -297,22 +323,8 @@ public class RouteChoiceView : MonoBehaviour
         timerText = CourseUI.Text("Seconds", card.transform, "", 22, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
         CourseUI.Place(timerText.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28, 92), new Vector2(100, 34));
 
-        keysButton = CourseUI.Button("Keys", card.transform, "Keys", CourseUI.ButtonKind.Light, ToggleKeys, 20);
-        CourseUI.Place((RectTransform)keysButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-28, -66), new Vector2(110, 40));
-
-        // Like "End competition for everyone" in a race: when someone has crashed or takes too long
-        endButton = CourseUI.Button("End for all", card.transform, "End for all", CourseUI.ButtonKind.Danger, OnEndForAll, 18);
-        CourseUI.Place((RectTransform)endButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-148, -66), new Vector2(176, 40));
-        // "Sure? Click again" is longer than "End for all": shrink the text to fit rather than cut it off
-        TextMeshProUGUI endLabel = endButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (endLabel != null)
-        {
-            endLabel.enableWordWrapping = false;
-            endLabel.enableAutoSizing = true;
-            endLabel.fontSizeMin = 12;
-            endLabel.fontSizeMax = 18;
-        }
-        endButton.gameObject.SetActive(CompetitionFlow.LocalIsHost());
+        // Changing the keys and ending the game for everyone are in the Esc menu (Key bindings, End competition)
+        RouteChoiceGame.KeysChanged += RefreshChoiceKeys;
 
         nextButton = CourseUI.Button("Next", card.transform, "Next leg", CourseUI.ButtonKind.Primary, OnNext, 24);
         CourseUI.Place((RectTransform)nextButton.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(28, 22), new Vector2(504, 60));
@@ -351,7 +363,6 @@ public class RouteChoiceView : MonoBehaviour
     {
         failed = true;
         step = Step.Done;
-        if (endButton != null) endButton.gameObject.SetActive(false);
         ClearBody();
         if (heading != null) heading.text = "Route choice game";
         if (info != null) info.text = message;
@@ -388,9 +399,7 @@ public class RouteChoiceView : MonoBehaviour
     {
         if (failed) return;
         ApplyPeek();
-        if (rebinding >= 0) ListenForKey();
-        else if (keysPanel != null && Input.GetKeyDown(KeyCode.Escape)) ToggleKeys();
-        bool keysOpen = keysPanel != null; // while the keys are being changed, key presses do not answer
+        bool keysOpen = EscMenu.IsOpen; // while the Esc menu is open (keys being changed), key presses do not answer
         switch (step)
         {
             case Step.Loading:
@@ -444,13 +453,12 @@ public class RouteChoiceView : MonoBehaviour
                 }
                 break;
         }
-        RefreshEndButton();
     }
 
-    // The route lines are shown at first; hold Tab or the right mouse button to hide them and see the clean map
+    // The route lines are shown at first; hold a hide key (right mouse button or Tab at first) to see the clean map
     static bool PeekHeld()
     {
-        return Input.GetKey(KeyCode.Tab) || Input.GetMouseButton(1);
+        return RouteChoiceGame.HideHeld();
     }
 
     void ApplyPeek()
@@ -466,33 +474,9 @@ public class RouteChoiceView : MonoBehaviour
     static bool AnyKeyForNext()
     {
         if (!Input.anyKeyDown) return false;
-        if (Input.GetKeyDown(KeyCode.Tab)) return false;
+        if (Input.GetKeyDown(KeyCode.Tab) || RouteChoiceGame.IsHideKeyDown()) return false;
         if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2)) return false;
         return !Input.GetKeyDown(KeyCode.Escape);
-    }
-
-    // ---- The host ends the game for everyone ----
-
-    void OnEndForAll()
-    {
-        if (!CompetitionFlow.LocalIsHost()) return;
-        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
-        // A big step, so the button asks once more
-        if (Time.unscaledTime >= endConfirmUntil)
-        {
-            endConfirmUntil = Time.unscaledTime + 5f;
-            RefreshEndButton();
-            return;
-        }
-        CompetitionFlow.HostReturnToLobby();
-    }
-
-    void RefreshEndButton()
-    {
-        if (endButton == null) return;
-        bool show = step != Step.Done && !failed && CompetitionFlow.LocalIsHost();
-        if (endButton.gameObject.activeSelf != show) endButton.gameObject.SetActive(show);
-        if (show) CourseUI.SetButtonText(endButton, Time.unscaledTime < endConfirmUntil ? "Sure? Click again" : "End for all");
     }
 
     void Ask(RouteChoiceLeg current)
@@ -598,88 +582,6 @@ public class RouteChoiceView : MonoBehaviour
         nextButton.gameObject.SetActive(true);
     }
 
-    // ---- Changing the keys ----
-
-    void ToggleKeys()
-    {
-        // A clicked button stays selected, and Enter or Space would press it again
-        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
-        if (keysPanel != null)
-        {
-            Destroy(keysPanel);
-            keysPanel = null;
-            rebinding = -1;
-            KeysOpen = false;
-            KeysClosedFrame = Time.frameCount;
-            return;
-        }
-        KeysOpen = true;
-        Image sheet = CourseUI.CardPanel("Keys", panel.transform);
-        keysPanel = sheet.gameObject;
-        Color solid = sheet.color;
-        solid.a = 1f;
-        sheet.color = solid;
-        CourseUI.Place(sheet.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -116), new Vector2(504, 420));
-        TextMeshProUGUI title = CourseUI.Text("Title", sheet.transform, "Keys for the routes", 26, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -18), new Vector2(456, 40));
-        keyButtons.Clear();
-        int k = 0;
-        foreach (int colour in RouteChoiceGame.LeftToRight)
-        {
-            int c = colour;
-            Image swatch = CourseUI.Panel("Colour", sheet.transform, RouteChoiceGame.Colours[c]);
-            CourseUI.Place(swatch.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(24, -96 - k * 64), new Vector2(44, 20));
-            TextMeshProUGUI name = CourseUI.Text("Name", sheet.transform, RouteChoiceGame.ColourNames[c], 22, CourseUI.Ink);
-            CourseUI.Place(name.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(84, -96 - k * 64), new Vector2(180, 40));
-            name.alignment = TextAlignmentOptions.MidlineLeft;
-            Button button = CourseUI.Button("Key " + c, sheet.transform, "", CourseUI.ButtonKind.Light, () => StartRebind(c), 22);
-            CourseUI.Place((RectTransform)button.transform, new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(-24, -96 - k * 64), new Vector2(200, 52));
-            keyButtons.Add(button);
-            k++;
-        }
-        Button done = CourseUI.Button("Done", sheet.transform, "Done", CourseUI.ButtonKind.Primary, ToggleKeys, 22);
-        CourseUI.Place((RectTransform)done.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 20), new Vector2(456, 52));
-        ShowKeys();
-    }
-
-    void ShowKeys()
-    {
-        for (int k = 0; k < keyButtons.Count; k++)
-        {
-            int c = RouteChoiceGame.LeftToRight[k];
-            CourseUI.SetButtonText(keyButtons[k], rebinding == c ? "Press a key..." : RouteChoiceGame.KeyName(RouteChoiceGame.Key(c)));
-        }
-        RefreshChoiceKeys();
-    }
-
-    void StartRebind(int colour)
-    {
-        rebinding = colour;
-        ShowKeys();
-    }
-
-    // Waiting for the new key: the first key pressed is it (Escape keeps the old one)
-    void ListenForKey()
-    {
-        if (!Input.anyKeyDown) return;
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            KeysClosedFrame = Time.frameCount;
-            rebinding = -1;
-            ShowKeys();
-            return;
-        }
-        foreach (KeyCode key in System.Enum.GetValues(typeof(KeyCode)))
-        {
-            if (key == KeyCode.None || key >= KeyCode.Mouse0) continue; // no mouse or joystick buttons
-            if (!Input.GetKeyDown(key)) continue;
-            RouteChoiceGame.SetKey(rebinding, key);
-            rebinding = -1;
-            ShowKeys();
-            return;
-        }
-    }
-
     // The key shown on the route boxes, after a change
     void RefreshChoiceKeys()
     {
@@ -742,8 +644,6 @@ public class RouteChoiceView : MonoBehaviour
         step = Step.Done;
         ShowTimer(false);
         nextButton.gameObject.SetActive(false);
-        if (keysButton != null) keysButton.gameObject.SetActive(false);
-        RefreshEndButton();
         NetworkPlayer local = NetworkPlayer.Local;
         if (local != null && local.Object != null && local.Object.IsValid)
         {
@@ -1366,7 +1266,7 @@ public class RouteChoiceView : MonoBehaviour
         // and for your place if you had played to the end
         if (!paid && !failed && question > 0) Pay(lastPlace, lastPlayers, step == Step.Done && lastPlace > 0);
         foreach (GameObject hidden in hiddenHud) if (hidden != null) hidden.SetActive(true);
-        KeysOpen = false;
+        RouteChoiceGame.KeysChanged -= RefreshChoiceKeys;
         RouteCompareView.HideRunners(false);
         ClearDrawn();
         if (panel != null) Destroy(panel);

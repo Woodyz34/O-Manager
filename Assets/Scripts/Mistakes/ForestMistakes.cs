@@ -552,7 +552,7 @@ public class ForestMistakes
             Log("vet vad det är, men inte exakt var på den");
             U = 20f; sinceFix = 0f; mode = Mode.Drift;
             Vector2 target = pos + (Control - chosen);
-            Run(PauseThen(2f, () => SetAim(target)));
+            Run(SlowThen(2f, () => SetAim(target)));
             return true;
         }
         // Twice fooled on this leg, or on the way to something big and certain: small things are not trusted any more
@@ -634,7 +634,7 @@ public class ForestMistakes
         lostCentre = Pos; lostTurn = Rand() < 0.5f ? -1f : 1f;
         controlSignature = MapFeatureIndex.Signature(Control, 30f);
         visited.Clear(); visited.Add(Pos);
-        Run(PauseThen(3f + 10f * (1f - skill), NextLostTarget));
+        Run(SlowThen(3f + 10f * (1f - skill), NextLostTarget));
     }
 
     // Lost: go round the area, to the clearest new thing ahead along a loop round where you got lost
@@ -725,7 +725,8 @@ public class ForestMistakes
 
     IEnumerator ReadAndGoOn()
     {
-        yield return Pause(2f + 4f * (1f - skill));
+        SlowDown(2f + 4f * (1f - skill));
+        yield return null;
         busy = null;
         // Look properly round here
         var keep = new Dictionary<long, float>();
@@ -741,8 +742,8 @@ public class ForestMistakes
     {
         Log("vet var den är");
         U = 8f; sinceFix = 0f; sureTravel = travel;
-        // Stop for a few seconds of the runner's time ("now I see, I'm over here"), then run the right way
-        if (mode != Mode.Route) Run(PauseThen(3.5f, ToControl));
+        // A few slower seconds ("now I see, I'm over here") while turning the right way
+        if (mode != Mode.Route) Run(SlowThen(3.5f, ToControl));
         else ToControl();
     }
 
@@ -818,13 +819,37 @@ public class ForestMistakes
         busy = null;
         then();
     }
-    // Standing reading the map. The game runs faster than real time, so a real pause is scaled to race time.
+    // Standing reading the map: only where the runner thinks it is at the control and finds no flag.
+    // The game runs faster than real time, so a real pause is scaled to race time.
     IEnumerator Pause(float realSeconds)
     {
         agent.isWaiting = true;
+        yield return new WaitForSeconds(GameSeconds(realSeconds));
+        agent.isWaiting = false;
+    }
+
+    float GameSeconds(float realSeconds)
+    {
         float gameMetresPerSecond = agent.UnscaledBaseSpeed * TerrainSpeedModel.RaceSpeedScale() * Mpu;
         float seconds = gameMetresPerSecond > 0f ? realSeconds * RealSpeed100 / gameMetresPerSecond : 0.5f;
-        yield return new WaitForSeconds(Mathf.Clamp(seconds, 0.05f, 3f));
-        agent.isWaiting = false;
+        return Mathf.Clamp(seconds, 0.05f, 3f);
+    }
+
+    // Unsure on the way (user's wish 2026-11-12): no stop-and-go. The runner reads the map on the run, at a slower pace
+    // for a few seconds, losing about the same time as the old pause. Then the next step starts at once.
+    const float ReadingPace = 0.45f;
+
+    void SlowDown(float realSeconds)
+    {
+        agent.readingSlowFactor = ReadingPace;
+        agent.readingSlowUntil = Time.time + GameSeconds(realSeconds) / (1f - ReadingPace);
+    }
+
+    IEnumerator SlowThen(float realSeconds, Action then)
+    {
+        SlowDown(realSeconds);
+        yield return null;
+        busy = null;
+        then();
     }
 }

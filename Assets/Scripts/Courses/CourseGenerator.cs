@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -307,6 +308,7 @@ public static class CourseGenerator
         public int controls = 12;
         public int seed;
         public bool barriers;   // sprint: out-of-bounds barriers that close the obvious straight way on some legs
+        public Progress progress;   // read by the AI course panel while the course is laid (another thread)
         // The part of the map the player drew round (map coordinates); null or fewer than 3 corners: the whole map
         public List<CoursePoint> region;
         public bool HasRegion => region != null && region.Count >= 3;
@@ -330,6 +332,22 @@ public static class CourseGenerator
     const double ChoiceBudgetSeconds = 12.0;    // all route choice checks of one course together
 
     // What PlacePoints needs to check route choices on sprint legs
+    // How far the laying has got, for the loading bar. The generator works against a time budget, so the time it
+    // can take at most is known when it starts; it often finishes sooner, when a good enough course is found.
+    public class Progress
+    {
+        long startedTicks;
+        long budgetTicks;
+        public void Start(double budgetSeconds)
+        {
+            Interlocked.Exchange(ref budgetTicks, TimeSpan.FromSeconds(budgetSeconds).Ticks);
+            Interlocked.Exchange(ref startedTicks, DateTime.UtcNow.Ticks);
+        }
+        public bool Started => Interlocked.Read(ref startedTicks) > 0;
+        public double Elapsed => Started ? new TimeSpan(DateTime.UtcNow.Ticks - Interlocked.Read(ref startedTicks)).TotalSeconds : 0;
+        public double Budget => new TimeSpan(Interlocked.Read(ref budgetTicks)).TotalSeconds;
+    }
+
     class ChoiceCheck
     {
         public RouteChoiceGenerator generator;
@@ -418,6 +436,9 @@ public static class CourseGenerator
         bool withBarriers = settings.barriers && settings.kind == Kind.Sprint;
         int barrierCourses = 0;
         double budget = withBarriers ? BarrierTotalSeconds : TimeBudgetSeconds;
+        // The most it takes: the budget, plus the last attempt (and its route choice checks) that started before the
+        // budget ran out
+        settings.progress?.Start(withBarriers ? BarrierTotalSeconds + 4.0 : TimeBudgetSeconds + ChoiceBudgetSeconds);
         for (int attempt = 0; attempt < Attempts && (DateTime.UtcNow - started).TotalSeconds < budget; attempt++)
         {
             List<float> legs = PlanLegs(settings.kind, length, controls + 1, random);

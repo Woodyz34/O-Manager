@@ -28,12 +28,12 @@ public class MultiPlayerHandler : MonoBehaviour
     void Start()
     {
         // The names from last time, so they don't have to be written again ("PlayerNickname" is what older versions saved)
-        string savedName = PlayerPrefs.GetString("PlayerNickName", PlayerPrefs.GetString("PlayerNickname", ""));
+        string savedName = PlayerPrefs.GetString(LocalPrefs.Key("PlayerNickName"), PlayerPrefs.GetString(LocalPrefs.Key("PlayerNickname"), ""));
         if (!string.IsNullOrEmpty(savedName))
         {
             playerNameinputField.text = savedName;
         }
-        string savedSession = PlayerPrefs.GetString("LobbyName", "");
+        string savedSession = PlayerPrefs.GetString(LocalPrefs.Key("LobbyName"), "");
         if (!string.IsNullOrEmpty(savedSession) && sessionNameinputField != null)
         {
             sessionNameinputField.text = savedSession;
@@ -82,7 +82,7 @@ public class MultiPlayerHandler : MonoBehaviour
         string nickName = CourseData.SafeText(playerNameinputField.text, 16);
         if (nickName.Length == 0) nickName = "Player";
         playerNameinputField.text = nickName;
-        PlayerPrefs.SetString("PlayerNickName", nickName);
+        PlayerPrefs.SetString(LocalPrefs.Key("PlayerNickName"), nickName);
         PlayerPrefs.Save();
 
         GameManager.Instance.playerNickName = nickName;
@@ -127,7 +127,7 @@ public class MultiPlayerHandler : MonoBehaviour
             string host = GameManager.Instance != null ? GameManager.Instance.playerNickName : "";
             sessionName = (string.IsNullOrWhiteSpace(host) ? "Player" : host.Trim()) + "'s lobby";
         }
-        PlayerPrefs.SetString("LobbyName", sessionName);
+        PlayerPrefs.SetString(LocalPrefs.Key("LobbyName"), sessionName);
         PlayerPrefs.Save();
         networkRunnerHandler.CreateGame(sessionName, "Lobby");
 

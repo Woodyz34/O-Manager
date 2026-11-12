@@ -7,7 +7,7 @@ using UnityEngine.UI;
 // The player's own colour (the dot, the trail and the drawn line), saved between games
 public static class PlayerColor
 {
-    const string Key = "PlayerColor";
+    static string Key => LocalPrefs.Key("PlayerColor");
 
     // Networked as 0xRRGGBB + 1, so 0 can mean "no colour chosen"
     public static int Pack(Color color)

@@ -102,6 +102,21 @@ public static class SessionGuard
         SceneManager.LoadScene(connecting ? "MultiPlayer" : "MainMenu");
     }
 
+    // The text when Photon has no room for more players (its CCU limit). Photon never throws anyone out to make room:
+    // the players already in keep playing, and a new one is told to come back later.
+    public const string MultiplayerFull =
+        "Sorry, multiplayer is full right now. Try again a little later. Until then you can play single player " +
+        "or do something else in the game.";
+
+    // Leaves the multiplayer pages and shows the message on the page before them
+    public static void MultiplayerIsFull()
+    {
+        if (handling) return;
+        handling = true;
+        pendingMessage = MultiplayerFull;
+        SceneManager.LoadScene("NewCompetition");
+    }
+
     static bool IsSingle(NetworkRunner runner)
     {
         try
@@ -125,7 +140,7 @@ public static class SessionGuard
             case ShutdownReason.GameNotFound:
                 return "That lobby is not there any more.";
             case ShutdownReason.MaxCcuReached:
-                return "The game servers are full right now. Try again in a little while.";
+                return MultiplayerFull;
             case ShutdownReason.IncompatibleConfiguration:
                 return "That lobby runs another version of the game.";
         }

@@ -62,6 +62,9 @@ public class TerrainSpeedPanel : MonoBehaviour
         else Add(s.darkGreen, "dark green");
         Add(s.marsh, "marsh");
         Add(s.stony, "stony ground");
+        Add(s.open, "open land");
+        Add(s.roughOpen, "clear-cuts");
+        Add(s.paved, "asphalt");
         return "Terrain speeds: " + string.Join(", ", changed) + ".";
     }
 
@@ -70,7 +73,7 @@ public class TerrainSpeedPanel : MonoBehaviour
     void Build(Transform root)
     {
         Image card = CourseUI.CardPanel("Card", root);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180, 1000));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180, 1040));
         CourseUI.Column(card.gameObject, 8, new RectOffset(36, 36, 28, 28));
 
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Terrain speeds", 34, CourseUI.Ink, FontStyles.Bold), 42);
@@ -111,6 +114,12 @@ public class TerrainSpeedPanel : MonoBehaviour
             s => s.darkGreen <= 0.03f ? "Closed" : Percent(s.Ground(TerrainKind.DarkGreen, TerrainSpeeds.NormalDark)));
         AddRow(card.transform, "Marsh", "Very heavy", "Like white forest", true,
             s => s.marsh, (s, v) => s.marsh = v, s => Percent(s.Ground(TerrainKind.Marsh, TerrainSpeeds.NormalMarsh)));
+        AddRow(card.transform, "Open land", "Like white forest", "Like asphalt", true,
+            s => s.open, (s, v) => s.open = v, s => Percent(s.Ground(TerrainKind.Open, TerrainSpeeds.NormalOpen)));
+        AddRow(card.transform, "Clear-cut / rough open", "Like mid green", "Like open land", true,
+            s => s.roughOpen, (s, v) => s.roughOpen = v, s => Percent(s.Ground(TerrainKind.RoughOpen, TerrainSpeeds.NormalRoughOpen)));
+        AddRow(card.transform, "Asphalt / paved", "Like open land", "Quicker", true,
+            s => s.paved, (s, v) => s.paved = v, s => Percent(s.Ground(TerrainKind.Paved, TerrainSpeeds.NormalPaved)));
         AddRow(card.transform, "Stony ground", "Very slow", "No slower", true,
             s => s.stony, (s, v) => s.stony = v,
             s => "-" + Mathf.RoundToInt((1f - s.StonyFactor(0.85f)) * 100f) + " %");
@@ -136,7 +145,7 @@ public class TerrainSpeedPanel : MonoBehaviour
     {
         RectTransform row = CourseUI.Rect(name, parent);
         CourseUI.Row(row.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
-        CourseUI.Size(row, 56);
+        CourseUI.Size(row, 48);
         TextMeshProUGUI label = CourseUI.Text("Name", row, name, 22, CourseUI.Ink, FontStyles.Bold);
         label.alignment = TextAlignmentOptions.MidlineLeft;
         CourseUI.Size(label, -1, 170);

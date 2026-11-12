@@ -42,7 +42,7 @@ public class SinglePlayerMenu : MonoBehaviour
         {
             GameManager.Instance.SetConnectionToken(ConnectionTokenUtils.NewToken());
         }
-        string name = PlayerPrefs.GetString("PlayerNickName", "");
+        string name = PlayerPrefs.GetString(LocalPrefs.Key("PlayerNickName"), "");
         GameManager.Instance.playerNickName = string.IsNullOrWhiteSpace(name) ? "You" : name;
 
         chosen = CourseLibrary.Current ?? (CourseLibrary.BuiltIn.Count > 0 ? CourseLibrary.BuiltIn[0] : null);
@@ -133,12 +133,12 @@ public class SinglePlayerMenu : MonoBehaviour
         }
         int owned = GameModes.OwnedRunnerCount();
         runnersText.text = GameModes.IsYourRunners(mode)
-            ? "You run with the runners you own: you have " + owned + (owned == 1 ? " runner." : " runners.") + (owned == 0 ? " Buy a pack in the shop first; until then every runner can be picked." : "")
+            ? "You run with the runners you own: you have " + owned + (owned == 1 ? " runner." : " runners.") + (owned < RunnerCollection.RaceMinimum ? " You borrow random runners up to 10 for the race." : "")
             : "Pick any runner in the game.";
 
         foreach (Transform child in courseList) Destroy(child.gameObject);
-        List<CourseData> courses = new List<CourseData>(CourseLibrary.BuiltIn);
-        courses.AddRange(CourseLibrary.Mine());
+        // No built-in courses: the player's own and the community's
+        List<CourseData> courses = new List<CourseData>(CourseLibrary.Mine());
         foreach (CourseData course in CourseLibrary.Community) if (!courses.Exists(c => c.id == course.id)) courses.Add(course);
         string search = searchField != null ? searchField.text : "";
         int shown = 0;
@@ -177,8 +177,8 @@ public class SinglePlayerMenu : MonoBehaviour
         if (chosen == null) return null;
         if (chosen.IsRelay() && GameModes.IsYourRunners(mode))
         {
-            int owned = GameModes.OwnedRunnerCount();
-            if (owned > 0 && owned < chosen.legs)
+            int owned = GameModes.RaceRunnerCount();
+            if (owned < chosen.legs)
             {
                 return "This relay has " + chosen.legs + " legs, but you only have " + owned + (owned == 1 ? " runner" : " runners") + ". Pick a relay with fewer legs or another game mode.";
             }
