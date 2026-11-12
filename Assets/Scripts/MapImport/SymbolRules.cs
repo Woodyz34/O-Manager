@@ -82,6 +82,10 @@ namespace MapImport
                     case 412: return Ground(1.3f, sprint);                                // cultivated land
                     case 413: return Ground(1.0f, sprint);                                // orchard
                     case 414: return Ground(1.0f, sprint);                                // vineyard
+                    case 113: return Ground(0.9f, sprint);                                // broken ground
+                    case 114: return Ground(0.75f, sprint);                               // very broken ground
+                    case 208: return Ground(0.8f, sprint);                                // boulder field
+                    case 209: return Ground(0.6f, sprint);                                // dense boulder field
                     case 210: return Ground(0.85f, sprint);                               // stony ground
                     case 211: return Ground(0.7f, sprint);
                     case 212: return Ground(0.5f, sprint);
@@ -146,6 +150,94 @@ namespace MapImport
                 return TerrainRule.None;
             }
             return TerrainRule.None;
+        }
+
+        // The ISOM 2017 number of a symbol. Maps drawn with the old numbering (ISOM 2000, and the line and point
+        // symbols ISSOM 2007 shares with it) are translated, so the game's map reading sees every map the same way.
+        public static int Isom2017Major(MapSymbol s)
+        {
+            if (s == null) return 0;
+            if (!s.oldNumbers) return s.major;
+            string name = (s.name ?? "").ToLowerInvariant();
+            switch (s.major)
+            {
+                case 104: return 101;   // slope line
+                case 106: return 104;   // earth bank
+                case 107: return 105;   // earth wall
+                case 108: return 106;   // small earth wall
+                case 109: return 107;   // erosion gully
+                case 110: return 108;   // small erosion gully
+                case 111: return 101;   // knoll drawn with a contour
+                case 112: return 109;   // small knoll
+                case 113: return 110;   // elongated knoll
+                case 114: return 101;   // depression drawn with a contour
+                case 115: return 111;   // small depression
+                case 116: return 112;   // pit
+                case 117: return 113;   // broken ground
+                case 118: return 115;   // special land form feature
+                case 202: return 206;   // rock pillars / cliffs
+                case 203: return 202;   // passable rock face
+                case 204: case 205: return 203;   // rocky pit, cave
+                case 206: return 204;   // boulder
+                case 207: return 205;   // large boulder
+                case 208: return 208;   // boulder field
+                case 209: return 207;   // boulder cluster
+                case 210: return 210;   // stony ground
+                case 211: return 213;   // open sandy ground
+                case 212: return 214;   // bare rock
+                case 302: return 301;   // pond
+                case 304: return name.Contains("stream") || name.Contains("bäck") || name.Contains("watercourse") && !name.Contains("uncrossable") ? 304 : 301;
+                case 305: return 304;   // crossable watercourse
+                case 306: return 305;   // crossable small watercourse
+                case 307: return 306;   // minor water channel
+                case 308: return 309;   // narrow marsh
+                case 309: return name.Contains("opasserb") || name.Contains("uncrossable") || name.Contains("impassable") ? 307 : 308;
+                case 310: return 308;   // marsh
+                case 311: return 310;   // indistinct marsh
+                case 312: return 311;   // well
+                case 313: return 312;   // spring
+                case 314: return 313;   // special water feature
+                case 414: return 415;   // distinct cultivation boundary
+                case 415: return 412;   // cultivated land
+                case 418: return 417;   // special vegetation features
+                case 419: return 418;
+                case 420: return 419;
+                case 421: return 410;   // impassable vegetation (ISSOM)
+                case 501: return 502;   // motorway
+                case 504: return 503;   // road
+                case 505: return 504;   // vehicle track
+                case 506: return 505;   // footpath
+                case 507: return 506;   // small path
+                case 508: return 507;   // less distinct small path
+                case 509: return 508;   // narrow ride
+                case 513: case 514: return 519;   // crossing points
+                case 515: return name.Contains("mur") || name.Contains("wall") ? 515 : 509;   // railway (high wall on some maps)
+                case 516: return 510;   // power line
+                case 517: return 511;   // major power line
+                case 518: return name.Contains("tunnel") || name.Contains("genomgång") ? 512 : 518;
+                case 519: return 513;   // stone wall
+                case 520: return 514;   // ruined stone wall
+                case 521: return 515;   // high stone wall
+                case 522: return 516;   // fence
+                case 523: return 517;   // ruined fence
+                case 524: return 518;   // high fence
+                case 525: return 519;   // crossing point
+                case 526: return 521;   // building
+                case 527: case 528: return 520;   // settlement, permanently out of bounds
+                case 529: return 501;   // paved area
+                case 530: return 523;   // ruin
+                case 531: return 520;   // firing range
+                case 532: return 531;   // grave
+                case 533: return 528;   // crossable pipeline
+                case 534: return 529;   // uncrossable pipeline
+                case 535: return 524;   // high tower
+                case 536: return 525;   // small tower
+                case 537: return 526;   // cairn
+                case 538: return 527;   // fodder rack
+                case 539: return 530;   // special man-made features
+                case 540: return 531;
+            }
+            return s.major;
         }
 
         public static bool IsBuilding(MapSymbol s) => s != null && s.kind == SymbolKind.Area && (s.oldNumbers ? s.major == 526 : s.major == 521);
@@ -287,5 +379,50 @@ namespace MapImport
         // The most usual contour interval for a map type: sprint maps (ISSprOM) 2 m, forest maps (ISOM) 5 m.
         // Maps that are both are mostly park and town maps at 1:5000-1:10000 with 2.5 m.
         public static double TypicalInterval(string mapType) => mapType == "sprint" ? 2.0 : mapType == "both" ? 2.5 : 5.0;
+    }
+    // What the ground of a grid cell is, for the runners' map reading (Mistakes/MapFeatureIndex.cs): one byte per
+    // cell in the package file kinds.bytes. Not the speed: a marsh and slow forest can be equally slow to run in.
+    public static class GroundKind
+    {
+        public const byte Forest = 0, Open = 1, Cultivated = 2, RoughOpen = 3, OpenTrees = 4, LightGreen = 5, Green = 6,
+            DarkGreen = 7, Marsh = 8, IndistinctMarsh = 9, UncrossableMarsh = 10, Water = 11, ShallowWater = 12, Plot = 13,
+            Building = 14, Paved = 15, Stony = 16, BoulderField = 17, BareRock = 18, Sand = 19, BrokenGround = 20,
+            Orchard = 21, OneWayForest = 22, Canopy = 23, OutOfBounds = 24;
+
+        public static byte Of(MapSymbol s)
+        {
+            if (s == null || s.kind != SymbolKind.Area) return Forest;
+            if (SymbolRules.IsBuilding(s)) return Building;
+            string name = (s.name ?? "").ToLowerInvariant();
+            if (s.oldNumbers && s.major == 526 && (name.Contains("skärmtak") || name.Contains("canopy"))) return Canopy;
+            switch (SymbolRules.Isom2017Major(s))
+            {
+                case 113: case 114: return BrokenGround;
+                case 206: return Building;          // a gigantic boulder: as plain to see as a house
+                case 208: case 209: return BoulderField;
+                case 210: case 211: case 212: return Stony;
+                case 213: return Sand;
+                case 214: return BareRock;
+                case 301: return Water;
+                case 302: return ShallowWater;
+                case 307: return UncrossableMarsh;
+                case 308: return Marsh;
+                case 310: return IndistinctMarsh;
+                case 401: return Open;
+                case 402: case 404: return OpenTrees;
+                case 403: return RoughOpen;
+                case 406: case 407: return LightGreen;
+                case 408: case 409: return Green;
+                case 410: return DarkGreen;
+                case 411: return OneWayForest;
+                case 412: return Cultivated;
+                case 413: case 414: return Orchard;
+                case 501: return Paved;
+                case 520: return Plot;
+                case 522: return Canopy;
+                case 709: case 714: return OutOfBounds;
+            }
+            return Forest;
+        }
     }
 }
