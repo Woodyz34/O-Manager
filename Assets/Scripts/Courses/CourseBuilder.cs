@@ -272,6 +272,13 @@ public class CourseBuilder : MonoBehaviour
         MapEditPanel.Open(canvasObject.transform, chosen, (saved, rebuilt) =>
         {
             FillMapPicker();
+            // The map on screen was deleted: show another one
+            if (saved == null && map != null && map.id == chosen.id)
+            {
+                MapDefinition other = MapDefinition.All.Find(m => m.id != chosen.id);
+                if (other != null) SelectMap(other);
+                return;
+            }
             if (saved == null || map == null || saved.id != map.id) return;
             // The map on screen changed: show the new version (a new edge means a new grid, so the course starts again)
             if (!rebuilt)
