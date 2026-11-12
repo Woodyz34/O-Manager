@@ -56,6 +56,13 @@ public static class CourseSetup
     public static string Run()
     {
         log = new StringBuilder();
+        // The old Illern map and its four training courses were removed, so this one-time setup would only bring them back
+        return "Retired: the old Illern map was removed from the game (use the Illern 2025 map).";
+    }
+
+    static string RunOld()
+    {
+        log = new StringBuilder();
         if (EditorApplication.isPlaying) return "Aborted: exit Play mode first.";
         for (int i = 0; i < SceneManager.sceneCount; i++)
         {
