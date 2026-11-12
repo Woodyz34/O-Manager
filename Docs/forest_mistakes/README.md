@@ -33,3 +33,35 @@ User found technique 51 made almost no mistakes in Unity. Now: H0 1/1500, 80 m o
 
 ## v11 (2026-11-09)
 More small mistakes: once per leg within 60 m of the control, chance 0.5*(1-s)^1.2*difficulty to aim 25-45 m beside it and look round there. Direction errors depend more on the ground (diff = 0.4 + max(0, 2 - readability/2)). H0 1/2800. Calibration N=8: T0 61 (38% of legs, median 100 s), T40 25, T60 24, T80 8, T90 4 s/control.
+
+## v12 (2026-11-12): every map symbol read, relocation from unique things, the game code run outside Unity
+From here on the model is tested with the game's own C# files, not a Python copy: `harness/` holds stand-ins for
+the Unity types and a small program. Needs mono (`apt-get install mono-mcs libnewtonsoft-json5.0-cil`).
+
+    harness/build.sh
+    mono harness/harness.exe <package folder> legs.json calib 12            # time lost per control per technique
+    mono harness/harness.exe <package folder> legs.json worst 20 15         # the worst run at technique 20, with its log
+    mono harness/harness.exe <package folder> legs.json tracks 28,35,38 40,70,90 tracks.json 9
+    python3 harness/render.py <package folder> tracks.json out-             # pictures
+    mono harness/harness.exe <package folder> legs.json zones               # what the index found on the map
+
+What changed in the model:
+* `MapFeatureIndex.Classify` has a row for every point and line symbol of ISOM 2017-2 (new: railway 509, major
+  power line 511, pylons at the corner points of power lines, impassable wall 515, earth banks, gullies, trench,
+  prominent line features, stairway, footbridge, crossing point, building of the smallest size ...). Maps drawn with
+  the ISOM 2000 numbers are translated at import (`SymbolRules.Isom2017Major`).
+* Zones: marsh, open land, rough open land, the three greens, boulder field, stony ground, bare rock, sand, broken
+  ground. The import writes `kinds.bytes` (one `GroundKind` per cell); older packages get the kinds from the speeds.
+  You notice a field from 30 m, a marsh only when you are in it (and then only now and then).
+* The runner looks for a thing of the kind it noticed round where it thinks it is; the clearer the thing, the wider
+  (25 + 250 * clarity^2 m, and 700 * clarity m when nothing fits). The only one: sure (60-100 % by technique).
+  Several: nearest first (1 / (1 + d^2 / U^2)), the right one * (1 + 4 * skill), each thing passed lately that fits
+  * (1 + 2 * skill) or does not * (1 - 0.6 * skill), a different slope * (1 - 0.8 * skill).
+* A candidate further from the true place than 30 m + (15-50 %) of the distance run since the last sure fix is
+  not considered (dead reckoning). At most two parallel errors per leg; none on the way to something big.
+* Technique no longer rises after a surprise. Ridge tops and valley bottoms count as handrails.
+* The flag: always seen within 8 m, else one look per 25 m with chance 0.45 + 0.5 * skill.
+* H0 1/1500, hazard (1-skill)^0.45, small miss at the control 0.7 * (1-skill)^0.9 * difficulty.
+Calibration (40 legs x 12, Illern 2025, s lost per control / share of legs with a mistake):
+T0 76 / 49 %, T40 34 / 27 %, T60 15 / 14 %, T80 9 / 8 %, T90 5 / 4 %, T99 3 / 1 % (about 2 s of every figure is
+the harness's own rounding of the path).
