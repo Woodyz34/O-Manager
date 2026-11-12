@@ -26,6 +26,39 @@ public static class SessionGuard
         SceneManager.sceneLoaded += OnSceneLoaded;
         Application.quitting -= OnQuitting;
         Application.quitting += OnQuitting;
+        QuietKickLog.Install();
+#if UNITY_EDITOR
+        // Several editors (clones) on one computer share the graphics card; capping the frame rate keeps the card from timing out
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = 60;
+#endif
+    }
+
+    // Photon logs "DisconnectMessage Code: 104 Kick Player" as a red error when the host leaves the lobby.
+    // That is an expected end of a session (the game already handles it), so it is shown as a warning instead.
+    class QuietKickLog : ILogHandler
+    {
+        static QuietKickLog instance;
+        readonly ILogHandler inner;
+
+        QuietKickLog(ILogHandler inner) { this.inner = inner; }
+
+        public static void Install()
+        {
+            if (instance != null && Debug.unityLogger.logHandler == instance) return;
+            instance = new QuietKickLog(Debug.unityLogger.logHandler);
+            Debug.unityLogger.logHandler = instance;
+        }
+
+        public void LogFormat(LogType logType, Object context, string format, params object[] args)
+        {
+            if (logType == LogType.Error && format != null && format.Contains("DisconnectMessage") && args != null && args.Length > 0
+                && (args[0] as string ?? "").Contains("Code: 104"))
+                logType = LogType.Warning;
+            inner.LogFormat(logType, context, format, args);
+        }
+
+        public void LogException(System.Exception exception, Object context) { inner.LogException(exception, context); }
     }
 
     static void OnQuitting()

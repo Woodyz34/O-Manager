@@ -342,6 +342,7 @@ public class RouteChoiceView : MonoBehaviour
     void ClearBody()
     {
         choiceButtons.Clear();
+        if (prizeShow != null) { StopCoroutine(prizeShow); prizeShow = null; }
         if (body == null) return;
         foreach (Transform child in body) Destroy(child.gameObject);
     }
@@ -1136,6 +1137,7 @@ public class RouteChoiceView : MonoBehaviour
     IEnumerator PrizeShow(List<CanvasGroup> lines, TextMeshProUGUI totalText, int total, TextMeshProUGUI balance, int before, int after)
     {
         foreach (CanvasGroup g in lines) g.alpha = 0f;
+        if (totalText == null) yield break;
         totalText.text = "+0 kr";
         if (before >= 0) balance.text = "You had " + before + " kr";
         yield return new WaitForSecondsRealtime(0.3f);
@@ -1168,10 +1170,11 @@ public class RouteChoiceView : MonoBehaviour
         RectTransform pop = totalText.rectTransform;
         for (float t = 0f; t < 0.3f; t += Time.unscaledDeltaTime)
         {
+            if (pop == null) { prizeShow = null; yield break; }
             pop.localScale = Vector3.one * (1f + 0.18f * Mathf.Sin(Mathf.PI * t / 0.3f));
             yield return null;
         }
-        pop.localScale = Vector3.one;
+        if (pop != null) pop.localScale = Vector3.one;
         prizeShow = null;
     }
 
