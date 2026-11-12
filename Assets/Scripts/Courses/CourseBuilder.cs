@@ -1529,7 +1529,7 @@ public class CourseBuilder : MonoBehaviour
             return;
         }
 
-        PlayerPrefs.SetString("PlayerNickName", authorField.text.Trim());
+        PlayerPrefs.SetString(LocalPrefs.Key("PlayerNickName"), authorField.text.Trim());
         PlayerPrefs.Save();
 
         busy = true;
@@ -1754,7 +1754,7 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Size(nameField, 54);
         authorField = CourseUI.Input("Your name", panel.transform, "Your name", CourseData.MaxAuthorLength, null);
         CourseUI.Size(authorField, 54);
-        authorField.text = PlayerPrefs.GetString("PlayerNickName", GameManager.Instance != null ? GameManager.Instance.playerNickName : "");
+        authorField.text = PlayerPrefs.GetString(LocalPrefs.Key("PlayerNickName"), GameManager.Instance != null ? GameManager.Instance.playerNickName : "");
 
         RectTransform toolRow = CourseUI.Rect("Tools", panel.transform);
         CourseUI.Row(toolRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;

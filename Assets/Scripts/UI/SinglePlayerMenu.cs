@@ -42,7 +42,7 @@ public class SinglePlayerMenu : MonoBehaviour
         {
             GameManager.Instance.SetConnectionToken(ConnectionTokenUtils.NewToken());
         }
-        string name = PlayerPrefs.GetString("PlayerNickName", "");
+        string name = PlayerPrefs.GetString(LocalPrefs.Key("PlayerNickName"), "");
         GameManager.Instance.playerNickName = string.IsNullOrWhiteSpace(name) ? "You" : name;
 
         chosen = CourseLibrary.Current ?? (CourseLibrary.BuiltIn.Count > 0 ? CourseLibrary.BuiltIn[0] : null);
