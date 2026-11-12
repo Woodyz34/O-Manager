@@ -12,7 +12,7 @@ using UnityEngine.UI;
 //    the next time they look for shared maps.
 //  - Private -> Public: the map is sent in and shared, as when it is imported as Public.
 //  - A public map that changes is sent in again, so the other players get the new version.
-//  - A new map edge builds the map again from the map file kept with it. Maps imported before the file was kept get
+//  - A new map edge or new terrain speeds build the map again from the map file kept with it. Maps imported before the file was kept get
 //    it back from the player's own Cloud Save Files when they are public.
 // Courses on the map stay where they are: the map's coordinates do not depend on the edge (MapPackageBuilder.Build).
 public class MapEditPanel : MonoBehaviour
@@ -25,13 +25,15 @@ public class MapEditPanel : MonoBehaviour
     bool isPrivate;
     double[] edge;
     bool edgeChanged;
+    TerrainSpeeds terrain;
+    bool terrainChanged;
     bool working;
     volatile string progressStep;
     volatile float progressShare;
 
     TMP_InputField nameField, clubField, senderField, contactField;
-    Button publicButton, privateButton, edgeButton, saveButton, cancelButton;
-    TextMeshProUGUI visibilityText, edgeText, statusText;
+    Button publicButton, privateButton, edgeButton, terrainButton, saveButton, cancelButton;
+    TextMeshProUGUI visibilityText, edgeText, terrainText, statusText;
     RectTransform contactRow;
 
     public static void Open(Transform canvas, MapDefinition map, Action<MapDefinition, bool> onSaved)
@@ -51,6 +53,7 @@ public class MapEditPanel : MonoBehaviour
         panel.onSaved = onSaved;
         panel.isPrivate = info.isPrivate;
         panel.edge = info.boundary != null && info.boundary.Length >= 6 ? info.boundary : null;
+        panel.terrain = info.terrain != null ? info.terrain.Copy() : new TerrainSpeeds();
         panel.Build(dim.transform);
         IsOpen = true;
     }
@@ -78,7 +81,7 @@ public class MapEditPanel : MonoBehaviour
     void Build(Transform root)
     {
         Image card = CourseUI.CardPanel("Card", root);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 720));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 790));
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
 
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Edit map", 36, CourseUI.Ink, FontStyles.Bold), 44);
@@ -117,6 +120,16 @@ public class MapEditPanel : MonoBehaviour
         CourseUI.Size(edgeText, -1, -1, 1);
         edgeButton = CourseUI.Button("Edge button", edgeRow, "Change map edge...", CourseUI.ButtonKind.Secondary, OpenEdge, 20);
         CourseUI.Size(edgeButton, -1, 300);
+
+        RectTransform terrainRow = CourseUI.Rect("Terrain row", card.transform);
+        CourseUI.Row(terrainRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(terrainRow, 52);
+        terrainText = CourseUI.Text("Terrain", terrainRow, "", 20, CourseUI.Ink);
+        terrainText.alignment = TextAlignmentOptions.MidlineLeft;
+        terrainText.textWrappingMode = TextWrappingModes.Normal;
+        CourseUI.Size(terrainText, -1, -1, 1);
+        terrainButton = CourseUI.Button("Terrain button", terrainRow, "Terrain speeds...", CourseUI.ButtonKind.Secondary, OpenTerrain, 20);
+        CourseUI.Size(terrainButton, -1, 300);
 
         statusText = CourseUI.Text("Status", card.transform, "", 20, CourseUI.Forest, FontStyles.Bold);
         statusText.textWrappingMode = TextWrappingModes.Normal;
@@ -159,7 +172,9 @@ public class MapEditPanel : MonoBehaviour
         edgeText.text = edge == null ? "Map edge: the whole map file is used."
             : edgeChanged ? "Map edge: changed. The map is built again when you save."
             : "Map edge: only the part inside the edge is used.";
-        foreach (Selectable s in new Selectable[] { publicButton, privateButton, edgeButton, cancelButton, nameField, clubField, senderField, contactField })
+        terrainText.text = TerrainSpeedPanel.Describe(terrain) + (terrainChanged ? " The map is built again when you save." : "");
+        terrainText.color = terrainChanged ? CourseUI.Accent : CourseUI.Ink;
+        foreach (Selectable s in new Selectable[] { publicButton, privateButton, edgeButton, terrainButton, cancelButton, nameField, clubField, senderField, contactField })
             s.interactable = !working;
         saveButton.interactable = !working && (isPrivate || ContactGiven());
     }
@@ -262,6 +277,17 @@ public class MapEditPanel : MonoBehaviour
         }
     }
 
+    void OpenTerrain()
+    {
+        if (working) return;
+        TerrainSpeedPanel.Open(transform, terrain, chosen =>
+        {
+            terrain = chosen;
+            terrainChanged = !chosen.SameAs(info.terrain);
+            Refresh();
+        });
+    }
+
     static bool SameEdge(double[] a, double[] b)
     {
         if (a == null || b == null) return a == b;
@@ -290,7 +316,8 @@ public class MapEditPanel : MonoBehaviour
         string sender = senderField.text.Trim(), contact = contactField.text.Trim();
         bool goPrivate = isPrivate && !info.isPrivate;
         bool goPublic = !isPrivate && info.isPrivate;
-        bool changed = name != info.name || club != (info.ownerClub ?? "") || edgeChanged
+        bool rebuild = edgeChanged || terrainChanged;
+        bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild
                        || (!isPrivate && (sender != (info.sender ?? "") || contact != (info.contact ?? "")));
         if (!changed && !goPrivate && !goPublic)
         {
@@ -306,12 +333,13 @@ public class MapEditPanel : MonoBehaviour
         {
             byte[] ownPng = info.ownPicture ? await Task.Run(() => File.ReadAllBytes(Path.Combine(folder, "picture.png"))) : null;
 
-            // A new map edge: build the map again next to the old one, then swap them
-            if (edgeChanged)
+            // A new map edge or new terrain speeds: build the map again next to the old one, then swap them
+            if (rebuild)
             {
                 byte[] source = await SourceAsync();
                 MapPackageInfo old = info;
                 double[] newEdge = edge;
+                TerrainSpeeds newTerrain = terrain.Copy();
                 string building = folder + ".rebuild";
                 string sourceCopy = PrivateMaps.SourceFile(folder, info);
                 updated = await Task.Run(() =>
@@ -319,6 +347,7 @@ public class MapEditPanel : MonoBehaviour
                     MapFile file = MapPackageBuilder.ReadMapFile(source);
                     if (old.contourInterval > 0) file.contourInterval = old.contourInterval;
                     file.boundary = newEdge;
+                    file.terrain = newTerrain;
                     MapPackage package = MapImportPanel.BuildPackage(file, name, old.mapType, ownPng,
                         (step, share) => { progressShare = share; progressStep = step; });
                     MapPackageInfo i = package.info;
@@ -403,7 +432,7 @@ public class MapEditPanel : MonoBehaviour
             MapDefinition saved = MapDefinition.All.Find(m => m.id == updated.id);
             UIToast.Show("Saved " + name + "." + cloudNote, 7f);
             working = false;
-            onSaved?.Invoke(saved, edgeChanged);
+            onSaved?.Invoke(saved, rebuild);
             Destroy(gameObject);
         }
         catch (Exception e)

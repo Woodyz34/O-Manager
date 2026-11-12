@@ -45,6 +45,7 @@ public static class SharedMaps
         public long sourceBytes;
         public double contourInterval;
         public double[] boundary;         // paper mm, or null for the whole map
+        public TerrainSpeeds terrain;     // the terrain sliders, or null for the normal speeds (maps shared before them)
         public long sharedAt;             // unix seconds
         [JsonIgnore] public string ownerId;
     }
@@ -77,6 +78,7 @@ public static class SharedMaps
             sourceBytes = sourceBytes,
             contourInterval = info.contourInterval,
             boundary = info.boundary != null && info.boundary.Length >= 6 ? info.boundary : null,
+            terrain = info.terrain != null && !info.terrain.IsDefault() ? info.terrain.Copy() : null,
             sharedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         });
         await SaveMineAsync(mine);
@@ -257,6 +259,7 @@ public static class SharedMaps
             MapFile file = MapPackageBuilder.ReadMapFile(source);
             if (m.contourInterval > 0) file.contourInterval = m.contourInterval;
             if (m.boundary != null && m.boundary.Length >= 6) file.boundary = m.boundary;
+            file.terrain = m.terrain;
             string type = m.mapType == "sprint" || m.mapType == "both" ? m.mapType : "forest";
             MapPackage package = MapImportPanel.BuildPackage(file, m.name, type, ownPng, null);
             package.info.id = m.id;
