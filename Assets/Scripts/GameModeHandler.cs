@@ -31,6 +31,10 @@ public static class GameModes
 
     // "Same stats" (added 2026-11-04): the host sets speed and technique, everyone picks any runner and all of them
     // run with those values. Sent as "Same stats|<speed>|<technique>" (MakeSameStats).
+    // Relays (2026-11-11): the host may set other values for each leg. Leg 1 stays "|<speed>|<technique>" and legs
+    // 2, 3, ... follow as one more part of hex pairs: "Same stats|85|70|5A465046" = leg 2 90/70, leg 3 80/70.
+    // Kept short so ten legs still fit the lobby's 64-character network string. A leg without values of its own
+    // uses the last leg's values.
     public const string SameStatsMode = "Same stats";
 
     // Single player offers the first two; the lobby all three
@@ -38,22 +42,23 @@ public static class GameModes
     public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode };
 
     public const int MinSpeed = 40, MaxSpeed = 100, MinTechnique = 20, MaxTechnique = 100;
+    public const int MaxLegs = 10;
 
     public static string PoolName(string mode)
     {
         if (string.IsNullOrEmpty(mode)) return "...";
         if (IsSameStats(mode))
         {
-            return TryGetSameStats(mode, out int speed, out int technique)
-                ? "Same stats " + speed + "/" + technique   // speed/technique, kept short for the lobby bar
-                : "Same stats";
+            if (!TryGetSameStatsLegs(mode, out List<Vector2Int> legs)) return "Same stats";
+            if (!AllLegsAlike(legs)) return "Same stats per leg";   // kept short for the lobby bar
+            return "Same stats " + legs[0].x + "/" + legs[0].y;     // speed/technique
         }
         return IsYourRunners(mode) ? "Your runners" : mode == ChooseAny ? "Any runner" : mode;
     }
 
     public static string PoolDescription(string mode)
     {
-        if (IsSameStats(mode)) return "You set speed and technique. Everyone picks any runner, and all run with your values.";
+        if (IsSameStats(mode)) return "You set speed and technique (for each leg in a relay). Everyone picks any runner, and all run with your values.";
         return IsYourRunners(mode) ? "Everyone races with runners from their own collection." : "Everyone may pick any runner in the game.";
     }
 
@@ -64,55 +69,122 @@ public static class GameModes
 
     public static string MakeSameStats(int speed, int technique)
     {
-        return SameStatsMode + "|" + Mathf.Clamp(speed, MinSpeed, MaxSpeed) + "|" + Mathf.Clamp(technique, MinTechnique, MaxTechnique);
+        return MakeSameStats(new List<Vector2Int> { new Vector2Int(speed, technique) });
     }
 
+    // One speed/technique pair per leg (x = speed, y = technique). Legs at the end that only repeat the leg before
+    // are left out, so a plain race or a relay with the same values everywhere gives the short "Same stats|85|70".
+    public static string MakeSameStats(IList<Vector2Int> legs)
+    {
+        List<Vector2Int> clamped = new List<Vector2Int>();
+        if (legs != null)
+            for (int i = 0; i < legs.Count && i < MaxLegs; i++) clamped.Add(Clamp(legs[i]));
+        if (clamped.Count == 0) clamped.Add(Clamp(new Vector2Int(MaxSpeed, MaxTechnique)));
+        while (clamped.Count > 1 && clamped[clamped.Count - 1] == clamped[clamped.Count - 2]) clamped.RemoveAt(clamped.Count - 1);
+
+        string mode = SameStatsMode + "|" + clamped[0].x + "|" + clamped[0].y;
+        if (clamped.Count > 1)
+        {
+            System.Text.StringBuilder more = new System.Text.StringBuilder();
+            for (int i = 1; i < clamped.Count; i++) more.Append(clamped[i].x.ToString("X2")).Append(clamped[i].y.ToString("X2"));
+            mode += "|" + more;
+        }
+        return mode;
+    }
+
+    static Vector2Int Clamp(Vector2Int v)
+    {
+        return new Vector2Int(Mathf.Clamp(v.x, MinSpeed, MaxSpeed), Mathf.Clamp(v.y, MinTechnique, MaxTechnique));
+    }
+
+    // Leg 1's values (the only ones, outside relays)
     public static bool TryGetSameStats(string mode, out int speed, out int technique)
     {
         speed = 0;
         technique = 0;
-        if (!IsSameStats(mode)) return false;
-        string[] parts = mode.Split('|');
-        if (parts.Length < 3 || !int.TryParse(parts[1], out speed) || !int.TryParse(parts[2], out technique)) return false;
-        speed = Mathf.Clamp(speed, MinSpeed, MaxSpeed);
-        technique = Mathf.Clamp(technique, MinTechnique, MaxTechnique);
+        if (!TryGetSameStatsLegs(mode, out List<Vector2Int> legs)) return false;
+        speed = legs[0].x;
+        technique = legs[0].y;
         return true;
     }
 
-    // The values every runner uses in the competition being played (x = speed, y = technique), or null when the
-    // runners keep their own. Set on each player when the runner picking starts.
-    public static Vector2? SameStats
+    // Every leg's values, leg 1 first. Legs after the last one in the list use the last one's values.
+    public static bool TryGetSameStatsLegs(string mode, out List<Vector2Int> legs)
     {
-        get => sameStats;
+        legs = null;
+        if (!IsSameStats(mode)) return false;
+        string[] parts = mode.Split('|');
+        if (parts.Length < 3 || !int.TryParse(parts[1], out int speed) || !int.TryParse(parts[2], out int technique)) return false;
+        legs = new List<Vector2Int> { Clamp(new Vector2Int(speed, technique)) };
+        if (parts.Length >= 4)
+        {
+            string more = parts[3];
+            for (int i = 0; i + 4 <= more.Length && legs.Count < MaxLegs; i += 4)
+            {
+                if (!int.TryParse(more.Substring(i, 2), System.Globalization.NumberStyles.HexNumber, null, out int s)) break;
+                if (!int.TryParse(more.Substring(i + 2, 2), System.Globalization.NumberStyles.HexNumber, null, out int t)) break;
+                legs.Add(Clamp(new Vector2Int(s, t)));
+            }
+        }
+        return true;
+    }
+
+    // The values of one leg (index from 0) in a list from TryGetSameStatsLegs
+    public static Vector2Int LegValues(IList<Vector2Int> legs, int leg)
+    {
+        return legs[Mathf.Clamp(leg, 0, legs.Count - 1)];
+    }
+
+    static bool AllLegsAlike(List<Vector2Int> legs)
+    {
+        for (int i = 1; i < legs.Count; i++) if (legs[i] != legs[0]) return false;
+        return true;
+    }
+
+    // The values every runner uses in the competition being played (x = speed, y = technique, one per relay leg),
+    // or null when the runners keep their own. Set on each player when the runner picking starts.
+    public static List<Vector2Int> SameStatsLegs
+    {
+        get => sameStatsLegs;
         set
         {
-            if (sameStats != value) sameStatsCopies.Clear();
-            sameStats = value;
+            sameStatsCopies.Clear();
+            sameStatsLegs = value != null && value.Count > 0 ? value : null;
         }
     }
-    static Vector2? sameStats;
-    static readonly Dictionary<CardData, CardData> sameStatsCopies = new Dictionary<CardData, CardData>();
+    static List<Vector2Int> sameStatsLegs;
+    static readonly Dictionary<(CardData, Vector2Int), CardData> sameStatsCopies = new Dictionary<(CardData, Vector2Int), CardData>();
+
+    public static bool SameStatsActive => sameStatsLegs != null;
+
+    // The values of one leg in the competition being played (leg 0 outside relays)
+    public static Vector2Int? SameStatsForLeg(int leg)
+    {
+        return sameStatsLegs == null ? (Vector2Int?)null : LegValues(sameStatsLegs, leg);
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetSameStats()
     {
-        sameStats = null;
+        sameStatsLegs = null;
         sameStatsCopies.Clear();
     }
 
-    // The runners to pick from: as they are, or copies with the host's values in "Same stats". The same copy is
-    // given back every time, so a relay can tell which runners are already picked.
-    public static List<CardData> WithSameStats(List<CardData> cards)
+    // The runners to pick from: as they are, or copies with the host's values in "Same stats" (the values of that
+    // relay leg; leg 0 outside relays). The same copy is given back every time for the same values.
+    public static List<CardData> WithSameStats(List<CardData> cards, int leg = 0)
     {
-        if (sameStats == null || cards == null) return cards;
+        Vector2Int? values = SameStatsForLeg(leg);
+        if (values == null || cards == null) return cards;
         List<CardData> result = new List<CardData>(cards.Count);
         foreach (CardData card in cards)
         {
             if (card == null) continue;
-            if (!sameStatsCopies.TryGetValue(card, out CardData copy))
+            var key = (card, values.Value);
+            if (!sameStatsCopies.TryGetValue(key, out CardData copy))
             {
-                copy = card.WithStats(sameStats.Value.x, sameStats.Value.y);
-                sameStatsCopies[card] = copy;
+                copy = card.WithStats(values.Value.x, values.Value.y);
+                sameStatsCopies[key] = copy;
             }
             result.Add(copy);
         }

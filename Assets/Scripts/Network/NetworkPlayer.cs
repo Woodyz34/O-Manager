@@ -46,7 +46,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int secoundCount { get; set; }
     [Networked] public int minuterCount { get; set; }
     [Networked] public int hourCount { get; set; }
-    [Networked] public string gameMode { get; set; }
+    // 64 characters: "Same stats" with values for every relay leg is longer than the default 16
+    [Networked, Capacity(64)] public string gameMode { get; set; }
     [Networked, Capacity(32)]
     public NetworkDictionary<int, PlayerRef> CardOwner => default;
     
@@ -553,11 +554,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             GameModeRuntime.StartIfNeeded(this);
         }
 
-        GameModes.SameStats = null;
-
-        // (Set before any early return, so a mode without runners never keeps an old game's same stats)
-        bool sameStats = GameModes.TryGetSameStats(effectiveGameMode, out int sameSpeed, out int sameTechnique);
-        GameModes.SameStats = sameStats ? new Vector2(sameSpeed, sameTechnique) : (Vector2?)null;
+        // (Set before any early return, so a mode without runners never keeps an old game's same stats.
+        // A relay gets one pair of values per leg.)
+        bool sameStats = GameModes.TryGetSameStatsLegs(effectiveGameMode, out List<Vector2Int> sameStatsLegs);
+        GameModes.SameStatsLegs = sameStats ? sameStatsLegs : null;
 
         // Route analysis: nobody picks a runner, everyone runs with the same one
         if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteAnalysis) && RelayRace.Active == null)
