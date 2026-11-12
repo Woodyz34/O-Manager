@@ -196,6 +196,9 @@ public static class GameModes
     // How many different runners the player owns
     public static int OwnedRunnerCount() => RunnerCollection.OwnedCards().Count;
 
+    // How many runners the player can race with in "Your runners": at least 10, with runners on loan
+    public static int RaceRunnerCount() => Mathf.Max(OwnedRunnerCount(), RunnerCollection.RaceMinimum);
+
     // In "Your runners" a relay can only be run when every player owns at least as many runners as it has legs.
     // Returns why not, or null when it is fine.
     public static string RelayNeedsMoreRunners(CourseData course, string mode)
@@ -204,7 +207,7 @@ public static class GameModes
         foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
             if (player.Object == null || !player.Object.IsValid) continue;
-            int owned = player.Object.HasStateAuthority ? OwnedRunnerCount() : player.ownedRunners;
+            int owned = player.Object.HasStateAuthority ? RaceRunnerCount() : player.ownedRunners;
             if (owned < course.legs)
             {
                 string who = player.Object.HasStateAuthority ? "you only have" : player.nickName.ToString() + " only has";

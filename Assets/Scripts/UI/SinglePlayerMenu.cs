@@ -133,7 +133,7 @@ public class SinglePlayerMenu : MonoBehaviour
         }
         int owned = GameModes.OwnedRunnerCount();
         runnersText.text = GameModes.IsYourRunners(mode)
-            ? "You run with the runners you own: you have " + owned + (owned == 1 ? " runner." : " runners.") + (owned == 0 ? " Buy a pack in the shop first; until then every runner can be picked." : "")
+            ? "You run with the runners you own: you have " + owned + (owned == 1 ? " runner." : " runners.") + (owned < RunnerCollection.RaceMinimum ? " You borrow random runners up to 10 for the race." : "")
             : "Pick any runner in the game.";
 
         foreach (Transform child in courseList) Destroy(child.gameObject);
@@ -177,8 +177,8 @@ public class SinglePlayerMenu : MonoBehaviour
         if (chosen == null) return null;
         if (chosen.IsRelay() && GameModes.IsYourRunners(mode))
         {
-            int owned = GameModes.OwnedRunnerCount();
-            if (owned > 0 && owned < chosen.legs)
+            int owned = GameModes.RaceRunnerCount();
+            if (owned < chosen.legs)
             {
                 return "This relay has " + chosen.legs + " legs, but you only have " + owned + (owned == 1 ? " runner" : " runners") + ". Pick a relay with fewer legs or another game mode.";
             }

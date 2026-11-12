@@ -402,7 +402,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             Local = this;
             RPC_SetNickName(GameManager.Instance.playerNickName);
             playerColor = PlayerColor.SavedPacked();
-            ownedRunners = GameModes.OwnedRunnerCount();
+            ownedRunners = GameModes.RaceRunnerCount();
 
             if (isReadyScene)
             {

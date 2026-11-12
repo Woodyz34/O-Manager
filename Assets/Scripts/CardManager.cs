@@ -52,20 +52,27 @@ public class CardManager : MonoBehaviour
 
     }
 
-    // "Your runners": the runners the player owns (all runners if they own none yet)
+    // "Your runners": the runners the player owns, plus runners on loan up to 10 (RunnerCollection.CardsForRace)
     public void ShowOwnedCards()
     {
-        List<CardData> owned = RunnerCollection.OwnedCards();
-        if (owned.Count == 0)
-        {
-            ShowAllCards();
-            return;
-        }
+        List<CardData> owned = RunnerCollection.CardsForRace();
         foreach (CardData card in owned)
         {
             GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
             cardInstance.GetComponent<CardDisplay>().SetValues(card);
+            if (RunnerCollection.IsOnLoan(card.RunnerName)) MarkOnLoan(cardInstance.transform);
         }
+    }
+
+    // A small orange tag on a runner the player only borrows for this round
+    static void MarkOnLoan(Transform card)
+    {
+        Image tag = CourseUI.Panel("On loan", card, CourseUI.Accent);
+        tag.raycastTarget = false;
+        CourseUI.Place(tag.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -6), new Vector2(150, 34));
+        TMPro.TextMeshProUGUI text = CourseUI.Text("Text", tag.transform, "ON LOAN", 20, Color.white, TMPro.FontStyles.Bold, TMPro.TextAlignmentOptions.Center);
+        text.raycastTarget = false;
+        CourseUI.Stretch(text.rectTransform);
     }
 
     public void ShowRandomCards(int amount)
