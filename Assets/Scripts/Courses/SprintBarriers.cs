@@ -18,7 +18,7 @@ public class SprintBarriers
     public const float MaxGapMeters = 40f;     // only passages this narrow are closed
     const float MinGapMeters = 1.5f;
     const float DepthMeters = 4f;              // how thick a barrier is along the way it closes
-    const float IntoWallMeters = 1.5f;         // a barrier reaches this far into the house on each side, so no gap is left
+    const float IntoWallMeters = 3f;           // a barrier reaches this far into the house or fence on each side, so no gap is seen or left
     const float ControlRoomMeters = 25f;       // never this close to a control, the start or the finish
     const float GapSpacingMeters = 10f;        // places tried on one leg at least this far apart
     const float MaxSlowdown = 1.6f;            // the leg at most this much slower than its straight way was
@@ -63,6 +63,7 @@ public class SprintBarriers
     }
 
     readonly float[,] speed;
+    readonly float[,] original;       // the grid before any barrier, to open one again
     readonly RouteChoiceGenerator generator;
     readonly float cellMeters;
     readonly float close;
@@ -81,6 +82,7 @@ public class SprintBarriers
                           double budgetSeconds, Func<Vector2, Vector2> snap = null)
     {
         this.speed = speed;
+        original = (float[,])speed.Clone();
         this.generator = generator;
         this.cellMeters = cellMeters;
         close = closeChoice;
@@ -125,6 +127,10 @@ public class SprintBarriers
         }
         // Still short of the number wanted: more barriers that change the map without spoiling any leg
         if (kept.Count < goal) Fill(points, state, kept);
+        // Last: every barrier must still change a way. One placed early can be left doing nothing once later ones
+        // closed more (the runners no longer come near it), so each is opened again on its own and taken away
+        // when no leg's choices change.
+        Prune(points, state, kept);
         FunAfter = 0;
         for (int k = 1; k <= legs; k++) if (state[k].Fun(close)) FunAfter++;
         return kept;
@@ -292,6 +298,7 @@ public class SprintBarriers
             List<Gap> one = new List<Gap> { gap };
             bool ok = true;
             List<KeyValuePair<int, LegState>> again = new List<KeyValuePair<int, LegState>>();
+            bool changes = false;
             for (int j = 1; j < state.Length && ok; j++)
             {
                 if (!Near(state[j], one)) continue;
@@ -302,8 +309,14 @@ public class SprintBarriers
                 {
                     ok = false;
                 }
-                else again.Add(new KeyValuePair<int, LegState>(j, now));
+                else
+                {
+                    again.Add(new KeyValuePair<int, LegState>(j, now));
+                    if (!Same(now, state[j])) changes = true;
+                }
             }
+            // It must change some leg's choices; one that changes nothing is only clutter
+            if (!changes) ok = false;
             if (Verbose) Log.Add($"   fill gap {gap.width * cellMeters:0.0} m at ({gap.centre.x:0},{gap.centre.y:0}) near leg {gap.leg}: {(ok ? "KEPT" : "no")}");
             if (!ok || again.Count == 0)
             {
@@ -314,6 +327,92 @@ public class SprintBarriers
             kept.Add(new Barrier { corners = gap.corners, leg = gap.leg });
             Log.Add($"fill: barrier by leg {gap.leg} ({gap.width * cellMeters:0} m)");
         }
+    }
+
+    void Prune(List<Vector2Int> points, LegState[] state, List<Barrier> kept)
+    {
+        int rows = speed.GetLength(0), cols = speed.GetLength(1);
+        float[,] mark = null;
+        DateTime pruneStart = DateTime.UtcNow;
+        for (int b = kept.Count - 1; b >= 0; b--)
+        {
+            if ((DateTime.UtcNow - pruneStart).TotalSeconds > budgetSeconds * 0.5) break;
+            Barrier barrier = kept[b];
+            // The cells this barrier closed, opened again (to the speed they had before any barrier)
+            if (mark == null)
+            {
+                mark = new float[rows, cols];
+                for (int i = 0; i < rows; i++) for (int j = 0; j < cols; j++) mark[i, j] = 1f;
+            }
+            List<KeyValuePair<int, float>> cells = new List<KeyValuePair<int, float>>();
+            ForbiddenRaster.Close(mark, barrier.corners, false, cells);
+            ForbiddenRaster.Undo(mark, new List<KeyValuePair<int, float>>(cells));
+            List<KeyValuePair<int, float>> reopened = new List<KeyValuePair<int, float>>();
+            foreach (var c in cells)
+            {
+                int i = c.Key / cols, j = c.Key % cols;
+                reopened.Add(new KeyValuePair<int, float>(c.Key, speed[i, j]));
+                speed[i, j] = original[i, j];
+            }
+            // Another barrier over the same cells stays closed
+            foreach (Barrier other in kept) if (other != barrier) ForbiddenRaster.Close(speed, other.corners, false);
+
+            Vector2 centre = Vector2.zero;
+            foreach (Vector2 c in barrier.corners) centre += c;
+            centre /= barrier.corners.Count;
+            float reach = 0f;
+            foreach (Vector2 c in barrier.corners) reach = Mathf.Max(reach, Vector2.Distance(c, centre));
+            bool changes = false;
+            List<KeyValuePair<int, LegState>> without = new List<KeyValuePair<int, LegState>>();
+            for (int k = 1; k < state.Length && !changes; k++)
+            {
+                // Opening can give a leg back a way it had before, which its present choices may not pass near, so every
+                // leg whose search window (as the route choice search) holds the barrier is looked at
+                if (!InWindow(points, k, centre, reach)) continue;
+                LegState now = Measure(points, k);
+                if (!Same(now, state[k])) changes = true;
+                else without.Add(new KeyValuePair<int, LegState>(k, now));
+            }
+            if (changes)
+            {
+                ForbiddenRaster.Undo(speed, reopened);   // closed again
+                continue;
+            }
+            foreach (var pair in without) state[pair.Key] = pair.Value;
+            kept.RemoveAt(b);
+            Log.Add($"pruned a barrier by leg {barrier.leg}: no leg's choices change without it");
+        }
+    }
+
+    // Is a point inside the window the route choice search looks at for a leg (its straight distance round it, at least 80 m)?
+    bool InWindow(List<Vector2Int> points, int k, Vector2 p, float reach)
+    {
+        Vector2Int a = points[k - 1], b = points[k];
+        float margin = Mathf.Max(0.6f * Vector2.Distance(a, b) * cellMeters, 80f) / cellMeters + reach;
+        return p.x >= Mathf.Min(a.x, b.x) - margin && p.x <= Mathf.Max(a.x, b.x) + margin
+            && p.y >= Mathf.Min(a.y, b.y) - margin && p.y <= Mathf.Max(a.y, b.y) + margin;
+    }
+
+    // The same choices: as many, and each about as fast
+    static bool Same(LegState a, LegState b)
+    {
+        if (a.blocked != b.blocked || a.choices.Count != b.choices.Count) return false;
+        List<float> x = new List<float>(), y = new List<float>();
+        foreach (RouteChoice c in a.choices) x.Add(c.seconds);
+        foreach (RouteChoice c in b.choices) y.Add(c.seconds);
+        x.Sort(); y.Sort();
+        for (int i = 0; i < x.Count; i++) if (Mathf.Abs(x[i] - y[i]) > Mathf.Max(1f, 0.01f * y[i])) return false;
+        return true;
+    }
+
+    // Does any choice of a leg pass within reach (cells) of a point?
+    static bool NearPoint(LegState s, Vector2 p, float reach)
+    {
+        if (s.blocked) return false;
+        foreach (RouteChoice c in s.choices)
+            foreach (Vector2Int cell in c.cells)
+                if (Vector2.Distance(new Vector2(cell.x + 0.5f, cell.y + 0.5f), p) < reach) return true;
+        return false;
     }
 
     // Two barriers never right next to each other (it would look like one odd shape)
