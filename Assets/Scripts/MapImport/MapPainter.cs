@@ -109,6 +109,7 @@ namespace MapImport
             {
                 foreach (MapSymbol part in s.parts)
                 {
+                    if (IsHaloPart(part, s.parts)) continue;
                     if (obj.kind == SymbolKind.Area && part.kind == SymbolKind.Area) AddArea(obj, part.area, ref order);
                     else if (part.line != null) AddLineObject(obj, part.line, ref order);
                 }
@@ -203,7 +204,7 @@ namespace MapImport
                 double off = -(l.doubleWidth + l.rightWidth) / 2;
                 Add(c, () => StrokeMaybeDashed(Offset(p, off), l.rightWidth, c, l.borderDash, l.borderGap), ref order);
             }
-            if (l.color >= 0 && l.width > 0)
+            if (l.color >= 0 && l.width > 0 && !IsHaloLine(l))
             {
                 int c = l.color;
                 if (l.mainGap > 0 && l.mainLength > 0)
@@ -225,9 +226,11 @@ namespace MapImport
                 List<(double x, double y, double a)> spots = l.oomMid && !(l.mainGap > 0 && l.mainLength > 0)
                     ? AlongLineOom(p, l.midSpacing, l.midEnd, l.midCount, l.midDistance, l.midAtLeastOne, l.midMinCount)
                     : AlongLine(p, spacing, l.midCount, l.midDistance);
+                double reach = OtherReach(l.midElements);
                 foreach (SymbolElement e in l.midElements)
                 {
                     SymbolElement el = e;
+                    if (IsWhite(el.color) && Reach(el) > reach + 0.01) continue;   // a white halo round the symbol
                     Add(el.color, () =>
                     {
                         foreach (var s in spots) DrawElement(el, s.x, s.y, s.a);
@@ -238,11 +241,94 @@ namespace MapImport
 
         void AddElements(List<SymbolElement> elements, double x, double y, double angle, ref int order)
         {
+            double reach = OtherReach(elements);
             foreach (SymbolElement e in elements)
             {
                 SymbolElement el = e;
+                if (IsWhite(el.color) && Reach(el) > reach + 0.01) continue;   // a white halo round the symbol
                 Add(el.color, () => DrawElement(el, x, y, angle), ref order);
             }
+        }
+
+        // ---- White halos ----
+        // Many symbol sets put a white ring under black symbols (stones, boulders, cliffs, fences, walls) so they stand
+        // out in print. On the screen that looks like a white hole in the green or yellow round the stone, and the
+        // ground there is not white at all, so such halos are left out: a white part of a point or line symbol that
+        // reaches further out than the symbol's coloured parts. White inside a symbol (a road's fill between its
+        // borders, a railway's white dashes) stays. White area symbols (open forest drawn over green) are not touched.
+
+        bool IsWhite(int color)
+        {
+            if (color < 0 || color >= map.colors.Count) return false;
+            MapColor c = map.colors[color];
+            return c.r >= 240 && c.g >= 240 && c.b >= 240;
+        }
+
+        // How far from the symbol's origin an element reaches, in mm
+        static double Reach(SymbolElement e)
+        {
+            double far = 0;
+            if (e.x != null)
+                for (int i = 0; i < e.x.Length; i++) far = Math.Max(far, Math.Sqrt(e.x[i] * e.x[i] + e.y[i] * e.y[i]));
+            switch (e.type)
+            {
+                case SymbolElement.ElementType.Dot: return far + e.diameter / 2;
+                case SymbolElement.ElementType.Circle: return far + e.diameter / 2 + e.lineWidth / 2;
+                case SymbolElement.ElementType.Line: return far + e.lineWidth / 2;
+                default: return far;
+            }
+        }
+
+        // The furthest reach of the elements that are not white (0 when there are none: then nothing is a halo)
+        double OtherReach(List<SymbolElement> elements)
+        {
+            double reach = 0;
+            bool any = false;
+            foreach (SymbolElement e in elements)
+            {
+                if (e.color < 0 || IsWhite(e.color)) continue;
+                reach = Math.Max(reach, Reach(e));
+                any = true;
+            }
+            return any ? reach : double.MaxValue;
+        }
+
+        // Half the width of the coloured (not white) parts of a line, without its main line
+        double ColouredHalfWidth(LineStyle l)
+        {
+            double half = 0;
+            if (l.leftColor >= 0 && !IsWhite(l.leftColor)) half = Math.Max(half, l.doubleWidth / 2 + l.leftWidth);
+            if (l.rightColor >= 0 && !IsWhite(l.rightColor)) half = Math.Max(half, l.doubleWidth / 2 + l.rightWidth);
+            if (l.fillColor >= 0 && !IsWhite(l.fillColor)) half = Math.Max(half, l.doubleWidth / 2);
+            if (l.midElements != null)
+                foreach (SymbolElement e in l.midElements)
+                    if (e.color >= 0 && !IsWhite(e.color)) half = Math.Max(half, Reach(e));
+            return half;
+        }
+
+        // A white main line wider than the line's coloured parts: a halo
+        bool IsHaloLine(LineStyle l)
+        {
+            if (!IsWhite(l.color)) return false;
+            double coloured = ColouredHalfWidth(l);
+            return coloured > 0 && l.width / 2 > coloured + 0.01;
+        }
+
+        // A part of a combined symbol (OpenOrienteering Mapper) that is only a white line wider than the other parts
+        bool IsHaloPart(MapSymbol part, List<MapSymbol> parts)
+        {
+            LineStyle l = part.line;
+            if (l == null || part.area != null || !IsWhite(l.color) || l.width <= 0) return false;
+            if ((l.leftColor >= 0 && !IsWhite(l.leftColor)) || (l.rightColor >= 0 && !IsWhite(l.rightColor))) return false;
+            double coloured = 0;
+            foreach (MapSymbol other in parts)
+            {
+                if (other == part || other.line == null) continue;
+                LineStyle o = other.line;
+                if (o.color >= 0 && !IsWhite(o.color)) coloured = Math.Max(coloured, o.width / 2);
+                coloured = Math.Max(coloured, ColouredHalfWidth(o));
+            }
+            return coloured > 0 && l.width / 2 > coloured + 0.01;
         }
 
         // ---- Geometry on paper ----
