@@ -73,8 +73,9 @@ public class GameModeSelect : MonoBehaviour
             SameStatsPopup.Open(gameModeHandler.gameMode, mode => gameModeHandler.gameMode = mode);
             return;
         }
-        gameModeHandler.gameMode = gameModeName;
-        Debug.Log($"GameMode selected: {gameModeName}");
+        // Your runners and Any runner keep the max average overall the host has set
+        gameModeHandler.gameMode = GameModes.WithCap(gameModeName, GameModes.Cap(gameModeHandler.gameMode));
+        Debug.Log($"GameMode selected: {gameModeHandler.gameMode}");
         gameModeSelectPanel.SetActive(false);
     }
 
@@ -88,11 +89,21 @@ public class GameModeSelect : MonoBehaviour
         {
             string pool = pools[i];
             // The chosen "Same stats" shows its values
-            string title = pool == GameModes.SameStatsMode && GameModes.IsSameStats(gameModeHandler.gameMode)
+            string title = (pool == GameModes.SameStatsMode && GameModes.IsSameStats(gameModeHandler.gameMode))
+                || (pool == GameModes.PoolId(gameModeHandler.gameMode))
                 ? GameModes.PoolName(gameModeHandler.gameMode) : GameModes.PoolName(pool);
             options[i] = new ChoicePopup.Option { id = pool, title = title, description = GameModes.PoolDescription(pool) };
         }
-        ChoicePopup.Open("Runner pool", options, GameModes.PoolId(gameModeHandler.gameMode), SelectGameMode);
+        // Your runners and Any runner can have a max average overall (CapPopup)
+        string extra = null;
+        System.Action openCap = null;
+        if (GameModes.CanHaveCap(gameModeHandler.gameMode))
+        {
+            int cap = GameModes.Cap(gameModeHandler.gameMode);
+            extra = "Max average overall: " + (cap > 0 ? cap.ToString() : "off");
+            openCap = () => CapPopup.Open(gameModeHandler.gameMode, mode => gameModeHandler.gameMode = mode);
+        }
+        ChoicePopup.Open("Runner pool", options, GameModes.PoolId(gameModeHandler.gameMode), SelectGameMode, extra, openCap);
     }
 
     public void ClosePanel()

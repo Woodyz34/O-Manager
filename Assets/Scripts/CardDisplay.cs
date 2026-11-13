@@ -52,6 +52,7 @@ public class CardDisplay : MonoBehaviour
         speed = card.speed;
         technique = card.technique;
         klass = card.klass;
+        man = card.man;
         clubb = card.clubb;
         RunnerPicture = card.RunnerPicture;
         country = card.country;

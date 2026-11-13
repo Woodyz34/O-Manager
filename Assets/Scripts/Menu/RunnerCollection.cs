@@ -180,7 +180,12 @@ public static class RunnerCollection
     public static List<CardData> CardsForRace()
     {
         List<CardData> owned = OwnedCards();
-        if (owned.Count >= RaceMinimum) return owned;
+        if (owned.Count >= RaceMinimum)
+        {
+            // Runners lent for the relay's rules (RunnerRules.YourRunnersPool) come on top
+            if (loans != null && loans.Count > 0) owned.AddRange(loans.FindAll(c => !owned.Exists(o => o.RunnerName == c.RunnerName)));
+            return owned;
+        }
         if (loans == null)
         {
             List<CardData> free = RunnerCards.InPacks().FindAll(c => !Owns(c.RunnerName));
@@ -196,6 +201,18 @@ public static class RunnerCollection
         List<CardData> all = new List<CardData>(owned);
         all.AddRange(loans);
         return all;
+    }
+
+    // Lends these runners too for this round (a relay with women's or men's legs, or a max average overall, that
+    // the player's own runners can't fill). Gone after the round like the other loans.
+    public static void Lend(List<CardData> cards)
+    {
+        if (cards == null || cards.Count == 0) return;
+        if (loans == null) loans = new List<CardData>();
+        foreach (CardData card in cards)
+        {
+            if (card != null && !Owns(card.RunnerName) && !loans.Exists(c => c.RunnerName == card.RunnerName)) loans.Add(card);
+        }
     }
 
     // Adds one copy from a pack. Returns true when the runner is new to the collection.

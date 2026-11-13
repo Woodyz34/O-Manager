@@ -108,26 +108,57 @@ public class RelayRace : MonoBehaviour, IRaceStats
 
     // ---- Picking the runners ----
 
-    // Called when the choose-runner panel opens at the start of the competition
+    // Called when the choose-runner panel opens at the start of the competition. The cards for leg 1 are made here
+    // too, so the leg's women/men rule and the max average overall count from the first pick.
     public void BeginPicking()
     {
         picks.Clear();
-        RefreshPickHeader();
+        pool = null;
+        ShowCardsForNextPick();
     }
 
     // A card was clicked. Returns true when every leg has a runner and the competition can go on.
     public bool PickRunner(CardDisplay card)
     {
         CardData data = card.CardData ?? RunnerCards.Find(card.runnerName);
-        if (data == null) return false;
+        if (data == null || picks.Count >= course.legs) return false;
+        // Only cards shown for this leg can be clicked, but check again: the leg's rule and what is left of the max
+        if (!RunnerRules.Allowed(data, Pool(), picks, LegSexes, RunnerRules.Cap) && AnyAllowed())
+        {
+            UIToast.Show(data.RunnerName + " can't run leg " + (picks.Count + 1) + ".", 3f);
+            return false;
+        }
         picks.Add(data);
         if (picks.Count < course.legs)
         {
             ShowCardsForNextPick();
             return false;
         }
+        RunnerFilterBar.ClearRules();
         if (pickHeader != null) pickHeader.transform.parent.gameObject.SetActive(false);
         return true;
+    }
+
+    // The runners the team picks from (without "Same stats" values): the player's own (and lent) runners in
+    // "Your runners", the runners out of the packs in "Open packs", else every runner in the packs
+    List<CardData> pool;
+    List<CardData> Pool()
+    {
+        if (pool != null) return pool;
+        if (RunnerRules.OpenPacksRound && RunnerRules.Opened.Count > 0) pool = new List<CardData>(RunnerRules.Opened);
+        else if (pathfinding.YourRunnersMode) pool = RunnerRules.YourRunnersPool(LegSexes, RunnerRules.Cap);
+        else pool = RunnerCards.InPacks();
+        if (pool.Count == 0) pool = RunnerCards.InPacks();
+        return pool;
+    }
+
+    List<LegSex> legSexes;
+    List<LegSex> LegSexes => legSexes ?? (legSexes = RunnerRules.LegSexes(course));
+
+    bool AnyAllowed()
+    {
+        List<CardData> all = Pool();
+        return all.Exists(c => RunnerRules.Allowed(c, all, picks, LegSexes, RunnerRules.Cap));
     }
 
     void ShowCardsForNextPick()
@@ -136,32 +167,28 @@ public class RelayRace : MonoBehaviour, IRaceStats
         if (cards == null) return;
         foreach (Transform child in cards.parent.transform) Destroy(child.gameObject);
 
-        // Runners not picked yet, or everyone again when there are more legs than runners.
-        // In "Your runners" only the player's own runners can be picked, each once.
-        List<CardData> all = pathfinding.YourRunnersMode ? RunnerCollection.CardsForRace() : RunnerCards.InPacks();
-        if (all.Count == 0) all = RunnerCards.InPacks();
-        // "Same stats": this leg's values (a relay can have other values on each leg)
-        all = GameModes.WithSameStats(all, picks.Count);
-        // By name: with other values on each leg, the same runner is another copy on every leg
-        List<CardData> left = all.FindAll(c => !picks.Exists(p => p.RunnerName == c.RunnerName));
+        // Runners not picked yet that may run this leg (women's/men's leg, and with a max average overall the legs
+        // after it must still be possible), or everyone again when there are more legs than runners.
+        List<CardData> all = Pool();
+        List<CardData> left = all.FindAll(c => RunnerRules.Allowed(c, all, picks, LegSexes, RunnerRules.Cap));
+        // Nothing fits (should not happen: loans fill up "Your runners"): the leg's rule still counts if it can
+        if (left.Count == 0) left = all.FindAll(c => RunnerRules.Fits(c, LegSexes[picks.Count]));
         if (left.Count == 0) left = new List<CardData>(all);
-        bool showAll = pathfinding.ChooseWhomeverYouWantMode || pathfinding.YourRunnersMode;
-        List<CardData> show = new List<CardData>(left);
-        if (pathfinding.ChooseRunnerOf3Mode && !showAll)
-        {
-            show.Clear();
-            while (show.Count < 3 && left.Count > 0)
-            {
-                int k = Random.Range(0, left.Count);
-                show.Add(left[k]);
-                left.RemoveAt(k);
-            }
-        }
-        foreach (CardData data in show)
+        // "Same stats": this leg's values (a relay can have other values on each leg)
+        left = GameModes.WithSameStats(left, picks.Count);
+
+        // A women's or men's leg shows only them; an open leg in "Open packs" shows both
+        LegSex sex = LegSexes[picks.Count];
+        RunnerFilterBar.SexRule = sex == LegSex.Women ? true : sex == LegSex.Men ? false : (bool?)null;
+        RunnerFilterBar.BothSexes = sex == LegSex.Any && RunnerRules.OpenPacksRound;
+
+        foreach (CardData data in left)
         {
             GameObject cardObject = Instantiate(cards.CardPrefab, cards.parent.transform);
             cardObject.GetComponent<CardDisplay>().SetValues(data);
+            cards.MarkCard(cardObject.transform, data);
         }
+        RunnerFilterBar.NotifyAll();
         RefreshPickHeader();
     }
 
@@ -200,10 +227,15 @@ public class RelayRace : MonoBehaviour, IRaceStats
         }
         pickHeader.transform.parent.gameObject.SetActive(true);
         string team = picks.Count > 0 ? "\n<size=90%><color=#5B7563>Team so far:  " + PickedList() + "</color></size>" : "\n<size=90%><color=#5B7563>Speed decides how long a runner can hang on to someone faster.</color></size>";
+        // Women's or men's leg, and the max average overall
+        LegSex sex = LegSexes[Mathf.Clamp(picks.Count, 0, LegSexes.Count - 1)];
+        string rules = sex != LegSex.Any ? "   <color=#E8742A>" + (sex == LegSex.Women ? "Women only" : "Men only") + "</color>" : "";
+        string cap = RunnerRules.CapText(picks, course.legs);
+        if (cap.Length > 0) rules += "   <color=#E8742A>" + cap + "</color>";
         // "Same stats": the values every runner gets on this leg
         Vector2Int? values = GameModes.SameStatsForLeg(picks.Count);
         string stats = values != null ? "   <color=#E8742A>Speed " + values.Value.x + ", technique " + values.Value.y + "</color>" : "";
-        pickHeader.text = "<b><size=120%>" + LegDescription(picks.Count) + "</size></b>" + stats + team;
+        pickHeader.text = "<b><size=120%>" + LegDescription(picks.Count) + "</size></b>" + stats + rules + team;
     }
 
     string PickedList()

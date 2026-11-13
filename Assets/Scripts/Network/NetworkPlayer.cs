@@ -580,6 +580,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         // A relay gets one pair of values per leg.)
         bool sameStats = GameModes.TryGetSameStatsLegs(effectiveGameMode, out List<Vector2Int> sameStatsLegs);
         GameModes.SameStatsLegs = sameStats ? sameStatsLegs : null;
+        // Max average overall and "Open packs" (RunnerRules)
+        RunnerRules.BeginRound(effectiveGameMode);
+        RunnerFilterBar.ClearRules();
 
         // Route analysis: nobody picks a runner, everyone runs with the same one
         if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteAnalysis) && RelayRace.Active == null)
@@ -592,6 +595,30 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteChoice) && RelayRace.Active == null)
         {
             RouteChoiceGame.Begin(this);
+            return;
+        }
+
+        // "Open packs": first the packs, then the usual picking among the runners that came out of them
+        if (Object.HasStateAuthority && RunnerRules.OpenPacksRound)
+        {
+            manager.ChooseRunnerPanel.SetActive(false);
+            OpenPacks.Begin(RelayRace.Active != null ? RelayRace.Active.Course : null, () =>
+            {
+                if (this == null || manager == null) return;
+                manager.ChooseRunnerPanel.SetActive(true);
+                if (RelayRace.Active != null)
+                {
+                    RelayRace.Active.BeginPicking();
+                }
+                else
+                {
+                    // Women and men alike: the runner from the pack is shown whoever it is
+                    RunnerFilterBar.BothSexes = true;
+                    FindObjectOfType<CardManager>().ShowCards(RunnerRules.Opened);
+                    RunnerFilterBar.NotifyAll();
+                    if (IndividualRace.Active != null) IndividualRace.Active.ShowPickInfo(manager.ChooseRunnerPanel);
+                }
+            });
             return;
         }
 
