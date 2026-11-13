@@ -42,6 +42,8 @@ public class CameraController : MonoBehaviour
     [SerializeField] private float followCamSize = 3f;
     private bool followRunner = false;
     private bool wasFollowing = false;
+    // Set by the TV production (TvViewer): a place the following camera shows in place of the player's own runner
+    public static Vector3? LookHere;
     private AgentMovement agent;
     private Button followButton;
     private TextMeshProUGUI followButtonText;
@@ -164,7 +166,9 @@ public class CameraController : MonoBehaviour
             return;
         }
         // Efter att löparen har flyttats i Update, så att kameran inte ligger en bildruta efter
-        cam.transform.position = new Vector3(transform.position.x, transform.position.y, -10f);
+        // In a TV production the map goes to where something happens (another team's mistake) and back again
+        Vector3 look = LookHere ?? transform.position;
+        cam.transform.position = new Vector3(look.x, look.y, -10f);
     }
 
     // Löparen springer (eller väntar på de andra) och spelaren ritar inte just nu
