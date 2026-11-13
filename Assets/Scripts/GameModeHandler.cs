@@ -46,8 +46,7 @@ public static class GameModes
     public const char CapMark = '#';
     public const int MinCap = 40, MaxCap = 99, DefaultCap = 75;
 
-    // Single player offers all but Same stats; the lobby all four
-    public static readonly string[] Pools = { YourRunners, ChooseAny, OpenPacksMode };
+    // The runner pools offered in the lobby and, since 2026-11-13, in single player too
     public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode, OpenPacksMode };
 
     // The whole scale (2026-11-13, the user wanted every value). Speed 0 would never reach the finish, so it starts at 1.

@@ -23,6 +23,21 @@ public static class ExtraModes
 {
     public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.SecretTask, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis, ExtraMode.RouteChoice };
 
+    // Every mode, for "show them all"
+    public static ExtraMode AllMask
+    {
+        get
+        {
+            ExtraMode all = ExtraMode.None;
+            foreach (ExtraMode mode in All) all |= mode;
+            return all;
+        }
+    }
+
+    // Modes that can be played alone in single player (2026-11-13). The imposter modes need someone to fool, a bear
+    // you hid yourself is no surprise, and a control you moved yourself is no trick.
+    public const ExtraMode Solo = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+
     // Modes that cannot be combined with any other mode
     public const ExtraMode Alone = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
@@ -167,9 +182,11 @@ public static class ExtraModes
         NetworkPlayer local = NetworkPlayer.Local;
         if (local != null && local.Runner != null && local.Runner.GameMode == GameMode.Single)
         {
-            // A single player game has no lobby, so no extra modes
+            // A single player game has no lobby: the modes come from the single player page
             known = true;
-            active = ExtraMode.None;
+            active = SinglePlayerMenu.ChosenModes & Solo;
+            if (RelayRace.Active != null) active &= ~IndividualOnly;
+            if (CourseLoader.Loaded != null && CourseLoader.Loaded.IsSprint()) active &= ~ForestOnly;
             return;
         }
         foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))

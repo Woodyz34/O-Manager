@@ -166,6 +166,17 @@ public static class CompetitionFlow
         NetworkPlayer.Local.RPC_RevealImposter();
     }
 
+    // The host's button text for going back after a race: the lobby, or the single player page
+    public static string BackButtonText
+    {
+        get
+        {
+            NetworkPlayer local = NetworkPlayer.Local;
+            bool single = local != null && local.Runner != null && local.Runner.GameMode == GameMode.Single;
+            return single ? "Back to single player" : "Back to the lobby";
+        }
+    }
+
     public static void HostReturnToLobby()
     {
         if (!LocalIsHost())
