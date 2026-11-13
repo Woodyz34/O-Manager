@@ -604,9 +604,20 @@ public class AgentMovement : NetworkBehaviour
 
             }
             lastPos = currentPos;
-            // Hanging on to someone in a relay: punch the control on the way through, once the leader has
-            if (hanging && controlDistance <= 0.3f && packRunning.LeaderPassed(currentKontroll) && RelayRace.Active != null)
+            // Hanging on to someone in a relay: punch the control on the way through, once the leader has.
+            // Right at the flag (15 m) the runner punches anyway, and a runner that came within 30 m punches as soon
+            // as the leader's punch is known (it can come late over the network), up to 60 m on.
+            if (hanging)
             {
+                if (hangControl != currentKontroll) { hangControl = currentKontroll; hangClosest = float.MaxValue; }
+                hangClosest = Mathf.Min(hangClosest, controlDistance);
+            }
+            if (hanging && RelayRace.Active != null
+                && (controlDistance <= 0.15f
+                    || (packRunning.LeaderPassed(currentKontroll) && (controlDistance <= 0.3f || (hangClosest <= 0.3f && controlDistance <= 0.6f)))))
+            {
+                if (controlDistance > 0.3f || !packRunning.LeaderPassed(currentKontroll))
+                    Debug.Log("PackRunning: punched control " + currentKontroll + " while hanging on, " + Mathf.RoundToInt(controlDistance * 100f) + " m from it");
                 RelayRace.Active.OnControlReached(this);
                 ClearMissState();
                 if (hasFinished || WaitingForAllPlayersToReachKontroll) return;
@@ -1718,6 +1729,8 @@ public class AgentMovement : NetworkBehaviour
     }
 
     bool findingControl;
+    int hangControl = -1;          // the control the closest distance below is for
+    float hangClosest = float.MaxValue;   // how close to it the runner has come while hanging on
 
     IEnumerator FindControlAloneRoutine()
     {

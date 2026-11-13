@@ -96,8 +96,13 @@ public class TvWorld
     public float[] ground;              // size * size heights, [j * size + i], i east and j north
     public readonly List<TvMesh> meshes = new List<TvMesh>();
     public readonly List<TvSolid> solids = new List<TvSolid>();
-    // Fallen trunks a runner jumps over rather than going round: ax, az, bx, bz for each
+    // Fallen trunks, stone walls and fences a runner jumps over rather than going round: ax, az, bx, bz, height for each
     public readonly List<float> logs = new List<float>();
+
+    public void AddHurdle(float ax, float az, float bx, float bz, float height)
+    {
+        logs.Add(ax); logs.Add(az); logs.Add(bx); logs.Add(bz); logs.Add(height);
+    }
     // The control flag's stand and the punching unit on top of it
     public float flagX, flagZ, unitX, unitY, unitZ;
     public bool hasUnit = true;         // false at the start of a leg: nothing to punch
@@ -106,18 +111,20 @@ public class TvWorld
     public int trees, rocks, tufts;
     public long vertices, triangles;
 
-    // 0 away from every fallen trunk, rising to 1 right over one: how high in the jump a runner here is
-    public float Hurdle(float x, float z)
+    // 0 away from every hurdle, rising to 1 right over one: how far into the jump a runner here is; height: how high it is
+    public float Hurdle(float x, float z, out float height)
     {
         float best = 1f;
-        for (int i = 0; i + 3 < logs.Count; i += 4)
+        height = 0f;
+        for (int i = 0; i + 4 < logs.Count; i += 5)
         {
             float ax = logs[i], az = logs[i + 1], dx = logs[i + 2] - ax, dz = logs[i + 3] - az, l2 = dx * dx + dz * dz;
             float t = l2 > 1e-6f ? ((x - ax) * dx + (z - az) * dz) / l2 : 0f;
             if (t < -0.05f || t > 1.05f) continue;
             t = t < 0f ? 0f : t > 1f ? 1f : t;
-            float ex = ax + dx * t - x, ez = az + dz * t - z, d = (float)Math.Sqrt(ex * ex + ez * ez) / 0.85f;
-            if (d < best) best = d;
+            float h = logs[i + 4];
+            float ex = ax + dx * t - x, ez = az + dz * t - z, d = (float)Math.Sqrt(ex * ex + ez * ez) / (0.75f + h * 0.4f);
+            if (d < best) { best = d; height = h; }
         }
         return best >= 1f ? 0f : (float)Math.Sin((1f - best) * Math.PI / 2);
     }
@@ -171,6 +178,7 @@ public class TvWorldBuilder
     TvColor[] trackColor;
     float[] clear;                      // metres to the nearest path, road, wall or stream edge (large = none near)
     float[] water;                      // how much stream water shows
+    float[] bog;                        // how wet a narrow marsh strip makes the ground
     float[] soil;                       // bare earth (banks, ditches)
     float baseHeight;
 
@@ -283,6 +291,7 @@ public class TvWorldBuilder
         trackColor = new TvColor[N * N];
         clear = new float[N * N];
         water = new float[N * N];
+        bog = new float[N * N];
         soil = new float[N * N];
         for (int i = 0; i < clear.Length; i++) clear[i] = 99f;
 
@@ -290,6 +299,7 @@ public class TvWorldBuilder
         rockMesh = new TvMesh { name = "Rocks" };
         thingMesh = new TvMesh { name = "Things" };
         wireMesh = new TvMesh { name = "Wires", castShadows = false };
+        waterMesh = new TvMesh { name = "Water", castShadows = false };
         treeMeshes = new TvMesh[TreeTiles * TreeTiles];
         tuftMeshes = new TvMesh[TreeTiles * TreeTiles];
         for (int i = 0; i < treeMeshes.Length; i++)
@@ -302,6 +312,7 @@ public class TvWorldBuilder
         Heights();
         Tracks();
         Ground();
+        Waters();
         Stones();
         Structures();
         ControlFlag();
@@ -313,6 +324,7 @@ public class TvWorldBuilder
         world.meshes.Add(groundMesh);
         world.meshes.Add(rockMesh);
         world.meshes.Add(thingMesh);
+        if (waterMesh.VertexCount > 0) world.meshes.Add(waterMesh);
         if (wireMesh.VertexCount > 0) world.meshes.Add(wireMesh);
         foreach (TvMesh m in treeMeshes) if (m.VertexCount > 0) world.meshes.Add(m);
         foreach (TvMesh m in tuftMeshes) if (m.VertexCount > 0) world.meshes.Add(m);
@@ -371,6 +383,12 @@ public class TvWorldBuilder
                 case WorldLineKind.Ditch: Groove(c, -0.45f, 1.3f, 0.7f, false); break;
                 case WorldLineKind.SmallStream: Groove(c, -0.4f, 1.5f, 0.3f, true, 0.45f); break;
                 case WorldLineKind.Stream: Groove(c, -0.6f, 2.6f, 0.3f, true, 1.0f); break;
+                case WorldLineKind.NarrowMarsh:
+                    // A narrow marsh: a shallow wet strip with pools here and there
+                    Groove(c, -0.12f, 1.6f, 0f, false);
+                    for (int q = 0; q + 3 < c.Length; q += 2)
+                        ForNear(c[q], c[q + 1], c[q + 2], c[q + 3], 2.5f, (k, d, qx, qz) => bog[k] = Math.Max(bog[k], 1f - Sm(0.6f, 1.8f, d)));
+                    break;
             }
         }
 
@@ -379,7 +397,10 @@ public class TvWorldBuilder
         {
             for (int i = 0; i < N; i++)
             {
-                if (Base(CellAt(i - R, j - R)) == WorldCell.Water) F[j * N + i] -= 0.45f;
+                byte cell = CellAt(i - R, j - R);
+                if (Base(cell) == WorldCell.Water) F[j * N + i] -= 0.45f;
+                // Pools in a marsh are hollows with water in them
+                else if (MarshPool(i - R - 0.5f, j - R - 0.5f, (cell & WorldCell.Marsh) != 0, bog[j * N + i])) F[j * N + i] -= 0.3f;
             }
         }
     }
@@ -573,6 +594,7 @@ public class TvWorldBuilder
                 if (!hard)
                 {
                     if ((cell & WorldCell.Marsh) != 0) c = c.Lerp(MarshColor, 0.85f).Lerp(Wet, Sm(0.62f, 0.8f, f2) * 0.8f);
+                    if (bog[k] > 0f) c = c.Lerp(MarshColor, bog[k] * 0.85f).Lerp(Wet, bog[k] * Sm(0.5f, 0.75f, f2) * 0.8f);
                     if ((cell & (WorldCell.Stony | WorldCell.Boulders)) != 0) c = c.Lerp(Rock, 0.25f + f2 * 0.3f);
                     if (soil[k] > 0f) c = c.Lerp(Soil, soil[k]);
                     if (trackBlend[k] > 0f) c = c.Lerp(trackColor[k], trackBlend[k]);
@@ -597,6 +619,81 @@ public class TvWorldBuilder
                 groundMesh.triangles.Add(a + 1); groundMesh.triangles.Add(a + N); groundMesh.triangles.Add(a + N + 1);
             }
         }
+    }
+
+    // ---- Water: a still surface on lakes, ponds and streams; pools of open water in marshes and along marsh strips ----
+
+    TvMesh waterMesh;
+
+    void Waters()
+    {
+        TvColor deep = TvColor.Hex("#34495a"), sky = TvColor.Hex("#6c8594"), bogC = TvColor.Hex("#3a4848");
+        // Which 1 m squares hold water, and what kind: 1 lake, 2 stream, 3 marsh pool
+        var kind = new byte[N * N];
+        for (int j = 0; j < N - 1; j++)
+        {
+            for (int i = 0; i < N - 1; i++)
+            {
+                int a = j * N + i;
+                float x = i - R, z = j - R;
+                byte cell = CellAt(x + 0.5f, z + 0.5f);
+                if (Base(cell) == WorldCell.Water) { kind[a] = 1; continue; }
+                float wet = Math.Max(Math.Max(water[a], water[a + 1]), Math.Max(water[a + N], water[a + N + 1]));
+                if (wet > 0.55f) { kind[a] = 2; continue; }
+                float strip = Math.Max(Math.Max(bog[a], bog[a + 1]), Math.Max(bog[a + N], bog[a + N + 1]));
+                if (MarshPool(x, z, (cell & WorldCell.Marsh) != 0 && Base(cell) != WorldCell.Building, strip)) kind[a] = 3;
+            }
+        }
+        // One level for every corner: the lowest ground round it, so the surface is smooth and lies below the banks
+        var level = new float[N * N];
+        for (int j = 0; j < N; j++)
+        {
+            for (int i = 0; i < N; i++)
+            {
+                float lo = float.MaxValue;
+                for (int dj = -2; dj <= 2; dj++)
+                    for (int di = -2; di <= 2; di++)
+                    {
+                        int ii = i + di, jj = j + dj;
+                        if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
+                        lo = Math.Min(lo, F[jj * N + ii]);
+                    }
+                level[j * N + i] = lo;
+            }
+        }
+        var corner = new int[N * N];
+        for (int i = 0; i < corner.Length; i++) corner[i] = -1;
+        for (int j = 0; j < N - 1; j++)
+        {
+            for (int i = 0; i < N - 1; i++)
+            {
+                int a = j * N + i;
+                byte k = kind[a];
+                if (k == 0) continue;
+                float lift = k == 1 ? 0.3f : k == 2 ? 0.12f : 0.12f;
+                int V(int ci, int cj)
+                {
+                    int q = cj * N + ci;
+                    if (corner[q] >= 0) return corner[q];
+                    float x = ci - R, z = cj - R;
+                    // The sky shows in the water in broad streaks; marsh pools are dark and brown
+                    float glint = TvRandom.Noise(x * 0.12f + 3f, z * 0.05f);
+                    TvColor c = k == 3 ? bogC.Shade(0.9f + 0.2f * glint) : deep.Lerp(sky, 0.15f + 0.45f * glint);
+                    corner[q] = waterMesh.Vertex(x, level[q] + lift, z, 0f, 1f, 0f, c);
+                    return corner[q];
+                }
+                int v0 = V(i, j), v1 = V(i + 1, j), v2 = V(i, j + 1), v3 = V(i + 1, j + 1);
+                waterMesh.triangles.Add(v0); waterMesh.triangles.Add(v2); waterMesh.triangles.Add(v1);
+                waterMesh.triangles.Add(v1); waterMesh.triangles.Add(v2); waterMesh.triangles.Add(v3);
+            }
+        }
+    }
+
+    // Open water in a marsh or a narrow marsh strip: where the noise is high
+    bool MarshPool(float x, float z, bool marsh, float strip)
+    {
+        float n = TvRandom.Patches(x * 0.13f + 11f, z * 0.13f - 4f) + TvRandom.Noise(x * 0.6f, z * 0.6f) * 0.1f;
+        return (marsh && n > 0.6f) || (strip > 0.55f && TvRandom.Patches(x * 0.3f + 11f, z * 0.3f - 4f) > 0.38f);
     }
 
     float H(float x, float z)
@@ -1037,8 +1134,9 @@ public class TvWorldBuilder
                             }
                             world.rocks += 2;
                         }
-                        world.solids.Add(new TvSolid { x = x, z = z, r = 0.45f });
                     });
+                    // Runners jump a stone wall rather than going round it
+                    for (int q = 0; q + 3 < c.Length; q += 2) world.AddHurdle(c[q], c[q + 1], c[q + 2], c[q + 3], ruined ? 0.4f : 0.8f);
                     break;
                 }
                 case WorldLineKind.Fence:
@@ -1062,6 +1160,7 @@ public class TvWorldBuilder
                         }
                         lastX = x; lastY = y; lastZ = z;
                     });
+                    for (int q = 0; q + 3 < c.Length; q += 2) world.AddHurdle(c[q], c[q + 1], c[q + 2], c[q + 3], ruined ? 0.6f : 1f);
                     break;
                 }
                 case WorldLineKind.HighFence:
@@ -1095,7 +1194,7 @@ public class TvWorldBuilder
                         if (!Inside(ax, az, 2f) || !Inside(bx, bz, 2f)) continue;
                         Bar(thingMesh, ax, H(ax, az) + 0.2f, az, bx, H(bx, bz) + 0.2f, bz, 0.19f, 0.13f, 6, TvColor.Hex("#5e5346"));
                         // Runners jump over a fallen trunk, so it is not a solid to go round
-                        world.logs.Add(ax); world.logs.Add(az); world.logs.Add(bx); world.logs.Add(bz);
+                        world.AddHurdle(ax, az, bx, bz, 0.4f);
                     }
                     break;
                 case WorldLineKind.PowerLine:
@@ -1259,7 +1358,7 @@ public class TvWorldBuilder
                     // The trunk lies away from the plate
                     float tx = (float)Math.Sin(yaw), tz = (float)Math.Cos(yaw);
                     Bar(thingMesh, x + tx * 0.3f, y + 0.55f, z + tz * 0.3f, x + tx * 7f, H(x + tx * 7f, z + tz * 7f) + 0.2f, z + tz * 7f, 0.2f, 0.12f, 6, TvColor.Hex("#5e5346"));
-                    world.logs.Add(x + tx * 1.2f); world.logs.Add(z + tz * 1.2f); world.logs.Add(x + tx * 7f); world.logs.Add(z + tz * 7f);
+                    world.AddHurdle(x + tx * 1.2f, z + tz * 1.2f, x + tx * 7f, z + tz * 7f, 0.4f);
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.9f });
                     break;
                 }
@@ -1720,7 +1819,10 @@ public class TvWorldBuilder
             if (ClearAt(x, z) < 0.3f) continue;
             float cx = x - world.camX, cz = z - world.camZ;
             if (cx * cx + cz * cz < 6.25f) continue;   // nothing in front of the TV camera's lens
-            bool marsh = (cell & WorldCell.Marsh) != 0, open = kind == WorldCell.Open || kind == WorldCell.OpenTrees || kind == WorldCell.Plot;
+            int gi = (int)Math.Round(x) + R, gj = (int)Math.Round(z) + R;
+            float strip = gi >= 0 && gj >= 0 && gi < N && gj < N ? bog[gj * N + gi] : 0f;
+            if (MarshPool((float)Math.Floor(x), (float)Math.Floor(z), (cell & WorldCell.Marsh) != 0, strip)) continue;   // open water
+            bool marsh = (cell & WorldCell.Marsh) != 0 || strip > 0.4f, open = kind == WorldCell.Open || kind == WorldCell.OpenTrees || kind == WorldCell.Plot;
             bool roughOpen = kind == WorldCell.RoughOpen || kind == WorldCell.RoughOpenTrees;
             float rough = TvRandom.Patches(x * 0.07f + 20f, z * 0.07f + 11f) + amount + ((cell & WorldCell.Undergrowth) != 0 ? 0.3f : 0f);
             TvShape shape;
