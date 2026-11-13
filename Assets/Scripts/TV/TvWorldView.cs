@@ -103,7 +103,8 @@ public class TvWorldView : MonoBehaviour
     }
 
     // Builds the world of a control. The heavy part runs on a background thread; returns null when the map has none.
-    public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control, bool start = false, float camDirX = 0f, float camDirZ = 0f)
+    public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control, bool start = false, float camDirX = 0f, float camDirZ = 0f,
+                                                  float legDirX = 0f, float legDirZ = 0f)
     {
         TvWorldData.Data data = await TvWorldData.LoadAsync(map);
         if (data == null) return null;
@@ -118,7 +119,9 @@ public class TvWorldView : MonoBehaviour
             seed = 1,
             start = start,
             camDirX = camDirX,
-            camDirZ = camDirZ
+            camDirZ = camDirZ,
+            legDirX = legDirX,
+            legDirZ = legDirZ
         };
         var watch = System.Diagnostics.Stopwatch.StartNew();
         TvWorld world = await Task.Run(() => TvWorldBuilder.Build(input));

@@ -81,6 +81,7 @@ public class TvWorldInput
     public int seed = 1;
     public float camDirX, camDirZ;      // where the TV camera should stand, as a direction from the control (0, 0 = anywhere)
     public bool start;                  // the start of a leg and not a control: no flag and no punching unit
+    public float legDirX, legDirZ;      // at the start: the way the first leg goes (0, 0 = not known)
 }
 
 // Something a runner cannot run through: a stone, a tree trunk, a pole
@@ -1608,10 +1609,13 @@ public class TvWorldBuilder
         float bestScore = float.MaxValue, bx = 9f, bz = -9f;
         float y0 = H(world.flagX, world.flagZ);
         bool wish = input.camDirX != 0f || input.camDirZ != 0f;
-        for (int k = 0; k < 48; k++)
+        // At the start the camera may stand further off, up on a rise or a stone, looking down the first leg
+        bool start = input.start && (input.legDirX != 0f || input.legDirZ != 0f);
+        int rings = start ? 3 : 2;
+        for (int k = 0; k < 24 * rings; k++)
         {
-            float a = (k / 2) / 24f * 6.2831853f, dx = (float)Math.Cos(a), dz = (float)Math.Sin(a);
-            float far = k % 2 == 0 ? 10f : 13f;
+            float a = (k / rings) / 24f * 6.2831853f, dx = (float)Math.Cos(a), dz = (float)Math.Sin(a);
+            float far = start ? 10f + 4f * (k % rings) : k % 2 == 0 ? 10f : 13f;
             float x = world.flagX + dx * far, z = world.flagZ + dz * far;
             float score = far > 10f ? 0.5f : 0f;
             // The side the course asks for: where the runners come in and go out in front of the camera
@@ -1623,7 +1627,25 @@ public class TvWorldBuilder
             }
             // A spot a little above the control sees it best; a spot in a hollow or on water does not
             float dy = H(x, z) - y0;
-            score += Math.Abs(dy - 1f) * 2f;
+            if (start)
+            {
+                // The higher the better, and a clear view 40 m down the first leg
+                score -= Math.Min(dy, 3f) * 1.5f;
+                float tx = world.flagX + input.legDirX * 40f, tz = world.flagZ + input.legDirZ * 40f;
+                foreach (TvSolid s in world.solids)
+                    if (DistSeg(s.x, s.z, x, z, tx, tz, out _, out _) < s.r + 0.8f) score += 1.5f;
+                // Ground in the way: the line of sight dips under a hill
+                for (float f = 0.2f; f < 1f; f += 0.2f)
+                {
+                    float sx = Lerp(x, tx, f), sz = Lerp(z, tz, f), sight = Lerp(H(x, z) + 1.6f, H(tx, tz) + 1f, f);
+                    if (H(sx, sz) > sight) score += 4f;
+                }
+                // A stone or a knoll right there to stand on
+                foreach (var p in points)
+                    if ((p.kind == WorldPointKind.Boulder || p.kind == WorldPointKind.LargeBoulder || p.kind == WorldPointKind.Knoll)
+                        && (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z) < 9f) { score -= 3f; break; }
+            }
+            else score += Math.Abs(dy - 1f) * 2f;
             int kind = Base(CellAt(x, z));
             if (kind == WorldCell.Water || kind == WorldCell.Building) score += 50f;
             if (ClearAt(x, z) < 0.5f) score += 2f;

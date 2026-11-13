@@ -41,6 +41,7 @@ public class TvDirector : MonoBehaviour
         public float lastUsed = -999f;
         public bool off;                       // not in use on this leg
         public float camE, camN;               // the side of the spot the TV camera should stand on (0, 0 = anywhere)
+        public float legE, legN;               // at the start: the way the first leg goes
         public int ordinal = -1;               // its number among the leg's common points, for the split times
         // The producer's notes for the leg
         internal readonly Dictionary<IPackRunner, Pass> passes = new Dictionary<IPackRunner, Pass>();
@@ -237,7 +238,18 @@ public class TvDirector : MonoBehaviour
         }
         Vector2 back = i > 0 ? Way(i, i - 1) : Vector2.zero, on = i < points.Count - 1 ? Way(i, i + 1) : Vector2.zero;
         Vector2 side;
-        if (back == Vector2.zero || on == Vector2.zero) side = -(back + on);
+        spot.legE = spot.legN = 0f;
+        if (back == Vector2.zero && on != Vector2.zero)
+        {
+            // The start: a little ahead and to the sunny side, so the camera sees the runners set off and run on
+            // down the first leg instead of only their backs
+            Vector2 across = new Vector2(-on.y, on.x);
+            if (across.x * 0.55f - across.y * 0.5f < 0f) across = -across;
+            side = on * 0.75f + across * 0.65f;
+            spot.legE = on.x;
+            spot.legN = on.y;
+        }
+        else if (back == Vector2.zero || on == Vector2.zero) side = -(back + on);
         else
         {
             side = -(back + on);
@@ -669,7 +681,7 @@ public class TvDirector : MonoBehaviour
         TvWorldView made = null;
         try
         {
-            made = await TvWorldView.Create(map, spot.point, spot.start, spot.camE, spot.camN);
+            made = await TvWorldView.Create(map, spot.point, spot.start, spot.camE, spot.camN, spot.legE, spot.legN);
         }
         catch (System.Exception e)
         {
