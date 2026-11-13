@@ -54,7 +54,7 @@ namespace MapImport
         public const float NormalDark = 0.35f;
         public const float NormalMarsh = 0.8f;
         public const float NormalOpen = 1.15f;
-        public const float NormalRoughOpen = 0.95f;
+        public const float NormalRoughOpen = 0.8f;    // felled areas (hygge): branches and stumps
         public const float NormalPaved = 1.5f;
         public const float NormalRoad = 1.4f;      // a road (gravel); wide roads 1.5, vehicle tracks 1.35
         public const float NormalPath = 1.2f;      // a small path; footpaths 1.25
