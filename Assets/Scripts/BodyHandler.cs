@@ -27,8 +27,14 @@ public class BodyHandler : MonoBehaviour
 
     private void Start()
     {
+        // NetworkPlayer.Spawned runs before Start and may already have shown the player's networked colour.
+        // That is always the case for a player who was in the lobby before us (their colour is not a "change" we
+        // would see later), so painting the default blue here hid the host's colour from players who joined late.
+        if (applied) return;
         ApplyAppearance(currentIndex);
     }
+
+    bool applied;
 
     public void ApplyAppearance(int index)
     {
@@ -45,6 +51,7 @@ public class BodyHandler : MonoBehaviour
         draw.material = drawMaterials[index];
 
         currentIndex = index;
+        applied = true;
     }
 
     // The player's own colour on the dot, the trail and the drawn line
@@ -56,6 +63,7 @@ public class BodyHandler : MonoBehaviour
         Color line = color;
         line.a = drawMaterials.Count > 0 ? drawMaterials[0].color.a : 1f;
         if (drawMaterials.Count > 0) draw.material = new Material(drawMaterials[0]) { color = line };
+        applied = true;
     }
 
     public void NextAppearance()

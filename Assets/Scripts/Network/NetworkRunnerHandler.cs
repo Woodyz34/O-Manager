@@ -36,8 +36,8 @@ public class NetworkRunnerHandler : MonoBehaviour
         // Om inte, lägg till en standard
         if (sceneManager == null)
         {
-            sceneManager = runner.gameObject.AddComponent<NetworkSceneManagerDefault>();
-            Debug.Log("[NetworkRunnerHandler] Added NetworkSceneManagerDefault");
+            sceneManager = runner.gameObject.AddComponent<SafeNetworkSceneManager>();
+            Debug.Log("[NetworkRunnerHandler] Added SafeNetworkSceneManager");
         }
         else
         {

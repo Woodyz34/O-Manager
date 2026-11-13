@@ -200,7 +200,7 @@ public class SinglePlayerMenu : MonoBehaviour
         runner.name = "Single player runner";
         runner.ProvideInput = true;
         INetworkSceneManager sceneManager = runner.GetComponent<NetworkSceneManagerDefault>();
-        if (sceneManager == null) sceneManager = runner.gameObject.AddComponent<NetworkSceneManagerDefault>();
+        if (sceneManager == null) sceneManager = runner.gameObject.AddComponent<SafeNetworkSceneManager>();
         int sceneIndex = SceneUtility.GetBuildIndexByScenePath("Assets/Scenes/" + CourseScenes.Competition + ".unity");
         StartGameResult result = await runner.StartGame(new StartGameArgs
         {

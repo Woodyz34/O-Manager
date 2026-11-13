@@ -41,7 +41,8 @@ public static class GameModes
     public static readonly string[] Pools = { YourRunners, ChooseAny };
     public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode };
 
-    public const int MinSpeed = 40, MaxSpeed = 100, MinTechnique = 20, MaxTechnique = 100;
+    // The whole scale (2026-11-13, the user wanted every value). Speed 0 would never reach the finish, so it starts at 1.
+    public const int MinSpeed = 1, MaxSpeed = 100, MinTechnique = 0, MaxTechnique = 100;
     public const int MaxLegs = 10;
 
     public static string PoolName(string mode)

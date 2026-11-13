@@ -27,6 +27,9 @@ public static class SessionGuard
         Application.quitting -= OnQuitting;
         Application.quitting += OnQuitting;
         QuietKickLog.Install();
+        // Keep the game (and its network connection) running while another window has focus, so a second player
+        // in another window is not dropped by the game servers with DisconnectByServerTimeout
+        Application.runInBackground = true;
 #if UNITY_EDITOR
         // Several editors (clones) on one computer share the graphics card; capping the frame rate keeps the card from timing out
         QualitySettings.vSyncCount = 0;
@@ -52,13 +55,23 @@ public static class SessionGuard
 
         public void LogFormat(UnityEngine.LogType logType, UnityEngine.Object context, string format, params object[] args)
         {
-            if (logType == UnityEngine.LogType.Error && format != null && format.Contains("DisconnectMessage") && args != null && args.Length > 0
-                && (args[0] as string ?? "").Contains("Code: 104"))
+            if (logType == UnityEngine.LogType.Error && IsExpectedDisconnect(format, args))
                 logType = UnityEngine.LogType.Warning;
             inner.LogFormat(logType, context, format, args);
         }
 
         public void LogException(System.Exception exception, UnityEngine.Object context) { inner.LogException(exception, context); }
+
+        // The host leaving (Code: 104), or the game servers dropping the connection (a server timeout, e.g. when an
+        // editor clone sat in the background). Both are handled by SessionGuard.OnShutdown, so they are warnings.
+        static bool IsExpectedDisconnect(string format, object[] args)
+        {
+            if (format == null) return false;
+            string text = args != null && args.Length > 0 ? (args[0] as string ?? "") : "";
+            if (format.Contains("DisconnectMessage") && text.Contains("Code: 104")) return true;
+            string all = format + " " + text;
+            return all.Contains("Connection lost") && (all.Contains("DisconnectByServerTimeout") || all.Contains("DisconnectByClientTimeout"));
+        }
     }
 
     static void OnQuitting()
@@ -133,6 +146,10 @@ public static class SessionGuard
     {
         switch (reason)
         {
+            case ShutdownReason.PhotonCloudTimeout:
+                return connecting
+                    ? "The game servers did not answer in time. Check the internet connection and try again."
+                    : "The connection to the game timed out, so you are back in the menu. Check the internet connection.";
             case ShutdownReason.GameIsFull:
                 return "That lobby is full.";
             case ShutdownReason.GameClosed:
