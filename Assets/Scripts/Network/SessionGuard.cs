@@ -50,15 +50,15 @@ public static class SessionGuard
             Debug.unityLogger.logHandler = instance;
         }
 
-        public void LogFormat(LogType logType, Object context, string format, params object[] args)
+        public void LogFormat(UnityEngine.LogType logType, UnityEngine.Object context, string format, params object[] args)
         {
-            if (logType == LogType.Error && format != null && format.Contains("DisconnectMessage") && args != null && args.Length > 0
+            if (logType == UnityEngine.LogType.Error && format != null && format.Contains("DisconnectMessage") && args != null && args.Length > 0
                 && (args[0] as string ?? "").Contains("Code: 104"))
-                logType = LogType.Warning;
+                logType = UnityEngine.LogType.Warning;
             inner.LogFormat(logType, context, format, args);
         }
 
-        public void LogException(System.Exception exception, Object context) { inner.LogException(exception, context); }
+        public void LogException(System.Exception exception, UnityEngine.Object context) { inner.LogException(exception, context); }
     }
 
     static void OnQuitting()
