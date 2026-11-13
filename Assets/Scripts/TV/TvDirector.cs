@@ -347,6 +347,7 @@ public class TvDirector : MonoBehaviour
         {
             current = on;
             shotStart = now;
+            if (on != null && on.view != null) on.view.NewShot();
             Subject = null;
         }
         SetPace(shot != 0);
@@ -379,7 +380,7 @@ public class TvDirector : MonoBehaviour
         Vector3? subject = view.ShowRunners(runners);
         // The camera stays on the control until the runner is near enough to be seen coming
         RunnerInPicture = nearest < 40f;
-        Subject = RunnerInPicture ? subject : null;
+        Subject = subject;
     }
 
     // ---- The producer (host) ----
@@ -646,6 +647,8 @@ public class TvDirector : MonoBehaviour
             if (player.relaySplitLeg != producedLeg || player.relaySplitCount <= current.ordinal || current.ordinal >= player.relaySplits.Length) continue;
             int seconds = player.relaySplits[current.ordinal];
             if (seconds <= 0) continue;
+            // The time comes up when the runner is seen punching, not a moment before
+            if (current.view != null && current.view.PunchToCome(runner)) continue;
             into.Add(new Split { name = player.RunnerLabel, color = ColorOf(runner), seconds = seconds });
         }
         into.Sort((a, b) => a.seconds.CompareTo(b.seconds));

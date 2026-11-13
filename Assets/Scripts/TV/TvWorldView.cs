@@ -31,6 +31,14 @@ public class TvWorldView : MonoBehaviour
     Vector3 lookAt;
     float tvFov = 34f;
     Vector3 camShift;
+    bool hadSubject;
+
+    // A new shot: the camera goes straight to the first runner
+    public void NewShot()
+    {
+        hadSubject = false;
+        camShift = Vector3.zero;
+    }
     // Free camera: turns round a point
     Vector3 orbitTarget;
     float yaw, pitch = 18f, distance = 14f;
@@ -283,6 +291,12 @@ public class TvWorldView : MonoBehaviour
     readonly HashSet<object> seen = new HashSet<object>();
     readonly List<object> gone = new List<object>();
     bool punching;
+    // The runner's figure is in the picture and has not touched the punching unit yet: its split time waits for the punch
+    public bool PunchToCome(object key)
+    {
+        return world.hasUnit && figures.TryGetValue(key, out TvStickFigure figure) && !figure.everPunched;
+    }
+
     // A runner is on its way to the flag or punching right now: the TV stays on it
     public bool Punching => punching;
 
@@ -357,6 +371,7 @@ public class TvWorldView : MonoBehaviour
                 moved = 0f;
                 f.punch = 0;
                 f.punched = false;
+                f.everPunched = false;
                 f.nearest = float.MaxValue;
                 f.shownX = x;
                 f.shownZ = z;
@@ -415,6 +430,7 @@ public class TvWorldView : MonoBehaviour
             {
                 f.punch = 2;
                 f.punched = true;
+                f.everPunched = true;
                 f.punchedAt = Time.unscaledTime;
             }
             else if (toUnit > 60f) f.punch = 2;   // the runner is far away by now: give up
@@ -437,8 +453,12 @@ public class TvWorldView : MonoBehaviour
     {
         Vector3 flag = new Vector3(world.flagX, world.HeightAt(world.flagX, world.flagZ) + 0.8f, world.flagZ);
         Vector3 position = new Vector3(world.camX, world.HeightAt(world.camX, world.camZ) + 1.7f, world.camZ);
-        Vector3 target = flag;
-        float fov = 38f;
+        // The camera is always on a runner: it starts on the runner, and when the runner is gone it stays where it
+        // was looking and does not swing back to the empty control
+        Vector3 target = hadSubject || subject.HasValue ? lookAt : flag;
+        float fov = hadSubject ? tvFov : 38f;
+        bool cut = subject.HasValue && !hadSubject;
+        hadSubject |= subject.HasValue;
         if (subject.HasValue)
         {
             float d = Vector3.Distance(position, subject.Value);
@@ -466,9 +486,9 @@ public class TvWorldView : MonoBehaviour
         // Follows quickly, so the runner is never out of the picture, but not so stiffly that it looks unnatural.
         // A new subject far from the old one is cut to and not panned to.
         float k = 1f - Mathf.Exp(-dt * 14f);
-        if ((target - lookAt).sqrMagnitude > 20f * 20f) k = 1f;
+        if (cut || (target - lookAt).sqrMagnitude > 20f * 20f) k = 1f;
         lookAt = Vector3.Lerp(lookAt, target, k);
-        tvFov = Mathf.Lerp(tvFov, fov, 1f - Mathf.Exp(-dt * 5f));
+        tvFov = cut ? fov : Mathf.Lerp(tvFov, fov, 1f - Mathf.Exp(-dt * 5f));
         cam.transform.localPosition = position;
         cam.transform.localRotation = Quaternion.LookRotation(lookAt - position);
         cam.fieldOfView = tvFov;
