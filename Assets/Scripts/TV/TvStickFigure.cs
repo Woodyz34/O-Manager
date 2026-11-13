@@ -31,6 +31,10 @@ public class TvStickFigure
     public Vector3 forward = Vector3.forward;
     public Vector3 position;
     public bool placed;
+    // Going up to the flag to punch (TvWorldView.ToThePunch): 0 = on its route, 1 = to the flag, 2 = back to the route
+    public int punch;
+    public bool punched, tracked;
+    public float shownX, shownZ, realX, realZ, headX, headZ, punchedAt;
 
     public TvStickFigure(Transform parent, string name, Color color, int seed)
     {

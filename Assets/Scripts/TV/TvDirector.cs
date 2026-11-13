@@ -8,8 +8,8 @@ using UnityEngine;
 //
 // The host is the producer: it decides what is on TV and sends it to everyone (NetworkPlayer.tvShot), so every player
 // slows down and speeds up together. What a shot shows:
-//  - a runner coming to a TV control: the last metres in, the punch, and a few metres out; then straight back to the
-//    map. Nothing is shown before a runner is there.
+//  - a runner coming to a TV control: from when the TV camera can see it, through the punch, until it is out of
+//    sight again; then straight back to the map. Nothing is shown while no runner is in the picture.
 //  - the start: the first seconds of every runner that sets off
 // The 3D worlds are built ahead, while the runners are on their way, and only a few are kept at a time.
 // Lives on the RelayRace's object, so it goes when the race does.
@@ -17,10 +17,11 @@ public class TvDirector : MonoBehaviour
 {
     public static TvDirector Active { get; private set; }
 
-    // The race clock runs 20 game seconds per real second (Clock); on TV the runners run in real time
-    public const float TvPace = 1f / 20f;
+    // The race clock runs 20 game seconds per real second (Clock); on TV the runners run a little faster than in real
+    // life (1.5 times), which looks right on a screen
+    public const float TvPace = 1.5f / 20f;
     const int StartShot = 99;
-    const float In = 24f, Out = 7f;                 // metres from the control: on TV from here in, until this far out again
+    const float SeenWithin = 60f, Out = 5f;         // metres: how far the camera sees a runner; always shown this far out after the punch
     const float StartOut = 12f;                     // metres from the start
     const float LongestShot = 25f, Linger = 0.1f;   // real seconds
     const float ShownWithin = 100f;                                             // runners this near are in the 3D world
@@ -43,6 +44,7 @@ public class TvDirector : MonoBehaviour
         internal readonly Dictionary<IPackRunner, Pass> passes = new Dictionary<IPackRunner, Pass>();
         internal readonly HashSet<IPackRunner> punched = new HashSet<IPackRunner>();
         internal readonly Dictionary<IPackRunner, float> closest = new Dictionary<IPackRunner, float>();
+        internal readonly Dictionary<IPackRunner, float> seen = new Dictionary<IPackRunner, float>();
         internal readonly Dictionary<IPackRunner, float> since = new Dictionary<IPackRunner, float>();
         internal IPackRunner firstRunner;      // the first runner to the spot on this leg
     }
@@ -158,6 +160,7 @@ public class TvDirector : MonoBehaviour
             spot.passes.Clear();
             spot.punched.Clear();
             spot.closest.Clear();
+            spot.seen.Clear();
             spot.since.Clear();
             spot.firstRunner = null;
             spot.ordinal = -1;
@@ -403,16 +406,17 @@ public class TvDirector : MonoBehaviour
             }
             else if (pass == Pass.None)
             {
-                // Coming to the control: near it and heading for it.
-                if (d < In)
+                // Coming to the control: on TV as soon as the camera can see the runner
+                if (d < SeenWithin)
                 {
                     float toE = (float)(spot.point.e - t.e), toN = (float)(spot.point.n - t.n);
                     float heading = d > 0.01f ? (toE * t.dirE + toN * t.dirN) / d : 1f;
-                    if (d < 10f || heading > 0.6f)
+                    if ((d < 10f || heading > 0.3f) && InSight(spot, t, d, false, 0f))
                     {
                         pass = Pass.In;
                         spot.since[runner] = now;
                         spot.closest[runner] = d;
+                        spot.seen[runner] = now;
                         if (spot.firstRunner == null) spot.firstRunner = runner;
                     }
                 }
@@ -424,10 +428,14 @@ public class TvDirector : MonoBehaviour
                 if (d < least) spot.closest[runner] = least = d;
                 if (d < 3f || (least < 15f && d > least + 2f)) spot.punched.Add(runner);
                 bool punched = spot.punched.Contains(runner);
-                if (punched && d > Mathf.Min(In - 2f, least + Out)) pass = Pass.Done;
-                else if (!punched && d > In + 15f)
+                if (InSight(spot, t, d, punched, least)) spot.seen[runner] = now;
+                spot.seen.TryGetValue(runner, out float seenAt);
+                bool lost = now - seenAt > 0.4f;
+                // On the way out: on TV for as long as the runner is seen, at least the first metres
+                if (punched && d > least + Out && (lost || d > SeenWithin)) pass = Pass.Done;
+                else if (!punched && (d > SeenWithin + 10f || now - seenAt > 1.5f))
                 {
-                    // Ran past without punching: it may come back
+                    // Out of sight without punching: it may come back
                     pass = Pass.None;
                     if (first) spot.firstRunner = null;
                 }
@@ -436,6 +444,39 @@ public class TvDirector : MonoBehaviour
             if (pass == Pass.In) any = true;
         }
         return any;
+    }
+
+    // Can the TV camera of the spot see the runner? From the built 3D world: not too far off, no hill in the way and
+    // not too many tree trunks. Before the world is built: the last metres to the control and the first ones out.
+    bool InSight(Spot spot, Track t, float d, bool punched, float least)
+    {
+        TvWorld world = spot.view != null ? spot.view.world : null;
+        if (world == null) return punched ? d < least + Out : d < 24f;
+        float x = (float)(t.e - spot.point.e), z = (float)(t.n - spot.point.n);
+        if (Mathf.Abs(x) > world.radius - 3f || Mathf.Abs(z) > world.radius - 3f) return false;
+        float cx = world.camX, cz = world.camZ;
+        float dx = x - cx, dz = z - cz, far = Mathf.Sqrt(dx * dx + dz * dz);
+        if (far > SeenWithin) return false;
+        if (far < 12f) return true;
+        float cy = world.HeightAt(cx, cz) + 1.7f, ry = world.HeightAt(x, z) + 1.3f;
+        int steps = Mathf.CeilToInt(far / 1.5f);
+        for (int i = 1; i < steps; i++)
+        {
+            float f = i / (float)steps;
+            if (world.HeightAt(cx + dx * f, cz + dz * f) > Mathf.Lerp(cy, ry, f) - 0.1f) return false;
+        }
+        // Trunks and stones on the line
+        int inTheWay = 0;
+        for (int i = 0; i < world.solids.Count; i++)
+        {
+            TvSolid solid = world.solids[i];
+            float f = ((solid.x - cx) * dx + (solid.z - cz) * dz) / (far * far);
+            if (f <= 0.05f || f >= 0.97f) continue;
+            float px = cx + dx * f - solid.x, pz = cz + dz * f - solid.z, reach = solid.r + 0.1f;
+            if (px * px + pz * pz > reach * reach) continue;
+            if (solid.r > 0.8f || ++inTheWay >= 3) return false;
+        }
+        return true;
     }
 
     // ---- The 3D worlds: built ahead, a few kept ----
@@ -555,14 +596,14 @@ public class TvDirector : MonoBehaviour
 
     // ---- Mistakes, for the map: the runners making a mistake right now ----
 
-    public void Mistakes(List<(Vector3 position, string name)> into)
+    public void Mistakes(List<(Vector3 position, string name, bool own)> into)
     {
         into.Clear();
         foreach (IPackRunner runner in PackRegistry.All)
         {
             if (runner is NetworkPlayer player && player.IsValidRunner && player.relayRunning && player.relayMistake)
             {
-                into.Add((player.RunnerPosition, player.RunnerLabel));
+                into.Add((player.RunnerPosition, player.RunnerLabel, player.IsLocalRunner));
             }
         }
     }

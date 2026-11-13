@@ -295,8 +295,8 @@ public class TvWorldView : MonoBehaviour
                 figure = new TvStickFigure(transform, r.label, r.color, (r.label ?? "").GetHashCode());
                 figures[r.key] = figure;
             }
-            float x = r.x, z = r.z;
-            ToThePunch(ref x, ref z);
+            ToThePunch(figure, r.x, r.z);
+            float x = figure.shownX, z = figure.shownZ;
             world.PushOut(ref x, ref z, 0.25f);
             float moved = 0f;
             if (figure.placed)
@@ -327,19 +327,85 @@ public class TvWorldView : MonoBehaviour
         return nearest;
     }
 
-    // The drawn route may cut the corner at a control, but on TV every runner goes up to the flag and punches: the
-    // last metres are bent in towards the punching unit, and out again afterwards
-    void ToThePunch(ref float x, ref float z)
+    // The route a runner really runs may cut the corner at a control, or pass some metres from it. On TV every runner
+    // leaves its route for the last metres, goes up to the flag, punches and runs back onto its route. Only what is
+    // shown changes; the race is as it was. The figure moves as far as the runner really moved, a little more to catch up.
+    void ToThePunch(TvStickFigure f, float x, float z)
     {
-        if (!world.hasUnit) return;
-        const float Whole = 14f, Core = 4f, Stand = 0.55f;
-        float dx = x - world.unitX, dz = z - world.unitZ;
-        float d = Mathf.Sqrt(dx * dx + dz * dz);
-        if (d >= Whole) return;
-        if (d < 0.01f) { dx = 1f; dz = 0f; d = 1f; }
-        float shown = Stand + (Whole - Stand) * Mathf.Clamp01((d - Core) / (Whole - Core));
-        x = world.unitX + dx / d * shown;
-        z = world.unitZ + dz / d * shown;
+        float moved = 0f;
+        if (f.tracked)
+        {
+            float mx = x - f.realX, mz = z - f.realZ;
+            moved = Mathf.Sqrt(mx * mx + mz * mz);
+            if (moved > 20f)
+            {
+                // A jump (a new leg): start again
+                moved = 0f;
+                f.punch = 0;
+                f.punched = false;
+                f.shownX = x;
+                f.shownZ = z;
+            }
+            else if (moved > 0.001f)
+            {
+                f.headX = Mathf.Lerp(f.headX, mx / moved, 0.3f);
+                f.headZ = Mathf.Lerp(f.headZ, mz / moved, 0.3f);
+            }
+        }
+        else
+        {
+            f.shownX = x;
+            f.shownZ = z;
+        }
+        f.tracked = true;
+        f.realX = x;
+        f.realZ = z;
+        if (!world.hasUnit)
+        {
+            f.shownX = x;
+            f.shownZ = z;
+            return;
+        }
+        float ux = world.unitX - x, uz = world.unitZ - z, toUnit = Mathf.Sqrt(ux * ux + uz * uz);
+        if (f.punch == 0)
+        {
+            f.shownX = x;
+            f.shownZ = z;
+            if (f.punched)
+            {
+                if (toUnit > 25f) f.punched = false;   // gone; ready for the next time it comes
+            }
+            else if (toUnit < 7f || (toUnit < 16f && toUnit > 0.01f && (ux * f.headX + uz * f.headZ) / toUnit > 0.3f))
+            {
+                f.punch = 1;
+            }
+        }
+        if (f.punch == 1)
+        {
+            // To the punching unit, stopping an arm's length from it
+            float sx = f.shownX - world.unitX, sz = f.shownZ - world.unitZ, s = Mathf.Sqrt(sx * sx + sz * sz);
+            if (s < 0.01f) { sx = 1f; sz = 0f; s = 1f; }
+            Vector2 stand = new Vector2(world.unitX + sx / s * 0.55f, world.unitZ + sz / s * 0.55f);
+            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), stand, moved * 1.15f);
+            f.shownX = at.x;
+            f.shownZ = at.y;
+            if ((at - stand).sqrMagnitude < 0.01f)
+            {
+                f.punch = 2;
+                f.punched = true;
+                f.punchedAt = Time.unscaledTime;
+            }
+            else if (toUnit > 35f) f.punch = 2;   // the runner went somewhere else
+        }
+        else if (f.punch == 2)
+        {
+            // A touch of the unit, then back onto the route
+            if (Time.unscaledTime - f.punchedAt < 0.25f) return;
+            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), new Vector2(x, z), moved * 1.5f + 0.002f);
+            f.shownX = at.x;
+            f.shownZ = at.y;
+            if ((at - new Vector2(x, z)).sqrMagnitude < 0.02f) f.punch = 0;
+        }
     }
 
     // ---- The camera ----

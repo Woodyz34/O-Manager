@@ -49,7 +49,8 @@ public class TvViewer : MonoBehaviour
     Camera mapCamera;
     TvWorldView drawn;
     readonly List<TvDirector.Split> splits = new List<TvDirector.Split>();
-    readonly List<(Vector3 position, string name)> mistakes = new List<(Vector3, string)>();
+    readonly List<(Vector3 position, string name, bool own)> mistakes = new List<(Vector3, string, bool)>();
+    string watched;             // the other team's runner whose mistake the map is looking at
     readonly List<TextMeshProUGUI> mistakeLabels = new List<TextMeshProUGUI>();
     readonly Dictionary<string, float> mistakeSeen = new Dictionary<string, float>();
     readonly Dictionary<string, Vector3> mistakeAt = new Dictionary<string, Vector3>();
@@ -203,6 +204,7 @@ public class TvViewer : MonoBehaviour
     {
         if (instance == this) instance = null;
         if (previewView != null) Destroy(previewView.gameObject);
+        CameraController.LookHere = null;
         SetSplit(false);
     }
 
@@ -375,6 +377,8 @@ public class TvViewer : MonoBehaviour
         {
             mistakeSeen[m.name] = now;
             mistakeAt[m.name] = m.position;
+            // Something worth seeing: a map that follows the player's own runner goes to another team's mistake
+            if (!m.own && (watched == null || !mistakeAt.ContainsKey(watched))) watched = m.name;
         }
         mistakeGone.Clear();
         foreach (var pair in mistakeSeen) if (now - pair.Value > 1.5f) mistakeGone.Add(pair.Key);
@@ -383,6 +387,8 @@ public class TvViewer : MonoBehaviour
             mistakeSeen.Remove(name);
             mistakeAt.Remove(name);
         }
+        if (watched != null && !mistakeAt.ContainsKey(watched)) watched = null;
+        CameraController.LookHere = watched != null ? mistakeAt[watched] : (Vector3?)null;
         Camera cam = MapCamera();
         int used = 0;
         if (cam != null && !fullscreen)
