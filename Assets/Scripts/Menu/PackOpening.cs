@@ -704,7 +704,17 @@ public class PackOpening : MonoBehaviour
             anotherButton.gameObject.SetActive(false);
             runnersButton.gameObject.SetActive(false);
             TextMeshProUGUI label = continueButton.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (label != null && loanButton != null) label.text = loanButton;
+            if (label != null && loanButton != null)
+            {
+                label.text = loanButton;
+                // Long texts like "Place the runners" must fit: wider button and a text that shrinks if needed
+                RectTransform buttonRect = (RectTransform)continueButton.transform;
+                buttonRect.sizeDelta = new Vector2(Mathf.Max(buttonRect.sizeDelta.x, 520f), Mathf.Max(buttonRect.sizeDelta.y, 96f));
+                label.enableWordWrapping = false;
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 18f;
+                label.fontSizeMax = Mathf.Max(label.fontSize, 40f);
+            }
         }
         else
         {
