@@ -10,7 +10,11 @@ using UnityEngine.Rendering;
 // the rest of the game looks as before; the light, the tone and the fog are worked out in the shader (TvVertexLit).
 public class TvWorldView : MonoBehaviour
 {
-    public static readonly Vector3 Origin = new Vector3(30000f, 0f, 0f);
+    // Every world gets a place of its own, far from the map and from the other worlds
+    static readonly Vector3 Origin = new Vector3(4000f, 0f, 0f);
+    const float Apart = 1000f;
+    const int Places = 12;
+    static int nextPlace;
     static readonly Color Sky = new Color32(0xc7, 0xd6, 0xda, 255);
 
     public CoursePoint control;
@@ -109,7 +113,8 @@ public class TvWorldView : MonoBehaviour
         TvWorld world = await Task.Run(() => TvWorldBuilder.Build(input));
         long built = watch.ElapsedMilliseconds;
         var go = new GameObject("TV world");
-        go.transform.position = Origin;
+        go.transform.position = Origin + new Vector3(nextPlace * Apart, 0f, 0f);
+        nextPlace = (nextPlace + 1) % Places;
         TvWorldView view = go.AddComponent<TvWorldView>();
         view.control = control;
         view.mapId = map.id;
@@ -291,6 +296,7 @@ public class TvWorldView : MonoBehaviour
                 figures[r.key] = figure;
             }
             float x = r.x, z = r.z;
+            ToThePunch(ref x, ref z);
             world.PushOut(ref x, ref z, 0.25f);
             float moved = 0f;
             if (figure.placed)
@@ -321,6 +327,21 @@ public class TvWorldView : MonoBehaviour
         return nearest;
     }
 
+    // The drawn route may cut the corner at a control, but on TV every runner goes up to the flag and punches: the
+    // last metres are bent in towards the punching unit, and out again afterwards
+    void ToThePunch(ref float x, ref float z)
+    {
+        if (!world.hasUnit) return;
+        const float Whole = 14f, Core = 4f, Stand = 0.55f;
+        float dx = x - world.unitX, dz = z - world.unitZ;
+        float d = Mathf.Sqrt(dx * dx + dz * dz);
+        if (d >= Whole) return;
+        if (d < 0.01f) { dx = 1f; dz = 0f; d = 1f; }
+        float shown = Stand + (Whole - Stand) * Mathf.Clamp01((d - Core) / (Whole - Core));
+        x = world.unitX + dx / d * shown;
+        z = world.unitZ + dz / d * shown;
+    }
+
     // ---- The camera ----
 
     // The TV camera stands still and turns after the runner nearest the control, zooming in on runners far away
@@ -333,12 +354,16 @@ public class TvWorldView : MonoBehaviour
         if (subject.HasValue)
         {
             float d = Vector3.Distance(position, subject.Value);
-            target = Vector3.Lerp(flag, subject.Value, d < 14f ? 0.5f : 0.85f);
-            fov = Mathf.Clamp(Mathf.Atan2(5f, d) * 2f * Mathf.Rad2Deg, 14f, 42f);
+            // The runner in the middle of the picture, a little towards the control when it is near the camera
+            target = Vector3.Lerp(flag, subject.Value, d < 8f ? 0.8f : 1f);
+            fov = Mathf.Clamp(Mathf.Atan2(4.5f, d) * 2f * Mathf.Rad2Deg, 16f, 46f);
         }
-        float k = 1f - Mathf.Exp(-dt * 3f);
+        // Follows quickly, so the runner is never out of the picture, but not so stiffly that it looks unnatural.
+        // A new subject far from the old one is cut to and not panned to.
+        float k = 1f - Mathf.Exp(-dt * 9f);
+        if ((target - lookAt).sqrMagnitude > 20f * 20f) k = 1f;
         lookAt = Vector3.Lerp(lookAt, target, k);
-        tvFov = Mathf.Lerp(tvFov, fov, 1f - Mathf.Exp(-dt * 1.5f));
+        tvFov = Mathf.Lerp(tvFov, fov, 1f - Mathf.Exp(-dt * 2.5f));
         cam.transform.localPosition = position;
         cam.transform.localRotation = Quaternion.LookRotation(lookAt - position);
         cam.fieldOfView = tvFov;

@@ -8,9 +8,8 @@ using UnityEngine;
 //
 // The host is the producer: it decides what is on TV and sends it to everyone (NetworkPlayer.tvShot), so every player
 // slows down and speeds up together. What a shot shows:
-//  - the first runner to a TV control on a leg gets a long shot: the camera waits at the control while the runner
-//    comes the last 50 metres, and follows it out
-//  - the teams after that get about eight seconds each: in to the control and out again
+//  - a runner coming to a TV control: the last metres in, the punch, and a few metres out; then straight back to the
+//    map. Nothing is shown before a runner is there.
 //  - the start: the first seconds of every runner that sets off
 // The 3D worlds are built ahead, while the runners are on their way, and only a few are kept at a time.
 // Lives on the RelayRace's object, so it goes when the race does.
@@ -21,9 +20,9 @@ public class TvDirector : MonoBehaviour
     // The race clock runs 20 game seconds per real second (Clock); on TV the runners run in real time
     public const float TvPace = 1f / 20f;
     const int StartShot = 99;
-    const float FirstIn = 50f, FirstOut = 20f, LaterIn = 25f, LaterOut = 12f;   // metres from the control
-    const float StartFirstOut = 22f, StartLaterOut = 14f;                       // metres from the start
-    const float LongestShot = 30f, Linger = 0.7f;                               // real seconds
+    const float In = 24f, Out = 7f;                 // metres from the control: on TV from here in, until this far out again
+    const float StartOut = 12f;                     // metres from the start
+    const float LongestShot = 25f, Linger = 0.1f;   // real seconds
     const float ShownWithin = 100f;                                             // runners this near are in the 3D world
     const int WorldsKept = 3;
 
@@ -43,6 +42,7 @@ public class TvDirector : MonoBehaviour
         // The producer's notes for the leg
         internal readonly Dictionary<IPackRunner, Pass> passes = new Dictionary<IPackRunner, Pass>();
         internal readonly HashSet<IPackRunner> punched = new HashSet<IPackRunner>();
+        internal readonly Dictionary<IPackRunner, float> closest = new Dictionary<IPackRunner, float>();
         internal readonly Dictionary<IPackRunner, float> since = new Dictionary<IPackRunner, float>();
         internal IPackRunner firstRunner;      // the first runner to the spot on this leg
     }
@@ -157,6 +157,7 @@ public class TvDirector : MonoBehaviour
         {
             spot.passes.Clear();
             spot.punched.Clear();
+            spot.closest.Clear();
             spot.since.Clear();
             spot.firstRunner = null;
             spot.ordinal = -1;
@@ -323,7 +324,7 @@ public class TvDirector : MonoBehaviour
         }
         Vector3? subject = view.ShowRunners(runners);
         // The camera stays on the control until the runner is near enough to be seen coming
-        RunnerInPicture = nearest < 32f;
+        RunnerInPicture = nearest < 40f;
         Subject = RunnerInPicture ? subject : null;
     }
 
@@ -398,13 +399,12 @@ public class TvDirector : MonoBehaviour
                     }
                     else if (d > 40f) pass = Pass.Done;   // was never seen at the start; not on the way back either
                 }
-                else if (pass == Pass.In && (d > (first ? StartFirstOut : StartLaterOut) || now - spot.since[runner] > 8f)) pass = Pass.Done;
+                else if (pass == Pass.In && (d > StartOut || now - spot.since[runner] > 6f)) pass = Pass.Done;
             }
             else if (pass == Pass.None)
             {
-                // Coming to the control: near it and heading for it. The first one of the leg is seen from further away.
-                float reach = spot.firstRunner == null ? FirstIn : LaterIn;
-                if (d < reach)
+                // Coming to the control: near it and heading for it.
+                if (d < In)
                 {
                     float toE = (float)(spot.point.e - t.e), toN = (float)(spot.point.n - t.n);
                     float heading = d > 0.01f ? (toE * t.dirE + toN * t.dirN) / d : 1f;
@@ -412,16 +412,20 @@ public class TvDirector : MonoBehaviour
                     {
                         pass = Pass.In;
                         spot.since[runner] = now;
+                        spot.closest[runner] = d;
                         if (spot.firstRunner == null) spot.firstRunner = runner;
                     }
                 }
             }
             else if (pass == Pass.In)
             {
-                if (d < 3f) spot.punched.Add(runner);
+                // Punched: at the control, or on the way out again after passing it (the drawn route may cut the corner)
+                spot.closest.TryGetValue(runner, out float least);
+                if (d < least) spot.closest[runner] = least = d;
+                if (d < 3f || (least < 15f && d > least + 2f)) spot.punched.Add(runner);
                 bool punched = spot.punched.Contains(runner);
-                if (punched && d > (first ? FirstOut : LaterOut)) pass = Pass.Done;
-                else if (!punched && d > FirstIn + 15f)
+                if (punched && d > Mathf.Min(In - 2f, least + Out)) pass = Pass.Done;
+                else if (!punched && d > In + 15f)
                 {
                     // Ran past without punching: it may come back
                     pass = Pass.None;
