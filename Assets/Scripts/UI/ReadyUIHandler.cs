@@ -87,6 +87,13 @@ public class ReadyUIHandler : NetworkBehaviour
         // Bara värden (master client i Shared Mode) får starta spelet
         if (!IsHost()) return;
         if (remaking) return;
+        // No course chosen: tell the host instead of starting a race that can't be set up
+        string courseProblem = CourseLibrary.StartProblem(CourseLibrary.Current);
+        if (courseProblem != null)
+        {
+            UIToast.Show(courseProblem);
+            return;
+        }
         if (AICoursePanel.ShouldRemake(CourseLibrary.Current))
         {
             RemakeAICourseThenStart();
