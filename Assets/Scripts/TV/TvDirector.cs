@@ -20,7 +20,7 @@ public class TvDirector : MonoBehaviour
     // The race clock runs 20 game seconds per real second (Clock); on TV the runners run a little faster than in real
     // life (1.4 times), which looks right on a screen
     public const float TvPace = 1.4f / 20f;
-    const int StartShot = 99;
+    const int StartShot = 99, FinishShot = 98;
     const float SeenWithin = 60f, Out = 5f;         // metres: how far the camera sees a runner; always shown this far out after the punch
     const float StartOut = 12f;                     // metres from the start
     const float LongestShot = 25f, Linger = 0.1f;   // real seconds
@@ -39,6 +39,7 @@ public class TvDirector : MonoBehaviour
         public TvWorldView view;
         public bool building, failed;
         public float lastUsed = -999f;
+        public bool off;                       // not in use on this leg
         public float camE, camN;               // the side of the spot the TV camera should stand on (0, 0 = anywhere)
         public int ordinal = -1;               // its number among the leg's common points, for the split times
         // The producer's notes for the leg
@@ -66,7 +67,7 @@ public class TvDirector : MonoBehaviour
     MapDefinition map;
     CourseData course;
     readonly List<Spot> spots = new List<Spot>();      // the TV controls, then the start
-    Spot startSpot;
+    Spot startSpot, finishSpot;
     Spot current;                                      // on TV now
     int producedLeg = -1;
     int produced;                                      // the producer's choice (host)
@@ -76,6 +77,7 @@ public class TvDirector : MonoBehaviour
     bool slowed;
     readonly Dictionary<IPackRunner, Track> tracks = new Dictionary<IPackRunner, Track>();
     readonly List<IPackRunner> running = new List<IPackRunner>();
+    readonly List<IPackRunner> ended = new List<IPackRunner>();
     readonly List<TvWorldView.RunnerAt> runners = new List<TvWorldView.RunnerAt>();
     readonly Dictionary<IPackRunner, Color> colors = new Dictionary<IPackRunner, Color>();
 
@@ -116,6 +118,9 @@ public class TvDirector : MonoBehaviour
         {
             director.spots.Add(new Spot { point = course.tvControls[i], name = "TV " + (i + 1), number = i + 1 });
         }
+        // The finish and the start of every leg are always on TV
+        director.finishSpot = new Spot { name = "Finish", number = FinishShot, off = true };
+        director.spots.Add(director.finishSpot);
         director.startSpot = new Spot { name = "Start", start = true, number = StartShot };
         director.spots.Add(director.startSpot);
         Active = director;
@@ -176,9 +181,23 @@ public class TvDirector : MonoBehaviour
         startSpot.point = points[0];
         CameraSide(startSpot, points, 0);
         startSpot.name = "Start · Leg " + (race.Leg + 1);
-        for (int s = 0; s < spots.Count - 1; s++)
+        // The finish, unless it is a TV control already
+        CoursePoint finish = points[points.Count - 1];
+        if (finishSpot.view != null && !Same(finishSpot.point, finish))
+        {
+            Destroy(finishSpot.view.gameObject);
+            finishSpot.view = null;
+        }
+        if (finishSpot.view == null) finishSpot.failed = false;
+        finishSpot.point = finish;
+        finishSpot.name = "Finish · Leg " + (race.Leg + 1);
+        finishSpot.off = points.Count < 2;
+        if (points.Count - 1 < route.commonOrdinal.Count) finishSpot.ordinal = route.commonOrdinal[points.Count - 1];
+        CameraSide(finishSpot, points, points.Count - 1);
+        for (int s = 0; s < spots.Count - 2; s++)
         {
             Spot spot = spots[s];
+            if (Same(spot.point, finish)) finishSpot.off = true;
             spot.name = "TV " + (s + 1);
             for (int i = 1; i < points.Count && i < route.commonOrdinal.Count; i++)
             {
@@ -416,6 +435,11 @@ public class TvDirector : MonoBehaviour
     bool Follow(Spot spot, float now)
     {
         bool any = false;
+        if (spot.off) return false;
+        // A runner who is not out running any more (finished, left) is not waited for
+        ended.Clear();
+        foreach (var pair in spot.passes) if (pair.Value == Pass.In && !tracks.ContainsKey(pair.Key)) ended.Add(pair.Key);
+        foreach (IPackRunner runner in ended) spot.passes[runner] = Pass.Done;
         foreach (IPackRunner runner in running)
         {
             Track t = tracks[runner];
@@ -533,7 +557,7 @@ public class TvDirector : MonoBehaviour
             float best = 700f;
             foreach (Spot spot in spots)
             {
-                if (spot.view != null || spot.failed || spot.start) continue;
+                if (spot.view != null || spot.failed || spot.start || spot.off) continue;
                 foreach (IPackRunner runner in running)
                 {
                     // Not the ones already past it
