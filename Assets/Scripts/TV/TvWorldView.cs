@@ -6,8 +6,8 @@ using UnityEngine.Rendering;
 
 // The 3D world of one TV control in the scene: the meshes TvWorldBuilder made, a sun, a camera that draws into a
 // texture (shown by TvViewer) and the stick figures of the runners. The world is put far away from the 2D map
-// (Origin), and only one is kept at a time. The fog, the sky light and the shadows are switched on only while the TV
-// camera draws, so the rest of the game looks as before.
+// (Origin), and only one is kept at a time. The sun and its shadows are switched on only while the TV camera draws, so
+// the rest of the game looks as before; the light, the tone and the fog are worked out in the shader (TvVertexLit).
 public class TvWorldView : MonoBehaviour
 {
     public static readonly Vector3 Origin = new Vector3(30000f, 0f, 0f);
@@ -31,6 +31,25 @@ public class TvWorldView : MonoBehaviour
     float yaw, pitch = 18f, distance = 14f;
 
     static Shader shader;
+    static Texture2D grain;
+
+    // Fine light and dark grains for the ground, the same every time
+    static Texture2D Grain()
+    {
+        if (grain != null) return grain;
+        const int Size = 128;
+        var random = new System.Random(7);
+        var pixels = new Color32[Size * Size];
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            byte v = (byte)(200 + random.Next(55));
+            pixels[i] = new Color32(v, v, v, 255);
+        }
+        grain = new Texture2D(Size, Size, TextureFormat.RGBA32, true) { name = "TV ground grain", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+        grain.SetPixels32(pixels);
+        grain.Apply(true, true);
+        return grain;
+    }
 
     public static Material NewMaterial(Color color)
     {
@@ -71,7 +90,7 @@ public class TvWorldView : MonoBehaviour
     }
 
     // Builds the world of a control. The heavy part runs on a background thread; returns null when the map has none.
-    public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control)
+    public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control, bool start = false)
     {
         TvWorldData.Data data = await TvWorldData.LoadAsync(map);
         if (data == null) return null;
@@ -83,7 +102,8 @@ public class TvWorldView : MonoBehaviour
             centerE = control.e,
             centerN = control.n,
             radius = 110f,
-            seed = 1
+            seed = 1,
+            start = start
         };
         var watch = System.Diagnostics.Stopwatch.StartNew();
         TvWorld world = await Task.Run(() => TvWorldBuilder.Build(input));
@@ -104,15 +124,21 @@ public class TvWorldView : MonoBehaviour
     {
         Material material = NewMaterial(Color.white);
         materials.Add(material);
+        // The ground has a fine grain, so it does not look painted
+        Material ground = NewMaterial(Color.white);
+        ground.SetTexture("_DetailTex", Grain());
+        ground.SetFloat("_Detail", 1f);
+        materials.Add(ground);
         foreach (TvMesh source in world.meshes)
         {
             Mesh mesh = ToMesh(source);
+            mesh.UploadMeshData(true);   // the graphics card has it now; no copy kept in memory
             meshes.Add(mesh);
             var go = new GameObject(source.name);
             go.transform.SetParent(transform, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = go.AddComponent<MeshRenderer>();
-            r.sharedMaterial = material;
+            r.sharedMaterial = source.name == "Ground" ? ground : material;
             r.shadowCastingMode = source.castShadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
             r.receiveShadows = true;
         }
@@ -122,9 +148,10 @@ public class TvWorldView : MonoBehaviour
         sun.transform.SetParent(transform, false);
         sun.type = LightType.Directional;
         sun.color = new Color32(0xff, 0xf1, 0xd6, 255);
-        sun.intensity = 1.15f;
+        sun.intensity = 3f;   // the strongest light, so it is the one the shader gets; its colour is set in the shader
         sun.shadows = LightShadows.Soft;
-        sun.shadowStrength = 0.75f;
+        sun.shadowStrength = 1f;
+        sun.shadowResolution = UnityEngine.Rendering.LightShadowResolution.VeryHigh;
         sun.shadowBias = 0.05f;
         sun.shadowNormalBias = 0.4f;
         sun.transform.rotation = Quaternion.LookRotation(-new Vector3(55f, 70f, -48f).normalized);
@@ -140,6 +167,7 @@ public class TvWorldView : MonoBehaviour
         cam.depth = -50;
         cam.allowHDR = false;
         cam.allowMSAA = true;
+        cam.renderingPath = RenderingPath.Forward;
         cam.enabled = false;
 
         float y = world.HeightAt(world.camX, world.camZ) + 1.7f;
@@ -167,7 +195,7 @@ public class TvWorldView : MonoBehaviour
                 texture.Release();
                 Destroy(texture);
             }
-            texture = new RenderTexture(width, height, 24, RenderTextureFormat.Default) { name = "TV", antiAliasing = 2 };
+            texture = new RenderTexture(width, height, 24, RenderTextureFormat.Default) { name = "TV", antiAliasing = 4 };
             cam.targetTexture = texture;
             cam.aspect = width / (float)height;
         }
@@ -179,43 +207,29 @@ public class TvWorldView : MonoBehaviour
         if (cam != null && cam.enabled != on) cam.enabled = on;
     }
 
-    bool savedFog;
-    Color savedFogColor;
-    FogMode savedFogMode;
-    float savedFogStart, savedFogEnd, savedShadowDistance;
-    SphericalHarmonicsL2 savedAmbient;
-    AmbientMode savedAmbientMode;
+    float savedShadowDistance;
+    int savedCascades;
     ShadowQuality savedShadows;
+    ShadowResolution savedResolution;
+    ShadowProjection savedProjection;
     bool drawing;
 
+    // The sun and good shadows only while the TV camera draws, so the rest of the game looks as before.
+    // The light itself is worked out in the shader (TvVertexLit); the sun here gives its direction and the shadows.
     void BeforeDraw(Camera c)
     {
         if (c != cam || drawing) return;
         drawing = true;
-        savedFog = RenderSettings.fog;
-        savedFogColor = RenderSettings.fogColor;
-        savedFogMode = RenderSettings.fogMode;
-        savedFogStart = RenderSettings.fogStartDistance;
-        savedFogEnd = RenderSettings.fogEndDistance;
-        savedAmbient = RenderSettings.ambientProbe;
-        savedAmbientMode = RenderSettings.ambientMode;
         savedShadowDistance = QualitySettings.shadowDistance;
         savedShadows = QualitySettings.shadows;
-
-        RenderSettings.fog = true;
-        RenderSettings.fogColor = Sky;
-        RenderSettings.fogMode = FogMode.Linear;
-        RenderSettings.fogStartDistance = 45f;
-        RenderSettings.fogEndDistance = 230f;
-        // Light from the sky above and a darker green-brown from the ground
-        var probe = new SphericalHarmonicsL2();
-        Color skyLight = new Color(0.81f, 0.88f, 0.93f) * 0.55f, groundLight = new Color(0.32f, 0.3f, 0.22f) * 0.55f;
-        probe.AddAmbientLight((skyLight + groundLight) * 0.5f);
-        probe.AddDirectionalLight(Vector3.up, (skyLight - groundLight) * 0.5f, 1f);
-        RenderSettings.ambientMode = AmbientMode.Custom;
-        RenderSettings.ambientProbe = probe;
-        QualitySettings.shadowDistance = 90f;
-        if (QualitySettings.shadows == ShadowQuality.Disable) QualitySettings.shadows = ShadowQuality.All;
+        savedCascades = QualitySettings.shadowCascades;
+        savedResolution = QualitySettings.shadowResolution;
+        savedProjection = QualitySettings.shadowProjection;
+        QualitySettings.shadowDistance = 130f;
+        QualitySettings.shadows = ShadowQuality.All;
+        QualitySettings.shadowCascades = 4;
+        QualitySettings.shadowResolution = ShadowResolution.VeryHigh;
+        QualitySettings.shadowProjection = ShadowProjection.StableFit;
         sun.enabled = true;
     }
 
@@ -224,15 +238,11 @@ public class TvWorldView : MonoBehaviour
         if (c != cam || !drawing) return;
         drawing = false;
         sun.enabled = false;
-        RenderSettings.fog = savedFog;
-        RenderSettings.fogColor = savedFogColor;
-        RenderSettings.fogMode = savedFogMode;
-        RenderSettings.fogStartDistance = savedFogStart;
-        RenderSettings.fogEndDistance = savedFogEnd;
-        RenderSettings.ambientMode = savedAmbientMode;
-        RenderSettings.ambientProbe = savedAmbient;
         QualitySettings.shadowDistance = savedShadowDistance;
         QualitySettings.shadows = savedShadows;
+        QualitySettings.shadowCascades = savedCascades;
+        QualitySettings.shadowResolution = savedResolution;
+        QualitySettings.shadowProjection = savedProjection;
     }
 
     void OnDestroy()
@@ -292,7 +302,7 @@ public class TvWorldView : MonoBehaviour
             }
             figure.placed = true;
             float toUnit = new Vector2(x - world.unitX, z - world.unitZ).magnitude;
-            float near = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.6f, 2.8f, toUnit));
+            float near = world.hasUnit ? 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.6f, 2.8f, toUnit)) : 0f;
             figure.Pose(x, world.HeightAt(x, z), z, moved, unit, near);
             float d = x * x + z * z;
             if (d < best)

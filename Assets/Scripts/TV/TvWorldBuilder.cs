@@ -79,6 +79,7 @@ public class TvWorldInput
     public double centerE, centerN;     // the control, in the game's map coordinates (metres)
     public float radius = 110f;         // the world is a square of 2 x radius
     public int seed = 1;
+    public bool start;                  // the start of a leg and not a control: no flag and no punching unit
 }
 
 // Something a runner cannot run through: a stone, a tree trunk, a pole
@@ -96,6 +97,7 @@ public class TvWorld
     public readonly List<TvSolid> solids = new List<TvSolid>();
     // The control flag's stand and the punching unit on top of it
     public float flagX, flagZ, unitX, unitY, unitZ;
+    public bool hasUnit = true;         // false at the start of a leg: nothing to punch
     // Where the TV camera stands: a spot about 9 m from the control with a free view of it (trees keep off it)
     public float camX, camZ;
     public int trees, rocks, tufts;
@@ -1093,6 +1095,8 @@ public class TvWorldBuilder
         world.unitX = fx;
         world.unitY = y + 1.02f;
         world.unitZ = fz;
+        world.hasUnit = !input.start;
+        if (input.start) return;
 
         TvColor white = TvColor.Hex("#f4f2ea"), orange = TvColor.Hex("#f26a1b");
         var b = new TvShapeBuilder(random);
@@ -1250,7 +1254,7 @@ public class TvWorldBuilder
                 }
                 if (random.Value() > p || Blocked(x, z, 1.3f)) continue;
 
-                bool near = x * x + z * z < 45f * 45f;
+                bool near = x * x + z * z < 70f * 70f;
                 int pick = random.Value() < 0.5f ? 0 : 1;
                 TvShape shape;
                 float trunk;

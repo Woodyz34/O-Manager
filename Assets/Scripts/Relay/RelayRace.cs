@@ -57,6 +57,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     public MapDefinition Map => map;
     public int LegCount => course.legs;
     public int Leg => leg;
+    public LegRoute Route => route;
     public bool LegIsStraight => !course.LegForked(leg);
     public int[] BranchesOfLeg(int legIndex) => branches[Mathf.Clamp(legIndex, 0, branches.Length - 1)];
 
