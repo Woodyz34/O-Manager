@@ -18,9 +18,9 @@ public class TvDirector : MonoBehaviour
     public static TvDirector Active { get; private set; }
 
     // The race clock runs 20 game seconds per real second (Clock); on TV the runners run a little faster than in real
-    // life (1.5 times), which looks right on a screen
-    public const float TvPace = 1.5f / 20f;
-    const int StartShot = 99;
+    // life (1.4 times), which looks right on a screen
+    public const float TvPace = 1.4f / 20f;
+    const int StartShot = 99, FinishShot = 98;
     const float SeenWithin = 60f, Out = 5f;         // metres: how far the camera sees a runner; always shown this far out after the punch
     const float StartOut = 12f;                     // metres from the start
     const float LongestShot = 25f, Linger = 0.1f;   // real seconds
@@ -39,6 +39,8 @@ public class TvDirector : MonoBehaviour
         public TvWorldView view;
         public bool building, failed;
         public float lastUsed = -999f;
+        public bool off;                       // not in use on this leg
+        public float camE, camN;               // the side of the spot the TV camera should stand on (0, 0 = anywhere)
         public int ordinal = -1;               // its number among the leg's common points, for the split times
         // The producer's notes for the leg
         internal readonly Dictionary<IPackRunner, Pass> passes = new Dictionary<IPackRunner, Pass>();
@@ -65,7 +67,7 @@ public class TvDirector : MonoBehaviour
     MapDefinition map;
     CourseData course;
     readonly List<Spot> spots = new List<Spot>();      // the TV controls, then the start
-    Spot startSpot;
+    Spot startSpot, finishSpot;
     Spot current;                                      // on TV now
     int producedLeg = -1;
     int produced;                                      // the producer's choice (host)
@@ -75,6 +77,7 @@ public class TvDirector : MonoBehaviour
     bool slowed;
     readonly Dictionary<IPackRunner, Track> tracks = new Dictionary<IPackRunner, Track>();
     readonly List<IPackRunner> running = new List<IPackRunner>();
+    readonly List<IPackRunner> ended = new List<IPackRunner>();
     readonly List<TvWorldView.RunnerAt> runners = new List<TvWorldView.RunnerAt>();
     readonly Dictionary<IPackRunner, Color> colors = new Dictionary<IPackRunner, Color>();
 
@@ -115,6 +118,9 @@ public class TvDirector : MonoBehaviour
         {
             director.spots.Add(new Spot { point = course.tvControls[i], name = "TV " + (i + 1), number = i + 1 });
         }
+        // The finish and the start of every leg are always on TV
+        director.finishSpot = new Spot { name = "Finish", number = FinishShot, off = true };
+        director.spots.Add(director.finishSpot);
         director.startSpot = new Spot { name = "Start", start = true, number = StartShot };
         director.spots.Add(director.startSpot);
         Active = director;
@@ -173,19 +179,64 @@ public class TvDirector : MonoBehaviour
         }
         if (startSpot.view == null) startSpot.failed = false;
         startSpot.point = points[0];
+        CameraSide(startSpot, points, 0);
         startSpot.name = "Start · Leg " + (race.Leg + 1);
-        for (int s = 0; s < spots.Count - 1; s++)
+        // The finish, unless it is a TV control already
+        CoursePoint finish = points[points.Count - 1];
+        if (finishSpot.view != null && !Same(finishSpot.point, finish))
+        {
+            Destroy(finishSpot.view.gameObject);
+            finishSpot.view = null;
+        }
+        if (finishSpot.view == null) finishSpot.failed = false;
+        finishSpot.point = finish;
+        finishSpot.name = "Finish · Leg " + (race.Leg + 1);
+        finishSpot.off = points.Count < 2;
+        if (points.Count - 1 < route.commonOrdinal.Count) finishSpot.ordinal = route.commonOrdinal[points.Count - 1];
+        CameraSide(finishSpot, points, points.Count - 1);
+        for (int s = 0; s < spots.Count - 2; s++)
         {
             Spot spot = spots[s];
+            if (Same(spot.point, finish)) finishSpot.off = true;
             spot.name = "TV " + (s + 1);
             for (int i = 1; i < points.Count && i < route.commonOrdinal.Count; i++)
             {
                 if (!Same(points[i], spot.point)) continue;
                 spot.ordinal = route.commonOrdinal[i];
+                CameraSide(spot, points, i);
                 spot.name += i == points.Count - 1 ? " · Finish" : " · Control " + i;
                 break;
             }
         }
+    }
+
+    // Where the TV camera of a point on the course should stand, so the runners come in and go out in front of it
+    // without it having to turn round: on the outside of the turn, looking into it. On a straight line through the
+    // control it stands to the side; at the finish behind the control, facing the runners coming in; at the start
+    // behind the start, watching them go.
+    static void CameraSide(Spot spot, List<CoursePoint> points, int i)
+    {
+        Vector2 Way(int from, int to)
+        {
+            var d = new Vector2((float)(points[to].e - points[from].e), (float)(points[to].n - points[from].n));
+            return d.sqrMagnitude > 1f ? d.normalized : Vector2.zero;
+        }
+        Vector2 back = i > 0 ? Way(i, i - 1) : Vector2.zero, on = i < points.Count - 1 ? Way(i, i + 1) : Vector2.zero;
+        Vector2 side;
+        if (back == Vector2.zero || on == Vector2.zero) side = -(back + on);
+        else
+        {
+            side = -(back + on);
+            // Straight on: to the side of the line, the sunny one (the sun stands in the south-east)
+            if (side.magnitude < 0.5f)
+            {
+                side = new Vector2(-on.y, on.x);
+                if (side.x * 0.55f - side.y * 0.5f < 0f) side = -side;
+            }
+        }
+        side = side.sqrMagnitude > 1e-4f ? side.normalized : Vector2.zero;
+        spot.camE = side.x;
+        spot.camN = side.y;
     }
 
     Spot SpotOf(int number)
@@ -296,6 +347,7 @@ public class TvDirector : MonoBehaviour
         {
             current = on;
             shotStart = now;
+            if (on != null && on.view != null) on.view.NewShot();
             Subject = null;
         }
         SetPace(shot != 0);
@@ -328,7 +380,7 @@ public class TvDirector : MonoBehaviour
         Vector3? subject = view.ShowRunners(runners);
         // The camera stays on the control until the runner is near enough to be seen coming
         RunnerInPicture = nearest < 40f;
-        Subject = RunnerInPicture ? subject : null;
+        Subject = subject;
     }
 
     // ---- The producer (host) ----
@@ -343,7 +395,8 @@ public class TvDirector : MonoBehaviour
         }
         if (current != null && IsProducer)
         {
-            bool stay = wanted == current || Wants(current);
+            // Never away from a runner who is on the way to the flag or punching
+            bool stay = wanted == current || Wants(current) || (current.view != null && current.view.Punching && now - shotStart < LongestShot);
             if (stay) lastWanted = now;
             bool tooLong = now - shotStart > LongestShot;
             if (tooLong)
@@ -383,6 +436,11 @@ public class TvDirector : MonoBehaviour
     bool Follow(Spot spot, float now)
     {
         bool any = false;
+        if (spot.off) return false;
+        // A runner who is not out running any more (finished, left) is not waited for
+        ended.Clear();
+        foreach (var pair in spot.passes) if (pair.Value == Pass.In && !tracks.ContainsKey(pair.Key)) ended.Add(pair.Key);
+        foreach (IPackRunner runner in ended) spot.passes[runner] = Pass.Done;
         foreach (IPackRunner runner in running)
         {
             Track t = tracks[runner];
@@ -500,7 +558,7 @@ public class TvDirector : MonoBehaviour
             float best = 700f;
             foreach (Spot spot in spots)
             {
-                if (spot.view != null || spot.failed || spot.start) continue;
+                if (spot.view != null || spot.failed || spot.start || spot.off) continue;
                 foreach (IPackRunner runner in running)
                 {
                     // Not the ones already past it
@@ -554,7 +612,7 @@ public class TvDirector : MonoBehaviour
         TvWorldView made = null;
         try
         {
-            made = await TvWorldView.Create(map, spot.point, spot.start);
+            made = await TvWorldView.Create(map, spot.point, spot.start, spot.camE, spot.camN);
         }
         catch (System.Exception e)
         {
@@ -589,6 +647,8 @@ public class TvDirector : MonoBehaviour
             if (player.relaySplitLeg != producedLeg || player.relaySplitCount <= current.ordinal || current.ordinal >= player.relaySplits.Length) continue;
             int seconds = player.relaySplits[current.ordinal];
             if (seconds <= 0) continue;
+            // The time comes up when the runner is seen punching, not a moment before
+            if (current.view != null && current.view.PunchToCome(runner)) continue;
             into.Add(new Split { name = player.RunnerLabel, color = ColorOf(runner), seconds = seconds });
         }
         into.Sort((a, b) => a.seconds.CompareTo(b.seconds));

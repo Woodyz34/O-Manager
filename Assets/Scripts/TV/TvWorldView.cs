@@ -30,6 +30,15 @@ public class TvWorldView : MonoBehaviour
     public bool freeCamera;
     Vector3 lookAt;
     float tvFov = 34f;
+    Vector3 camShift;
+    bool hadSubject;
+
+    // A new shot: the camera goes straight to the first runner
+    public void NewShot()
+    {
+        hadSubject = false;
+        camShift = Vector3.zero;
+    }
     // Free camera: turns round a point
     Vector3 orbitTarget;
     float yaw, pitch = 18f, distance = 14f;
@@ -94,7 +103,7 @@ public class TvWorldView : MonoBehaviour
     }
 
     // Builds the world of a control. The heavy part runs on a background thread; returns null when the map has none.
-    public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control, bool start = false)
+    public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control, bool start = false, float camDirX = 0f, float camDirZ = 0f)
     {
         TvWorldData.Data data = await TvWorldData.LoadAsync(map);
         if (data == null) return null;
@@ -107,7 +116,9 @@ public class TvWorldView : MonoBehaviour
             centerN = control.n,
             radius = 110f,
             seed = 1,
-            start = start
+            start = start,
+            camDirX = camDirX,
+            camDirZ = camDirZ
         };
         var watch = System.Diagnostics.Stopwatch.StartNew();
         TvWorld world = await Task.Run(() => TvWorldBuilder.Build(input));
@@ -279,11 +290,21 @@ public class TvWorldView : MonoBehaviour
     readonly Dictionary<object, TvStickFigure> figures = new Dictionary<object, TvStickFigure>();
     readonly HashSet<object> seen = new HashSet<object>();
     readonly List<object> gone = new List<object>();
+    bool punching;
+    // The runner's figure is in the picture and has not touched the punching unit yet: its split time waits for the punch
+    public bool PunchToCome(object key)
+    {
+        return world.hasUnit && figures.TryGetValue(key, out TvStickFigure figure) && !figure.everPunched;
+    }
+
+    // A runner is on its way to the flag or punching right now: the TV stays on it
+    public bool Punching => punching;
 
     // The runners to show now; the ones not in the list are taken away. Returns the one nearest the control, if any.
     public Vector3? ShowRunners(List<RunnerAt> runners)
     {
         seen.Clear();
+        punching = false;
         Vector3? nearest = null;
         float best = float.MaxValue;
         Vector3 unit = new Vector3(world.unitX, world.unitY, world.unitZ);
@@ -296,8 +317,15 @@ public class TvWorldView : MonoBehaviour
                 figures[r.key] = figure;
             }
             ToThePunch(figure, r.x, r.z);
-            float x = figure.shownX, z = figure.shownZ;
-            world.PushOut(ref x, ref z, 0.25f);
+            // Round the trees and stones with room to spare, and smoothly: the runner swerves, it does not bump
+            float px = figure.shownX, pz = figure.shownZ;
+            world.PushOut(ref px, ref pz, 0.5f);
+            float ease = figure.placed ? 0.18f : 1f;
+            figure.swerveX = Mathf.Lerp(figure.swerveX, px - figure.shownX, ease);
+            figure.swerveZ = Mathf.Lerp(figure.swerveZ, pz - figure.shownZ, ease);
+            float x = figure.shownX + figure.swerveX, z = figure.shownZ + figure.swerveZ;
+            world.PushOut(ref x, ref z, 0.2f);   // never inside anything
+            if (figure.punch == 1 || (figure.punch == 2 && Time.unscaledTime - figure.punchedAt < 0.6f)) punching = true;
             float moved = 0f;
             if (figure.placed)
             {
@@ -309,7 +337,17 @@ public class TvWorldView : MonoBehaviour
             figure.placed = true;
             float toUnit = new Vector2(x - world.unitX, z - world.unitZ).magnitude;
             float near = world.hasUnit ? 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.6f, 2.8f, toUnit)) : 0f;
-            figure.Pose(x, world.HeightAt(x, z), z, moved, unit, near);
+            // The lie of the ground ahead (steps, slopes, cliffs) and the fallen trunks to jump
+            float dt = Time.unscaledDeltaTime, rise = 0f;
+            if (figure.placed)
+            {
+                Vector3 f = figure.forward;
+                rise = (world.HeightAt(x + f.x * 0.6f, z + f.z * 0.6f) - world.HeightAt(x - f.x * 0.6f, z - f.z * 0.6f)) / 1.2f;
+            }
+            figure.slope = Mathf.Lerp(figure.slope, rise, Mathf.Clamp01(dt * 8f));
+            float jump = figure.Pace > 1f && near < 0.5f ? world.Hurdle(x, z) : 0f;
+            figure.hop = Mathf.Lerp(figure.hop, jump, Mathf.Clamp01(dt * 18f));
+            figure.Pose(x, world.HeightAt(x, z), z, moved, unit, near, dt, figure.slope, figure.hop);
             float d = x * x + z * z;
             if (d < best)
             {
@@ -343,6 +381,8 @@ public class TvWorldView : MonoBehaviour
                 moved = 0f;
                 f.punch = 0;
                 f.punched = false;
+                f.everPunched = false;
+                f.nearest = float.MaxValue;
                 f.shownX = x;
                 f.shownZ = z;
             }
@@ -375,10 +415,14 @@ public class TvWorldView : MonoBehaviour
             {
                 if (toUnit > 25f) f.punched = false;   // gone; ready for the next time it comes
             }
-            else if (toUnit < 7f || (toUnit < 16f && toUnit > 0.01f && (ux * f.headX + uz * f.headZ) / toUnit > 0.3f))
+            else
             {
-                f.punch = 1;
+                // Every runner that comes near punches: within 16 m whatever way it is heading, or when it has
+                // passed its nearest point a little further off
+                if (toUnit < f.nearest) f.nearest = toUnit;
+                if (toUnit < 16f || (f.nearest < 32f && toUnit > f.nearest + 1.5f)) f.punch = 1;
             }
+            if (toUnit > 45f) f.nearest = float.MaxValue;
         }
         if (f.punch == 1)
         {
@@ -386,22 +430,26 @@ public class TvWorldView : MonoBehaviour
             float sx = f.shownX - world.unitX, sz = f.shownZ - world.unitZ, s = Mathf.Sqrt(sx * sx + sz * sz);
             if (s < 0.01f) { sx = 1f; sz = 0f; s = 1f; }
             Vector2 stand = new Vector2(world.unitX + sx / s * 0.55f, world.unitZ + sz / s * 0.55f);
-            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), stand, moved * 1.15f);
+            // A little quicker than the runner really moves, and more so once the runner is on its way out again
+            bool leaving = toUnit > f.nearest + 1f;
+            if (toUnit < f.nearest) f.nearest = toUnit;
+            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), stand, moved * (leaving ? 1.9f : 1.2f));
             f.shownX = at.x;
             f.shownZ = at.y;
             if ((at - stand).sqrMagnitude < 0.01f)
             {
                 f.punch = 2;
                 f.punched = true;
+                f.everPunched = true;
                 f.punchedAt = Time.unscaledTime;
             }
-            else if (toUnit > 35f) f.punch = 2;   // the runner went somewhere else
+            else if (toUnit > 60f) f.punch = 2;   // the runner is far away by now: give up
         }
         else if (f.punch == 2)
         {
             // A touch of the unit, then back onto the route
             if (Time.unscaledTime - f.punchedAt < 0.25f) return;
-            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), new Vector2(x, z), moved * 1.5f + 0.002f);
+            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), new Vector2(x, z), moved * 1.6f + 0.002f);
             f.shownX = at.x;
             f.shownZ = at.y;
             if ((at - new Vector2(x, z)).sqrMagnitude < 0.02f) f.punch = 0;
@@ -415,21 +463,42 @@ public class TvWorldView : MonoBehaviour
     {
         Vector3 flag = new Vector3(world.flagX, world.HeightAt(world.flagX, world.flagZ) + 0.8f, world.flagZ);
         Vector3 position = new Vector3(world.camX, world.HeightAt(world.camX, world.camZ) + 1.7f, world.camZ);
-        Vector3 target = flag;
-        float fov = 38f;
+        // The camera is always on a runner: it starts on the runner, and when the runner is gone it stays where it
+        // was looking and does not swing back to the empty control
+        Vector3 target = hadSubject || subject.HasValue ? lookAt : flag;
+        float fov = hadSubject ? tvFov : 38f;
+        bool cut = subject.HasValue && !hadSubject;
+        hadSubject |= subject.HasValue;
         if (subject.HasValue)
         {
             float d = Vector3.Distance(position, subject.Value);
             // The runner in the middle of the picture, a little towards the control when it is near the camera
             target = Vector3.Lerp(flag, subject.Value, d < 8f ? 0.8f : 1f);
-            fov = Mathf.Clamp(Mathf.Atan2(4.5f, d) * 2f * Mathf.Rad2Deg, 16f, 46f);
+            // The whole runner in the picture, with some room round it
+            fov = Mathf.Clamp(Mathf.Atan2(3.4f, d) * 2f * Mathf.Rad2Deg, 13f, 58f);
+            // A runner coming straight at the camera: the camera steps aside, so nobody runs through it
+            Vector3 away = position - subject.Value;
+            away.y = 0f;
+            float gap = away.magnitude;
+            const float Room = 4.5f;
+            Vector3 aside = Vector3.zero;
+            if (gap < Room)
+            {
+                Vector3 side = Vector3.Cross(Vector3.up, flag - position).normalized;
+                if (Vector3.Dot(side, away) < 0f) side = -side;
+                aside = (gap > 0.05f ? Vector3.Lerp(away / gap, side, 0.6f).normalized : side) * (Room - gap);
+            }
+            camShift = Vector3.Lerp(camShift, aside, 1f - Mathf.Exp(-dt * 6f));
         }
+        else camShift = Vector3.Lerp(camShift, Vector3.zero, 1f - Mathf.Exp(-dt * 2f));
+        position += camShift;
+        position.y = world.HeightAt(position.x, position.z) + 1.7f;
         // Follows quickly, so the runner is never out of the picture, but not so stiffly that it looks unnatural.
         // A new subject far from the old one is cut to and not panned to.
-        float k = 1f - Mathf.Exp(-dt * 9f);
-        if ((target - lookAt).sqrMagnitude > 20f * 20f) k = 1f;
+        float k = 1f - Mathf.Exp(-dt * 14f);
+        if (cut || (target - lookAt).sqrMagnitude > 20f * 20f) k = 1f;
         lookAt = Vector3.Lerp(lookAt, target, k);
-        tvFov = Mathf.Lerp(tvFov, fov, 1f - Mathf.Exp(-dt * 2.5f));
+        tvFov = cut ? fov : Mathf.Lerp(tvFov, fov, 1f - Mathf.Exp(-dt * 5f));
         cam.transform.localPosition = position;
         cam.transform.localRotation = Quaternion.LookRotation(lookAt - position);
         cam.fieldOfView = tvFov;
