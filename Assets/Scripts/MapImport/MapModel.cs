@@ -123,6 +123,8 @@ namespace MapImport
         public double[] boundary;
         // How quick the kinds of ground are on this map (the sliders at import), or null for the game's normal speeds
         public TerrainSpeeds terrain;
+        // What the terrain looks like in 3D (the choices at import), or null for the normal look
+        public TerrainLook look;
 
         public double MetersPerMm => scale / 1000.0;
 

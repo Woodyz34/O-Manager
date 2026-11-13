@@ -29,6 +29,7 @@ public class MapEditPanel : MonoBehaviour
     double[] edge;
     bool edgeChanged;
     TerrainSpeeds terrain;
+    TerrainLook look;          // ground, trees and undergrowth for the 3D view of a TV control; needs no rebuild
     bool terrainChanged;
     string mapType;
     float deleteConfirmUntil = -1f;
@@ -37,10 +38,10 @@ public class MapEditPanel : MonoBehaviour
     volatile float progressShare;
 
     TMP_InputField nameField, clubField, senderField, contactField;
-    Button publicButton, privateButton, edgeButton, terrainButton, saveButton, cancelButton;
+    Button publicButton, privateButton, edgeButton, terrainButton, lookButton, saveButton, cancelButton;
     Button forestButton, sprintButton, deleteButton;
     TextMeshProUGUI typeText;
-    TextMeshProUGUI visibilityText, edgeText, terrainText, statusText;
+    TextMeshProUGUI visibilityText, edgeText, terrainText, lookText, statusText;
     RectTransform contactRow;
 
     public static void Open(Transform canvas, MapDefinition map, Action<MapDefinition, bool> onSaved)
@@ -61,6 +62,7 @@ public class MapEditPanel : MonoBehaviour
         panel.isPrivate = info.isPrivate;
         panel.edge = info.boundary != null && info.boundary.Length >= 6 ? info.boundary : null;
         panel.terrain = info.terrain != null ? info.terrain.Copy() : new TerrainSpeeds();
+        panel.look = info.look != null ? info.look.Safe() : new TerrainLook();
         panel.mapType = string.IsNullOrEmpty(info.mapType) ? "forest" : info.mapType;
         panel.Build(dim.transform);
         IsOpen = true;
@@ -89,7 +91,7 @@ public class MapEditPanel : MonoBehaviour
     void Build(Transform root)
     {
         Image card = CourseUI.CardPanel("Card", root);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 860));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 924));
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
 
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Edit map", 36, CourseUI.Ink, FontStyles.Bold), 44);
@@ -152,6 +154,17 @@ public class MapEditPanel : MonoBehaviour
         terrainButton = CourseUI.Button("Terrain button", terrainRow, "Terrain speeds...", CourseUI.ButtonKind.Secondary, OpenTerrain, 20);
         CourseUI.Size(terrainButton, -1, 300);
 
+        // What the terrain looks like in the 3D view of a TV control (ground, trees, undergrowth, own words)
+        RectTransform lookRow = CourseUI.Rect("Look row", card.transform);
+        CourseUI.Row(lookRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(lookRow, 52);
+        lookText = CourseUI.Text("Look", lookRow, "", 20, CourseUI.Ink);
+        lookText.alignment = TextAlignmentOptions.MidlineLeft;
+        lookText.textWrappingMode = TextWrappingModes.Normal;
+        CourseUI.Size(lookText, -1, -1, 1);
+        lookButton = CourseUI.Button("Look button", lookRow, "Terrain look...", CourseUI.ButtonKind.Secondary, OpenLook, 20);
+        CourseUI.Size(lookButton, -1, 300);
+
         statusText = CourseUI.Text("Status", card.transform, "", 20, CourseUI.Forest, FontStyles.Bold);
         statusText.textWrappingMode = TextWrappingModes.Normal;
         CourseUI.Size(statusText, 60);
@@ -204,7 +217,9 @@ public class MapEditPanel : MonoBehaviour
         CourseUI.SetButtonText(deleteButton, confirming ? "Sure? Click again" : "Delete map");
         terrainText.text = TerrainSpeedPanel.Describe(terrain) + (terrainChanged ? " The map is built again when you save." : "");
         terrainText.color = terrainChanged ? CourseUI.Accent : CourseUI.Ink;
-        foreach (Selectable s in new Selectable[] { publicButton, privateButton, forestButton, sprintButton, deleteButton, edgeButton, terrainButton, cancelButton, nameField, clubField, senderField, contactField })
+        lookText.text = TerrainLookPanel.Describe(look);
+        lookText.color = look.SameAs(info.look) ? CourseUI.Ink : CourseUI.Accent;
+        foreach (Selectable s in new Selectable[] { publicButton, privateButton, forestButton, sprintButton, deleteButton, edgeButton, terrainButton, lookButton, cancelButton, nameField, clubField, senderField, contactField })
             s.interactable = !working;
         saveButton.interactable = !working && (isPrivate || ContactGiven());
     }
@@ -379,6 +394,12 @@ public class MapEditPanel : MonoBehaviour
         });
     }
 
+    void OpenLook()
+    {
+        if (working) return;
+        TerrainLookPanel.Open(transform, look, chosen => { look = chosen; Refresh(); });
+    }
+
     static bool SameEdge(double[] a, double[] b)
     {
         if (a == null || b == null) return a == b;
@@ -408,7 +429,8 @@ public class MapEditPanel : MonoBehaviour
         bool goPrivate = isPrivate && !info.isPrivate;
         bool goPublic = !isPrivate && info.isPrivate;
         bool rebuild = edgeChanged || terrainChanged || TypeChanged;
-        bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild
+        bool lookChanged = !look.SameAs(info.look);
+        bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild || lookChanged
                        || (!isPrivate && (sender != (info.sender ?? "") || contact != (info.contact ?? "")));
         if (!changed && !goPrivate && !goPublic)
         {
@@ -431,6 +453,7 @@ public class MapEditPanel : MonoBehaviour
                 MapPackageInfo old = info;
                 double[] newEdge = edge;
                 TerrainSpeeds newTerrain = terrain.Copy();
+                TerrainLook newLook = look.Copy();
                 string newType = mapType;
                 string building = folder + ".rebuild";
                 string sourceCopy = PrivateMaps.SourceFile(folder, info);
@@ -440,6 +463,7 @@ public class MapEditPanel : MonoBehaviour
                     if (old.contourInterval > 0) file.contourInterval = old.contourInterval;
                     file.boundary = newEdge;
                     file.terrain = newTerrain;
+                    file.look = newLook;
                     MapPackage package = MapImportPanel.BuildPackage(file, name, newType, ownPng,
                         (step, share) => { progressShare = share; progressStep = step; });
                     MapPackageInfo i = package.info;
@@ -473,6 +497,7 @@ public class MapEditPanel : MonoBehaviour
             }
             updated.name = name;
             updated.ownerClub = club;
+            updated.look = look.Copy();
             if (!isPrivate)
             {
                 updated.sender = sender;

@@ -47,6 +47,8 @@ namespace MapImport
         public double[] boundary;             // the edge of the finished map the player chose (paper mm), or empty for all of it
         // How quick the kinds of ground are (the sliders at import). All in the middle = the game's normal speeds.
         public TerrainSpeeds terrain = new TerrainSpeeds();
+        // What the terrain looks like in the 3D view of a TV control (ground, trees, undergrowth); see TerrainLook
+        public TerrainLook look = new TerrainLook();
         // A copy of a map another player shared through Unity Cloud (see SharedMaps): their player id and when they
         // shared it (unix seconds). Empty for maps imported on this computer and for maps built into the game.
         public string sharedBy;
@@ -66,6 +68,7 @@ namespace MapImport
         public string pointsJson;      // GeoJSON, same layer names as the old Illern files
         public string linesJson;
         public byte[] kinds;            // one GroundKind per grid cell, for the runners' map reading
+        public byte[] world;            // what the terrain is made of, for the 3D view of a TV control (WorldLayer)
         public byte[] pictureRgba;     // row 0 at the top
         // On the paper, in mm: the grid, and every object of the map (an exported PNG of the whole map covers that)
         public MapExtent gridExtent;
@@ -149,12 +152,26 @@ namespace MapImport
                 gridAngle = (float)map.gridAngle,
                 boundary = map.boundary != null && map.boundary.Length >= 6 ? map.boundary : null,
                 terrain = map.terrain != null ? map.terrain.Copy() : new TerrainSpeeds(),
+                look = map.look != null ? map.look.Safe() : new TerrainLook(),
                 crs = map.crsCode,
                 created = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
             };
             pkg.info = info;
             pkg.grid = WriteGrid(grid, info);
             pkg.kinds = grid.kind;
+
+            // What grows where, the stones, cliffs and paths: for the 3D view of a TV control. The map works without it.
+            try
+            {
+                var worldSw = System.Diagnostics.Stopwatch.StartNew();
+                WorldLayer world = WorldLayer.Build(map, extent, offE, offN);
+                pkg.world = world.ToBytes();
+                Log($"World layer: {world.cols} x {world.rows} cells of {world.cell:0.#} m, {world.points.Count} points, {world.lines.Count} lines, {pkg.world.Length / 1024} kB in {worldSw.ElapsedMilliseconds} ms");
+            }
+            catch (Exception e)
+            {
+                Log("World layer: could not be made (" + e.Message + "); the map gets no TV controls");
+            }
 
             progress?.Invoke("Picking out stones, paths and streams", 0.35f);
             WriteLayers(map, offE, offN, out pkg.pointsJson, out pkg.linesJson);
@@ -216,7 +233,7 @@ namespace MapImport
 
         public const int ThumbnailSide = 768;
 
-        // Writes map.json, grid.bytes, kinds.bytes, points.json, lines.json, picture.png and (for a drawn picture) thumb.png.
+        // Writes map.json, grid.bytes, kinds.bytes, world.bytes, points.json, lines.json, picture.png and (for a drawn picture) thumb.png.
         // Safe on a background thread. ownPng: a picture the player gave (FitOwnPicture first); its thumbnail is made by the caller.
         public static void WriteFolder(string folder, MapPackage pkg, byte[] ownPng, Action<string, float> progress = null)
         {
@@ -225,6 +242,7 @@ namespace MapImport
             File.WriteAllText(Path.Combine(folder, "points.json"), pkg.pointsJson);
             File.WriteAllText(Path.Combine(folder, "lines.json"), pkg.linesJson);
             if (pkg.kinds != null) File.WriteAllBytes(Path.Combine(folder, "kinds.bytes"), pkg.kinds);
+            if (pkg.world != null) File.WriteAllBytes(Path.Combine(folder, "world.bytes"), pkg.world);
             if (ownPng != null)
             {
                 File.WriteAllBytes(Path.Combine(folder, "picture.png"), ownPng);
@@ -263,6 +281,17 @@ namespace MapImport
             S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created);
             S("sharedBy", i.sharedBy); N("sharedAt", i.sharedAt);
             B("isPrivate", i.isPrivate); S("privateSourceKey", i.privateSourceKey);
+            TerrainSpeeds t = i.terrain ?? new TerrainSpeeds();
+            sb.Append("  \"terrain\": {");
+            void T(string k, float v, bool last = false) { sb.Append('"').Append(k).Append("\": ").Append(v.ToString("0.###", CultureInfo.InvariantCulture)).Append(last ? "" : ", "); }
+            T("overall", t.overall); T("roads", t.roads); T("paths", t.paths); T("forest", t.forest); T("lightGreen", t.lightGreen);
+            T("midGreen", t.midGreen); T("darkGreen", t.darkGreen); T("marsh", t.marsh); T("stony", t.stony); T("open", t.open);
+            T("roughOpen", t.roughOpen); T("paved", t.paved, true);
+            sb.Append("},\n");
+            TerrainLook look = (i.look ?? new TerrainLook()).Safe();
+            sb.Append("  \"look\": {\"ground\": \"").Append(Escape(look.ground)).Append("\", \"forest\": \"").Append(Escape(look.forest))
+              .Append("\", \"undergrowth\": ").Append(look.undergrowth.ToString("0.###", CultureInfo.InvariantCulture))
+              .Append(", \"text\": \"").Append(Escape(look.text)).Append("\"},\n");
             sb.Append("  \"permissionConfirmed\": ").Append(i.permissionConfirmed ? "true" : "false").Append("\n}\n");
             File.WriteAllText(Path.Combine(folder, "map.json"), sb.ToString());
         }
