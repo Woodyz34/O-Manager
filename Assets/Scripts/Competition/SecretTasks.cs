@@ -26,24 +26,67 @@ public static class SecretTasks
     }
 
     // The tasks the host draws from. Add or remove tasks here.
-    static readonly Task[] Pool =
+    public static readonly Task[] Pool =
     {
         Task.BadLeg, Task.OverrunControls, Task.StrangeRoutes, Task.KeepLeft, Task.KeepRight,
         Task.StraightLines, Task.FromBehind, Task.Zigzag, Task.SecretPlace,
     };
 
     // Called by the host when the game starts. Returns the shared number (never 0).
-    public static int Pick(CourseData course)
+    public static int Pick(CourseData course, int tasksOff = 0)
     {
         int controls = course != null && course.controls != null ? course.controls.Count : 0;
-        List<Task> pool = new List<Task>(Pool);
-        // A task about one leg needs a few controls, so the slow leg is not the first one
-        if (controls < 3) pool.Remove(Task.BadLeg);
+        List<Task> pool = Available(course, tasksOff);
         Task task = pool[Random.Range(0, pool.Count)];
         // BadLeg: the control at the end of the slow leg. SecretPlace: a seed, so every player works out the same place.
         int param = task == Task.BadLeg ? UnityEngine.Random.Range(2, controls + 1)
             : task == Task.SecretPlace ? UnityEngine.Random.Range(1, 10000) : 0;
         return (int)task + 100 * param;
+    }
+
+    // The tasks the host's filter leaves in, for this course
+    public static List<Task> Available(CourseData course, int tasksOff)
+    {
+        int controls = course != null && course.controls != null ? course.controls.Count : 0;
+        List<Task> pool = new List<Task>();
+        foreach (Task t in Pool)
+        {
+            if ((tasksOff & Bit(t)) != 0) continue;
+            // A task about one leg needs a few controls, so the slow leg is not the first one
+            if (t == Task.BadLeg && controls < 3) continue;
+            pool.Add(t);
+        }
+        return pool;
+    }
+
+    public static int Bit(Task t) => 1 << (int)t;
+
+    // Why the game cannot start with this filter, or null
+    public static string StartProblem(CourseData course, int tasksOff)
+    {
+        if (Available(course, tasksOff).Count > 0) return null;
+        return "Secret task has no task left to give. Open Game mode > Secret task > Tasks and turn at least one on.";
+    }
+
+    // The host's filter, remembered for the next race in the same session; published to the others by LobbySettingsUI
+    public static int HostOff;
+
+    // Name and one-line explanation of a task, for the filter list
+    public static string Label(Task t)
+    {
+        switch (t)
+        {
+            case Task.BadLeg: return "Lose time on one leg";
+            case Task.OverrunControls: return "Overrun every control";
+            case Task.StrangeRoutes: return "Strange route choices";
+            case Task.KeepLeft: return "Keep left of the straight line";
+            case Task.KeepRight: return "Keep right of the straight line";
+            case Task.StraightLines: return "Straight at every control";
+            case Task.FromBehind: return "Into every control from behind";
+            case Task.Zigzag: return "Zigzag on every leg";
+            case Task.SecretPlace: return "Run through a secret place";
+            default: return t.ToString();
+        }
     }
 
     public static Task TaskOf(int code) => (Task)(code % 100);
@@ -95,6 +138,7 @@ public static class SecretTasks
     static void Init()
     {
         remembered = 0;
+        HostOff = 0;
         SceneManager.sceneLoaded -= OnSceneLoaded;
         SceneManager.sceneLoaded += OnSceneLoaded;
     }

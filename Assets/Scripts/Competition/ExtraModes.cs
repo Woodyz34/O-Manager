@@ -44,6 +44,27 @@ public static class ExtraModes
     // The two imposter modes both pick one imposter, so only one of them can be on
     public const ExtraMode ImposterKinds = ExtraMode.Imposter | ExtraMode.SecretTask;
 
+    // The imposter modes need at least this many players, or the imposter is too easy to spot
+    public const int MinImposterPlayers = 3;
+
+    public static int PlayersInLobby()
+    {
+        int n = 0;
+        foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        {
+            if (p.Object != null && p.Object.IsValid) n++;
+        }
+        return n;
+    }
+
+    // Why this mode cannot be played with this many players, or null when it can
+    public static string NotWithPlayers(ExtraMode mode, int players)
+    {
+        if ((mode & ImposterKinds) != 0 && players < MinImposterPlayers)
+            return "You need at least " + MinImposterPlayers + " players for this game mode";
+        return null;
+    }
+
     // Modes where nobody picks a runner (everyone gets the same one), so the runner pool does not matter
     public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 

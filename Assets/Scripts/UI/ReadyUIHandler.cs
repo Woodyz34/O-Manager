@@ -117,6 +117,25 @@ public class ReadyUIHandler : NetworkBehaviour
             UIToast.Show(modeProblem);
             return;
         }
+        // The imposter modes (Imposter, Secret task) need at least 3 players
+        if ((extraModes & ExtraModes.ImposterKinds) != 0 || CompetitionFlow.IsImposterMode(chosenMode))
+        {
+            string fewPlayers = ExtraModes.NotWithPlayers(ExtraModes.ImposterKinds, ExtraModes.PlayersInLobby());
+            if (fewPlayers != null)
+            {
+                UIToast.Show("Imposter and Secret task need at least " + ExtraModes.MinImposterPlayers + " players. Wait for more players or choose another game mode.");
+                return;
+            }
+        }
+        if ((extraModes & ExtraMode.SecretTask) != 0)
+        {
+            string noTask = SecretTasks.StartProblem(CourseLibrary.Current, SecretTasks.HostOff);
+            if (noTask != null)
+            {
+                UIToast.Show(noTask);
+                return;
+            }
+        }
         // A course on the host's private map: everyone needs their copy of the map before the race can start
         string mapProblem = PrivateMaps.StartProblem(CourseLibrary.Current);
         if (mapProblem != null)
@@ -156,7 +175,7 @@ public class ReadyUIHandler : NetworkBehaviour
             // Secret task mode: one random player is the imposter, everyone else gets the same secret task.
             bool secretTaskOn = (extraModes & ExtraMode.SecretTask) != 0;
             bool imposterOn = secretTaskOn || (extraModes & ExtraMode.Imposter) != 0 || CompetitionFlow.IsImposterMode(selectedMode);
-            serverPlayer.secretTask = secretTaskOn ? SecretTasks.Pick(CourseLibrary.Current) : 0;
+            serverPlayer.secretTask = secretTaskOn ? SecretTasks.Pick(CourseLibrary.Current, SecretTasks.HostOff) : 0;
             serverPlayer.imposter = imposterOn
                 ? CompetitionFlow.PickRandomPlayer(Runner)
                 : PlayerRef.None;
