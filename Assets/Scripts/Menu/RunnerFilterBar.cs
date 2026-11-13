@@ -64,6 +64,41 @@ public class RunnerFilterBar : MonoBehaviour
         }
     }
 
+    // Set by the game while picking for a women's or men's relay leg (true = women only, false = men only), and
+    // BothSexes for an open leg in "Open packs", where the runners out of the packs are shown whoever they are.
+    // The chips can't be changed then. Cleared when the picking ends.
+    public static bool? SexRule;
+    public static bool BothSexes;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRules()
+    {
+        ClearRules();
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    static void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        if (mode != UnityEngine.SceneManagement.LoadSceneMode.Additive) ClearRules();
+    }
+
+    public static void ClearRules()
+    {
+        SexRule = null;
+        BothSexes = false;
+    }
+
+    // What the bar shows: the rule's sex while there is one, else the player's choice
+    static bool WomenShown => SexRule ?? ShowWomen;
+    static bool Locked => SexRule.HasValue || BothSexes;
+
+    // The rules changed: every bar shows it and filters again
+    public static void NotifyAll()
+    {
+        foreach (RunnerFilterBar bar in FindObjectsByType<RunnerFilterBar>(FindObjectsSortMode.None)) bar.Notify();
+    }
+
     void Awake()
     {
         Wire();
@@ -114,8 +149,8 @@ public class RunnerFilterBar : MonoBehaviour
 
         womenChip = CopyChip("Women", left + 240f + 18f + 58f, y, 116f);
         menChip = CopyChip("Men", left + 240f + 18f + 116f + 10f + 46f, y, 92f);
-        womenChip.onClick.AddListener(() => { ShowWomen = true; Notify(); });
-        menChip.onClick.AddListener(() => { ShowWomen = false; Notify(); });
+        womenChip.onClick.AddListener(() => { if (Locked) return; ShowWomen = true; Notify(); });
+        menChip.onClick.AddListener(() => { if (Locked) return; ShowWomen = false; Notify(); });
     }
 
     // A last chip turns the order round (best or worst first). (Club and Country sorting is gone: the
@@ -195,7 +230,7 @@ public class RunnerFilterBar : MonoBehaviour
         x += 4f + 150f + 20f;
 
         classChip.onClick.AddListener(() => MultiSelectDropdown.Open((RectTransform)classChip.transform, "Class",
-            ClassAges, classes, false, age => (ShowWomen ? "D" : "H") + age, Notify));
+            ClassAges, classes, false, age => (WomenShown ? "D" : "H") + age, Notify));
         countryChip.onClick.AddListener(() => MultiSelectDropdown.Open((RectTransform)countryChip.transform, "Country",
             CountryOptions(), countries, true, TitleCase, Notify));
         clubChip.onClick.AddListener(() => MultiSelectDropdown.Open((RectTransform)clubChip.transform, "Club",
@@ -276,7 +311,7 @@ public class RunnerFilterBar : MonoBehaviour
     string ClassLabel()
     {
         if (classes.Count == 0) return "Class v";
-        string sex = ShowWomen ? "D" : "H";
+        string sex = WomenShown ? "D" : "H";
         if (classes.Count > 1) return "Class (" + classes.Count + ")";
         foreach (string age in classes) return sex + age;
         return "Class v";
@@ -331,7 +366,7 @@ public class RunnerFilterBar : MonoBehaviour
     public bool Matches(CardData card)
     {
         string wanted = search.text == null ? "" : search.text.Trim();
-        if (card.man == ShowWomen) return false;
+        if (!BothSexes && card.man == WomenShown) return false;
         if (wanted.Length > 0 && !Contains(card.RunnerName, wanted) && !Contains(card.clubName, wanted)
             && !Contains(RunnerCards.CountryName(card), wanted)) return false;
         if (tierFilter >= 0 && (int)RunnerCards.Tier(card) != tierFilter) return false;
@@ -412,8 +447,8 @@ public class RunnerFilterBar : MonoBehaviour
             PaintDrop(countryChip, countries.Count > 0, ChipText("Country", countries, TitleCase));
             PaintDrop(clubChip, clubs.Count > 0, ChipText("Club", clubs, c => c));
         }
-        if (womenChip != null) PaintChip(womenChip, ShowWomen);
-        if (menChip != null) PaintChip(menChip, !ShowWomen);
+        if (womenChip != null) PaintChip(womenChip, BothSexes || WomenShown);
+        if (menChip != null) PaintChip(menChip, BothSexes || !WomenShown);
     }
 
     void PaintDrop(Button chip, bool on, string text)

@@ -40,7 +40,7 @@ public class CardManager : MonoBehaviour
         {
             AllCards.getInstance().SetAllCards();
         }
-        foreach (CardData card in GameModes.WithSameStats(RunnerCards.InPacks()))
+        foreach (CardData card in GameModes.WithSameStats(UnderCap(RunnerCards.InPacks())))
         {
 
             GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
@@ -55,13 +55,40 @@ public class CardManager : MonoBehaviour
     // "Your runners": the runners the player owns, plus runners on loan up to 10 (RunnerCollection.CardsForRace)
     public void ShowOwnedCards()
     {
-        List<CardData> owned = RunnerCollection.CardsForRace();
+        // With a max overall the cheapest missing runner is lent when none of the player's own is under it
+        List<CardData> owned = RunnerRules.Cap > 0 && RelayRace.Active == null ? UnderCap(RunnerRules.YourRunnersPool(new List<LegSex> { LegSex.Any }, RunnerRules.Cap))
+            : RunnerCollection.CardsForRace();
         foreach (CardData card in owned)
         {
             GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
             cardInstance.GetComponent<CardDisplay>().SetValues(card);
-            if (RunnerCollection.IsOnLoan(card.RunnerName)) MarkOnLoan(cardInstance.transform);
+            MarkCard(cardInstance.transform, card);
         }
+    }
+
+    // "Open packs" in an individual race: the runner that came out of the pack
+    public void ShowCards(List<CardData> cards)
+    {
+        foreach (CardData card in cards)
+        {
+            GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
+            cardInstance.GetComponent<CardDisplay>().SetValues(card);
+            MarkCard(cardInstance.transform, card);
+        }
+    }
+
+    // An individual race with a max overall (RunnerRules.Cap): only the runners at or under it
+    static List<CardData> UnderCap(List<CardData> cards)
+    {
+        if (RunnerRules.Cap <= 0 || RelayRace.Active != null) return cards;   // relays: RelayRace checks the whole team
+        return cards.FindAll(c => RunnerRules.BudgetCost(c) <= RunnerRules.Cap);
+    }
+
+    // The ON LOAN ribbon on runners the player only has for this round (lent, or out of an "Open packs" pack)
+    public void MarkCard(Transform card, CardData data)
+    {
+        if (data == null) return;
+        if (RunnerCollection.IsOnLoan(data.RunnerName) || RunnerRules.IsOpened(data.RunnerName)) MarkOnLoan(card);
     }
 
     // A small orange tag on a runner the player only borrows for this round. It sits like a ribbon across the

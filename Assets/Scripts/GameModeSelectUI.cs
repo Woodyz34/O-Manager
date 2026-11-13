@@ -82,14 +82,25 @@ public class GameModeSelect : MonoBehaviour
             SameStatsPopup.Open(current, set);
             return;
         }
-        set(pool);
+        // Your runners and Any runner keep the max average overall the host has set
+        set(GameModes.WithCap(pool, GameModes.Cap(current)));
     }
 
     // "Runner pool" in the lobby: your own runners, any runner in the game, or any runner with the host's values.
     // A small pop-up with the choices replaced the old panel of pictures (kept in the scene, unused).
     public void OpenPanel()
     {
-        ChoicePopup.Open("Runner pool", PoolOptions(gameModeHandler.gameMode), GameModes.PoolId(gameModeHandler.gameMode), SelectGameMode);
+        // Your runners and Any runner can have a max average overall (CapPopup; lobby only)
+        string current = gameModeHandler.gameMode;
+        string extra = null;
+        System.Action openCap = null;
+        if (GameModes.CanHaveCap(current))
+        {
+            int cap = GameModes.Cap(current);
+            extra = "Max average overall: " + (cap > 0 ? cap.ToString() : "off");
+            openCap = () => CapPopup.Open(gameModeHandler.gameMode, mode => gameModeHandler.gameMode = mode);
+        }
+        ChoicePopup.Open("Runner pool", PoolOptions(current), GameModes.PoolId(current), SelectGameMode, null, extra, openCap);
     }
 
     // The runner pools to pick from (the lobby and single player offer the same ones)
@@ -101,7 +112,8 @@ public class GameModeSelect : MonoBehaviour
         {
             string pool = pools[i];
             // The chosen "Same stats" shows its values
-            string title = pool == GameModes.SameStatsMode && GameModes.IsSameStats(current)
+            // The chosen pool shows its values or its max average
+            string title = (pool == GameModes.SameStatsMode && GameModes.IsSameStats(current)) || pool == GameModes.PoolId(current)
                 ? GameModes.PoolName(current) : GameModes.PoolName(pool);
             options[i] = new ChoicePopup.Option { id = pool, title = title, description = GameModes.PoolDescription(pool) };
         }

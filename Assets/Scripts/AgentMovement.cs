@@ -1640,7 +1640,9 @@ public class AgentMovement : NetworkBehaviour
     public void SetRunner(CardDisplay card)
     {
         Debug.Log("SetRunner starts");
-        baseSpeed = unscaledBaseSpeed * card.speed/100;
+        // Women run with RunnerRules.WomenSpeedFactor of their card speed (the cards' speed is measured within each class)
+        float raceSpeed = card.CardData != null ? RunnerRules.RaceSpeed(card.CardData) : card.man ? card.speed : card.speed * RunnerRules.WomenSpeedFactor;
+        baseSpeed = unscaledBaseSpeed * raceSpeed / 100;
         runnerStatTec = card.technique;
         runnerName = card.runnerName;
 
@@ -1658,7 +1660,7 @@ public class AgentMovement : NetworkBehaviour
     // The runner for a relay leg
     public void SetRunner(CardData card)
     {
-        baseSpeed = unscaledBaseSpeed * card.speed / 100;
+        baseSpeed = unscaledBaseSpeed * RunnerRules.RaceSpeed(card) / 100;
         runnerName = card.RunnerName;
         runnerStatTec = (100 - card.technique) / 100;
         originalBaseSpeed = baseSpeed;

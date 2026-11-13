@@ -149,6 +149,26 @@ public class PackOpening : MonoBehaviour
         StartCoroutine(Sequence());
     }
 
+    // "Open packs" (RunnerRules / OpenPacks.cs): a free pack in a competition. The runner is only on loan, so the
+    // card says so and the only button goes on (to the next pack or to placing the runners).
+    string loanTitle;
+    string loanButton;
+
+    public void PlayLoan(CardData runner, string title, string buttonText, Action closed)
+    {
+        loanTitle = title;
+        loanButton = buttonText;
+        // The competition has its own screens (overlay canvases) above any camera: the show goes over them all
+        Canvas canvas = GetComponentInChildren<Canvas>(true);
+        if (canvas != null)
+        {
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 500;
+        }
+        Play(new PackResult { card = runner, isNew = false, paid = 0 }, exit => closed?.Invoke());
+    }
+
     // ---------- the show ----------
 
     void Prepare()
@@ -656,7 +676,12 @@ public class PackOpening : MonoBehaviour
             sparks.streamRate = tier == RunnerTier.Elite ? 26f : 12f;
         }
 
-        if (result.isNew)
+        if (loanTitle != null)
+        {
+            titleText.text = loanTitle;
+            subtitleText.text = RunnerCards.TierName(tier) + "   <color=#FBF4DA>OVERALL " + RunnerCards.Overall(result.card) + "   ON LOAN</color>";
+        }
+        else if (result.isNew)
         {
             titleText.text = tier == RunnerTier.Elite ? "ELITE RUNNER!" : "NEW RUNNER!";
             subtitleText.text = RunnerCards.TierName(tier) + "   <color=#FBF4DA>OVERALL " + RunnerCards.Overall(result.card) + "</color>";
@@ -674,9 +699,19 @@ public class PackOpening : MonoBehaviour
             subtitleText.alpha = t;
             titleText.characterSpacing = Mathf.Lerp(40f, 12f, UIAnim.OutCubic(t));
         });
-        int price = PackShop.CurrentPrice();
-        anotherButton.gameObject.SetActive(PackShop.CanBuy());
-        anotherLabel.text = price == 0 ? "Open free pack" : "Open another (" + price + " kr)";
+        if (loanTitle != null)
+        {
+            anotherButton.gameObject.SetActive(false);
+            runnersButton.gameObject.SetActive(false);
+            TextMeshProUGUI label = continueButton.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (label != null && loanButton != null) label.text = loanButton;
+        }
+        else
+        {
+            int price = PackShop.CurrentPrice();
+            anotherButton.gameObject.SetActive(PackShop.CanBuy());
+            anotherLabel.text = price == 0 ? "Open free pack" : "Open another (" + price + " kr)";
+        }
         yield return UIAnim.Wait(0.3f);
         buttons.blocksRaycasts = true;
         buttons.interactable = true;

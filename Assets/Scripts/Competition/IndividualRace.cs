@@ -77,7 +77,8 @@ public class IndividualRace : MonoBehaviour, IRaceStats
                 list.offsetMin = new Vector2(list.offsetMin.x, Mathf.Max(list.offsetMin.y, 96f));
             }
         }
-        pickInfo.text = LegDescription(0);
+        string cap = RunnerRules.CapText(new System.Collections.Generic.List<CardData>(), 1);
+        pickInfo.text = LegDescription(0) + (cap.Length > 0 ? "   <color=#E8742A>" + cap + "</color>" : "");
     }
 
     // Every runner has drawn the first stretch: the race starts (later stretches are ignored here)

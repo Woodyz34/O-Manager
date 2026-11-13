@@ -57,6 +57,7 @@ public class CourseBuilder : MonoBehaviour
     readonly List<EditCourse> courses = new List<EditCourse> { new EditCourse() };
     readonly List<EditFork> forks = new List<EditFork>();
     readonly List<int> legCourse = new List<int>();   // relay: the course each leg runs
+    readonly List<LegSex> legSex = new List<LegSex>();  // relay: who may run each leg (women, men or anyone)
     bool relay;
     string terrain = CourseData.Forest;   // forest or sprint course, for sorting and for mistakes
     int legs = 3;
@@ -167,6 +168,7 @@ public class CourseBuilder : MonoBehaviour
     Button sprintButton;
     Image relayPanel;
     TextMeshProUGUI legsLabel;
+    Button legSexButton;
     RectTransform legButtonRow;
     Button sameCourseButton;
     Button forkModeButton;
@@ -896,6 +898,7 @@ public class CourseBuilder : MonoBehaviour
         public List<EditCourse> courses;
         public List<EditFork> forks;
         public List<int> legCourse;
+        public List<LegSex> legSex;
         public List<List<Vector3>> areas, boundaries;
         public List<Vector3> openArea;
         public bool relay, forkEveryVariant, openIsLine;
@@ -911,7 +914,7 @@ public class CourseBuilder : MonoBehaviour
     {
         Snapshot snapshot = new Snapshot
         {
-            courses = new List<EditCourse>(), forks = new List<EditFork>(), legCourse = new List<int>(legCourse),
+            courses = new List<EditCourse>(), forks = new List<EditFork>(), legCourse = new List<int>(legCourse), legSex = new List<LegSex>(legSex),
             areas = areas.ConvertAll(a => new List<Vector3>(a)), boundaries = boundaries.ConvertAll(b => new List<Vector3>(b)),
             openArea = openArea != null ? new List<Vector3>(openArea) : null,
             relay = relay, forkEveryVariant = forkEveryVariant, openIsLine = openIsLine, legs = legs, selectedLeg = selectedLeg,
@@ -974,6 +977,8 @@ public class CourseBuilder : MonoBehaviour
         forks.AddRange(snapshot.forks);
         legCourse.Clear();
         legCourse.AddRange(snapshot.legCourse);
+        legSex.Clear();
+        if (snapshot.legSex != null) legSex.AddRange(snapshot.legSex);
         areas.Clear();
         areas.AddRange(snapshot.areas);
         boundaries.Clear();
@@ -1866,6 +1871,20 @@ public class CourseBuilder : MonoBehaviour
         SelectLeg(selectedLeg);
     }
 
+    // Who may run a leg (anyone when not set)
+    LegSex SexOf(int leg) => leg >= 0 && leg < legSex.Count ? legSex[leg] : LegSex.Any;
+
+    // Anyone -> Women -> Men -> Anyone for the selected leg
+    void CycleLegSex()
+    {
+        PushUndo();
+        while (legSex.Count < legs) legSex.Add(LegSex.Any);
+        LegSex now = legSex[selectedLeg];
+        legSex[selectedLeg] = now == LegSex.Any ? LegSex.Women : now == LegSex.Women ? LegSex.Men : LegSex.Any;
+        SetStatus("Leg " + (selectedLeg + 1) + ": " + (legSex[selectedLeg] == LegSex.Any ? "anyone may run it." : legSex[selectedLeg] == LegSex.Women ? "only women may run it." : "only men may run it."), false);
+        Redraw();
+    }
+
     void ToggleForkMode()
     {
         PushUndo();
@@ -1908,13 +1927,18 @@ public class CourseBuilder : MonoBehaviour
             EditCourse course = courses[legCourse[leg]];
             bool forked = course.items.Exists(item => item.fork >= 0 && forks[item.fork].branches.Count > 1);
             string kind = leg > 0 && legCourse[leg] == legCourse[leg - 1] ? "= leg " + leg : forked ? "forked" : course.items.Count == 0 ? "empty" : "straight";
-            Button button = CourseUI.Button("Leg " + (leg + 1), legButtonRow, "Leg " + (leg + 1) + "\n" + kind,
+            LegSex sex = SexOf(leg);
+            string who = sex == LegSex.Women ? " W" : sex == LegSex.Men ? " M" : "";
+            Button button = CourseUI.Button("Leg " + (leg + 1), legButtonRow, "Leg " + (leg + 1) + who + "\n" + kind,
                 leg == selectedLeg ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light, () => SelectLeg(captured), 15);
             button.GetComponentInChildren<TextMeshProUGUI>().enableWordWrapping = true;
         }
         sameCourseButton.gameObject.SetActive(selectedLeg > 0);
         bool same = selectedLeg > 0 && legCourse[selectedLeg] == legCourse[selectedLeg - 1];
         CourseUI.SetButtonText(sameCourseButton, same ? "Give leg " + (selectedLeg + 1) + " its own course" : "Same course as leg " + selectedLeg);
+        LegSex selectedSex = SexOf(selectedLeg);
+        CourseUI.SetButtonText(legSexButton, "Leg " + (selectedLeg + 1) + " runners: " + (selectedSex == LegSex.Any ? "Anyone" : selectedSex == LegSex.Women ? "Women" : "Men"));
+        CourseUI.SetButtonColor(legSexButton, selectedSex == LegSex.Any ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
         CourseUI.SetButtonText(forkModeButton, forkEveryVariant ? "Every team runs every branch" : "Branches are random");
         CourseUI.SetButtonText(otherLegsButton, showOtherLegs ? "Other legs: shown faded" : "Other legs: only their forks");
         relayInfo.text = "Each leg has its own course. Turn a control into a fork with \"Fork\" in the control list; a branch can have several controls, or none.\n"
@@ -1929,6 +1953,7 @@ public class CourseBuilder : MonoBehaviour
         courses.Clear();
         forks.Clear();
         legCourse.Clear();
+        legSex.Clear();
         areas.Clear();
         boundaries.Clear();
         openArea = null;
@@ -2030,6 +2055,10 @@ public class CourseBuilder : MonoBehaviour
             course.relayCourses.Add(relayCourse);
         }
         for (int leg = 0; leg < legs; leg++) course.legCourse.Add(usedCourses.IndexOf(legCourse[leg]));
+        char[] sexes = new char[legs];
+        for (int leg = 0; leg < legs; leg++) sexes[leg] = CourseData.SexLetter(SexOf(leg));
+        course.legSexes = new string(sexes).TrimEnd('a');
+        if (course.legSexes.Length == 0) course.legSexes = null;
         course.RefreshMainFields();
         return course;
     }
@@ -2264,6 +2293,8 @@ public class CourseBuilder : MonoBehaviour
                 courses.Add(edit);
             }
             for (int leg = 0; leg < legs; leg++) legCourse.Add(course.LegCourseIndex(leg));
+            legSex.Clear();
+            for (int leg = 0; leg < legs; leg++) legSex.Add(course.SexOfLeg(leg));
         }
         else
         {
@@ -2513,7 +2544,7 @@ public class CourseBuilder : MonoBehaviour
     void BuildRelayPanel(Transform canvas)
     {
         relayPanel = CourseUI.CardPanel("Relay panel", canvas);
-        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 654));
+        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 708));
         CourseUI.Column(relayPanel.gameObject, 10, new RectOffset(22, 22, 20, 20));
 
         TextMeshProUGUI title = CourseUI.Text("Title", relayPanel.transform, "Relay", 32, CourseUI.Ink, FontStyles.Bold);
@@ -2542,6 +2573,10 @@ public class CourseBuilder : MonoBehaviour
 
         sameCourseButton = CourseUI.Button("Same course", relayPanel.transform, "", CourseUI.ButtonKind.Light, ToggleSameCourse, 19);
         CourseUI.Size(sameCourseButton, 44);
+
+        // Women's, men's or open leg (2026-11-13); W/M on the leg buttons
+        legSexButton = CourseUI.Button("Leg runners", relayPanel.transform, "", CourseUI.ButtonKind.Light, CycleLegSex, 19);
+        CourseUI.Size(legSexButton, 44);
 
         forkModeButton = CourseUI.Button("Fork mode", relayPanel.transform, "", CourseUI.ButtonKind.Secondary, ToggleForkMode, 20);
         CourseUI.Size(forkModeButton, 44);
