@@ -182,6 +182,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int relayLeg { get; set; }
     [Networked] public int relayControl { get; set; }
     [Networked] public NetworkBool relayRunning { get; set; }
+    [Networked] public NetworkBool relayMistake { get; set; }   // the runner is making a mistake right now, shown on the map of a TV production
+    // TV production of a relay with TV controls (TvDirector): what the host puts on TV. 0 = nothing (the race runs at
+    // full pace), else TvDirector's number of the TV shot. Everyone slows the race down while something is on.
+    [Networked] public int tvShot { get; set; }
 
     // Relay results, for the statistics between the legs (RelayRace, RelayStats)
     [Networked, Capacity(10)] public NetworkArray<int> relayLegTimes => default;      // seconds on each leg
@@ -238,6 +242,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             relayLeg = -1;
             relayRunning = false;
+            relayMistake = false;
+            tvShot = 0;
             return;
         }
         relayLeg = relay != null ? relay.Leg : 0; // an individual competition is "leg 0" for the replay
@@ -246,6 +252,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         relayRunning = agentMovement.canRunNextSegment && !agentMovement.hasFinished && !agentMovement.relayHold
             && !agentMovement.WaitingForAllPlayersToReachKontroll && !agentMovement.WaitingForAllPlayersToDraw
             && drawer != null && !drawer.timeToDraw;
+        relayMistake = relayRunning && agentMovement.IsMissing;
+        tvShot = TvDirector.Active != null ? TvDirector.Active.ShotToSend : 0;
     }
 
     public override void Despawned(NetworkRunner runner, bool hasState)

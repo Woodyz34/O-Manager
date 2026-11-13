@@ -57,6 +57,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     public MapDefinition Map => map;
     public int LegCount => course.legs;
     public int Leg => leg;
+    public LegRoute Route => route;
     public bool LegIsStraight => !course.LegForked(leg);
     public int[] BranchesOfLeg(int legIndex) => branches[Mathf.Clamp(legIndex, 0, branches.Length - 1)];
 
@@ -71,6 +72,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
         race.branches = course.AssignBranches(new System.Random());
         race.courseRenderer = new GameObject("Course").AddComponent<CourseRenderer>();
         race.recorder = race.gameObject.AddComponent<RelayReplayRecorder>();
+        TvDirector.Create(race.gameObject, course, map);   // the TV of the TV controls, if the course has any
         Active = race;
         race.SetupLegPoints(0);
         Debug.Log($"RelayRace: {course.legs} legs, {course.relayCourses.Count} courses, {course.relayForks.Count} forks");

@@ -36,6 +36,7 @@ public class MapImportPanel : MonoBehaviour
     bool contourTyped;   // the player wrote the contour interval: changing the type no longer changes it
     bool permission;
     bool isPrivate;      // Public is the default
+    TerrainLook look = new TerrainLook();          // ground, trees and undergrowth for the 3D view of a TV control
     TerrainSpeeds terrain = new TerrainSpeeds();   // the terrain sliders; all in the middle = normal speeds
     bool working;
 
@@ -47,8 +48,8 @@ public class MapImportPanel : MonoBehaviour
     TMP_InputField pathField, pictureField, nameField, contourField;
     TMP_InputField senderField, clubField, contactField;   // who sends the map in, so the game's owner can reach them
     Button typeButton, pictureButton, permissionButton, importButton, cancelButton, edgeButton;
-    Button publicButton, privateButton, terrainButton;
-    TextMeshProUGUI edgeText, visibilityText, terrainText;
+    Button publicButton, privateButton, terrainButton, lookButton;
+    TextMeshProUGUI edgeText, visibilityText, terrainText, lookText;
     RectTransform contactRow;
     Image permissionBox;
 
@@ -74,7 +75,7 @@ public class MapImportPanel : MonoBehaviour
     void Build(Transform root)
     {
         Image card = CourseUI.CardPanel("Card", root);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180, 960));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180, 1024));
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
 
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Import a map", 36, CourseUI.Ink, FontStyles.Bold), 44);
@@ -149,6 +150,17 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.Size(terrainText, -1, -1, 1);
         terrainButton = CourseUI.Button("Terrain button", terrainRow, "Terrain speeds...", CourseUI.ButtonKind.Secondary, OpenTerrain, 20);
         CourseUI.Size(terrainButton, -1, 300);
+
+        // What the terrain looks like in the 3D view of a TV control (ground, trees, undergrowth, own words)
+        RectTransform lookRow = CourseUI.Rect("Look row", card.transform);
+        CourseUI.Row(lookRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(lookRow, 52);
+        lookText = CourseUI.Text("Look", lookRow, "", 20, CourseUI.Ink);
+        lookText.alignment = TextAlignmentOptions.MidlineLeft;
+        lookText.textWrappingMode = TextWrappingModes.Normal;
+        CourseUI.Size(lookText, -1, -1, 1);
+        lookButton = CourseUI.Button("Look button", lookRow, "Terrain look...", CourseUI.ButtonKind.Secondary, OpenLook, 20);
+        CourseUI.Size(lookButton, -1, 300);
 
         // Who can use the map: everyone (Public, the default) or only this player (Private)
         RectTransform visibilityRow = CourseUI.Rect("Visibility row", card.transform);
@@ -368,6 +380,12 @@ public class MapImportPanel : MonoBehaviour
         TerrainSpeedPanel.Open(transform, terrain, chosen => { terrain = chosen; Refresh(); });
     }
 
+    void OpenLook()
+    {
+        if (working) return;
+        TerrainLookPanel.Open(transform, look, chosen => { look = chosen; Refresh(); });
+    }
+
     // "Tranås_sprint_20190125 ocad9 (1)" -> "Tranås sprint": no copy numbers, dates or OCAD versions
     static string NiceName(string file)
     {
@@ -409,6 +427,9 @@ public class MapImportPanel : MonoBehaviour
         terrainText.text = TerrainSpeedPanel.Describe(terrain);
         terrainText.color = terrain.IsDefault() ? CourseUI.Ink : CourseUI.Accent;
         terrainButton.interactable = !working;
+        lookText.text = TerrainLookPanel.Describe(look);
+        lookText.color = look.IsDefault() ? CourseUI.Ink : CourseUI.Accent;
+        lookButton.interactable = !working;
         permissionBox.enabled = permission;
         CourseUI.SetButtonColor(publicButton, isPrivate ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Primary);
         CourseUI.SetButtonColor(privateButton, isPrivate ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
@@ -520,6 +541,7 @@ public class MapImportPanel : MonoBehaviour
         source.contourInterval = contours;
         source.boundary = edge;
         source.terrain = terrain.Copy();
+        source.look = look.Copy();
         string sourceName = Path.GetFileName(mapPath);
         string sourcePath = mapPath;
         MapPackage package = null;

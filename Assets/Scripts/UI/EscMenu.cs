@@ -128,6 +128,11 @@ public class EscMenu : MonoBehaviour
         {
             return;
         }
+        // Escape closes the full-screen TV view first
+        if (!IsOpen && TvViewer.CloseOnEscape())
+        {
+            return;
+        }
         if (IsOpen)
         {
             // Escape first stops waiting for a new key, then leaves the key bindings page, then closes the menu

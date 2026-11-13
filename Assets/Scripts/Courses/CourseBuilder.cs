@@ -40,6 +40,7 @@ public class CourseBuilder : MonoBehaviour
     {
         public int fork = -1;          // index into forks, or -1 for a control
         public Vector3 point;
+        public bool tv;                // relays: a TV control (a 3D view of it during the race)
     }
 
     class EditCourse
@@ -47,6 +48,7 @@ public class CourseBuilder : MonoBehaviour
         public Vector3? start;
         public List<EditItem> items = new List<EditItem>();
         public Vector3? finish;
+        public bool finishTv;
     }
 
     class EditFork
@@ -922,8 +924,8 @@ public class CourseBuilder : MonoBehaviour
         };
         foreach (EditCourse course in courses)
         {
-            EditCourse copy = new EditCourse { start = course.start, finish = course.finish };
-            foreach (EditItem item in course.items) copy.items.Add(new EditItem { fork = item.fork, point = item.point });
+            EditCourse copy = new EditCourse { start = course.start, finish = course.finish, finishTv = course.finishTv };
+            foreach (EditItem item in course.items) copy.items.Add(new EditItem { fork = item.fork, point = item.point, tv = item.tv });
             snapshot.courses.Add(copy);
         }
         foreach (EditFork fork in forks)
@@ -1857,8 +1859,8 @@ public class CourseBuilder : MonoBehaviour
         if (legCourse[selectedLeg] == legCourse[selectedLeg - 1])
         {
             EditCourse shared = Cur;
-            EditCourse own = new EditCourse { start = shared.start, finish = shared.finish };
-            foreach (EditItem item in shared.items) own.items.Add(new EditItem { fork = item.fork, point = item.point });
+            EditCourse own = new EditCourse { start = shared.start, finish = shared.finish, finishTv = shared.finishTv };
+            foreach (EditItem item in shared.items) own.items.Add(new EditItem { fork = item.fork, point = item.point, tv = item.tv });
             courses.Add(own);
             legCourse[selectedLeg] = courses.Count - 1;
             SetStatus("Leg " + (selectedLeg + 1) + " now has its own course, a copy of leg " + selectedLeg + "'s.", false);
@@ -2053,6 +2055,17 @@ public class CourseBuilder : MonoBehaviour
                     : new RelayItem { fork = usedForks.IndexOf(item.fork) });
             }
             course.relayCourses.Add(relayCourse);
+            // TV controls: common controls and the finish, each once
+            if (TvAllowed)
+            {
+                foreach (EditItem item in edit.items)
+                {
+                    if (item.fork < 0 && item.tv && !course.HasTvControl(WholeMeters(item.point)) && course.tvControls.Count < CourseData.MaxTvControls)
+                        course.tvControls.Add(WholeMeters(item.point));
+                }
+                if (edit.finishTv && edit.finish.HasValue && !course.HasTvControl(relayCourse.finish) && course.tvControls.Count < CourseData.MaxTvControls)
+                    course.tvControls.Add(relayCourse.finish);
+            }
         }
         for (int leg = 0; leg < legs; leg++) course.legCourse.Add(usedCourses.IndexOf(legCourse[leg]));
         char[] sexes = new char[legs];
@@ -2285,10 +2298,15 @@ public class CourseBuilder : MonoBehaviour
             }
             foreach (RelayLegCourse relayCourse in course.relayCourses)
             {
-                EditCourse edit = new EditCourse { start = map.ToWorld(relayCourse.start), finish = map.ToWorld(relayCourse.finish) };
+                EditCourse edit = new EditCourse
+                {
+                    start = map.ToWorld(relayCourse.start), finish = map.ToWorld(relayCourse.finish), finishTv = course.HasTvControl(relayCourse.finish)
+                };
                 foreach (RelayItem item in relayCourse.items)
                 {
-                    edit.items.Add(item.fork < 0 ? new EditItem { point = map.ToWorld(item.point) } : new EditItem { fork = item.fork });
+                    edit.items.Add(item.fork < 0
+                        ? new EditItem { point = map.ToWorld(item.point), tv = course.HasTvControl(item.point) }
+                        : new EditItem { fork = item.fork });
                 }
                 courses.Add(edit);
             }
@@ -2617,9 +2635,11 @@ public class CourseBuilder : MonoBehaviour
                 if (relay)
                 {
                     AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
+                        ("TV", item.tv ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light, () => ToggleTv(item, null)),
                         ("Fork", CourseUI.ButtonKind.Secondary, () => MakeFork(index)),
                         ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
                         ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
+                    if (item.tv) AddTvRow(item.point);
                 }
                 else
                 {
@@ -2655,7 +2675,15 @@ public class CourseBuilder : MonoBehaviour
             }
             previous = null;
         }
-        if (course.finish.HasValue)
+        if (course.finish.HasValue && relay)
+        {
+            AddRow("Finish" + Meters(previous, course.finish.Value), 38, MovingColor(MarkType.Finish, -1), FontStyles.Normal, 6,
+                ("TV", course.finishTv ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light, () => ToggleTv(null, course)),
+                ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Finish, -1, "The finish")),
+                ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.finish = null; Redraw(); }));
+            if (course.finishTv) AddTvRow(course.finish.Value);
+        }
+        else if (course.finish.HasValue)
         {
             AddRow("Finish" + Meters(previous, course.finish.Value), 38, MovingColor(MarkType.Finish, -1), FontStyles.Normal, 6,
                 ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Finish, -1, "The finish")),
@@ -2673,6 +2701,52 @@ public class CourseBuilder : MonoBehaviour
             AddRow("<color=#8A0A94>Uncrossable boundary " + (b + 1) + "</color>  <color=#5B7563>" + boundaries[b].Count + " corners</color>", 38, CourseUI.Ink, FontStyles.Normal, 6,
                 ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); boundaries.RemoveAt(index); Redraw(); }));
         }
+    }
+
+    // ---- TV controls (relays on forest maps) ----
+
+    // A relay on a forest map whose package has the 3D layer (maps imported before it have to be imported again)
+    bool TvAllowed => relay && terrain != CourseData.Sprint && map != null && !map.IsSprint;
+
+    void ToggleTv(EditItem item, EditCourse finishOf)
+    {
+        bool on = item != null ? item.tv : finishOf.finishTv;
+        if (!on)
+        {
+            if (!TvAllowed)
+            {
+                SetStatus(terrain == CourseData.Sprint || (map != null && map.IsSprint)
+                    ? "TV controls are only for forest maps so far." : "TV controls are only for relays.", true);
+                return;
+            }
+            if (!TvWorldData.HasWorld(map))
+            {
+                SetStatus("This map has no 3D layer for TV controls yet. Import the map again to get it.", true);
+                return;
+            }
+            int count = 0;
+            foreach (EditCourse c in courses)
+            {
+                foreach (EditItem i in c.items) if (i.fork < 0 && i.tv) count++;
+                if (c.finishTv) count++;
+            }
+            if (count >= CourseData.MaxTvControls)
+            {
+                SetStatus("A relay can have at most " + CourseData.MaxTvControls + " TV controls.", true);
+                return;
+            }
+        }
+        PushUndo();
+        if (item != null) item.tv = !on;
+        else finishOf.finishTv = !on;
+        if (!on) SetStatus("TV control: during the race a small 3D view shows the runners at it. Click View to see it.", false);
+        Redraw();
+    }
+
+    void AddTvRow(Vector3 point)
+    {
+        AddRow("<color=#E8742A>TV camera here</color>", 32, CourseUI.Ink, FontStyles.Bold, 34,
+            ("View", CourseUI.ButtonKind.Secondary, () => TvViewer.OpenPreview(map, map.FromWorld(point))));
     }
 
     // The row of the mark being moved is shown in the accent colour
@@ -2700,7 +2774,7 @@ public class CourseBuilder : MonoBehaviour
         foreach (var button in buttons)
         {
             Button made = CourseUI.Button(button.label, row, button.label, button.kind, button.action, 15);
-            CourseUI.Size(made, height - 4, button.label.Length > 7 ? 104 : 90);
+            CourseUI.Size(made, height - 4, button.label.Length > 7 ? 104 : button.label.Length <= 2 ? 56 : 90);
         }
     }
 
