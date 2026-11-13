@@ -64,12 +64,15 @@ public class CardManager : MonoBehaviour
         }
     }
 
-    // A small orange tag on a runner the player only borrows for this round
+    // A small orange tag on a runner the player only borrows for this round. It sits like a ribbon across the
+    // bottom tip of the card (the card picture is 301 high round the card's centre): at the top it stuck out above
+    // the card and the top row of the Choose a runner grid cut it off.
     static void MarkOnLoan(Transform card)
     {
         Image tag = CourseUI.Panel("On loan", card, CourseUI.Accent);
         tag.raycastTarget = false;
-        CourseUI.Place(tag.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -6), new Vector2(150, 34));
+        CourseUI.Place(tag.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -146), new Vector2(150, 34));
+        tag.transform.SetAsLastSibling();
         TMPro.TextMeshProUGUI text = CourseUI.Text("Text", tag.transform, "ON LOAN", 20, Color.white, TMPro.FontStyles.Bold, TMPro.TextAlignmentOptions.Center);
         text.raycastTarget = false;
         CourseUI.Stretch(text.rectTransform);

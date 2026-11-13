@@ -533,9 +533,10 @@ public static class GameUIBuilder
         Transform yourTime = root.transform.Find("Your time");
         if (yourTime != null)
         {
-            UI.Place((RectTransform)yourTime, UI.Center, UI.Center, new Vector2(0, 190), new Vector2(820, 180));
+            // A small card at the top edge (Clock.PlaceFinishTimeAtTop sets the same), so it does not hide the race
+            UI.Place((RectTransform)yourTime, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -16), new Vector2(460, 96));
             Text text = yourTime.GetComponent<Text>();
-            text.fontSize = 64;
+            text.fontSize = 40;
             text.fontStyle = FontStyle.Bold;
             text.color = UI.Ink;
             text.alignment = TextAnchor.MiddleCenter;

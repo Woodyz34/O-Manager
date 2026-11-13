@@ -409,10 +409,24 @@ public class Clock : MonoBehaviour
     public void setEndTimeText()
     {
         finishTime.gameObject.SetActive(true);
+        PlaceFinishTimeAtTop();
         finishTime.text = "Time: " + GetTime();
         if (agentMovement != null && agentMovement.pathfindingManager != null && agentMovement.pathfindingManager.multiplayer)
         {
-            finishTime.text += "\n<size=30>Waiting for the other runners to finish...</size>";
+            finishTime.text += "\n<size=20>Waiting for the other runners to finish...</size>";
         }
+    }
+
+    // The time card after the finish sat in the middle of the screen and hid the others still racing.
+    // Now it is a small card at the top edge, so the race can be followed under it.
+    void PlaceFinishTimeAtTop()
+    {
+        RectTransform rect = finishTime.rectTransform;
+        rect.anchorMin = new Vector2(0.5f, 1f);
+        rect.anchorMax = new Vector2(0.5f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, -16f);
+        rect.sizeDelta = new Vector2(460f, 96f);
+        finishTime.fontSize = 40;
     }
 }

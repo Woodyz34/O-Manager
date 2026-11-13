@@ -231,3 +231,55 @@ public static class UIToast
         UnityEngine.Object.Destroy(go, seconds);
     }
 }
+
+// A message at the bottom of the screen with a loading bar and the time left, for work that takes a while
+// (the lobby laying a new AI course before a race). Stays until Close.
+public class UIProgressCard
+{
+    GameObject root;
+    RectTransform fill;
+    TextMeshProUGUI status;
+
+    public static UIProgressCard Show(string message)
+    {
+        UIProgressCard card = new UIProgressCard();
+        GameObject go = new GameObject("Progress card", typeof(Canvas), typeof(CanvasScaler));
+        Canvas canvas = go.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 300;
+        ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
+        Image panel = CourseUI.CardPanel("Message", go.transform);
+        panel.raycastTarget = false;
+        CourseUI.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 60), new Vector2(1100, 150));
+        TextMeshProUGUI text = CourseUI.Text("Text", panel.transform, message, 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+        CourseUI.Place(text.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -14), new Vector2(1040, 50));
+
+        Image track = CourseUI.Panel("Bar", panel.transform, new Color(0.83f, 0.8f, 0.7f));
+        track.raycastTarget = false;
+        CourseUI.Place(track.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40, 30), new Vector2(760, 26));
+        Image bar = CourseUI.Panel("Fill", track.transform, CourseUI.Accent);
+        bar.raycastTarget = false;
+        card.fill = bar.rectTransform;
+        card.fill.anchorMin = Vector2.zero;
+        card.fill.anchorMax = new Vector2(0f, 1f);
+        card.fill.offsetMin = card.fill.offsetMax = Vector2.zero;
+
+        card.status = CourseUI.Text("Time left", panel.transform, "Starting...", 22, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+        CourseUI.Place(card.status.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-40, 22), new Vector2(260, 42));
+        card.root = go;
+        return card;
+    }
+
+    public void Set(string text, float share)
+    {
+        if (root == null) return;
+        status.text = text;
+        fill.anchorMax = new Vector2(Mathf.Clamp01(share), 1f);
+    }
+
+    public void Close()
+    {
+        if (root != null) UnityEngine.Object.Destroy(root);
+        root = null;
+    }
+}
