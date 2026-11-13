@@ -157,8 +157,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
 
     bool AnyAllowed()
     {
-        List<CardData> all = Pool();
-        return all.Exists(c => RunnerRules.Allowed(c, all, picks, LegSexes, RunnerRules.Cap));
+        return RunnerRules.AllowedList(Pool(), picks, LegSexes, RunnerRules.Cap).Count > 0;
     }
 
     void ShowCardsForNextPick()
@@ -170,7 +169,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
         // Runners not picked yet that may run this leg (women's/men's leg, and with a max average overall the legs
         // after it must still be possible), or everyone again when there are more legs than runners.
         List<CardData> all = Pool();
-        List<CardData> left = all.FindAll(c => RunnerRules.Allowed(c, all, picks, LegSexes, RunnerRules.Cap));
+        List<CardData> left = RunnerRules.AllowedList(all, picks, LegSexes, RunnerRules.Cap);
         // Nothing fits (should not happen: loans fill up "Your runners"): the leg's rule still counts if it can
         if (left.Count == 0) left = all.FindAll(c => RunnerRules.Fits(c, LegSexes[picks.Count]));
         if (left.Count == 0) left = new List<CardData>(all);

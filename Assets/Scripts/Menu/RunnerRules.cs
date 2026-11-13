@@ -89,42 +89,69 @@ public static class RunnerRules
     // take the cheapest women and men, then the open legs the cheapest of those left.
     public static bool CanFill(List<CardData> pool, IList<LegSex> legs, int budget, bool repeats = false)
     {
-        if (legs.Count == 0) return budget >= 0;
         List<CardData> sorted = new List<CardData>(pool);
         sorted.RemoveAll(c => c == null);
         sorted.Sort((a, b) => BudgetCost(a).CompareTo(BudgetCost(b)));
-        HashSet<string> used = new HashSet<string>();
-        long total = 0;
+        return Cheapest(sorted, legs, repeats, null, out long total, out _) && total <= budget;
+    }
+
+    // The cheapest runners for the legs from a pool sorted cheapest first, leaving out one runner (exclude)
+    static bool Cheapest(List<CardData> sorted, IList<LegSex> legs, bool repeats, string exclude, out long total, out HashSet<string> used)
+    {
+        used = new HashSet<string>();
+        total = 0;
         foreach (LegSex pass in new[] { LegSex.Women, LegSex.Men, LegSex.Any })
         {
             foreach (LegSex leg in legs)
             {
                 if (leg != pass) continue;
-                CardData cheapest = sorted.Find(c => Fits(c, leg) && (repeats || !used.Contains(c.RunnerName)));
+                CardData cheapest = null;
+                foreach (CardData c in sorted)
+                {
+                    if (c.RunnerName == exclude || !Fits(c, leg) || (!repeats && used.Contains(c.RunnerName))) continue;
+                    cheapest = c;
+                    break;
+                }
                 if (cheapest == null) return false;
                 used.Add(cheapest.RunnerName);
                 total += BudgetCost(cheapest);
             }
         }
-        return total <= budget;
+        return true;
     }
 
-    // May this runner run the next leg? It must fit the leg, and the legs after it must still be possible with the
-    // runners left and (with a max average) the overall left.
-    public static bool Allowed(CardData candidate, List<CardData> pool, List<CardData> picks, IList<LegSex> legs, int cap)
+    // The runners that may run the next leg: they fit the leg, and the legs after it must still be possible with the
+    // runners left and (with a max average) the overall left. Fast enough for every runner in the game: the cheapest
+    // way to fill the rest is worked out once, and again only for the few runners it uses.
+    public static List<CardData> AllowedList(List<CardData> pool, List<CardData> picks, IList<LegSex> legs, int cap)
     {
+        List<CardData> result = new List<CardData>();
         int leg = picks.Count;
-        if (leg >= legs.Count || !Fits(candidate, legs[leg])) return false;
+        if (leg >= legs.Count) return result;
         bool repeats = CountUnique(pool) < legs.Count;
-        List<CardData> left = new List<CardData>(pool);
-        if (!repeats)
-        {
-            left.RemoveAll(c => c == null || c.RunnerName == candidate.RunnerName || picks.Exists(p => p.RunnerName == c.RunnerName));
-        }
+        List<CardData> left = pool.FindAll(c => c != null && (repeats || !picks.Exists(p => p.RunnerName == c.RunnerName)));
+        List<CardData> sorted = new List<CardData>(left);
+        sorted.Sort((a, b) => BudgetCost(a).CompareTo(BudgetCost(b)));
         List<LegSex> rest = new List<LegSex>();
         for (int i = leg + 1; i < legs.Count; i++) rest.Add(legs[i]);
-        int budget = cap > 0 ? cap * legs.Count - Spent(picks) - BudgetCost(candidate) : int.MaxValue;
-        return budget >= 0 && CanFill(left, rest, budget, repeats);
+        long budget = cap > 0 ? (long)cap * legs.Count - Spent(picks) : long.MaxValue;
+
+        bool baseOk = Cheapest(sorted, rest, repeats, null, out long baseTotal, out HashSet<string> baseUsed);
+        HashSet<string> seen = new HashSet<string>();
+        foreach (CardData card in left)
+        {
+            if (!seen.Add(card.RunnerName) || !Fits(card, legs[leg])) continue;
+            bool ok = baseOk;
+            long restCost = baseTotal;
+            if (!repeats && baseUsed.Contains(card.RunnerName)) ok = Cheapest(sorted, rest, repeats, card.RunnerName, out restCost, out _);
+            if (ok && (budget == long.MaxValue || restCost + BudgetCost(card) <= budget)) result.Add(card);
+        }
+        return result;
+    }
+
+    public static bool Allowed(CardData candidate, List<CardData> pool, List<CardData> picks, IList<LegSex> legs, int cap)
+    {
+        return candidate != null && AllowedList(pool, picks, legs, cap).Exists(c => c.RunnerName == candidate.RunnerName);
     }
 
     public static int Spent(List<CardData> picks)
