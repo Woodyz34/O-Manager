@@ -32,6 +32,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     int leg = -1;
     readonly List<CardData> picks = new List<CardData>();
     bool hangEnabled = true;
+    bool raceStarted;               // from the moment every team has drawn: the hang-on choice is locked
     int legStartSeconds;
 
     // Statistics and replay
@@ -47,7 +48,6 @@ public class RelayRace : MonoBehaviour, IRaceStats
     GameObject hud;
     TextMeshProUGUI legText;
     TextMeshProUGUI statusText;
-    Image reserveFill;
     Button hangButton;
     TextMeshProUGUI pickHeader;
     string legMessage = "";
@@ -262,6 +262,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     void StartLeg(AgentMovement agent, int legIndex)
     {
         leg = legIndex;
+        raceStarted = false;
         SetupLegPoints(leg);
         CardData runner = picks.Count > 0 ? picks[Mathf.Min(leg, picks.Count - 1)] : null;
         if (runner != null) agent.SetRunner(runner);
@@ -312,6 +313,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     // Every team has drawn the leg: work out how long our runner waits for the changeover, then go
     public void OnAllDrawn(AgentMovement agent)
     {
+        raceStarted = true;
         int ourTime = TeamSeconds(NetworkPlayer.Local);
         int firstTime = ourTime;
         foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
@@ -495,42 +497,40 @@ public class RelayRace : MonoBehaviour, IRaceStats
         if (hud != null) return;
         GameObject canvas = GameObject.FindGameObjectWithTag("Canvas");
         if (canvas == null) return;
+        // A compact box under the timer (top right), so the map and the control are never covered
         Image panel = CourseUI.CardPanel("Relay HUD", canvas.transform);
         hud = panel.gameObject;
-        CourseUI.Place(panel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -16), new Vector2(900, 128));
+        CourseUI.Place(panel.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32, -112), new Vector2(330, 270));
 
-        legText = CourseUI.Text("Leg", panel.transform, "", 30, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Place(legText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -12), new Vector2(620, 40));
-        legText.enableWordWrapping = false;
+        legText = CourseUI.Text("Leg", panel.transform, "", 20, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Place(legText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0, -12), new Vector2(-32, 118));
+        legText.rectTransform.anchorMin = new Vector2(0f, 1f);
+        legText.rectTransform.anchorMax = new Vector2(1f, 1f);
+        legText.rectTransform.offsetMin = new Vector2(16, -134);
+        legText.rectTransform.offsetMax = new Vector2(-16, -12);
+        legText.alignment = TextAlignmentOptions.TopLeft;
+        legText.enableWordWrapping = true;
 
-        statusText = CourseUI.Text("Status", panel.transform, "", 22, CourseUI.InkMuted);
-        CourseUI.Place(statusText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24, -54), new Vector2(620, 64));
+        hangButton = CourseUI.Button("Hang", panel.transform, "", CourseUI.ButtonKind.Secondary, ToggleHang, 18);
+        CourseUI.Place((RectTransform)hangButton.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -140), new Vector2(298, 44));
 
-        TextMeshProUGUI reserveLabel = CourseUI.Text("Reserve label", panel.transform, "Reserve", 18, CourseUI.InkMuted, FontStyles.Bold);
-        CourseUI.Place(reserveLabel.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24, -14), new Vector2(220, 24));
-        Image reserveBack = CourseUI.Panel("Reserve", panel.transform, new Color(0.12f, 0.24f, 0.17f, 0.2f), false);
-        CourseUI.Place(reserveBack.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24, -42), new Vector2(220, 16));
-        reserveFill = CourseUI.Panel("Fill", reserveBack.transform, CourseUI.Forest, false);
-        reserveFill.rectTransform.anchorMin = Vector2.zero;
-        reserveFill.rectTransform.anchorMax = Vector2.one;
-        reserveFill.rectTransform.pivot = new Vector2(0f, 0.5f);
-        reserveFill.rectTransform.offsetMin = Vector2.zero;
-        reserveFill.rectTransform.offsetMax = Vector2.zero;
-
-        hangButton = CourseUI.Button("Hang", panel.transform, "", CourseUI.ButtonKind.Secondary, ToggleHang, 20);
-        CourseUI.Place((RectTransform)hangButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24, -68), new Vector2(220, 46));
+        statusText = CourseUI.Text("Status", panel.transform, "", 17, CourseUI.InkMuted);
+        statusText.rectTransform.anchorMin = new Vector2(0f, 0f);
+        statusText.rectTransform.anchorMax = new Vector2(1f, 0f);
+        statusText.rectTransform.pivot = new Vector2(0.5f, 0f);
+        statusText.rectTransform.offsetMin = new Vector2(16, 10);
+        statusText.rectTransform.offsetMax = new Vector2(-16, 80);
+        statusText.alignment = TextAlignmentOptions.TopLeft;
     }
 
+    // The choice is made while drawing, never during the race
     void ToggleHang()
     {
+        if (raceStarted) return;
         hangEnabled = !hangEnabled;
         NetworkPlayer local = NetworkPlayer.Local;
         PackRunning pack = local != null ? local.agentMovement.packRunning : null;
-        if (pack != null)
-        {
-            pack.HangAllowed = LegIsStraight && hangEnabled;
-            if (!hangEnabled && pack.IsHanging) pack.LetGo("Stopped hanging on", false);
-        }
+        if (pack != null) pack.HangAllowed = LegIsStraight && hangEnabled;
         RefreshHud();
     }
 
@@ -538,10 +538,17 @@ public class RelayRace : MonoBehaviour, IRaceStats
     {
         if (hud == null || leg < 0) return;
         CardData runner = picks.Count > 0 ? picks[Mathf.Min(leg, picks.Count - 1)] : null;
-        legText.text = "Leg " + (leg + 1) + " of " + course.legs + (runner != null ? "  ·  " + runner.RunnerName : "")
-            + "  <size=70%><color=#5B7563>" + (LegIsStraight ? "straight" : "forked") + "</color></size>";
-        hangButton.gameObject.SetActive(LegIsStraight);
-        CourseUI.SetButtonText(hangButton, hangEnabled ? "Hang on: ON" : "Hang on: OFF");
+        string text = runner != null ? runner.RunnerName + "\n" : "";
+        text += "<size=85%><color=#5B7563>Leg " + (leg + 1) + " of " + course.legs + "  ·  " + (LegIsStraight ? "straight" : "forked") + "\n"
+            + CourseData.KmText(route.course.LengthMeters()) + "  ·  " + route.course.controls.Count + " controls</color></size>";
+        if (runner != null)
+        {
+            text += "\n<size=85%><color=#5B7563>Speed " + Mathf.RoundToInt(runner.speed) + "  ·  Technique " + Mathf.RoundToInt(runner.technique) + "</color></size>";
+        }
+        legText.text = text;
+        bool showHang = LegIsStraight && !raceStarted;
+        hangButton.gameObject.SetActive(showHang);
+        CourseUI.SetButtonText(hangButton, hangEnabled ? "Hang on: follow faster runners" : "Hang on: own route");
         CourseUI.SetButtonColor(hangButton, hangEnabled ? CourseUI.ButtonKind.Secondary : CourseUI.ButtonKind.Light);
     }
 
@@ -564,12 +571,9 @@ public class RelayRace : MonoBehaviour, IRaceStats
         if (text == "" && pack != null) text = pack.Status;
         if (text == "" && pack != null && LegIsStraight)
         {
-            text = hangEnabled ? "Running alone. You will hang on to anyone who passes you." : "Running alone.";
+            text = hangEnabled ? "Running alone. You hang on to anyone who passes you." : "Running alone.";
         }
         statusText.text = text;
-        float share = pack != null ? pack.ReserveShare : 1f;
-        reserveFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(share), 1f);
-        reserveFill.color = share > 0.5f ? CourseUI.Forest : share > 0.2f ? CourseUI.Accent : CourseUI.Danger;
     }
 
     static bool AllTeamsFinished(int legIndex)

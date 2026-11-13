@@ -300,6 +300,7 @@ public class LobbySettingsUI : MonoBehaviour
         if (course == null) return "...";
         // Everyone sees whether it is a sprint or a forest course, next to the name and who made it
         string type = course.IsSprint() ? "<color=#E8742A>Sprint</color>" : "<color=#3F7D54>Forest</color>";
+        if (course.IsRelay()) type = "<color=#2C6E8F>Relay · " + course.legs + (course.legs == 1 ? " leg" : " legs") + "</color>  ·  " + type;
         MapDefinition courseMap = MapDefinition.FindExact(course.mapId);
         if (courseMap != null && courseMap.isPrivate) type += "  ·  <color=#8A5A2B>Private map</color>";
         string by = string.IsNullOrEmpty(course.author) ? "" : "  ·  by " + course.author;
