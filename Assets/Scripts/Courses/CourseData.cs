@@ -72,6 +72,9 @@ public class CourseData
     public List<RelayLegCourse> relayCourses = new List<RelayLegCourse>();
     public List<RelayFork> relayForks = new List<RelayFork>();
     public bool forkEveryVariant = true;                        // true: every team runs every branch of a fork once; false: random
+    // relay: who may run each leg, one letter per leg: "a" anyone, "w" women, "m" men (2026-11-13). Empty or
+    // missing letters = anyone, so older relays need no change.
+    public string legSexes;
 
     // Only in relays saved by earlier versions of the builder; Normalize turns them into the courses and forks above
     public List<ControlFork> forks = new List<ControlFork>();
@@ -79,6 +82,26 @@ public class CourseData
     public List<bool> forkedLegs = new List<bool>();
 
     public bool IsRelay() => kind == KindRelay;
+
+    // Who may run a leg (index from 0)
+    public LegSex SexOfLeg(int leg)
+    {
+        if (!IsRelay() || string.IsNullOrEmpty(legSexes) || leg < 0 || leg >= legSexes.Length) return global::LegSex.Any;
+        char c = legSexes[leg];
+        return c == 'w' ? global::LegSex.Women : c == 'm' ? global::LegSex.Men : global::LegSex.Any;
+    }
+
+    public static char SexLetter(LegSex sex) => sex == global::LegSex.Women ? 'w' : sex == global::LegSex.Men ? 'm' : 'a';
+
+    // Only letters that say something; empty when every leg is open to anyone
+    static string CleanSexes(string text, int legCount)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < text.Length && i < legCount && i < MaxLegs; i++) sb.Append(text[i] == 'w' || text[i] == 'm' ? text[i] : 'a');
+        string clean = sb.ToString().TrimEnd('a');
+        return clean.Length > 0 ? clean : null;
+    }
 
     public const string Forest = "forest";
     public const string Sprint = "sprint";
@@ -418,6 +441,9 @@ public class CourseData
             }
         }
         if (!string.IsNullOrEmpty(terrain)) sb.Append('|').Append(terrain == Sprint ? 's' : 'f');
+        // Women/men per relay leg in a "g" field (older versions of the game skip it)
+        string sexes = relay ? CleanSexes(legSexes, legs) : null;
+        if (sexes != null) sb.Append("|g").Append(sexes);
         // Areas in a "z" field, uncrossable boundary lines in a "y" field (versions before the lines skip it)
         AppendForbidden(sb, false);
         AppendForbidden(sb, true);
@@ -603,6 +629,7 @@ public class CourseData
                 if (parts[p].StartsWith("z")) course.forbidden.AddRange(ReadForbidden(parts[p], false));
                 if (parts[p].StartsWith("y")) course.forbidden.AddRange(ReadForbidden(parts[p], true));
                 if (parts[p].StartsWith("t")) course.tvControls = ReadTvControls(parts[p]);
+                if (parts[p].StartsWith("g")) course.legSexes = parts[p].Substring(1);
             }
             string coords = parts[8];
             if (coords.Length < 14 || (coords.Length - 8) % 6 != 0)
@@ -809,6 +836,7 @@ public class CourseData
         authorId = SafeText(authorId, 64);
         background = SafeText(background, 64);
         if (terrain != Forest && terrain != Sprint) terrain = null;
+        legSexes = IsRelay() ? CleanSexes(legSexes, legs) : null;
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         if (createdAt < 0) createdAt = 0;
         if (createdAt > now + 86400) createdAt = now;   // a date in the future would keep the course on top of the list for ever

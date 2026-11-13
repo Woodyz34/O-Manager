@@ -45,9 +45,23 @@ public class ReadyUIHandler : NetworkBehaviour
     async void RemakeAICourseThenStart()
     {
         remaking = true;
-        UIToast.Show("Laying a new AI course with the same length and controls...", 4f);
-        CourseGenerator.Result result = await AICoursePanel.Remake();
+        // A card with a loading bar and the time left, as in the AI course window: laying a sprint course with
+        // barriers can take up to about 50 s, and a plain message that went away after 4 s looked like nothing happened
+        CourseGenerator.Progress progress = new CourseGenerator.Progress();
+        UIProgressCard card = UIProgressCard.Show("Laying a new AI course with the same length and controls...");
+        Task<CourseGenerator.Result> making = AICoursePanel.Remake(progress);
+        while (!making.IsCompleted)
+        {
+            await Task.Yield();
+            if (this == null) { card.Close(); return; }
+            card.Set(AICoursePanel.DescribeProgress(progress, out float share), share);
+        }
+        CourseGenerator.Result result;
+        try { result = await making; }
+        catch (System.Exception e) { result = new CourseGenerator.Result { error = e.Message }; }
+        card.Close();
         if (this == null) return;
+        if (result.course != null) UIToast.Show("New AI course laid. Starting...", 3f, CourseUI.Forest);
         if (result.course != null)
         {
             mapHandler.Select(result.course);
@@ -73,6 +87,13 @@ public class ReadyUIHandler : NetworkBehaviour
         // Bara värden (master client i Shared Mode) får starta spelet
         if (!IsHost()) return;
         if (remaking) return;
+        // No course chosen: tell the host instead of starting a race that can't be set up
+        string courseProblem = CourseLibrary.StartProblem(CourseLibrary.Current);
+        if (courseProblem != null)
+        {
+            UIToast.Show(courseProblem);
+            return;
+        }
         if (AICoursePanel.ShouldRemake(CourseLibrary.Current))
         {
             RemakeAICourseThenStart();
@@ -95,6 +116,25 @@ public class ReadyUIHandler : NetworkBehaviour
         {
             UIToast.Show(modeProblem);
             return;
+        }
+        // The imposter modes (Imposter, Secret task) need at least 3 players
+        if ((extraModes & ExtraModes.ImposterKinds) != 0 || CompetitionFlow.IsImposterMode(chosenMode))
+        {
+            string fewPlayers = ExtraModes.NotWithPlayers(ExtraModes.ImposterKinds, ExtraModes.PlayersInLobby());
+            if (fewPlayers != null)
+            {
+                UIToast.Show("Imposter and Secret task need at least " + ExtraModes.MinImposterPlayers + " players. Wait for more players or choose another game mode.");
+                return;
+            }
+        }
+        if ((extraModes & ExtraMode.SecretTask) != 0)
+        {
+            string noTask = SecretTasks.StartProblem(CourseLibrary.Current, SecretTasks.HostOff);
+            if (noTask != null)
+            {
+                UIToast.Show(noTask);
+                return;
+            }
         }
         // A course on the host's private map: everyone needs their copy of the map before the race can start
         string mapProblem = PrivateMaps.StartProblem(CourseLibrary.Current);
@@ -135,7 +175,7 @@ public class ReadyUIHandler : NetworkBehaviour
             // Secret task mode: one random player is the imposter, everyone else gets the same secret task.
             bool secretTaskOn = (extraModes & ExtraMode.SecretTask) != 0;
             bool imposterOn = secretTaskOn || (extraModes & ExtraMode.Imposter) != 0 || CompetitionFlow.IsImposterMode(selectedMode);
-            serverPlayer.secretTask = secretTaskOn ? SecretTasks.Pick(CourseLibrary.Current) : 0;
+            serverPlayer.secretTask = secretTaskOn ? SecretTasks.Pick(CourseLibrary.Current, SecretTasks.HostOff) : 0;
             serverPlayer.imposter = imposterOn
                 ? CompetitionFlow.PickRandomPlayer(Runner)
                 : PlayerRef.None;

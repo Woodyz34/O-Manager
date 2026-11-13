@@ -37,9 +37,17 @@ public static class GameModes
     // uses the last leg's values.
     public const string SameStatsMode = "Same stats";
 
-    // Single player offers the first two; the lobby all three
-    public static readonly string[] Pools = { YourRunners, ChooseAny };
-    public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode };
+    // "Open packs" (2026-11-13): every player opens one free pack per leg (one in an individual race) and races with
+    // what comes out. The runners are on loan for the round and never saved to My Runners (OpenPacks.cs).
+    public const string OpenPacksMode = "Open packs";
+
+    // "Max average overall" (2026-11-13): with Your runners or Any runner the host can cap the team's average overall,
+    // so the best runners must be paired with weaker ones. Sent after the pool as "#<cap>": "Your runners#75".
+    public const char CapMark = '#';
+    public const int MinCap = 40, MaxCap = 99, DefaultCap = 75;
+
+    // The runner pools offered in the lobby and, since 2026-11-13, in single player too
+    public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode, OpenPacksMode };
 
     // The whole scale (2026-11-13, the user wanted every value). Speed 0 would never reach the finish, so it starts at 1.
     public const int MinSpeed = 1, MaxSpeed = 100, MinTechnique = 0, MaxTechnique = 100;
@@ -54,17 +62,53 @@ public static class GameModes
             if (!AllLegsAlike(legs)) return "Same stats per leg";   // kept short for the lobby bar
             return "Same stats " + legs[0].x + "/" + legs[0].y;     // speed/technique
         }
-        return IsYourRunners(mode) ? "Your runners" : mode == ChooseAny ? "Any runner" : mode;
+        string id = PoolId(mode);
+        string name = IsYourRunners(id) ? "Your runners" : id == ChooseAny ? "Any runner" : id;
+        int cap = Cap(mode);
+        return cap > 0 ? name + ", avg max " + cap : name;
     }
 
     public static string PoolDescription(string mode)
     {
         if (IsSameStats(mode)) return "You set speed and technique (for each leg in a relay). Everyone picks any runner, and all run with your values.";
+        if (IsOpenPacks(mode)) return "Everyone opens one free pack per leg and races with what comes out. The runners are only on loan.";
         return IsYourRunners(mode) ? "Everyone races with runners from their own collection." : "Everyone may pick any runner in the game.";
     }
 
-    // The option id of a mode ("Same stats|85|70" is the option "Same stats")
-    public static string PoolId(string mode) => IsSameStats(mode) ? SameStatsMode : mode;
+    // The option id of a mode ("Same stats|85|70" is the option "Same stats", "Your runners#75" is "Your runners")
+    public static string PoolId(string mode)
+    {
+        if (IsSameStats(mode)) return SameStatsMode;
+        if (string.IsNullOrEmpty(mode)) return mode;
+        int mark = mode.IndexOf(CapMark);
+        return mark >= 0 ? mode.Substring(0, mark) : mode;
+    }
+
+    public static bool IsOpenPacks(string mode) => !string.IsNullOrEmpty(mode) && mode.StartsWith(OpenPacksMode);
+
+    // Only Your runners and Any runner can have a max average overall
+    public static bool CanHaveCap(string mode)
+    {
+        string id = PoolId(mode);
+        return id == YourRunners || id == ChooseAny;
+    }
+
+    // The host's max average overall, or 0 when there is none
+    public static int Cap(string mode)
+    {
+        if (!CanHaveCap(mode)) return 0;
+        int mark = mode.IndexOf(CapMark);
+        if (mark < 0 || !int.TryParse(mode.Substring(mark + 1), out int cap)) return 0;
+        return Mathf.Clamp(cap, MinCap, MaxCap);
+    }
+
+    // The pool with this cap (0 = none). Pools that cannot have one are given back as they are.
+    public static string WithCap(string mode, int cap)
+    {
+        if (!CanHaveCap(mode)) return mode;
+        string id = PoolId(mode);
+        return cap > 0 ? id + CapMark + Mathf.Clamp(cap, MinCap, MaxCap) : id;
+    }
 
     public static bool IsSameStats(string mode) => !string.IsNullOrEmpty(mode) && mode.StartsWith(SameStatsMode);
 

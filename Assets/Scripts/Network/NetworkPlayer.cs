@@ -120,6 +120,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     }
     // The extra game modes the host has turned on in the lobby (ExtraMode flags)
     [Networked] public int lobbyModes { get; set; }
+    // Secret task tasks the host has switched off in the lobby (one bit per SecretTasks.Task; 0 = all tasks on)
+    [Networked] public int lobbyTasksOff { get; set; }
 
     // The extra game modes of the competition being played, set by the host on its own player when the game
     // starts (ExtraMode flags + ExtraModes.KnownBit, 0 = not set)
@@ -452,6 +454,12 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                     }
                     Debug.Log($"Spawned local player using RestoredPosition: {desiredPos}");
                 }
+                else if (manager == null || manager.controlPoints == null || manager.controlPoints.Count == 0)
+                {
+                    // No course could be loaded (none chosen, or its map is missing): stop here instead of throwing
+                    AbortRaceWithoutCourse();
+                    return;
+                }
                 else
                 {
                     // Fallback till normalt beteende (startpunkt)
@@ -498,6 +506,22 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
         OnNickNameChanged();
         UpdateAppearance();
+    }
+
+    // The competition scene has no course to run: say so and go back to where the player started from
+    void AbortRaceWithoutCourse()
+    {
+        Debug.LogError("NetworkPlayer: the competition has no course (none chosen or its map is missing)");
+        UIToast.Show("You haven't chosen a course to run. Pick a course and try again.");
+        if (Runner == null) return;
+        if (Runner.GameMode == GameMode.Single)
+        {
+            SinglePlayerMenu.EndGame(Runner);
+        }
+        else if (Runner.IsServer || Runner.IsSharedModeMasterClient)
+        {
+            Runner.LoadScene("Lobby");
+        }
     }
 
     private void InitAfterSpawn()
@@ -588,6 +612,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         // A relay gets one pair of values per leg.)
         bool sameStats = GameModes.TryGetSameStatsLegs(effectiveGameMode, out List<Vector2Int> sameStatsLegs);
         GameModes.SameStatsLegs = sameStats ? sameStatsLegs : null;
+        // Max average overall and "Open packs" (RunnerRules)
+        RunnerRules.BeginRound(effectiveGameMode);
+        RunnerFilterBar.ClearRules();
 
         // Route analysis: nobody picks a runner, everyone runs with the same one
         if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteAnalysis) && RelayRace.Active == null)
@@ -600,6 +627,30 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteChoice) && RelayRace.Active == null)
         {
             RouteChoiceGame.Begin(this);
+            return;
+        }
+
+        // "Open packs": first the packs, then the usual picking among the runners that came out of them
+        if (Object.HasStateAuthority && RunnerRules.OpenPacksRound)
+        {
+            manager.ChooseRunnerPanel.SetActive(false);
+            OpenPacks.Begin(RelayRace.Active != null ? RelayRace.Active.Course : null, () =>
+            {
+                if (this == null || manager == null) return;
+                manager.ChooseRunnerPanel.SetActive(true);
+                if (RelayRace.Active != null)
+                {
+                    RelayRace.Active.BeginPicking();
+                }
+                else
+                {
+                    // Women and men alike: the runner from the pack is shown whoever it is
+                    RunnerFilterBar.BothSexes = true;
+                    FindObjectOfType<CardManager>().ShowCards(RunnerRules.Opened);
+                    RunnerFilterBar.NotifyAll();
+                    if (IndividualRace.Active != null) IndividualRace.Active.ShowPickInfo(manager.ChooseRunnerPanel);
+                }
+            });
             return;
         }
 

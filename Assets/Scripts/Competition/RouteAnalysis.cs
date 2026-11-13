@@ -457,7 +457,7 @@ public class RouteCompareView : MonoBehaviour
         view.shared = true;
         view.source = RouteAnalysis.SharedRoutes;
         view.entries = view.source();
-        view.Build(CompetitionFlow.LocalIsHost() ? "Back to the lobby" : "The host takes everyone back to the lobby");
+        view.Build(CompetitionFlow.LocalIsHost() ? CompetitionFlow.BackButtonText : "The host takes everyone back to the lobby");
         view.StartComputer();
         view.Show(0);
         return view;

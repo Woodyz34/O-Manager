@@ -46,6 +46,7 @@ public class LobbySettingsUI : MonoBehaviour
     string seenMode;
     string seenMap;
     ExtraMode seenModes;
+    int seenTasksOff;
     bool hasSeenHostSettings;
     bool wasHost;
     float nextRefresh;
@@ -109,9 +110,21 @@ public class LobbySettingsUI : MonoBehaviour
     // The host picks the game modes. Several can be on at once; none means a normal race.
     public void OpenGameModes()
     {
+        NetworkPlayer local = NetworkPlayer.Local;
+        bool host = local != null && local.Object != null && local.Object.IsValid && local.Runner != null && local.Runner.IsSharedModeMasterClient;
+        if (!host)
+        {
+            // The other players can look at what the host has picked, including which secret tasks are in
+            ModesPopup.Open(seenModes, null, null, "What the host has picked. Only the host can change it.", true, seenTasksOff);
+            return;
+        }
         ModesPopup.Open(modes, chosen =>
         {
             modes = chosen;
+            nextRefresh = 0f;
+        }, null, null, false, SecretTasks.HostOff, off =>
+        {
+            SecretTasks.HostOff = off;
             nextRefresh = 0f;
         });
     }
@@ -134,9 +147,10 @@ public class LobbySettingsUI : MonoBehaviour
         bool ready = local != null && local.Object != null && local.Object.IsValid && local.Runner != null;
         bool host = ready && local.Runner.IsSharedModeMasterClient;
 
-        if (imposterToggle.gameObject.activeSelf != host)
+        // Everyone gets the button: the host to change the modes, the others to look at them
+        if (imposterToggle.gameObject.activeSelf != ready)
         {
-            imposterToggle.gameObject.SetActive(host);
+            imposterToggle.gameObject.SetActive(ready);
         }
         if (!ready)
         {
@@ -154,6 +168,7 @@ public class LobbySettingsUI : MonoBehaviour
                 // CourseLibrary.Current already holds the course the old host had picked
                 if (CourseLibrary.Current != null) mapHandler.Select(CourseLibrary.Current);
                 modes = seenModes;
+                SecretTasks.HostOff = seenTasksOff;
             }
 
             // A course on the old host's private map cannot be raced once that host has left
@@ -178,6 +193,7 @@ public class LobbySettingsUI : MonoBehaviour
             string courseText = mapHandler.course != null ? mapHandler.course.ToLobbyString() : "";
             local.SetLobbyCourseText(courseText);
             if (local.lobbyModes != (int)modes) local.lobbyModes = (int)modes;
+            if (local.lobbyTasksOff != SecretTasks.HostOff) local.lobbyTasksOff = SecretTasks.HostOff;
 
             Show(gameModeHandler.gameMode, modes, CourseTitle(mapHandler.course));
         }
@@ -197,6 +213,7 @@ public class LobbySettingsUI : MonoBehaviour
                 seenMap = player.lobbyMap.ToString();
                 CourseLibrary.ApplyLobbyString(player.LobbyCourseText());
                 seenModes = (ExtraMode)player.lobbyModes;
+                seenTasksOff = player.lobbyTasksOff;
                 hasSeenHostSettings = true;
                 FollowPrivateMap(local, player.lobbyMapOwner.ToString());
                 break;
@@ -210,7 +227,7 @@ public class LobbySettingsUI : MonoBehaviour
         }
         wasHost = host;
 
-        imposterToggleText.text = "Game mode";
+        imposterToggleText.text = host ? "Game mode" : "See game modes";
         imposterToggleText.color = toggleOffTextColor;
         imposterToggle.image.color = toggleOffColor;
     }
@@ -278,7 +295,7 @@ public class LobbySettingsUI : MonoBehaviour
         if (local.privateMapProgress != progress) local.privateMapProgress = progress;
     }
 
-    static string CourseTitle(CourseData course)
+    public static string CourseTitle(CourseData course)
     {
         if (course == null) return "...";
         // Everyone sees whether it is a sprint or a forest course, next to the name and who made it

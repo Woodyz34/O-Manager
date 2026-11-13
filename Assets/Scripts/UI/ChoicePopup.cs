@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // A small window over everything with a few options to pick from, each with a line that explains it.
-// Used in the lobby for "Runner pool" and "Game mode".
+// Used in the lobby and on the single player page for "Runner pool".
 public class ChoicePopup : MonoBehaviour
 {
     public struct Option
@@ -16,7 +16,9 @@ public class ChoicePopup : MonoBehaviour
 
     static ChoicePopup open;
 
-    public static void Open(string heading, Option[] options, string selected, Action<string> chosen)
+    // hint: the line under the heading (the lobby's text when left out)
+    // extraText/extra: an optional button under the options (the runner pool's "Max average overall")
+    public static void Open(string heading, Option[] options, string selected, Action<string> chosen, string hint = null, string extraText = null, Action extra = null)
     {
         if (open != null) open.Close();
         GameObject go = new GameObject("Choice: " + heading, typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -26,10 +28,10 @@ public class ChoicePopup : MonoBehaviour
         CanvasScaler scaler = go.GetComponent<CanvasScaler>();
         ScreenSettings.Fit(scaler);
         open = go.AddComponent<ChoicePopup>();
-        open.Build(heading, options, selected, chosen);
+        open.Build(heading, options, selected, chosen, hint ?? "Everyone in the lobby plays with what you pick.", extraText, extra);
     }
 
-    void Build(string heading, Option[] options, string selected, Action<string> chosen)
+    void Build(string heading, Option[] options, string selected, Action<string> chosen, string hintText, string extraText, Action extra)
     {
         Image dim = CourseUI.Panel("Dim", transform, new Color(0f, 0f, 0f, 0.45f), false);
         CourseUI.Stretch(dim.rectTransform);
@@ -37,7 +39,7 @@ public class ChoicePopup : MonoBehaviour
         outside.transition = Selectable.Transition.None;
         outside.onClick.AddListener(Close);
 
-        float height = 150f + options.Length * 126f + 90f;
+        float height = 150f + options.Length * 126f + 90f + (extra != null ? 72f : 0f);
         Image card = CourseUI.CardPanel("Card", transform);
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760, height));
         card.gameObject.AddComponent<ClickCatcher>();
@@ -45,7 +47,7 @@ public class ChoicePopup : MonoBehaviour
 
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, heading, 40, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 52);
-        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, "Everyone in the lobby plays with what you pick.", 21, CourseUI.InkMuted);
+        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, hintText, 21, CourseUI.InkMuted);
         CourseUI.Size(hint, 30);
 
         foreach (Option option in options)
@@ -71,6 +73,16 @@ public class ChoicePopup : MonoBehaviour
             text.richText = true;
             string muted = on ? "<color=#FFFFFFCC>" : "<color=#5B7563>";
             text.text = "<b>" + option.title + "</b>" + (on ? "   <size=20>CHOSEN</size>" : "") + "\n<size=21>" + muted + option.description + "</color></size>";
+        }
+
+        if (extra != null)
+        {
+            Button more = CourseUI.Button("Extra", card.transform, extraText ?? "", CourseUI.ButtonKind.Secondary, () =>
+            {
+                Close();
+                extra();
+            }, 24);
+            CourseUI.Size(more, 58);
         }
 
         Button close = CourseUI.Button("Close", card.transform, "Close", CourseUI.ButtonKind.Light, Close, 24);

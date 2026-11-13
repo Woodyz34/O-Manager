@@ -40,7 +40,7 @@ public class CardManager : MonoBehaviour
         {
             AllCards.getInstance().SetAllCards();
         }
-        foreach (CardData card in GameModes.WithSameStats(RunnerCards.InPacks()))
+        foreach (CardData card in GameModes.WithSameStats(UnderCap(RunnerCards.InPacks())))
         {
 
             GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
@@ -55,21 +55,51 @@ public class CardManager : MonoBehaviour
     // "Your runners": the runners the player owns, plus runners on loan up to 10 (RunnerCollection.CardsForRace)
     public void ShowOwnedCards()
     {
-        List<CardData> owned = RunnerCollection.CardsForRace();
+        // With a max overall the cheapest missing runner is lent when none of the player's own is under it
+        List<CardData> owned = RunnerRules.Cap > 0 && RelayRace.Active == null ? UnderCap(RunnerRules.YourRunnersPool(new List<LegSex> { LegSex.Any }, RunnerRules.Cap))
+            : RunnerCollection.CardsForRace();
         foreach (CardData card in owned)
         {
             GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
             cardInstance.GetComponent<CardDisplay>().SetValues(card);
-            if (RunnerCollection.IsOnLoan(card.RunnerName)) MarkOnLoan(cardInstance.transform);
+            MarkCard(cardInstance.transform, card);
         }
     }
 
-    // A small orange tag on a runner the player only borrows for this round
+    // "Open packs" in an individual race: the runner that came out of the pack
+    public void ShowCards(List<CardData> cards)
+    {
+        foreach (CardData card in cards)
+        {
+            GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
+            cardInstance.GetComponent<CardDisplay>().SetValues(card);
+            MarkCard(cardInstance.transform, card);
+        }
+    }
+
+    // An individual race with a max overall (RunnerRules.Cap): only the runners at or under it
+    static List<CardData> UnderCap(List<CardData> cards)
+    {
+        if (RunnerRules.Cap <= 0 || RelayRace.Active != null) return cards;   // relays: RelayRace checks the whole team
+        return cards.FindAll(c => RunnerRules.BudgetCost(c) <= RunnerRules.Cap);
+    }
+
+    // The ON LOAN ribbon on runners the player only has for this round (lent, or out of an "Open packs" pack)
+    public void MarkCard(Transform card, CardData data)
+    {
+        if (data == null) return;
+        if (RunnerCollection.IsOnLoan(data.RunnerName) || RunnerRules.IsOpened(data.RunnerName)) MarkOnLoan(card);
+    }
+
+    // A small orange tag on a runner the player only borrows for this round. It sits like a ribbon across the
+    // bottom tip of the card (the card picture is 301 high round the card's centre): at the top it stuck out above
+    // the card and the top row of the Choose a runner grid cut it off.
     static void MarkOnLoan(Transform card)
     {
         Image tag = CourseUI.Panel("On loan", card, CourseUI.Accent);
         tag.raycastTarget = false;
-        CourseUI.Place(tag.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -6), new Vector2(150, 34));
+        CourseUI.Place(tag.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -146), new Vector2(150, 34));
+        tag.transform.SetAsLastSibling();
         TMPro.TextMeshProUGUI text = CourseUI.Text("Text", tag.transform, "ON LOAN", 20, Color.white, TMPro.FontStyles.Bold, TMPro.TextAlignmentOptions.Center);
         text.raycastTarget = false;
         CourseUI.Stretch(text.rectTransform);

@@ -23,11 +23,47 @@ public static class ExtraModes
 {
     public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.SecretTask, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis, ExtraMode.RouteChoice };
 
+    // Every mode, for "show them all"
+    public static ExtraMode AllMask
+    {
+        get
+        {
+            ExtraMode all = ExtraMode.None;
+            foreach (ExtraMode mode in All) all |= mode;
+            return all;
+        }
+    }
+
+    // Modes that can be played alone in single player (2026-11-13). The imposter modes need someone to fool, a bear
+    // you hid yourself is no surprise, and a control you moved yourself is no trick.
+    public const ExtraMode Solo = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+
     // Modes that cannot be combined with any other mode
     public const ExtraMode Alone = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
     // The two imposter modes both pick one imposter, so only one of them can be on
     public const ExtraMode ImposterKinds = ExtraMode.Imposter | ExtraMode.SecretTask;
+
+    // The imposter modes need at least this many players, or the imposter is too easy to spot
+    public const int MinImposterPlayers = 3;
+
+    public static int PlayersInLobby()
+    {
+        int n = 0;
+        foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        {
+            if (p.Object != null && p.Object.IsValid) n++;
+        }
+        return n;
+    }
+
+    // Why this mode cannot be played with this many players, or null when it can
+    public static string NotWithPlayers(ExtraMode mode, int players)
+    {
+        if ((mode & ImposterKinds) != 0 && players < MinImposterPlayers)
+            return "You need at least " + MinImposterPlayers + " players for this game mode";
+        return null;
+    }
 
     // Modes where nobody picks a runner (everyone gets the same one), so the runner pool does not matter
     public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
@@ -167,9 +203,11 @@ public static class ExtraModes
         NetworkPlayer local = NetworkPlayer.Local;
         if (local != null && local.Runner != null && local.Runner.GameMode == GameMode.Single)
         {
-            // A single player game has no lobby, so no extra modes
+            // A single player game has no lobby: the modes come from the single player page
             known = true;
-            active = ExtraMode.None;
+            active = SinglePlayerMenu.ChosenModes & Solo;
+            if (RelayRace.Active != null) active &= ~IndividualOnly;
+            if (CourseLoader.Loaded != null && CourseLoader.Loaded.IsSprint()) active &= ~ForestOnly;
             return;
         }
         foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))

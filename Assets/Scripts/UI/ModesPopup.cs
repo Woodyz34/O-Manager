@@ -13,8 +13,17 @@ public class ModesPopup : MonoBehaviour
     ExtraMode modes;
     Action<ExtraMode> chosen;
     RectTransform list;
+    ExtraMode offered = ExtraModes.AllMask;
+    string hintText;
+    bool readOnly;
+    int tasksOff;
+    Action<int> tasksChosen;
 
-    public static void Open(ExtraMode current, Action<ExtraMode> onChosen)
+    // offered: the modes to show (single player only offers the ones that work alone); hint: the line under the heading
+    // readOnly: the guests of a lobby look at what the host picked; nothing can be changed.
+    // tasksOff / onTasksChosen: the Secret task tasks the host has switched off (see TaskFilterPopup).
+    public static void Open(ExtraMode current, Action<ExtraMode> onChosen, ExtraMode? offered = null, string hint = null,
+        bool readOnly = false, int tasksOff = 0, Action<int> onTasksChosen = null)
     {
         if (open != null) open.Close();
         GameObject go = new GameObject("Choice: Game mode", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -23,8 +32,13 @@ public class ModesPopup : MonoBehaviour
         canvas.sortingOrder = 200;
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
         open = go.AddComponent<ModesPopup>();
-        open.modes = current;
+        open.offered = offered ?? ExtraModes.AllMask;
+        open.modes = current & open.offered;
         open.chosen = onChosen;
+        open.readOnly = readOnly;
+        open.tasksOff = tasksOff;
+        open.tasksChosen = onTasksChosen;
+        open.hintText = hint ?? "Tick as many as you like. Everyone in the lobby plays with them.";
         open.Build();
     }
 
@@ -36,7 +50,8 @@ public class ModesPopup : MonoBehaviour
         outside.transition = Selectable.Transition.None;
         outside.onClick.AddListener(Done);
 
-        int tiles = ExtraModes.All.Length + 1;
+        int tiles = 1;
+        foreach (ExtraMode mode in ExtraModes.All) if ((offered & mode) != 0) tiles++;
         float height = 150f + tiles * 112f + 100f;
         Image card = CourseUI.CardPanel("Card", transform);
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820, height));
@@ -45,7 +60,7 @@ public class ModesPopup : MonoBehaviour
 
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "Game mode", 40, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 52);
-        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, "Tick as many as you like. Everyone in the lobby plays with them.", 21, CourseUI.InkMuted);
+        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, hintText, 21, CourseUI.InkMuted);
         CourseUI.Size(hint, 30);
 
         list = CourseUI.Rect("Modes", card.transform);
@@ -60,29 +75,59 @@ public class ModesPopup : MonoBehaviour
     void Fill()
     {
         foreach (Transform child in list) Destroy(child.gameObject);
-        AddTile("Normal", "No extra modes: everyone races to finish first.", modes == ExtraMode.None, () => modes = ExtraMode.None);
+        AddTile("Normal", "No extra modes: everyone races to finish first.", modes == ExtraMode.None, () => { if (!readOnly) modes = ExtraMode.None; });
+        int players = ExtraModes.PlayersInLobby();
         foreach (ExtraMode mode in ExtraModes.All)
         {
+            if ((offered & mode) == 0) continue;
             ExtraMode captured = mode;
             string description = ExtraModes.Description(mode);
             // Bears and Move a control cannot be ticked on a sprint course (nor the modes for individual courses on a relay).
             // They are shown greyed out; clicking one anyway says why.
             string notHere = ExtraModes.NotOn(mode, CourseLibrary.Current);
+            // The imposter modes need at least 3 players in the lobby (a host alone in single player never sees them)
+            if (notHere == null && !readOnly && (offered & ExtraModes.ImposterKinds) == ExtraModes.ImposterKinds)
+                notHere = ExtraModes.NotWithPlayers(mode, players);
             if (notHere != null)
             {
-                modes &= ~mode;
+                if (!readOnly) modes &= ~mode;
                 AddTile(ExtraModes.Title(mode), description, false,
                     () => UIToast.Show(notHere, 3f, CourseUI.Ink), true);
                 continue;
             }
-            AddTile(ExtraModes.Title(mode), description, (modes & mode) != 0, () => modes = ExtraModes.Toggle(modes, captured));
+            bool secret = mode == ExtraMode.SecretTask;
+            Image tile = AddTile(ExtraModes.Title(mode), description, (modes & mode) != 0, () =>
+            {
+                if (readOnly) return;
+                bool wasOn = (modes & captured) != 0;
+                modes = ExtraModes.Toggle(modes, captured);
+                // Switching Secret task on asks which tasks to play with
+                if (captured == ExtraMode.SecretTask && !wasOn && (modes & captured) != 0) OpenTasks();
+            });
+            if (secret && (modes & mode) != 0)
+            {
+                // "Tasks" button: the host edits the list, the guests only look at it
+                Button tasks = CourseUI.Button("Tasks", tile.transform, readOnly ? "See tasks" : "Tasks", CourseUI.ButtonKind.Primary, OpenTasks, 22);
+                CourseUI.Place(tasks.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24, 0), new Vector2(150, 56));
+                Transform label = tile.transform.Find("Text");
+                if (label != null) CourseUI.Stretch((RectTransform)label, 86, 190, 10, 10);
+            }
         }
     }
 
     static readonly Color DisabledTile = new Color(0.55f, 0.55f, 0.52f, 0.55f);
     static readonly Color DisabledInk = new Color(0.25f, 0.27f, 0.25f, 0.55f);
 
-    void AddTile(string name, string description, bool on, Action click, bool disabled = false)
+    void OpenTasks()
+    {
+        TaskFilterPopup.Open(tasksOff, readOnly, off =>
+        {
+            tasksOff = off;
+            tasksChosen?.Invoke(off);
+        });
+    }
+
+    Image AddTile(string name, string description, bool on, Action click, bool disabled = false)
     {
         Image tile = CourseUI.Panel(name, list, disabled ? DisabledTile : on ? CourseUI.Forest : CourseUI.Soft);
         CourseUI.Size(tile, 102);
@@ -116,11 +161,12 @@ public class ModesPopup : MonoBehaviour
         text.raycastTarget = false;
         string muted = disabled ? "<color=#3F443F88>" : on ? "<color=#FFFFFFCC>" : "<color=#5B7563>";
         text.text = "<b>" + name + "</b>\n<size=20>" + muted + description + "</color></size>";
+        return tile;
     }
 
     void Done()
     {
-        chosen?.Invoke(modes);
+        if (!readOnly) chosen?.Invoke(modes);
         Close();
     }
 
