@@ -94,10 +94,10 @@ public class TvStickFigure
         // Long nylon trousers: the team's colour, a little darker, or black
         trousers = random.NextDouble() < 0.7 ? Own(Color.Lerp(color, Color.black, 0.5f)) : darkMaterial;
 
-        pelvis = Part("Trousers top", Tube(0.15f, 0.16f, 0.75f), trousers);
+        pelvis = Part("Trousers top", Tube(0.125f, 0.12f, 0.7f), trousers);
         seat = Part("Seat", ball, trousers);
         // A loose nylon top: wide, hanging a little over the waist
-        torso = Part("Top", Tube(0.175f, 0.205f, 0.74f), jersey);
+        torso = Part("Top", Tube(0.15f, 0.165f, 0.62f), jersey);
         shoulders = Part("Shoulders", cap, jersey);
         bib = Part("Bib", bibMesh, paintedMaterial);
         neck = Part("Neck", Tube(0.055f, 0.05f, 1f), skin);
@@ -109,9 +109,9 @@ public class TvStickFigure
             legs[i] = new Leg
             {
                 hip = Part("Hip", ball, trousers),
-                thigh = Part("Thigh", Tube(0.088f, 0.07f, 1f), trousers),
+                thigh = Part("Thigh", Tube(0.075f, 0.064f, 1f), trousers),
                 knee = Part("Knee", ball, trousers),
-                shin = Part("Shin", Tube(0.066f, 0.054f, 1f), trousers),
+                shin = Part("Shin", Tube(0.06f, 0.05f, 1f), trousers),
                 ankle = Part("Ankle", ball, trousers),
                 shoe = Part("Shoe", ball, shoeMaterial),
                 sole = Part("Sole", ball, soleMaterial)
@@ -119,7 +119,7 @@ public class TvStickFigure
             arms[i] = new Arm
             {
                 shoulder = Part("Shoulder", ball, jersey),
-                sleeve = Part("Sleeve", Tube(0.07f, 0.064f, 1f), jersey),
+                sleeve = Part("Sleeve", Tube(0.06f, 0.055f, 1f), jersey),
                 upper = Part("Upper arm", Tube(0.047f, 0.042f, 1f), skin),
                 elbow = Part("Elbow", ball, skin),
                 fore = Part("Forearm", Tube(0.042f, 0.032f, 1f), skin),
@@ -358,10 +358,11 @@ public class TvStickFigure
         Vector3 chest = waist + bodyUp * 0.5f;
         Quaternion bodyTurn = Quaternion.LookRotation(front, bodyUp);
         Segment(pelvis, hip, waist + bodyUp * 0.08f, front);
-        Ball(seat, hip, bodyTurn, new Vector3(0.155f, 0.08f, 0.12f));
-        Segment(torso, waist - bodyUp * 0.05f, chest, front);
-        Ball(shoulders, chest, bodyTurn, new Vector3(0.205f, 0.09f, 0.152f));
-        bib.localPosition = waist + bodyUp * 0.28f + front * 0.142f;
+        Ball(seat, hip, bodyTurn, new Vector3(0.135f, 0.07f, 0.095f));
+        // The top hangs a little below the waist, so the trousers never show through it
+        Segment(torso, waist - bodyUp * 0.09f, chest, front);
+        Ball(shoulders, chest, bodyTurn, new Vector3(0.165f, 0.075f, 0.102f));
+        bib.localPosition = waist + bodyUp * 0.28f + front * 0.098f;
         bib.localRotation = bodyTurn;
         bib.localScale = Vector3.one;
         Vector3 neckTop = chest + bodyUp * 0.06f;
@@ -375,14 +376,14 @@ public class TvStickFigure
 
         for (int k = 0; k < 2; k++)
         {
-            float s = k == 0 ? 0.1f : -0.1f;
+            float s = k == 0 ? 0.085f : -0.085f;
             Leg leg = legs[k];
             Vector3 h = P(0f, hipY, s), kn = P(knee[k, 0], hipY + knee[k, 1], s), an = P(foot[k, 0], hipY + foot[k, 1], s);
-            Ball(leg.hip, h, 0.088f);
+            Ball(leg.hip, h, 0.072f);
             Segment(leg.thigh, h, kn);
-            Ball(leg.knee, kn, 0.069f);
+            Ball(leg.knee, kn, 0.063f);
             Segment(leg.shin, kn, an);
-            Ball(leg.ankle, an, 0.054f);
+            Ball(leg.ankle, an, 0.05f);
             // The foot: flat on the ground under the body, toes pointing down when the leg swings back
             Quaternion footTurn = Quaternion.LookRotation(fwd) * Quaternion.Euler(Mathf.Clamp(-shinAngle[k] * Mathf.Rad2Deg * 0.5f, -25f, 45f), 0f, 0f);
             Ball(leg.shoe, an + Vector3.up * -0.035f + footTurn * new Vector3(0f, 0f, 0.06f), footTurn, new Vector3(0.05f, 0.042f, 0.13f));
@@ -399,7 +400,7 @@ public class TvStickFigure
             Arm arm = arms[k];
             float p = ph + (side < 0 ? Mathf.PI : 0f);
             float a = -st.arm * Mathf.Sin(p) * 0.9f, el = st.elbow + 0.25f * Mathf.Sin(p), fl = st.flare * 0.16f * (1f + 0.6f * Mathf.Sin(p + 1f));
-            float handIn = 0.19f + fl * 0.4f - 0.06f;
+            float handIn = 0.16f + fl * 0.4f - 0.05f;
             if (side == mapSide)
             {
                 // The map hand moves only a little with the stride
@@ -408,8 +409,8 @@ public class TvStickFigure
                 fl = 0.02f;
                 handIn = 0.08f;
             }
-            Vector3 shoulder = P(sf - Mathf.Sin(p) * 0.02f * side, su, 0.2f * side);
-            Vector3 elbow = P(sf + 0.29f * Mathf.Sin(a), su - 0.29f * Mathf.Cos(a), (0.2f + fl) * side);
+            Vector3 shoulder = P(sf - Mathf.Sin(p) * 0.02f * side, su, 0.17f * side);
+            Vector3 elbow = P(sf + 0.29f * Mathf.Sin(a), su - 0.29f * Mathf.Cos(a), (0.18f + fl) * side);
             Vector3 hand = P(sf + 0.29f * Mathf.Sin(a) + 0.27f * Mathf.Sin(a + el), su - 0.29f * Mathf.Cos(a) - 0.27f * Mathf.Cos(a + el), handIn * side);
             if (side == punchSide && near > 0f)
             {
@@ -421,7 +422,7 @@ public class TvStickFigure
                 elbow = Vector3.Lerp(elbow, mid, near);
                 hand = Vector3.Lerp(hand, reach, near);
             }
-            Ball(arm.shoulder, shoulder, 0.07f);
+            Ball(arm.shoulder, shoulder, 0.06f);
             Segment(arm.sleeve, shoulder, Vector3.Lerp(shoulder, elbow, 0.62f));
             Segment(arm.upper, Vector3.Lerp(shoulder, elbow, 0.58f), elbow);
             Ball(arm.elbow, elbow, 0.043f);
