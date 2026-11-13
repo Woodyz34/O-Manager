@@ -298,7 +298,6 @@ public class TvViewer : MonoBehaviour
         string caption = "";
         if (view == null) caption = director.Failed ? "No picture from this place" : "The camera is on its way ...";
         director.Splits(splits);
-        if (view != null && !director.AtStart && !director.RunnerInPicture && splits.Count == 0) caption = "The first runners should be here any moment ...";
         string title = "<color=#E8742A>LIVE</color>  " + director.Title;
         if (fullscreen)
         {

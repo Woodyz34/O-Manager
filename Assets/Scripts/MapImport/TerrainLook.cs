@@ -48,8 +48,8 @@ namespace MapImport
                 case Pine: return "Pine";
                 case Spruce: return "Spruce";
                 case Birch: return "Birch";
-                case Beech: return "Beech and other broad-leaved";
-                default: return "Pine and spruce mixed";
+                case Beech: return "Broad-leaved";
+                default: return "Mixed conifer";
             }
         }
 

@@ -595,7 +595,7 @@ public class TvWorldBuilder
 
     TvShape rockA, rockB, logShape, bushShape, bigTree, poolShape;
     TvShape[] pineNear, pineFar, pine2Near, pine2Far, spruceShape, birchNear, birchFar, beechNear, beechFar;
-    TvShape tuftBerry, tuftHeath, tuftGrass, tuftDry, tuftShort, tuftFern;
+    TvShape tuftBerry, tuftHeath, tuftGrass, tuftDry, tuftShort, tuftFern, tuftBerryNear, tuftHeathNear;
 
     void MakeShapes()
     {
@@ -678,13 +678,28 @@ public class TvWorldBuilder
         tuftBerry = s.Done();
         s = new TvShapeBuilder(random);
         s.Blob(0.3f, 1f, 0.55f, 1f, 0f, 0.1f, 0f, 0.5f, 0, false, TvColor.Hex("#5c5a34"));
-        s.Blob(0.2f, 1f, 0.6f, 1f, 0.25f, 0.08f, -0.12f, 0.5f, 0, false, TvColor.Hex("#7a4a62"));
+        s.Blob(0.2f, 1f, 0.6f, 1f, 0.25f, 0.08f, -0.12f, 0.5f, 0, false, TvColor.Hex("#7a4a52"));
         tuftHeath = s.Done();
         s = new TvShapeBuilder(random);
-        s.Cone(0.16f, 0.55f, 0f, 5, TvColor.Hex("#a7a35a"));
-        s.Cone(0.12f, 0.42f, 0f, 5, TvColor.Hex("#8f9a4c"), 0.17f, 0.08f);
-        s.Cone(0.12f, 0.48f, 0f, 5, TvColor.Hex("#b4a860"), -0.12f, 0.16f);
+        // A tussock: a low mound with many thin blades
+        s.Blob(0.2f, 1f, 0.45f, 1f, 0f, 0.03f, 0f, 0.3f, 0, false, TvColor.Hex("#7f8a48"));
+        TvColor[] blades = { TvColor.Hex("#a7a35a"), TvColor.Hex("#8f9a4c"), TvColor.Hex("#b4a860"), TvColor.Hex("#99a052") };
+        for (int i = 0; i < 9; i++)
+        {
+            float a = i * 2.4f, d = 0.04f + 0.02f * i;
+            s.Cone(0.045f + 0.004f * (i % 3), 0.3f + 0.035f * ((i * 5) % 7), 0.02f, 3, blades[i % blades.Length], (float)Math.Cos(a) * d, (float)Math.Sin(a) * d);
+        }
         tuftGrass = s.Done();
+        // The same undergrowth with hard facets, for the tufts near the control
+        s = new TvShapeBuilder(random);
+        s.Blob(0.34f, 1f, 0.5f, 1f, 0f, 0.1f, 0f, 0.5f, 1, true, TvColor.Hex("#3d5a2a"));
+        s.Blob(0.24f, 1f, 0.55f, 1f, 0.3f, 0.08f, 0.16f, 0.5f, 1, true, TvColor.Hex("#4b6a2d"));
+        s.Blob(0.22f, 1f, 0.5f, 1f, -0.2f, 0.07f, 0.28f, 0.5f, 1, true, TvColor.Hex("#5a4a2c"));
+        tuftBerryNear = s.Done();
+        s = new TvShapeBuilder(random);
+        s.Blob(0.3f, 1f, 0.55f, 1f, 0f, 0.1f, 0f, 0.5f, 1, true, TvColor.Hex("#5c5a34"));
+        s.Blob(0.2f, 1f, 0.6f, 1f, 0.25f, 0.08f, -0.12f, 0.5f, 1, true, TvColor.Hex("#7a4a52"));
+        tuftHeathNear = s.Done();
         s = new TvShapeBuilder(random);
         s.Cone(0.12f, 0.36f, 0f, 4, TvColor.Hex("#b9ab72"));
         s.Cone(0.09f, 0.3f, 0f, 4, TvColor.Hex("#a39a62"), 0.13f, -0.06f);
@@ -1344,6 +1359,11 @@ public class TvWorldBuilder
                     shape = r < 0.3f ? tuftFern : tuftGrass;
                     tint = Rr(0.75f, 1f);
                 }
+            }
+            if (x * x + z * z < 18f * 18f)
+            {
+                if (shape == tuftBerry) shape = tuftBerryNear;
+                else if (shape == tuftHeath) shape = tuftHeathNear;
             }
             tuftMeshes[Tile(x, z)].Add(shape, x, H(x, z) - 0.02f, z, s, s, s, Rr(0f, 6.283f), tint);
             world.tufts++;
