@@ -13,8 +13,11 @@ public class ModesPopup : MonoBehaviour
     ExtraMode modes;
     Action<ExtraMode> chosen;
     RectTransform list;
+    ExtraMode offered = ExtraModes.AllMask;
+    string hintText;
 
-    public static void Open(ExtraMode current, Action<ExtraMode> onChosen)
+    // offered: the modes to show (single player only offers the ones that work alone); hint: the line under the heading
+    public static void Open(ExtraMode current, Action<ExtraMode> onChosen, ExtraMode? offered = null, string hint = null)
     {
         if (open != null) open.Close();
         GameObject go = new GameObject("Choice: Game mode", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -23,8 +26,10 @@ public class ModesPopup : MonoBehaviour
         canvas.sortingOrder = 200;
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
         open = go.AddComponent<ModesPopup>();
-        open.modes = current;
+        open.offered = offered ?? ExtraModes.AllMask;
+        open.modes = current & open.offered;
         open.chosen = onChosen;
+        open.hintText = hint ?? "Tick as many as you like. Everyone in the lobby plays with them.";
         open.Build();
     }
 
@@ -36,7 +41,8 @@ public class ModesPopup : MonoBehaviour
         outside.transition = Selectable.Transition.None;
         outside.onClick.AddListener(Done);
 
-        int tiles = ExtraModes.All.Length + 1;
+        int tiles = 1;
+        foreach (ExtraMode mode in ExtraModes.All) if ((offered & mode) != 0) tiles++;
         float height = 150f + tiles * 112f + 100f;
         Image card = CourseUI.CardPanel("Card", transform);
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820, height));
@@ -45,7 +51,7 @@ public class ModesPopup : MonoBehaviour
 
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "Game mode", 40, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 52);
-        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, "Tick as many as you like. Everyone in the lobby plays with them.", 21, CourseUI.InkMuted);
+        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, hintText, 21, CourseUI.InkMuted);
         CourseUI.Size(hint, 30);
 
         list = CourseUI.Rect("Modes", card.transform);
@@ -63,6 +69,7 @@ public class ModesPopup : MonoBehaviour
         AddTile("Normal", "No extra modes: everyone races to finish first.", modes == ExtraMode.None, () => modes = ExtraMode.None);
         foreach (ExtraMode mode in ExtraModes.All)
         {
+            if ((offered & mode) == 0) continue;
             ExtraMode captured = mode;
             string description = ExtraModes.Description(mode);
             // Bears and Move a control cannot be ticked on a sprint course (nor the modes for individual courses on a relay).

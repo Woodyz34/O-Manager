@@ -711,7 +711,7 @@ public class RouteChoiceView : MonoBehaviour
         }
         else
         {
-            CourseUI.SetButtonText(overlayLobby, host ? "Back to the lobby" : "The host takes everyone back to the lobby");
+            CourseUI.SetButtonText(overlayLobby, host ? CompetitionFlow.BackButtonText : "The host takes everyone back to the lobby");
             overlayLobby.interactable = host;
         }
         if (overlayBack != null) overlayBack.gameObject.SetActive(page == Page.Money);
@@ -1112,7 +1112,7 @@ public class RouteChoiceView : MonoBehaviour
         bool host = CompetitionFlow.LocalIsHost();
         nextButton.onClick.RemoveAllListeners();
         nextButton.onClick.AddListener(CompetitionFlow.HostReturnToLobby);
-        CourseUI.SetButtonText(nextButton, host ? "Back to the lobby" : "The host takes everyone back to the lobby");
+        CourseUI.SetButtonText(nextButton, host ? CompetitionFlow.BackButtonText : "The host takes everyone back to the lobby");
         nextButton.interactable = host;
         nextButton.gameObject.SetActive(true);
     }

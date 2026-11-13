@@ -278,7 +278,7 @@ public class LobbySettingsUI : MonoBehaviour
         if (local.privateMapProgress != progress) local.privateMapProgress = progress;
     }
 
-    static string CourseTitle(CourseData course)
+    public static string CourseTitle(CourseData course)
     {
         if (course == null) return "...";
         // Everyone sees whether it is a sprint or a forest course, next to the name and who made it

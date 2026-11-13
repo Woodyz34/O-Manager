@@ -37,8 +37,7 @@ public static class GameModes
     // uses the last leg's values.
     public const string SameStatsMode = "Same stats";
 
-    // Single player offers the first two; the lobby all three
-    public static readonly string[] Pools = { YourRunners, ChooseAny };
+    // The runner pools offered in the lobby and, since 2026-11-13, in single player too
     public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode };
 
     // The whole scale (2026-11-13, the user wanted every value). Speed 0 would never reach the finish, so it starts at 1.
