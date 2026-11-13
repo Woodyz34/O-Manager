@@ -444,6 +444,12 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                     }
                     Debug.Log($"Spawned local player using RestoredPosition: {desiredPos}");
                 }
+                else if (manager == null || manager.controlPoints == null || manager.controlPoints.Count == 0)
+                {
+                    // No course could be loaded (none chosen, or its map is missing): stop here instead of throwing
+                    AbortRaceWithoutCourse();
+                    return;
+                }
                 else
                 {
                     // Fallback till normalt beteende (startpunkt)
@@ -490,6 +496,22 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
         OnNickNameChanged();
         UpdateAppearance();
+    }
+
+    // The competition scene has no course to run: say so and go back to where the player started from
+    void AbortRaceWithoutCourse()
+    {
+        Debug.LogError("NetworkPlayer: the competition has no course (none chosen or its map is missing)");
+        UIToast.Show("You haven't chosen a course to run. Pick a course and try again.");
+        if (Runner == null) return;
+        if (Runner.GameMode == GameMode.Single)
+        {
+            SinglePlayerMenu.EndGame(Runner);
+        }
+        else if (Runner.IsServer || Runner.IsSharedModeMasterClient)
+        {
+            Runner.LoadScene("Lobby");
+        }
     }
 
     private void InitAfterSpawn()

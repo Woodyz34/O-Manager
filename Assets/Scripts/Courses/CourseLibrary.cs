@@ -27,6 +27,14 @@ public static class CourseLibrary
         }
     }
 
+    // Why a competition can't start on this course, or null. Used by Start game in the lobby (and the same texts in single player).
+    public static string StartProblem(CourseData course)
+    {
+        if (course == null) return "You haven't chosen a course to run. Press Change course and pick one.";
+        if (!MapDefinition.Exists(course.mapId)) return "This course is on a map that is not on this computer. Pick another course.";
+        return null;
+    }
+
     static string lastLobbyString;
 
     // A player who is not the host takes the course the host has published in the lobby

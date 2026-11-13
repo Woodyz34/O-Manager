@@ -299,8 +299,8 @@ public class SinglePlayerMenu : MonoBehaviour
     string Problem()
     {
         CourseData course = Chosen;
-        if (course == null) return "Pick a course first.";
-        if (!MapDefinition.Exists(course.mapId)) return "This course is on a map that is not on this computer. Pick another course.";
+        string courseProblem = CourseLibrary.StartProblem(course);
+        if (courseProblem != null) return courseProblem;
         string modeProblem = ExtraModes.CourseProblem(modes, course);
         if (modeProblem != null) return modeProblem;
         if ((modes & ExtraModes.NoRunners) == 0 && course.IsRelay() && GameModes.IsYourRunners(pool))
