@@ -492,6 +492,7 @@ public class MapEditPanel : MonoBehaviour
                 Directory.Delete(folder, true);
                 Directory.Move(building, folder);
                 MapGrid.Forget(map.gridName);
+                TvWorldData.Forget();
                 MapPlayArea.Forget(map.id);
                 MapPackages.ForgetCached(folder);
             }

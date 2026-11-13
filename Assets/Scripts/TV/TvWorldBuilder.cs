@@ -96,6 +96,8 @@ public class TvWorld
     public readonly List<TvSolid> solids = new List<TvSolid>();
     // The control flag's stand and the punching unit on top of it
     public float flagX, flagZ, unitX, unitY, unitZ;
+    // Where the TV camera stands: a spot about 9 m from the control with a free view of it (trees keep off it)
+    public float camX, camZ;
     public int trees, rocks, tufts;
     public long vertices, triangles;
 
@@ -282,6 +284,7 @@ public class TvWorldBuilder
         Stones();
         Structures();
         ControlFlag();
+        CameraSpot();
         Trees();
         Undergrowth();
 
@@ -1109,6 +1112,41 @@ public class TvWorldBuilder
         thingMesh.Add(b.Done(), fx, y, fz, 1f, 1f, 1f, Rr(0f, 6.283f));
     }
 
+    // ---- The TV camera's spot: the direction with the fewest stones and walls between it and the control ----
+
+    void CameraSpot()
+    {
+        float bestScore = float.MaxValue, bx = 9f, bz = -9f;
+        float y0 = H(world.flagX, world.flagZ);
+        for (int k = 0; k < 16; k++)
+        {
+            float a = k / 16f * 6.2831853f, dx = (float)Math.Cos(a), dz = (float)Math.Sin(a);
+            float x = world.flagX + dx * 9f, z = world.flagZ + dz * 9f;
+            float score = 0f;
+            foreach (TvSolid s in world.solids)
+            {
+                float d = DistSeg(s.x, s.z, world.flagX, world.flagZ, x, z, out _, out _);
+                if (d < s.r + 0.6f) score += 10f;
+            }
+            // A spot a little above the control sees it best; a spot in a hollow or on water does not
+            float dy = H(x, z) - y0;
+            score += Math.Abs(dy - 1f) * 2f;
+            int kind = Base(CellAt(x, z));
+            if (kind == WorldCell.Water || kind == WorldCell.Building) score += 50f;
+            if (ClearAt(x, z) < 0.5f) score += 2f;
+            // The sun stands in the south-east (TvWorldView); a camera on that side has the light behind it
+            score += (dx * 0.55f - dz * 0.5f) > 0f ? 0f : 1.5f;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bx = x;
+                bz = z;
+            }
+        }
+        world.camX = bx;
+        world.camZ = bz;
+    }
+
     // ---- Trees: the kind follows the terrain look, how dense they stand follows the map ----
 
     int Tile(float x, float z)
@@ -1123,6 +1161,11 @@ public class TvWorldBuilder
         if (x * x + z * z < 9f) return true;                                  // the control stands free
         float dx = x - world.flagX, dz = z - world.flagZ;
         if (dx * dx + dz * dz < 6f) return true;
+        // Nothing between the TV camera and the control
+        if (DistSeg(x, z, world.camX, world.camZ, world.flagX, world.flagZ, out _, out _) < 1.8f) return true;
+        dx = x - world.camX;
+        dz = z - world.camZ;
+        if (dx * dx + dz * dz < 12f) return true;
         if (ClearAt(x, z) < gap) return true;
         foreach (TvSolid s in world.solids)
         {
@@ -1254,6 +1297,8 @@ public class TvWorldBuilder
             if (kind == WorldCell.Water || kind == WorldCell.BareRock || kind == WorldCell.Paved || kind == WorldCell.Building
                 || kind == WorldCell.Sand || kind == WorldCell.Cultivated) continue;
             if (ClearAt(x, z) < 0.3f) continue;
+            float cx = x - world.camX, cz = z - world.camZ;
+            if (cx * cx + cz * cz < 6.25f) continue;   // nothing in front of the TV camera's lens
             bool marsh = (cell & WorldCell.Marsh) != 0, open = kind == WorldCell.Open || kind == WorldCell.OpenTrees || kind == WorldCell.Plot;
             bool roughOpen = kind == WorldCell.RoughOpen || kind == WorldCell.RoughOpenTrees;
             float rough = TvRandom.Patches(x * 0.07f + 20f, z * 0.07f + 11f) + amount + ((cell & WorldCell.Undergrowth) != 0 ? 0.3f : 0f);

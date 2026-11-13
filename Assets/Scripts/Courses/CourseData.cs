@@ -42,6 +42,17 @@ public class CourseData
     public CoursePoint finish;
     // Out-of-bounds areas (purple stripes) the runners must not enter; they count for every leg of a relay
     public List<ForbiddenArea> forbidden = new List<ForbiddenArea>();
+    // Relays on forest maps: the controls (and the finish) with a TV camera. During the race a small 3D view of the
+    // control shows the runners passing it (TV/TvDirector). Only common controls, the ones every team runs.
+    public const int MaxTvControls = 6;
+    public List<CoursePoint> tvControls = new List<CoursePoint>();
+
+    public bool HasTvControl(CoursePoint point)
+    {
+        if (tvControls == null) return false;
+        foreach (CoursePoint tv in tvControls) if (Math.Abs(tv.e - point.e) < 1.5 && Math.Abs(tv.n - point.n) < 1.5) return true;
+        return false;
+    }
 
     // ---- Relay ----
     // A relay is run by teams: every team member runs one leg, and every leg has its own course (relayCourses; legs can
@@ -410,7 +421,51 @@ public class CourseData
         // Areas in a "z" field, uncrossable boundary lines in a "y" field (versions before the lines skip it)
         AppendForbidden(sb, false);
         AppendForbidden(sb, true);
+        // TV controls in a "t" field: the first point in full, then steps
+        if (tvControls != null && tvControls.Count > 0)
+        {
+            sb.Append("|t");
+            long tvE = 0, tvN = 0;
+            for (int i = 0; i < tvControls.Count && i < MaxTvControls; i++)
+            {
+                long e = (long)Math.Round(tvControls[i].e), n = (long)Math.Round(tvControls[i].n);
+                if (i == 0)
+                {
+                    AppendDigits(sb, e, 4);
+                    AppendDigits(sb, n, 4);
+                }
+                else
+                {
+                    AppendDigits(sb, e - tvE + StepOffset, 3);
+                    AppendDigits(sb, n - tvN + StepOffset, 3);
+                }
+                tvE = e;
+                tvN = n;
+            }
+        }
         return sb.ToString();
+    }
+
+    static List<CoursePoint> ReadTvControls(string text)
+    {
+        var points = new List<CoursePoint>();
+        int index = 1;   // after the "t"
+        long e = 0, n = 0;
+        while (index < text.Length && points.Count < MaxTvControls)
+        {
+            if (points.Count == 0)
+            {
+                e = ReadDigits(text, ref index, 4);
+                n = ReadDigits(text, ref index, 4);
+            }
+            else
+            {
+                e += ReadDigits(text, ref index, 3) - StepOffset;
+                n += ReadDigits(text, ref index, 3) - StepOffset;
+            }
+            points.Add(new CoursePoint(e, n));
+        }
+        return points;
     }
 
     void AppendForbidden(StringBuilder sb, bool lines)
@@ -547,6 +602,7 @@ public class CourseData
             {
                 if (parts[p].StartsWith("z")) course.forbidden.AddRange(ReadForbidden(parts[p], false));
                 if (parts[p].StartsWith("y")) course.forbidden.AddRange(ReadForbidden(parts[p], true));
+                if (parts[p].StartsWith("t")) course.tvControls = ReadTvControls(parts[p]);
             }
             string coords = parts[8];
             if (coords.Length < 14 || (coords.Length - 8) % 6 != 0)
@@ -770,6 +826,10 @@ public class CourseData
             if (!Finite(area.corners)) return false;
         }
 
+        if (tvControls == null) tvControls = new List<CoursePoint>();
+        if (tvControls.Count > MaxTvControls) tvControls.RemoveRange(MaxTvControls, tvControls.Count - MaxTvControls);
+        if (!Finite(tvControls)) return false;
+
         if (legCourse == null) legCourse = new List<int>();
         if (relayCourses == null) relayCourses = new List<RelayLegCourse>();
         if (relayForks == null) relayForks = new List<RelayFork>();
@@ -785,6 +845,7 @@ public class CourseData
             forks.Clear();
             extraCourses.Clear();
             forkedLegs.Clear();
+            tvControls.Clear();   // TV controls are for relays only
             return true;
         }
 
