@@ -63,7 +63,7 @@ public class TerrainSpeedPanel : MonoBehaviour
         Add(s.marsh, "marsh");
         Add(s.stony, "stony ground");
         Add(s.open, "open land");
-        Add(s.roughOpen, "clear-cuts");
+        Add(s.roughOpen, "felled areas (hygge)");
         Add(s.paved, "asphalt");
         return "Terrain speeds: " + string.Join(", ", changed) + ".";
     }
@@ -109,8 +109,9 @@ public class TerrainSpeedPanel : MonoBehaviour
             s => s.open, (s, v) => s.open = v, s => Percent(s.Ground(TerrainKind.Open, TerrainSpeeds.NormalOpen)));
         AddRow(card.transform, "White forest", "A fight every step", "Quick as a road", true,
             s => s.forest, (s, v) => s.forest = v, s => Percent(s.Ground(TerrainKind.Forest, TerrainSpeeds.NormalForest)));
-        // Rough open land (ISOM 403/404, light yellow): mostly clear-cuts, also heath and newly planted ground
-        AddRow(card.transform, "Clear-cut", "Like mid green", "Like open land", true,
+        // Rough open land (ISOM 403/404, light yellow): mostly felled areas (hygge), also heath and newly planted ground.
+        // "Felled area" is the IOF's own English word for it; the Swedish word in brackets, since everyone knows "hygge"
+        AddRow(card.transform, "Felled area (hygge)", "Like mid green", "Like open land", true,
             s => s.roughOpen, (s, v) => s.roughOpen = v, s => Percent(s.Ground(TerrainKind.RoughOpen, TerrainSpeeds.NormalRoughOpen)));
         AddRow(card.transform, "Marsh", "Very heavy", "Like white forest", true,
             s => s.marsh, (s, v) => s.marsh = v, s => Percent(s.Ground(TerrainKind.Marsh, TerrainSpeeds.NormalMarsh)));
@@ -152,7 +153,7 @@ public class TerrainSpeedPanel : MonoBehaviour
         CourseUI.Size(row, 48);
         TextMeshProUGUI label = CourseUI.Text("Name", row, name, 22, CourseUI.Ink, FontStyles.Bold);
         label.alignment = TextAlignmentOptions.MidlineLeft;
-        CourseUI.Size(label, -1, 170);
+        CourseUI.Size(label, -1, 240);   // room for "Felled area (hygge)"
         TextMeshProUGUI left = CourseUI.Text("Slow end", row, slow, 17, CourseUI.InkMuted);
         left.alignment = TextAlignmentOptions.MidlineRight;
         left.textWrappingMode = TextWrappingModes.Normal;

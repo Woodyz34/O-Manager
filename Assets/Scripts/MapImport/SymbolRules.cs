@@ -114,7 +114,7 @@ namespace MapImport
 
         // The rule with every slider in the middle. Normal speeds (2026-11-13, the player's order, quickest first):
         // asphalt 150 %, roads 140 % (vehicle tracks 135 %), small paths 120 %, open land 115 % (grass on a sprint map
-        // 130 %), white forest 100 %, rough open land / clear-cuts 95 %, marsh 80 %, light green 70 %, mid green 55 %,
+        // 130 %), white forest 100 %, rough open land / felled areas (hygge) 80 %, marsh 80 %, light green 70 %, mid green 55 %,
         // dark green 35 %; stony ground 20 % slower than the ground under it.
         static TerrainRule Normal(MapSymbol s, bool sprint)
         {
@@ -137,8 +137,8 @@ namespace MapImport
                     case 310: return Ground(0.9f, sprint);                                // indistinct marsh
                     case 401: return Ground(sprint ? 1.3f : 1.15f, sprint);                            // open land
                     case 402: return Ground(sprint ? 1.2f : 1.1f, sprint);                             // open land, scattered trees
-                    case 403: return Ground(0.95f, sprint);                               // rough open land
-                    case 404: return Ground(0.9f, sprint);                                // rough open, scattered trees
+                    case 403: return Ground(0.8f, sprint);                                // rough open land (hygge)
+                    case 404: return Ground(0.75f, sprint);                               // rough open, scattered trees
                     case 405: return Ground(1.0f, sprint);                                // forest
                     case 406: return Ground(0.7f, sprint);                                // slow running
                     case 407: return Ground(0.7f, sprint);                                // slow running, good visibility
@@ -362,8 +362,8 @@ namespace MapImport
                     case 212: return Ground(1.2f, sprint);                                // bare rock
                     case 401: return Ground(sprint ? 1.3f : 1.15f, sprint);
                     case 402: return Ground(sprint ? 1.2f : 1.1f, sprint);
-                    case 403: return Ground(0.95f, sprint);
-                    case 404: return Ground(0.9f, sprint);
+                    case 403: return Ground(0.8f, sprint);
+                    case 404: return Ground(0.75f, sprint);
                     case 405: return Ground(1.0f, sprint);
                     case 406: return Ground(0.7f, sprint);
                     case 407: return Ground(0.7f, sprint);
