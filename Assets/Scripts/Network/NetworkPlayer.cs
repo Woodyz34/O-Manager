@@ -120,6 +120,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     }
     // The extra game modes the host has turned on in the lobby (ExtraMode flags)
     [Networked] public int lobbyModes { get; set; }
+    // Secret task tasks the host has switched off in the lobby (one bit per SecretTasks.Task; 0 = all tasks on)
+    [Networked] public int lobbyTasksOff { get; set; }
 
     // The extra game modes of the competition being played, set by the host on its own player when the game
     // starts (ExtraMode flags + ExtraModes.KnownBit, 0 = not set)
