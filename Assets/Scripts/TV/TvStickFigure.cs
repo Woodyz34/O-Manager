@@ -74,6 +74,8 @@ public class TvStickFigure
     public float shownX, shownZ, realX, realZ, headX, headZ, punchedAt, swerveX, swerveZ;
     public float nearest = float.MaxValue;
     float pace = 4f;
+    public float Pace => pace;
+    public float slope, hop;     // smoothed: the ground's rise ahead, and how far into a jump over a trunk
 
     public TvStickFigure(Transform parent, string name, Color color, int seed)
     {
@@ -310,11 +312,35 @@ public class TvStickFigure
         t.localScale = size;
     }
 
+    // Blends an arm towards a hand position, bending the elbow outwards and keeping the arm its own length
+    static void Reach(Vector3 shoulder, Vector3 target, int side, Vector3 right, float share, ref Vector3 elbow, ref Vector3 hand)
+    {
+        Vector3 d = target - shoulder;
+        float dist = Mathf.Min(d.magnitude, 0.55f);
+        d.Normalize();
+        Vector3 to = shoulder + d * dist;
+        Vector3 bend = Vector3.ProjectOnPlane(right * side + Vector3.down * 0.3f, d).normalized;
+        float half = dist * 0.52f;
+        Vector3 mid = shoulder + d * half + bend * Mathf.Sqrt(Mathf.Max(0f, 0.0841f - half * half));
+        elbow = Vector3.Lerp(elbow, mid, share);
+        hand = Vector3.Lerp(hand, to, share);
+    }
+
     // Moves the runner (on the ground at x, z) by the distance it ran since the last frame and poses it.
     // ground: the ground's height there; unit: the punching unit; near: 0 far from the control, 1 at it.
-    public void Pose(float x, float ground, float z, float moved, Vector3 unit, float near, float dt = 0f)
+    // slope: how much the ground rises per metre ahead (negative downhill); hop: 0..1 through a jump over a fallen trunk.
+    public void Pose(float x, float ground, float z, float moved, Vector3 unit, float near, float dt = 0f, float slope = 0f, float hop = 0f)
     {
         Style st = style;
+        // Hills: shorter steps with high knees and a forward lean uphill, longer steps leaning back downhill.
+        // Steep ground and cliffs: hands to the ground going up, a deep crouch going down.
+        float up = Mathf.Clamp(slope, -1.3f, 1.3f);
+        float climb = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.5f, 0.95f, up));
+        float crouch = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.5f, -0.95f, up));
+        float uphill = Mathf.Clamp01(up / 0.45f), downhill = Mathf.Clamp01(-up / 0.45f);
+        st.stride *= 1f - 0.3f * uphill + 0.12f * downhill * (1f - crouch) - 0.3f * climb - 0.45f * crouch;
+        st.knee *= 1f + 0.35f * uphill - 0.25f * downhill;
+        st.bounce *= 1f - 0.7f * Mathf.Max(climb, crouch);
         // A slow runner (uphill, in a marsh) takes shorter steps at nearly the same rhythm; long slow strides would
         // look like slow motion
         if (dt > 1e-5f) pace = Mathf.Lerp(pace, moved / dt, 0.15f);
@@ -330,7 +356,8 @@ public class TvStickFigure
         Vector3 right = Vector3.Cross(Vector3.up, fwd);
         Vector3 P(float f, float u, float s) => position + fwd * f + Vector3.up * u + right * s;
 
-        float ph = phase, lean = st.lean + near * 0.25f;
+        float ph = phase;
+        float lean = st.lean + near * 0.25f + 0.2f * uphill + 0.5f * climb - 0.16f * downhill * (1f - crouch) + 0.05f * crouch;
 
         // Legs: the angle of the thigh and of the shin, from straight down, forward positive
         float low = 0f;
@@ -340,15 +367,19 @@ public class TvStickFigure
         for (int k = 0; k < 2; k++)
         {
             float p = ph + (k == 1 ? Mathf.PI : 0f);
-            float th = st.stride * (1f - near * 0.5f) * Mathf.Sin(p) + 0.12f;
-            float kn = 0.22f + st.knee * Mathf.Max(0f, Mathf.Cos(p + 0.55f));
+            // Thighs come forward and knees bend in a crouch, on a steep climb and in the air over a trunk
+            // Over a trunk the leading leg reaches ahead and the trailing one tucks up
+            float lead = Mathf.Sin(p) > 0f ? 1f : 0f;
+            float th = st.stride * (1f - near * 0.5f) * Mathf.Sin(p) + 0.12f + 0.55f * crouch + 0.3f * climb + hop * (0.65f * lead + 0.15f);
+            float kn = 0.22f + st.knee * Mathf.Max(0f, Mathf.Cos(p + 0.55f)) + 1.05f * crouch + 0.35f * climb + hop * (1.3f - 0.9f * lead);
             float kx = 0.45f * Mathf.Sin(th), ky = -0.45f * Mathf.Cos(th), a2 = th - kn;
             knee[k, 0] = kx; knee[k, 1] = ky;
             foot[k, 0] = kx + 0.45f * Mathf.Sin(a2); foot[k, 1] = ky - 0.45f * Mathf.Cos(a2);
             shinAngle[k] = a2;
-            low = Mathf.Min(low, foot[k, 1]);
+            // On a slope the ground under a foot ahead of the body is higher (or lower)
+            low = Mathf.Min(low, foot[k, 1] - up * foot[k, 0]);
         }
-        float hipY = -low + 0.09f + st.bounce * 0.055f * (0.5f + 0.5f * Mathf.Cos(2f * ph)) * (1f - near * 0.6f);
+        float hipY = -low + 0.09f + st.bounce * 0.055f * (0.5f + 0.5f * Mathf.Cos(2f * ph)) * (1f - near * 0.6f) + 0.42f * hop;
 
         // The body
         Vector3 bodyUp = (fwd * Mathf.Sin(lean) + Vector3.up * Mathf.Cos(lean)).normalized;
@@ -412,6 +443,24 @@ public class TvStickFigure
             Vector3 shoulder = P(sf - Mathf.Sin(p) * 0.02f * side, su, 0.17f * side);
             Vector3 elbow = P(sf + 0.29f * Mathf.Sin(a), su - 0.29f * Mathf.Cos(a), (0.18f + fl) * side);
             Vector3 hand = P(sf + 0.29f * Mathf.Sin(a) + 0.27f * Mathf.Sin(a + el), su - 0.29f * Mathf.Cos(a) - 0.27f * Mathf.Cos(a + el), handIn * side);
+            if (climb > 0f)
+            {
+                // Hands to the ground ahead, one after the other
+                float f = 0.4f + 0.1f * Mathf.Sin(p), lift = 0.1f * Mathf.Max(0f, Mathf.Sin(p));
+                Reach(shoulder, P(f, up * f + 0.05f + lift, 0.19f * side), side, right, climb, ref elbow, ref hand);
+            }
+            if (crouch > 0f)
+            {
+                // Arms out for balance, the downhill hand low and back ready to catch a slip
+                Vector3 to = side == mapSide ? P(0.3f, hipY + 0.25f, 0.4f * side) : P(-0.15f, hipY - 0.05f, 0.42f * side);
+                Reach(shoulder, to, side, right, crouch * 0.85f, ref elbow, ref hand);
+            }
+            if (hop > 0f)
+            {
+                // Arms up and out in the air
+                hand += (Vector3.up * 0.12f + right * 0.08f * side) * hop;
+                elbow += right * 0.06f * side * hop;
+            }
             if (side == punchSide && near > 0f)
             {
                 Vector3 target = unit + Vector3.up * 0.05f, d = target - shoulder;

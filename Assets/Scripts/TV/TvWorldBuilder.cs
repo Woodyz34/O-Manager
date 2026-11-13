@@ -96,6 +96,8 @@ public class TvWorld
     public float[] ground;              // size * size heights, [j * size + i], i east and j north
     public readonly List<TvMesh> meshes = new List<TvMesh>();
     public readonly List<TvSolid> solids = new List<TvSolid>();
+    // Fallen trunks a runner jumps over rather than going round: ax, az, bx, bz for each
+    public readonly List<float> logs = new List<float>();
     // The control flag's stand and the punching unit on top of it
     public float flagX, flagZ, unitX, unitY, unitZ;
     public bool hasUnit = true;         // false at the start of a leg: nothing to punch
@@ -103,6 +105,22 @@ public class TvWorld
     public float camX, camZ;
     public int trees, rocks, tufts;
     public long vertices, triangles;
+
+    // 0 away from every fallen trunk, rising to 1 right over one: how high in the jump a runner here is
+    public float Hurdle(float x, float z)
+    {
+        float best = 1f;
+        for (int i = 0; i + 3 < logs.Count; i += 4)
+        {
+            float ax = logs[i], az = logs[i + 1], dx = logs[i + 2] - ax, dz = logs[i + 3] - az, l2 = dx * dx + dz * dz;
+            float t = l2 > 1e-6f ? ((x - ax) * dx + (z - az) * dz) / l2 : 0f;
+            if (t < -0.05f || t > 1.05f) continue;
+            t = t < 0f ? 0f : t > 1f ? 1f : t;
+            float ex = ax + dx * t - x, ez = az + dz * t - z, d = (float)Math.Sqrt(ex * ex + ez * ez) / 0.85f;
+            if (d < best) best = d;
+        }
+        return best >= 1f ? 0f : (float)Math.Sin((1f - best) * Math.PI / 2);
+    }
 
     public float HeightAt(float x, float z)
     {
@@ -594,7 +612,8 @@ public class TvWorldBuilder
 
     // ---- The low-poly shapes everything is put together from ----
 
-    TvShape rockA, rockB, logShape, bushShape, bigTree, poolShape;
+    TvShape[] rocks, rocksLow, bushShapes, youngSpruce, youngLeafy;
+    TvShape rootPlate, logShape, bigTree, poolShape;
     TvShape[] pineNear, pineFar, pine2Near, pine2Far, spruceShape, birchNear, birchFar, beechNear, beechFar;
     TvShape tuftBerry, tuftHeath, tuftGrass, tuftDry, tuftShort, tuftFern, tuftBerryNear, tuftHeathNear;
 
@@ -654,6 +673,29 @@ public class TvWorldBuilder
             b.Blob(2.2f, 1f, 0.65f, 1f, 0.4f, 17.4f, -0.6f, 0.3f, near ? 1 : 0, near, beechG2);
             return b.Done();
         }
+        // Young trees for thickets, 2.5 m tall: spruces with branches down to the ground, and leafy saplings
+        TvShape YoungSpruce()
+        {
+            var b = new TvShapeBuilder(random);
+            TvColor c1 = spruceG.Shade(Rr(0.9f, 1.15f)), c2 = spruceG2.Shade(Rr(0.9f, 1.15f));
+            b.Tube(0.05f, 0.02f, 2.5f, 0f, 4, bark);
+            b.Cone(0.8f, 1.1f, 0.05f, 6, c1);
+            b.Cone(0.62f, 1f, 0.72f, 6, c2);
+            b.Cone(0.44f, 0.9f, 1.35f, 6, c1);
+            b.Cone(0.25f, 0.65f, 1.9f, 5, c2);
+            return b.Done();
+        }
+        TvShape YoungLeafy()
+        {
+            var b = new TvShapeBuilder(random);
+            b.Tube(0.035f, 0.02f, 1.8f, 0f, 4, birchW);
+            b.Blob(0.6f, 1f, 1.15f, 1f, 0f, 1.55f, 0f, 0.5f, 0, true, birchG.Shade(0.8f), birchG2, 0.9f, 2.1f);
+            b.Blob(0.42f, 1f, 1f, 1f, 0.3f, 0.95f, 0.25f, 0.5f, 0, true, birchG.Shade(0.75f), birchG, 0.6f, 1.4f);
+            return b.Done();
+        }
+        youngSpruce = new[] { YoungSpruce(), YoungSpruce(), YoungSpruce() };
+        youngLeafy = new[] { YoungLeafy(), YoungLeafy() };
+
         // Two of each, so a forest is not one tree copied
         pineNear = new[] { Pine(true), Pine(true) };
         pineFar = new[] { Pine(false), Pine(false) };
@@ -665,22 +707,53 @@ public class TvWorldBuilder
         beechNear = new[] { Beech(true), Beech(true) };
         beechFar = new[] { Beech(false), Beech(false) };
 
+        // Rocks: granite broken by flat planes, moss on top where the ground is mossy, pale lichen spots
+        float mossy = look.ground == TerrainLook.Moss ? 0.5f : look.ground == TerrainLook.Stone || look.ground == TerrainLook.Lichen || look.ground == TerrainLook.Sand ? 0.18f : 0.4f;
+        TvColor granite = TvColor.Hex("#75736d"), granite2 = TvColor.Hex("#6c6b68"), mossG = TvColor.Hex("#667a3a");
+        TvShape RockShape(float sx, float sy, float sz, float oy, int detail, int cuts, TvColor c)
+        {
+            var b = new TvShapeBuilder(random);
+            b.Rock(sx, sy, sz, oy, detail, cuts, 0.3f, c, mossG, mossy, 0.12f);
+            return b.Done();
+        }
+        rocks = new[]
+        {
+            RockShape(1f, 0.75f, 1f, 0.3f, 1, 7, granite), RockShape(1.15f, 0.6f, 0.85f, 0.24f, 1, 8, granite2),
+            RockShape(0.9f, 0.85f, 1f, 0.33f, 1, 6, granite2), RockShape(1.2f, 0.5f, 0.95f, 0.2f, 1, 8, granite)
+        };
+        rocksLow = new[] { RockShape(1f, 0.7f, 1f, 0.28f, 0, 3, granite), RockShape(1.1f, 0.55f, 0.9f, 0.22f, 0, 3, granite2), RockShape(0.95f, 0.8f, 1f, 0.3f, 0, 3, granite) };
         var s = new TvShapeBuilder(random);
-        s.Blob(1f, 1f, 0.72f, 1f, 0f, 0.42f, 0f, 0.42f, 1, true, TvColor.Hex("#85837d"), TvColor.Hex("#7e8a5c"), 0.55f, 1.1f);
-        rockA = s.Done();
-        s = new TvShapeBuilder(random);
-        s.Blob(1f, 1.2f, 0.6f, 0.85f, 0f, 0.32f, 0f, 0.5f, 0, true, TvColor.Hex("#797874"), TvColor.Hex("#8d8f7c"), 0.4f, 0.9f);
-        rockB = s.Done();
+        // The root plate of a fallen tree: earth and roots, standing on edge
+        s.Rock(1f, 1f, 0.3f, 0.75f, 1, 4, 0.45f, TvColor.Hex("#5a4636"), TvColor.Hex("#4a3a2c"), 0.3f, 0f, -0.75f);
+        rootPlate = s.Done();
 
-        s = new TvShapeBuilder(random);
-        s.Blob(0.34f, 1f, 0.5f, 1f, 0f, 0.1f, 0f, 0.5f, 0, false, TvColor.Hex("#3d5a2a"));
-        s.Blob(0.24f, 1f, 0.55f, 1f, 0.3f, 0.08f, 0.16f, 0.5f, 0, false, TvColor.Hex("#4b6a2d"));
-        s.Blob(0.22f, 1f, 0.5f, 1f, -0.2f, 0.07f, 0.28f, 0.5f, 0, false, TvColor.Hex("#5a4a2c"));
-        tuftBerry = s.Done();
-        s = new TvShapeBuilder(random);
-        s.Blob(0.3f, 1f, 0.55f, 1f, 0f, 0.1f, 0f, 0.5f, 0, false, TvColor.Hex("#5c5a34"));
-        s.Blob(0.2f, 1f, 0.6f, 1f, 0.25f, 0.08f, -0.12f, 0.5f, 0, false, TvColor.Hex("#7a4a52"));
-        tuftHeath = s.Done();
+        // Bilberry: a low tangle of small leafy clumps, lit lighter on top
+        TvShape Berry(bool near, int clumps)
+        {
+            var b = new TvShapeBuilder(random);
+            TvColor[] leaf = { TvColor.Hex("#3f5f2a"), TvColor.Hex("#4b6c2e"), TvColor.Hex("#456628") };
+            for (int i = 0; i < clumps; i++)
+            {
+                float a = i * 2.4f + random.Value(), d = i == 0 ? 0f : 0.12f + 0.22f * random.Value(), r = 0.13f + 0.08f * random.Value();
+                TvColor c = leaf[i % leaf.Length];
+                b.Blob(r, 1f, 0.75f, 1f, (float)Math.Cos(a) * d, 0.1f + 0.08f * random.Value(), (float)Math.Sin(a) * d, 0.55f, 0, near, c.Shade(0.8f), c.Lerp(TvColor.Hex("#7d9a3e"), 0.45f), 0f, 0.3f);
+            }
+            return b.Done();
+        }
+        // Heather: olive-brown cushions with a purple tinge on top
+        TvShape Heath(bool near, int clumps)
+        {
+            var b = new TvShapeBuilder(random);
+            for (int i = 0; i < clumps; i++)
+            {
+                float a = i * 2.4f + random.Value(), d = i == 0 ? 0f : 0.1f + 0.18f * random.Value(), r = 0.12f + 0.07f * random.Value();
+                b.Blob(r, 1f, 0.7f, 1f, (float)Math.Cos(a) * d, 0.08f + 0.05f * random.Value(), (float)Math.Sin(a) * d, 0.55f, 0, near,
+                    TvColor.Hex("#4e4a2c"), i % 2 == 0 ? TvColor.Hex("#7a5868") : TvColor.Hex("#6d6a3c"), 0.02f, 0.24f);
+            }
+            return b.Done();
+        }
+        tuftBerry = Berry(false, 4);
+        tuftHeath = Heath(false, 3);
         s = new TvShapeBuilder(random);
         // A tussock: a low mound with many thin blades
         s.Blob(0.2f, 1f, 0.45f, 1f, 0f, 0.03f, 0f, 0.3f, 0, false, TvColor.Hex("#7f8a48"));
@@ -691,16 +764,9 @@ public class TvWorldBuilder
             s.Cone(0.045f + 0.004f * (i % 3), 0.3f + 0.035f * ((i * 5) % 7), 0.02f, 3, blades[i % blades.Length], (float)Math.Cos(a) * d, (float)Math.Sin(a) * d);
         }
         tuftGrass = s.Done();
-        // The same undergrowth with hard facets, for the tufts near the control
-        s = new TvShapeBuilder(random);
-        s.Blob(0.34f, 1f, 0.5f, 1f, 0f, 0.1f, 0f, 0.5f, 1, true, TvColor.Hex("#3d5a2a"));
-        s.Blob(0.24f, 1f, 0.55f, 1f, 0.3f, 0.08f, 0.16f, 0.5f, 1, true, TvColor.Hex("#4b6a2d"));
-        s.Blob(0.22f, 1f, 0.5f, 1f, -0.2f, 0.07f, 0.28f, 0.5f, 1, true, TvColor.Hex("#5a4a2c"));
-        tuftBerryNear = s.Done();
-        s = new TvShapeBuilder(random);
-        s.Blob(0.3f, 1f, 0.55f, 1f, 0f, 0.1f, 0f, 0.5f, 1, true, TvColor.Hex("#5c5a34"));
-        s.Blob(0.2f, 1f, 0.6f, 1f, 0.25f, 0.08f, -0.12f, 0.5f, 1, true, TvColor.Hex("#7a4a52"));
-        tuftHeathNear = s.Done();
+        // The same undergrowth with hard facets and more clumps, for the tufts near the control
+        tuftBerryNear = Berry(true, 6);
+        tuftHeathNear = Heath(true, 5);
         s = new TvShapeBuilder(random);
         s.Cone(0.12f, 0.36f, 0f, 4, TvColor.Hex("#b9ab72"));
         s.Cone(0.09f, 0.3f, 0f, 4, TvColor.Hex("#a39a62"), 0.13f, -0.06f);
@@ -713,10 +779,25 @@ public class TvWorldBuilder
         s.Cone(0.22f, 0.62f, 0f, 5, TvColor.Hex("#6d9a40"), 0.1f, 0.1f);
         tuftFern = s.Done();
 
-        s = new TvShapeBuilder(random);
-        s.Blob(0.9f, 1f, 0.8f, 1f, 0f, 0.6f, 0f, 0.4f, 1, true, TvColor.Hex("#476a2c"));
-        s.Blob(0.6f, 1f, 0.8f, 1f, 0.6f, 0.45f, 0.3f, 0.4f, 0, true, TvColor.Hex("#557a33"));
-        bushShape = s.Done();
+        // A bush: several leafy lumps, dark and dense inside, lighter where the sun reaches, a few stems at the foot
+        TvShape Bush()
+        {
+            var b = new TvShapeBuilder(random);
+            TvColor low = TvColor.Hex("#2f4824"), high = TvColor.Hex("#5f7f37");
+            for (int i = 0; i < 4; i++)
+            {
+                float a = i * 1.7f + random.Value(), d = 0.15f + 0.3f * random.Value();
+                b.Tube(0.035f, 0.02f, 0.55f, -0.05f, 4, TvColor.Hex("#4a3e30"), null, 0f, 1f, (float)Math.Cos(a) * d, (float)Math.Sin(a) * d);
+            }
+            b.Blob(0.62f, 1f, 0.78f, 1f, 0f, 0.82f, 0f, 0.42f, 1, true, low, high, 0.35f, 1.35f);
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i * 1.05f + random.Value() * 0.6f, d = 0.38f + 0.2f * random.Value(), r = 0.32f + 0.14f * random.Value();
+                b.Blob(r, 1f, 0.8f, 1f, (float)Math.Cos(a) * d, 0.45f + 0.45f * random.Value(), (float)Math.Sin(a) * d, 0.45f, 0, true, low, high, 0.3f, 1.3f);
+            }
+            return b.Done();
+        }
+        bushShapes = new[] { Bush(), Bush() };
 
         // A distinct big tree: an old oak
         s = new TvShapeBuilder(random);
@@ -740,9 +821,16 @@ public class TvWorldBuilder
     void AddRock(float x, float z, float s, float sink, bool solid, float tint = -1f)
     {
         if (!Inside(x, z, 1.5f)) return;
-        rockMesh.Add(random.Value() < 0.5f ? rockA : rockB, x, H(x, z) - sink * s, z, s, s * Rr(0.85f, 1.15f), s, Rr(0f, 6.283f), tint < 0f ? Rr(0.88f, 1.1f) : tint);
+        rockMesh.Add(RockFor(x, z, s), x, H(x, z) - sink * s, z, s, s * Rr(0.85f, 1.15f), s, Rr(0f, 6.283f), tint < 0f ? Rr(0.9f, 1.08f) : tint);
         world.rocks++;
         if (solid) world.solids.Add(new TvSolid { x = x, z = z, r = s * 0.95f });
+    }
+
+    // Small or far stones get the plain shape: nobody sees the extra facets
+    TvShape RockFor(float x, float z, float size)
+    {
+        bool near = size > 0.3f && x * x + z * z < 60f * 60f;
+        return near ? rocks[(int)(random.Value() * rocks.Length) % rocks.Length] : rocksLow[(int)(random.Value() * rocksLow.Length) % rocksLow.Length];
     }
 
     void Stones()
@@ -787,7 +875,7 @@ public class TvWorldBuilder
                     {
                         float a = Rr(0f, 6.283f), d = Rr(0f, 0.7f) * (1f - i * 0.1f);
                         float rx = x + (float)Math.Cos(a) * d, rz = z + (float)Math.Sin(a) * d, s = Rr(0.25f, 0.4f);
-                        if (Inside(rx, rz, 1.5f)) rockMesh.Add(rockA, rx, H(rx, rz) + i * 0.07f - 0.05f, rz, s, s, s, Rr(0f, 6.283f), Rr(0.9f, 1.05f));
+                        if (Inside(rx, rz, 1.5f)) rockMesh.Add(RockFor(rx, rz, s), rx, H(rx, rz) + i * 0.07f - 0.05f, rz, s, s, s, Rr(0f, 6.283f), Rr(0.9f, 1.05f));
                     }
                     world.solids.Add(new TvSolid { x = x, z = z, r = 1.0f });
                     break;
@@ -905,48 +993,96 @@ public class TvWorldBuilder
 
     void Structures()
     {
-        TvColor stone = TvColor.Hex("#8a8880"), wood = TvColor.Hex("#6a5a48"), pole = TvColor.Hex("#4e4033"), wire = TvColor.Hex("#2b2b2b"),
+        TvColor stone = TvColor.Hex("#7e7b74"), wood = TvColor.Hex("#6a5a48"), pole = TvColor.Hex("#4e4033"), wire = TvColor.Hex("#2b2b2b"),
             steel = TvColor.Hex("#8c9094"), house = TvColor.Hex("#b4472f"), roof = TvColor.Hex("#3f3b38");
-        TvShape wallPiece = Box(1f, 1f, 0.55f, stone);
+        TvColor grey = TvColor.Hex("#857d70"), wireC = TvColor.Hex("#9a9a94");
+        TvShape wallPiece = Box(1f, 1f, 0.55f, stone), wallCap = Box(1f, 0.14f, 0.68f, TvColor.Hex("#6c6a64"));
 
         foreach (var line in lines)
         {
             float[] c = line.xz;
             switch (line.kind)
             {
-                case WorldLineKind.Wall:
-                case WorldLineKind.RuinedWall:
                 case WorldLineKind.HighWall:
-                {
-                    bool ruined = line.kind == WorldLineKind.RuinedWall;
-                    float height = line.kind == WorldLineKind.HighWall ? 1.9f : ruined ? 0.45f : 0.85f;
                     Along(c, 1.2f, (x, z, yaw, len) =>
                     {
-                        if (ruined && random.Value() < 0.3f) return;
                         // Unity turns clockwise round y for a positive angle seen from above; the mesh copy turns the same way
-                        thingMesh.Add(wallPiece, x, H(x, z) - 0.1f, z, len + 0.05f, height * Rr(0.85f, 1.1f), 1f, yaw, Rr(0.9f, 1.08f));
+                        thingMesh.Add(wallPiece, x, H(x, z) - 0.1f, z, len + 0.05f, 1.9f, 1f, yaw, Rr(0.94f, 1.04f));
+                        thingMesh.Add(wallCap, x, H(x, z) + 1.78f, z, len + 0.05f, 1f, 1f, yaw);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.55f });
+                    });
+                    break;
+                case WorldLineKind.Wall:
+                case WorldLineKind.RuinedWall:
+                {
+                    // A Swedish stone wall: field stones piled in two or three rows, mossy on top. A ruined one is one low row with gaps.
+                    bool ruined = line.kind == WorldLineKind.RuinedWall;
+                    Along(c, 0.48f, (x, z, yaw, len) =>
+                    {
+                        if (ruined && random.Value() < 0.35f) return;
+                        float dx = (float)Math.Cos(yaw), dz = (float)Math.Sin(yaw), side = ruined ? 0.35f : 0.12f;
+                        float bx = x + (-dz) * Rr(-side, side), bz = z + dx * Rr(-side, side), s0 = ruined ? Rr(0.22f, 0.36f) : Rr(0.34f, 0.44f);
+                        float y0 = H(bx, bz);
+                        rockMesh.Add(RockFor(bx, bz, s0), bx, y0 - 0.12f, bz, s0, s0 * Rr(0.8f, 1.1f), s0, Rr(0f, 6.283f), Rr(0.88f, 1.08f));
+                        world.rocks++;
+                        if (!ruined)
+                        {
+                            float s1 = Rr(0.26f, 0.35f), off = Rr(-0.2f, 0.2f);
+                            float tx = x + dx * off, tz = z + dz * off;
+                            rockMesh.Add(RockFor(tx, tz, s1), tx, y0 + s0 * 0.55f, tz, s1, s1 * Rr(0.75f, 1f), s1, Rr(0f, 6.283f), Rr(0.88f, 1.1f));
+                            if (random.Value() < 0.45f)
+                            {
+                                float s2 = Rr(0.16f, 0.24f);
+                                rockMesh.Add(RockFor(x, z, s2), x + dx * Rr(-0.15f, 0.15f), y0 + s0 * 0.55f + s1 * 0.6f, z + dz * Rr(-0.15f, 0.15f), s2, s2, s2, Rr(0f, 6.283f), Rr(0.9f, 1.1f));
+                            }
+                            world.rocks += 2;
+                        }
+                        world.solids.Add(new TvSolid { x = x, z = z, r = 0.45f });
                     });
                     break;
                 }
                 case WorldLineKind.Fence:
                 case WorldLineKind.RuinedFence:
-                case WorldLineKind.HighFence:
                 {
-                    bool high = line.kind == WorldLineKind.HighFence, ruined = line.kind == WorldLineKind.RuinedFence;
-                    float height = high ? 2f : 1.05f;
+                    // Weathered grey posts with two split rails; a ruined fence leans, misses posts and has a rail left here and there
+                    bool ruined = line.kind == WorldLineKind.RuinedFence;
                     float lastX = float.NaN, lastY = 0f, lastZ = 0f;
-                    Along(c, 2.5f, (x, z, yaw, len) =>
+                    Along(c, 2.4f, (x, z, yaw, len) =>
                     {
                         float y = H(x, z);
-                        Bar(thingMesh, x, y - 0.1f, z, x, y + height, z, 0.045f, 0.04f, 4, high ? steel : wood);
-                        if (!float.IsNaN(lastX) && !ruined && (x - lastX) * (x - lastX) + (z - lastZ) * (z - lastZ) < 16f)
+                        if (ruined && random.Value() < 0.3f) { lastX = float.NaN; return; }
+                        float lean = ruined ? Rr(0.05f, 0.4f) : Rr(0f, 0.04f), la = Rr(0f, 6.283f);
+                        float topX = x + (float)Math.Cos(la) * lean, topZ = z + (float)Math.Sin(la) * lean;
+                        Bar(thingMesh, x, y - 0.15f, z, topX, y + 1.15f, topZ, 0.06f, 0.05f, 5, grey.Shade(Rr(0.85f, 1.1f)));
+                        if (!float.IsNaN(lastX) && (!ruined || random.Value() < 0.3f) && (x - lastX) * (x - lastX) + (z - lastZ) * (z - lastZ) < 16f)
                         {
-                            for (int rail = 1; rail <= (high ? 3 : 2); rail++)
-                            {
-                                float up = height * rail / (high ? 3f : 2f) - 0.08f;
-                                Bar(wireMesh, lastX, lastY + up, lastZ, x, y + up, z, 0.015f, 0.015f, 3, high ? steel : wood);
-                            }
+                            float sag = ruined ? Rr(0.2f, 0.6f) : 0f;
+                            foreach (float up in ruined ? new[] { 0.5f } : new[] { 0.48f, 0.98f })
+                                Bar(thingMesh, lastX, lastY + up, lastZ, x, y + up - sag, z, 0.04f, 0.035f, 4, grey.Shade(Rr(0.9f, 1.1f)));
+                        }
+                        lastX = x; lastY = y; lastZ = z;
+                    });
+                    break;
+                }
+                case WorldLineKind.HighFence:
+                {
+                    // A game fence: tall wooden posts with wire mesh; the mesh is only drawn where it can be seen
+                    float lastX = float.NaN, lastY = 0f, lastZ = 0f;
+                    Along(c, 3f, (x, z, yaw, len) =>
+                    {
+                        float y = H(x, z);
+                        Bar(thingMesh, x, y - 0.2f, z, x, y + 2.1f, z, 0.07f, 0.06f, 5, grey.Shade(Rr(0.85f, 1.05f)));
+                        if (!float.IsNaN(lastX) && (x - lastX) * (x - lastX) + (z - lastZ) * (z - lastZ) < 25f)
+                        {
+                            bool near = x * x + z * z < 55f * 55f;
+                            foreach (float up in near ? new[] { 0.1f, 0.35f, 0.65f, 1f, 1.4f, 1.95f } : new[] { 0.1f, 1f, 1.95f })
+                                Bar(wireMesh, lastX, lastY + up, lastZ, x, y + up, z, 0.008f, 0.008f, 3, wireC);
+                            if (near)
+                                for (float f = 0.15f; f < 1f; f += 0.15f)
+                                {
+                                    float wx = Lerp(lastX, x, f), wz = Lerp(lastZ, z, f), wy = Lerp(lastY, y, f);
+                                    Bar(wireMesh, wx, wy + 0.1f, wz, wx, wy + 1.95f, wz, 0.007f, 0.007f, 3, wireC);
+                                }
                         }
                         lastX = x; lastY = y; lastZ = z;
                     });
@@ -958,9 +1094,8 @@ public class TvWorldBuilder
                         float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
                         if (!Inside(ax, az, 2f) || !Inside(bx, bz, 2f)) continue;
                         Bar(thingMesh, ax, H(ax, az) + 0.2f, az, bx, H(bx, bz) + 0.2f, bz, 0.19f, 0.13f, 6, TvColor.Hex("#5e5346"));
-                        float len = (float)Math.Sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
-                        for (float t = 0.3f; t < len; t += 0.6f)
-                            world.solids.Add(new TvSolid { x = Lerp(ax, bx, t / len), z = Lerp(az, bz, t / len), r = 0.3f });
+                        // Runners jump over a fallen trunk, so it is not a solid to go round
+                        world.logs.Add(ax); world.logs.Add(az); world.logs.Add(bx); world.logs.Add(bz);
                     }
                     break;
                 case WorldLineKind.PowerLine:
@@ -1021,23 +1156,82 @@ public class TvWorldBuilder
                 case WorldPointKind.Tower:
                 case WorldPointKind.SmallTower:
                 {
-                    // A hunting tower: four legs and a box on top
-                    float top = p.kind == WorldPointKind.Tower ? 5f : 2.6f, w = 0.75f;
+                    // A hunting tower: four slanting legs, a ladder, and a plank cabin with a window band and a roof.
+                    // The small one is an open stand with a rail round the seat.
+                    bool tall = p.kind == WorldPointKind.Tower;
+                    float top = tall ? 4.6f : 2.4f, w = tall ? 0.8f : 0.6f, yaw = Rr(0f, 6.283f);
+                    float ca = (float)Math.Cos(yaw), sa = (float)Math.Sin(yaw);
+                    (float, float) At(float lx, float lz) => (x + lx * ca + lz * sa, z - lx * sa + lz * ca);
                     foreach (float sx in new[] { -1f, 1f })
                         foreach (float sz in new[] { -1f, 1f })
-                            Bar(thingMesh, x + sx * w * 1.2f, y - 0.2f, z + sz * w * 1.2f, x + sx * w, y + top, z + sz * w, 0.06f, 0.05f, 4, wood);
-                    thingMesh.Add(Box(w * 2.2f, 1.3f, w * 2.2f, wood), x, y + top, z, 1f, 1f, 1f, Rr(0f, 0.2f));
-                    thingMesh.Add(Box(w * 2.6f, 0.1f, w * 2.6f, roof), x, y + top + 1.5f, z, 1f, 1f, 1f, 0f);
+                        {
+                            var (fx, fz) = At(sx * w * 1.45f, sz * w * 1.45f);
+                            var (tx, tz) = At(sx * w * 0.95f, sz * w * 0.95f);
+                            Bar(thingMesh, fx, H(fx, fz) - 0.2f, fz, tx, y + top, tz, 0.07f, 0.06f, 5, wood);
+                        }
+                    // Cross braces
+                    foreach (float sz in new[] { -1f, 1f })
+                    {
+                        var (ax, az) = At(-w * 1.3f, sz * w * 1.3f);
+                        var (bx, bz) = At(w * 1.05f, sz * w * 1.05f);
+                        Bar(thingMesh, ax, y + top * 0.25f, az, bx, y + top * 0.8f, bz, 0.035f, 0.035f, 4, wood);
+                    }
+                    // The ladder up the front
+                    foreach (float lx in new[] { -0.22f, 0.22f })
+                    {
+                        var (fx, fz) = At(lx, w * 1.0f + top * 0.32f);
+                        var (tx, tz) = At(lx, w * 1.0f);
+                        Bar(thingMesh, fx, H(fx, fz) - 0.1f, fz, tx, y + top + 0.1f, tz, 0.035f, 0.035f, 4, wood);
+                    }
+                    for (float r = 0.35f; r < top; r += 0.35f)
+                    {
+                        float f = r / top, lz = w * 1.0f + top * 0.32f * (1f - f);
+                        var (ax, az) = At(-0.22f, lz);
+                        var (bx, bz) = At(0.22f, lz);
+                        Bar(thingMesh, ax, y + r, az, bx, y + r, bz, 0.025f, 0.025f, 3, wood);
+                    }
+                    var t = new TvShapeBuilder(random);
+                    TvColor plank = wood.Shade(1.12f), dark = TvColor.Hex("#1f2326");
+                    t.Box(-w - 0.1f, -0.08f, -w - 0.1f, w + 0.1f, 0.04f, w + 0.1f, plank.Shade(0.85f));   // the floor
+                    if (tall)
+                    {
+                        t.Box(-w, 0f, -w, w, 0.85f, w, plank);
+                        t.Box(-w + 0.04f, 0.85f, -w + 0.04f, w - 0.04f, 1.35f, w - 0.04f, dark);   // the open window band
+                        foreach (float sx in new[] { -1f, 1f })
+                            foreach (float sz in new[] { -1f, 1f })
+                                t.Box(sx * w - 0.06f, 0.85f, sz * w - 0.06f, sx * w + 0.06f, 1.35f, sz * w + 0.06f, plank);
+                        t.Box(-w, 1.35f, -w, w, 1.6f, w, plank);
+                        t.Triangle(-w, 1.6f, -w, -w, 1.6f, w, -w, 2.1f, 0f, 0f, 1.6f, 0f, plank);
+                        t.Triangle(w, 1.6f, -w, w, 1.6f, w, w, 2.1f, 0f, 0f, 1.6f, 0f, plank);
+                        Roof(t, w, w, 1.6f, 2.1f, 0.25f, roof);
+                    }
+                    else
+                    {
+                        t.Box(-w, 0.5f, -w, w, 0.58f, w, plank);    // the seat rail
+                        t.Box(-0.35f, 0.35f, -w + 0.05f, 0.35f, 0.42f, -w + 0.4f, plank);   // the seat
+                        foreach (float sx in new[] { -1f, 1f })
+                            foreach (float sz in new[] { -1f, 1f })
+                                t.Box(sx * w - 0.04f, 0f, sz * w - 0.04f, sx * w + 0.04f, 0.58f, sz * w + 0.04f, plank);
+                    }
+                    thingMesh.Add(t.Done(), x, y + top, z, 1f, 1f, 1f, yaw);
                     world.solids.Add(new TvSolid { x = x, z = z, r = 1.3f });
                     break;
                 }
                 case WorldPointKind.FodderRack:
+                {
+                    // A fodder rack: a slatted hay box on two legs under a small pitched roof
+                    var t = new TvShapeBuilder(random);
                     foreach (float sx in new[] { -1f, 1f })
-                        Bar(thingMesh, x + sx * 0.6f, y - 0.1f, z, x + sx * 0.6f, y + 1.3f, z, 0.05f, 0.05f, 4, wood);
-                    thingMesh.Add(Box(1.5f, 0.5f, 0.7f, wood), x, y + 0.7f, z, 1f, 1f, 1f, 0f);
-                    thingMesh.Add(Box(1.8f, 0.08f, 1.1f, roof), x, y + 1.35f, z, 1f, 1f, 1f, 0f);
+                        t.Box(sx * 0.7f - 0.05f, -0.1f, -0.05f, sx * 0.7f + 0.05f, 1.45f, 0.05f, wood);
+                    t.Box(-0.7f, 0.55f, -0.3f, 0.7f, 0.65f, 0.3f, wood);
+                    for (float sx = -0.6f; sx <= 0.61f; sx += 0.2f)
+                        t.Box(sx - 0.02f, 0.65f, -0.32f, sx + 0.02f, 1.15f, 0.32f, wood.Shade(1.1f));
+                    t.Box(-0.6f, 0.68f, -0.28f, 0.6f, 0.95f, 0.28f, TvColor.Hex("#a59a5c"));   // hay
+                    Roof(t, 0.75f, 0.45f, 1.4f, 1.7f, 0.15f, roof);
+                    thingMesh.Add(t.Done(), x, y, z, 1f, 1f, 1f, Rr(0f, 6.283f));
                     world.solids.Add(new TvSolid { x = x, z = z, r = 1f });
                     break;
+                }
                 case WorldPointKind.BigTree:
                     treeMeshes[Tile(x, z)].Add(bigTree, x, y - 0.15f, z, 1f, Rr(0.95f, 1.15f), 1f, Rr(0f, 6.283f), Rr(0.9f, 1.08f));
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.75f });
@@ -1046,7 +1240,7 @@ public class TvWorldBuilder
                 case WorldPointKind.Bush:
                 {
                     float s = Rr(0.9f, 1.4f);
-                    treeMeshes[Tile(x, z)].Add(bushShape, x, y - 0.1f, z, s, s, s, Rr(0f, 6.283f), Rr(0.85f, 1.1f));
+                    treeMeshes[Tile(x, z)].Add(bushShapes[random.Value() < 0.5f ? 0 : 1], x, y - 0.1f, z, s, s * Rr(0.85f, 1.1f), s, Rr(0f, 6.283f), Rr(0.85f, 1.1f));
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.8f * s });
                     break;
                 }
@@ -1061,31 +1255,207 @@ public class TvWorldBuilder
                 {
                     // The root plate of a fallen tree, standing on edge
                     float yaw = Rr(0f, 6.283f);
-                    thingMesh.Add(rockA, x, y + 0.2f, z, 0.35f, 1.5f, 1.3f, yaw, 0.55f);
+                    thingMesh.Add(rootPlate, x, y - 0.3f, z, 1.2f, 1.1f, 1.2f, yaw);
+                    // The trunk lies away from the plate
+                    float tx = (float)Math.Sin(yaw), tz = (float)Math.Cos(yaw);
+                    Bar(thingMesh, x + tx * 0.3f, y + 0.55f, z + tz * 0.3f, x + tx * 7f, H(x + tx * 7f, z + tz * 7f) + 0.2f, z + tz * 7f, 0.2f, 0.12f, 6, TvColor.Hex("#5e5346"));
+                    world.logs.Add(x + tx * 1.2f); world.logs.Add(z + tz * 1.2f); world.logs.Add(x + tx * 7f); world.logs.Add(z + tz * 7f);
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.9f });
                     break;
                 }
             }
         }
 
-        // Buildings: every 2 m cell of one becomes a block, so a house has the outline the map gives it
-        TvShape block = Box(2.02f, 3f, 2.02f, house), lid = Box(2.3f, 0.25f, 2.3f, roof);
+        Buildings();
+    }
+
+    // ---- Houses: every group of building cells on the map becomes one house with walls, windows and a roof ----
+
+    void Buildings()
+    {
         double e0 = Math.Floor((input.centerE - R - layer.minE) / layer.cell), n0 = Math.Floor((input.centerN - R - layer.minN) / layer.cell);
         int cells = (int)(2 * R / layer.cell) + 2;
+        var isHouse = new bool[cells * cells];
+        float CellX(int i) => (float)(layer.minE + (e0 + i + 0.5) * layer.cell - input.centerE);
+        float CellZ(int j) => (float)(layer.minN + (n0 + j + 0.5) * layer.cell - input.centerN);
         for (int j = 0; j < cells; j++)
-        {
             for (int i = 0; i < cells; i++)
+                isHouse[j * cells + i] = Base(layer.At(input.centerE + CellX(i), input.centerN + CellZ(j))) == WorldCell.Building && Inside(CellX(i), CellZ(j), 2f);
+
+        var seen = new bool[cells * cells];
+        var group = new List<int>();
+        var todo = new Stack<int>();
+        for (int start = 0; start < isHouse.Length; start++)
+        {
+            if (!isHouse[start] || seen[start]) continue;
+            group.Clear();
+            todo.Push(start);
+            seen[start] = true;
+            while (todo.Count > 0)
             {
-                double e = layer.minE + (e0 + i + 0.5) * layer.cell, n = layer.minN + (n0 + j + 0.5) * layer.cell;
-                if (Base(layer.At(e, n)) != WorldCell.Building) continue;
-                float x = (float)(e - input.centerE), z = (float)(n - input.centerN);
-                if (!Inside(x, z, 2f)) continue;
-                float y = H(x, z);
-                thingMesh.Add(block, x, y - 0.6f, z, layer.cell / 2f, 1.2f, layer.cell / 2f, 0f);
-                thingMesh.Add(lid, x, y + 3f, z, layer.cell / 2f, 1f, layer.cell / 2f, 0f);
-                world.solids.Add(new TvSolid { x = x, z = z, r = layer.cell * 0.75f });
+                int k = todo.Pop();
+                group.Add(k);
+                int ci = k % cells, cj = k / cells;
+                for (int d = 0; d < 4; d++)
+                {
+                    int ni = ci + (d == 0 ? 1 : d == 1 ? -1 : 0), nj = cj + (d == 2 ? 1 : d == 3 ? -1 : 0);
+                    if (ni < 0 || nj < 0 || ni >= cells || nj >= cells) continue;
+                    int nk = nj * cells + ni;
+                    if (isHouse[nk] && !seen[nk]) { seen[nk] = true; todo.Push(nk); }
+                }
+            }
+            House(group, cells, CellX, CellZ);
+        }
+    }
+
+    // A pitched roof along x: two thick slabs meeting at the ridge, reaching out over the walls by over
+    static void Roof(TvShapeBuilder b, float hl, float hw, float eaves, float ridge, float over, TvColor color)
+    {
+        float pitch = (ridge - eaves) / Math.Max(0.01f, hw);
+        foreach (float side in new[] { -1f, 1f })
+        {
+            float x0 = -hl - over, x1 = hl + over, ze = side * (hw + over), yr = ridge + 0.05f, ye = eaves - over * pitch;
+            const float T = 0.14f;
+            float[] q =
+            {
+                x0, ye, ze, x1, ye, ze, x1, yr, 0f, x0, yr, 0f,
+                x0, ye + T, ze, x1, ye + T, ze, x1, yr + T, 0f, x0, yr + T, 0f
+            };
+            float mx = 0f, my = 0f, mz = 0f;
+            for (int i = 0; i < 24; i += 3) { mx += q[i]; my += q[i + 1]; mz += q[i + 2]; }
+            mx /= 8f; my /= 8f; mz /= 8f;
+            void F(int a, int c, int e, int d)
+            {
+                b.Triangle(q[a * 3], q[a * 3 + 1], q[a * 3 + 2], q[c * 3], q[c * 3 + 1], q[c * 3 + 2], q[e * 3], q[e * 3 + 1], q[e * 3 + 2], mx, my, mz, color);
+                b.Triangle(q[a * 3], q[a * 3 + 1], q[a * 3 + 2], q[e * 3], q[e * 3 + 1], q[e * 3 + 2], q[d * 3], q[d * 3 + 1], q[d * 3 + 2], mx, my, mz, color);
+            }
+            F(4, 5, 6, 7); F(0, 1, 2, 3); F(0, 1, 5, 4); F(2, 3, 7, 6); F(0, 3, 7, 4); F(1, 2, 6, 5);
+        }
+    }
+
+    void House(List<int> group, int cells, Func<int, float> cellX, Func<int, float> cellZ)
+    {
+        float c = layer.cell;
+        // Which way the house lies: the long axis of its cells
+        float mx = 0f, mz = 0f;
+        foreach (int k in group) { mx += cellX(k % cells); mz += cellZ(k / cells); }
+        mx /= group.Count; mz /= group.Count;
+        float sxx = 0f, szz = 0f, sxz = 0f;
+        foreach (int k in group)
+        {
+            float dx = cellX(k % cells) - mx, dz = cellZ(k / cells) - mz;
+            sxx += dx * dx; szz += dz * dz; sxz += dx * dz;
+        }
+        float angle = 0.5f * (float)Math.Atan2(2f * sxz, sxx - szz);
+        // A house drawn as a square of cells lies along the grid
+        if (Math.Abs(sxx - szz) < 0.15f * (sxx + szz) && Math.Abs(sxz) < 0.15f * (sxx + szz)) angle = 0f;
+        float ux = (float)Math.Cos(angle), uz = (float)Math.Sin(angle);
+        float u0 = float.MaxValue, u1 = float.MinValue, v0 = float.MaxValue, v1 = float.MinValue;
+        foreach (int k in group)
+        {
+            float dx = cellX(k % cells) - mx, dz = cellZ(k / cells) - mz;
+            float u = dx * ux + dz * uz, v = -dx * uz + dz * ux;
+            float half = c * 0.5f * (Math.Abs(ux) + Math.Abs(uz));
+            u0 = Math.Min(u0, u - half); u1 = Math.Max(u1, u + half);
+            v0 = Math.Min(v0, v - half); v1 = Math.Max(v1, v + half);
+        }
+        // Cells round a slanted outline stick out a little: pull the rectangle in to the area the cells cover
+        float area = group.Count * c * c, len = u1 - u0, wid = v1 - v0;
+        float fill = area / Math.Max(1f, len * wid);
+        if (fill < 0.92f)
+        {
+            float shrink = (float)Math.Sqrt(Math.Max(0.55f, fill));
+            float cu = (u0 + u1) / 2f, cv = (v0 + v1) / 2f;
+            len *= shrink; wid *= shrink;
+            u0 = cu - len / 2f; u1 = cu + len / 2f; v0 = cv - wid / 2f; v1 = cv + wid / 2f;
+        }
+        float cx = mx + ux * (u0 + u1) / 2f - uz * (v0 + v1) / 2f, cz = mz + uz * (u0 + u1) / 2f + ux * (v0 + v1) / 2f;
+        len = Math.Max(len, 3f); wid = Math.Max(wid, 2.6f);
+        foreach (int k in group) world.solids.Add(new TvSolid { x = cellX(k % cells), z = cellZ(k / cells), r = c * 0.75f });
+
+        // A shape that is far from a rectangle (an L, a farm with wings) keeps its cells, with one roof each
+        if (fill < 0.55f)
+        {
+            TvColor w = TvColor.Hex("#8f3426"), r = TvColor.Hex("#3a3634");
+            foreach (int k in group)
+            {
+                float x = cellX(k % cells), z = cellZ(k / cells), y = H(x, z);
+                thingMesh.Add(Box(c + 0.02f, 3.2f, c + 0.02f, w), x, y - 0.6f, z, 1f, 1f, 1f, 0f);
+                thingMesh.Add(Box(c + 0.3f, 0.22f, c + 0.3f, r), x, y + 2.6f, z, 1f, 1f, 1f, 0f);
+            }
+            return;
+        }
+
+        float big = len * wid;
+        bool shed = big > 260f || len > 24f;
+        int look = (int)(TvRandom.Hash((int)(cx * 7f), (int)(cz * 7f)) * 4f);
+        TvColor wall = shed ? TvColor.Hex("#8d877b") : look == 3 ? TvColor.Hex("#d9cfb4") : TvColor.Hex("#8f3426");
+        TvColor trim = TvColor.Hex("#e9e5da"), glass = TvColor.Hex("#26313a"), plinth = TvColor.Hex("#6b6964"),
+            roofC = shed ? TvColor.Hex("#5a5e60") : look == 1 ? TvColor.Hex("#7b3a2b") : TvColor.Hex("#363331"), door = TvColor.Hex("#3d4f5e");
+        if (look == 3) trim = TvColor.Hex("#ffffff");
+
+        float hl = len / 2f, hw = wid / 2f;
+        float lowest = float.MaxValue, highest = float.MinValue;
+        foreach (float su in new[] { -1f, 0f, 1f })
+            foreach (float sv in new[] { -1f, 0f, 1f })
+            {
+                float x = cx + ux * su * hl - uz * sv * hw, z = cz + uz * su * hl + ux * sv * hw, y = H(x, z);
+                lowest = Math.Min(lowest, y); highest = Math.Max(highest, y);
+            }
+        float floor = highest - lowest + 0.35f;           // the plinth takes up the slope
+        float eaves = floor + (shed ? 4.2f : 2.5f);
+        float pitch = shed ? 0.22f : 0.7f;                 // rise per metre
+        float ridge = eaves + hw * pitch;
+        float over = 0.35f;
+
+        var b = new TvShapeBuilder(random);
+        b.Box(-hl - 0.05f, 0f, -hw - 0.05f, hl + 0.05f, floor, hw + 0.05f, plinth);
+        b.Box(-hl, floor, -hw, hl, eaves, hw, wall);
+        // The gables
+        foreach (float end in new[] { -hl, hl })
+            b.Triangle(end, eaves, -hw, end, eaves, hw, end, ridge, 0f, 0f, eaves, 0f, wall);
+        // White corner boards and windows with frames
+        if (!shed)
+        {
+            foreach (float su in new[] { -1f, 1f })
+                foreach (float sv in new[] { -1f, 1f })
+                    b.Box(su * hl - 0.09f, floor, sv * hw - 0.09f, su * hl + 0.09f, eaves, sv * hw + 0.09f, trim);
+        }
+        float winY = floor + 0.85f, winH = shed ? 0.7f : 1.1f, winW = shed ? 1.6f : 0.95f, spacing = shed ? 4.5f : 2.6f;
+        int perSide = Math.Max(1, (int)((len - 1.2f) / spacing));
+        int doorAt = perSide > 1 ? perSide / 2 : -1;
+        foreach (float sv in new[] { -1f, 1f })
+        {
+            for (int i = 0; i < perSide; i++)
+            {
+                float u = -hl + len * (i + 0.5f) / perSide, wv = sv * hw;
+                if (sv > 0f && i == doorAt)
+                {
+                    b.Box(u - 0.55f, floor - 0.05f, wv - 0.02f * sv - 0.05f, u + 0.55f, floor + 2.15f, wv + 0.05f * sv + 0.05f, trim);
+                    b.Box(u - 0.45f, floor, wv - 0.02f, u + 0.45f, floor + 2.05f, wv + 0.09f * sv, door);
+                    continue;
+                }
+                b.Box(u - winW / 2f - 0.08f, winY - 0.08f, wv - 0.03f, u + winW / 2f + 0.08f, winY + winH + 0.08f, wv + 0.03f, trim);
+                b.Box(u - winW / 2f, winY, wv - 0.05f, u + winW / 2f, winY + winH, wv + 0.05f, glass);
+                // The cross bars of an old window
+                if (!shed) b.Box(u - 0.03f, winY, wv - 0.06f, u + 0.03f, winY + winH, wv + 0.06f, trim);
             }
         }
+        if (!shed)
+            foreach (float su in new[] { -1f, 1f })
+            {
+                float wu = su * hl, y = eaves + 0.15f;
+                b.Box(wu - 0.03f, y - 0.08f, -0.4f, wu + 0.03f, y + 0.82f, 0.4f, trim);
+                b.Box(wu - 0.05f, y, -0.32f, wu + 0.05f, y + 0.74f, 0.32f, glass);
+            }
+        Roof(b, hl, hw, eaves, ridge, over, roofC);
+        if (!shed && len > 5f)
+        {
+            float u = hl * 0.4f;
+            b.Box(u - 0.3f, ridge - 0.9f, -0.75f, u + 0.3f, ridge + 0.75f, -0.15f, TvColor.Hex("#7d746c"));
+            b.Box(u - 0.36f, ridge + 0.75f, -0.81f, u + 0.36f, ridge + 0.85f, -0.09f, TvColor.Hex("#4a4644"));
+        }
+        thingMesh.Add(b.Done(), cx, lowest - 0.25f, cz, 1f, 1f, 1f, -angle);
     }
 
     // ---- The control: a stand with the punching unit on top and the flag under it ----
@@ -1289,6 +1659,33 @@ public class TvWorldBuilder
                 treeMeshes[Tile(x, z)].Add(shape, x, H(x, z) - 0.15f, z, s, s * Rr(0.9f, 1.12f), s, Rr(0f, 6.283f), Rr(0.82f, 1.12f), Rr(-0.03f, 0.03f), Rr(-0.03f, 0.03f));
                 world.trees++;
                 world.solids.Add(new TvSolid { x = x, z = z, r = Math.Max(0.18f, trunk * (0.5f + s * 0.5f)) });
+            }
+        }
+
+        // Thickets near the camera: green areas packed with young trees, as hard to see through as they are to run through
+        const float Near = 75f, Fine = 0.95f;
+        for (float gz = -Near; gz < Near; gz += Fine)
+        {
+            for (float gx = -Near; gx < Near; gx += Fine)
+            {
+                float x = gx + Rr(-0.4f, 0.4f), z = gz + Rr(-0.4f, 0.4f);
+                if (x * x + z * z > Near * Near || !Inside(x, z, 2f)) continue;
+                int kind = Base(CellAt(x, z));
+                float p, h;
+                switch (kind)
+                {
+                    case WorldCell.LightGreen: p = 0.22f; h = Rr(1.2f, 2.6f); break;
+                    case WorldCell.Green: p = 0.55f; h = Rr(1.4f, 2.8f); break;
+                    case WorldCell.DarkGreen: p = 0.85f; h = Rr(1.6f, 3.2f); break;
+                    default: continue;
+                }
+                if (random.Value() > p || Blocked(x, z, 0.8f)) continue;
+                bool spruce = ThicketTree(kind != WorldCell.LightGreen) != Tree.Birch;
+                TvShape[] set = spruce ? youngSpruce : youngLeafy;
+                float sc = h / 2.5f;
+                treeMeshes[Tile(x, z)].Add(set[(int)(random.Value() * set.Length) % set.Length], x, H(x, z) - 0.05f, z,
+                    sc * Rr(0.85f, 1.2f), sc, sc * Rr(0.85f, 1.2f), Rr(0f, 6.283f), Rr(0.8f, 1.1f), Rr(-0.04f, 0.04f), Rr(-0.04f, 0.04f));
+                world.trees++;
             }
         }
     }

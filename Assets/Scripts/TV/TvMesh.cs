@@ -224,6 +224,67 @@ public class TvShapeBuilder
         }
     }
 
+    // ---- A rock: a lumpy ball broken by flat planes, every face coloured on its own ----
+    // Stretched (sx, sy, sz) round (0, oy, 0); cuts flat breaks; moss covers that share of the faces that look up;
+    // lichen: the share of faces with pale spots. Looks like split granite rather than a smooth pebble.
+    public void Rock(float sx, float sy, float sz, float oy, int detail, int cuts, float jitter, TvColor stone, TvColor moss,
+                     float mossShare, float lichen, float bottom = -0.35f)
+    {
+        float[] sv = detail > 0 ? ico1V : IcoV;
+        int[] sf = detail > 0 ? ico1F : IcoF;
+        int count = sv.Length / 3;
+        var v = new float[sv.Length];
+        for (int i = 0; i < count; i++)
+        {
+            float s = 1f + (random.Value() - 0.5f) * jitter;
+            v[i * 3] = sv[i * 3] * s * sx;
+            v[i * 3 + 1] = sv[i * 3 + 1] * s * sy;
+            v[i * 3 + 2] = sv[i * 3 + 2] * s * sz;
+        }
+        for (int k = 0; k < cuts; k++)
+        {
+            float nx = random.Value() * 2f - 1f, ny = random.Value() * 1.3f - 0.3f, nz = random.Value() * 2f - 1f;
+            float l = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            if (l < 0.1f) continue;
+            nx /= l; ny /= l; nz /= l;
+            float reach = (float)Math.Sqrt(nx * nx * sx * sx + ny * ny * sy * sy + nz * nz * sz * sz) * (0.45f + random.Value() * 0.3f);
+            for (int i = 0; i < count; i++)
+            {
+                float d = v[i * 3] * nx + v[i * 3 + 1] * ny + v[i * 3 + 2] * nz - reach;
+                if (d <= 0f) continue;
+                v[i * 3] -= nx * d; v[i * 3 + 1] -= ny * d; v[i * 3 + 2] -= nz * d;
+            }
+        }
+        // It sits in the ground: the underside is flat
+        float floor = bottom * sy;
+        for (int i = 0; i < count; i++) if (v[i * 3 + 1] < floor) v[i * 3 + 1] = floor;
+        for (int i = 0; i < count; i++) v[i * 3 + 1] += oy;
+
+        TvColor pale = TvColor.Hex("#c4c6ba"), yellow = TvColor.Hex("#b3ad78"), dark = stone.Shade(0.72f);
+        float seed = random.Value() * 50f;
+        for (int f = 0; f < sf.Length; f += 3)
+        {
+            int a = sf[f] * 3, b = sf[f + 1] * 3, q = sf[f + 2] * 3;
+            float ux = v[b] - v[a], uy = v[b + 1] - v[a + 1], uz = v[b + 2] - v[a + 2];
+            float wx = v[q] - v[a], wy = v[q + 1] - v[a + 1], wz = v[q + 2] - v[a + 2];
+            float nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+            float cx = (v[a] + v[b] + v[q]) / 3f, cy = (v[a + 1] + v[b + 1] + v[q + 1]) / 3f - oy, cz = (v[a + 2] + v[b + 2] + v[q + 2]) / 3f;
+            if (nx * cx + ny * cy + nz * cz < 0f) { nx = -nx; ny = -ny; nz = -nz; }
+            float nl = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            if (nl < 1e-9f) continue;
+            nx /= nl; ny /= nl; nz /= nl;
+            // Faces on one break share the normal, so they share the colour and read as one flat face
+            float grain = TvRandom.Noise(nx * 1.6f + seed, nz * 1.6f + ny * 1.1f) * 0.7f + TvRandom.Noise(cx * 2.3f, cz * 2.3f + cy) * 0.3f;
+            TvColor col = stone.Shade(0.86f + 0.28f * grain);
+            // Damp and shaded low down
+            col = col.Lerp(dark, Smooth(0.15f, -0.3f, cy / Math.Max(0.01f, sy)) * 0.7f);
+            float up = Smooth(0.45f, 0.9f, ny) * Smooth(0.42f, 0.6f, TvRandom.Noise(cx * 1.8f - seed, cz * 1.8f + 3f) + mossShare - 0.5f);
+            if (up > 0.02f) col = col.Lerp(moss.Shade(0.9f + 0.2f * grain), Math.Min(1f, up * 1.15f));
+            else if (random.Value() < lichen) col = col.Lerp(random.Value() < 0.6f ? pale : yellow, 0.55f);
+            FlatTri(v[a], v[a + 1], v[a + 2], v[b], v[b + 1], v[b + 2], v[q], v[q + 1], v[q + 2], 0f, oy, 0f, col, col, col);
+        }
+    }
+
     // An upright tube from y to y + h, radius r0 at the bottom and r1 at the top (a trunk, a pole), round shading
     public void Tube(float r0, float r1, float h, float y, int sides, TvColor bottom, TvColor? top = null, float y0 = 0f, float y1 = 1f,
                      float ox = 0f, float oz = 0f)

@@ -337,7 +337,17 @@ public class TvWorldView : MonoBehaviour
             figure.placed = true;
             float toUnit = new Vector2(x - world.unitX, z - world.unitZ).magnitude;
             float near = world.hasUnit ? 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.6f, 2.8f, toUnit)) : 0f;
-            figure.Pose(x, world.HeightAt(x, z), z, moved, unit, near, Time.unscaledDeltaTime);
+            // The lie of the ground ahead (steps, slopes, cliffs) and the fallen trunks to jump
+            float dt = Time.unscaledDeltaTime, rise = 0f;
+            if (figure.placed)
+            {
+                Vector3 f = figure.forward;
+                rise = (world.HeightAt(x + f.x * 0.6f, z + f.z * 0.6f) - world.HeightAt(x - f.x * 0.6f, z - f.z * 0.6f)) / 1.2f;
+            }
+            figure.slope = Mathf.Lerp(figure.slope, rise, Mathf.Clamp01(dt * 8f));
+            float jump = figure.Pace > 1f && near < 0.5f ? world.Hurdle(x, z) : 0f;
+            figure.hop = Mathf.Lerp(figure.hop, jump, Mathf.Clamp01(dt * 18f));
+            figure.Pose(x, world.HeightAt(x, z), z, moved, unit, near, dt, figure.slope, figure.hop);
             float d = x * x + z * z;
             if (d < best)
             {
