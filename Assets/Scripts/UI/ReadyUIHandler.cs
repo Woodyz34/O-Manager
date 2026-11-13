@@ -45,9 +45,23 @@ public class ReadyUIHandler : NetworkBehaviour
     async void RemakeAICourseThenStart()
     {
         remaking = true;
-        UIToast.Show("Laying a new AI course with the same length and controls...", 4f);
-        CourseGenerator.Result result = await AICoursePanel.Remake();
+        // A card with a loading bar and the time left, as in the AI course window: laying a sprint course with
+        // barriers can take up to about 50 s, and a plain message that went away after 4 s looked like nothing happened
+        CourseGenerator.Progress progress = new CourseGenerator.Progress();
+        UIProgressCard card = UIProgressCard.Show("Laying a new AI course with the same length and controls...");
+        Task<CourseGenerator.Result> making = AICoursePanel.Remake(progress);
+        while (!making.IsCompleted)
+        {
+            await Task.Yield();
+            if (this == null) { card.Close(); return; }
+            card.Set(AICoursePanel.DescribeProgress(progress, out float share), share);
+        }
+        CourseGenerator.Result result;
+        try { result = await making; }
+        catch (System.Exception e) { result = new CourseGenerator.Result { error = e.Message }; }
+        card.Close();
         if (this == null) return;
+        if (result.course != null) UIToast.Show("New AI course laid. Starting...", 3f, CourseUI.Forest);
         if (result.course != null)
         {
             mapHandler.Select(result.course);

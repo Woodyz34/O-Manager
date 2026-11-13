@@ -35,7 +35,7 @@ public class AICoursePanel : MonoBehaviour
     }
 
     // Lays a new course with the same settings and a new seed. Null and the reason when it fails.
-    public static async Task<CourseGenerator.Result> Remake()
+    public static async Task<CourseGenerator.Result> Remake(CourseGenerator.Progress progress = null)
     {
         MapGrid grid = MapGrid.Load(lastMap.gridName);
         CourseGenerator.Settings settings = new CourseGenerator.Settings
@@ -45,7 +45,8 @@ public class AICoursePanel : MonoBehaviour
             controls = LastSettings.controls,
             barriers = LastSettings.barriers,
             region = LastSettings.region,
-            seed = Environment.TickCount
+            seed = Environment.TickCount,
+            progress = progress
         };
         MapDefinition map = lastMap;
         return await Task.Run(() => CourseGenerator.Generate(map, grid, settings));
@@ -219,15 +220,23 @@ public class AICoursePanel : MonoBehaviour
     void Update()
     {
         if (!busy || progress == null || progressRow == null) return;
-        if (!progress.Started) { progressText.text = "Starting..."; return; }
+        progressText.text = DescribeProgress(progress, out float share);
+        progressFill.anchorMax = new Vector2(share, 1f);
+    }
+
+    // How far a course being laid has got: the share of the bar to fill and the text beside it.
+    // Also used by the lobby while it lays a new AI course before a race (ReadyUIHandler).
+    public static string DescribeProgress(CourseGenerator.Progress progress, out float share)
+    {
+        share = 0f;
+        if (progress == null || !progress.Started) return "Starting...";
         double elapsed = progress.Elapsed, budget = Math.Max(1.0, progress.Budget);
-        float share = (float)Math.Min(1.0, elapsed / budget);
+        share = (float)Math.Min(1.0, elapsed / budget);
         // Past the budget the last checks are still running: creep on slowly instead of standing full
         if (elapsed > budget) share = 0.95f + 0.05f * (1f - Mathf.Exp(-(float)(elapsed - budget) / 5f));
         else share *= 0.95f;
-        progressFill.anchorMax = new Vector2(share, 1f);
         int left = Mathf.CeilToInt((float)(budget - elapsed));
-        progressText.text = left > 0 ? "At most " + left + " s left" : "Last checks...";
+        return left > 0 ? "At most " + left + " s left" : "Last checks...";
     }
 
     TextMeshProUGUI kindHint;
@@ -444,8 +453,8 @@ public class AICoursePanel : MonoBehaviour
         UpdateLabels();
     }
 
-    // The number of controls depends on the length (at most one per 50 m) and, for middle distance,
-    // there must be enough of them to keep the legs short
+    // The number of controls depends on the length: at most one per 50 m (40 m on a sprint), and at least enough
+    // that the average leg is not longer than CourseGenerator allows (1 km middle, 1.6 km long, 500 m sprint)
     void UpdateLimits()
     {
         int min = CourseGenerator.MinControlsFor(kind, lengthKm);
@@ -455,9 +464,10 @@ public class AICoursePanel : MonoBehaviour
         controls = Mathf.Clamp(controls, min, max);
         controlsSlider.SetValueWithoutNotify(controls);
         controlsHint.text = $"{min} to {max} controls for this length. At most one control per {Mathf.RoundToInt(CourseGenerator.MinMetersPerControlFor(kind))} m, and never more than {CourseData.MaxControls}."
-                            + (kind == CourseGenerator.Kind.Middle ? " Middle distance needs enough controls to keep the legs short."
-                               : kind == CourseGenerator.Kind.Sprint ? " A sprint needs enough controls to keep the legs short."
-                               : " A long course needs enough controls for its legs to fit on the map.");
+                            + (kind == CourseGenerator.Kind.Middle ? " Legs average at most 1 km on middle distance."
+                               : kind == CourseGenerator.Kind.Sprint ? " Legs average at most 500 m on a sprint."
+                               : " Legs average at most 1.6 km on long distance.")
+                            + " Very long legs may not fit on a small map or area.";
         UpdateLabels();
     }
 

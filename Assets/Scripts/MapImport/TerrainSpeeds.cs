@@ -42,7 +42,7 @@ namespace MapImport
         public float marsh = 0.5f;       // 0 = very heavy, 1 = as quick as white forest
         public float stony = 0.5f;       // 0 = very slow, 1 = no slower than the ground under it
         public float open = 0.5f;        // 0 = as slow as white forest, 1 = as quick as a paved area
-        public float roughOpen = 0.5f;   // clear-cut / rough open: 0 = as slow as mid green, 1 = as quick as open land
+        public float roughOpen = 0.5f;   // clear-cut (rough open land): 0 = as slow as mid green, 1 = as quick as open land
         public float paved = 0.5f;       // 0 = as slow as open land, 1 = a bit quicker than normal asphalt
 
         public const float Middle = 0.5f;
@@ -50,12 +50,16 @@ namespace MapImport
         // The game's normal speeds (white forest = 1), the middle of each slider
         public const float NormalForest = 1.0f;
         public const float NormalLight = 0.7f;
-        public const float NormalMid = 0.6f;
+        public const float NormalMid = 0.55f;
         public const float NormalDark = 0.35f;
         public const float NormalMarsh = 0.8f;
-        public const float NormalOpen = 1.3f;
-        public const float NormalRoughOpen = 1.3f;
+        public const float NormalOpen = 1.15f;
+        public const float NormalRoughOpen = 0.95f;
         public const float NormalPaved = 1.5f;
+        public const float NormalRoad = 1.4f;      // a road (gravel); wide roads 1.5, vehicle tracks 1.35
+        public const float NormalPath = 1.2f;      // a small path; footpaths 1.25
+        public const float NormalTrack = 1.35f;    // a vehicle track: the quick end of the small path slider
+        public const float NormalStony = 0.8f;     // stony ground: 20 % slower than the ground under it
 
         public static TerrainSpeeds Default => new TerrainSpeeds();
 
@@ -138,7 +142,7 @@ namespace MapImport
             if (kind == TerrainKind.Path)
             {
                 // The quick end: a vehicle track as the road slider makes it
-                float track = Math.Max(normal, Line(TerrainKind.Road, 1.55f));
+                float track = Math.Max(normal, Line(TerrainKind.Road, NormalTrack));
                 return Slide(paths, slowest, normal, track);
             }
             return normal;

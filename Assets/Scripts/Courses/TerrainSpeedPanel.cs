@@ -98,13 +98,22 @@ public class TerrainSpeedPanel : MonoBehaviour
         summary.textWrappingMode = TextWrappingModes.Normal;
         CourseUI.Size(summary, -1, -1, 1);
 
-        // Each kind of ground; the slow end on the left
+        // Each kind of ground, quickest first; the slow end of each slider on the left
+        AddRow(card.transform, "Asphalt", "Like open land", "Quicker", true,
+            s => s.paved, (s, v) => s.paved = v, s => Percent(s.Ground(TerrainKind.Paved, TerrainSpeeds.NormalPaved)));
         AddRow(card.transform, "Roads", "Like white forest", "Like asphalt", true,
-            s => s.roads, (s, v) => s.roads = v, s => Percent(s.Line(TerrainKind.Road, 1.5f)));
+            s => s.roads, (s, v) => s.roads = v, s => Percent(s.Line(TerrainKind.Road, TerrainSpeeds.NormalRoad)));
         AddRow(card.transform, "Small paths", "Like white forest", "Like a vehicle track", true,
-            s => s.paths, (s, v) => s.paths = v, s => Percent(s.Line(TerrainKind.Path, 1.35f)));
+            s => s.paths, (s, v) => s.paths = v, s => Percent(s.Line(TerrainKind.Path, TerrainSpeeds.NormalPath)));
+        AddRow(card.transform, "Open land", "Like white forest", "Like asphalt", true,
+            s => s.open, (s, v) => s.open = v, s => Percent(s.Ground(TerrainKind.Open, TerrainSpeeds.NormalOpen)));
         AddRow(card.transform, "White forest", "A fight every step", "Quick as a road", true,
             s => s.forest, (s, v) => s.forest = v, s => Percent(s.Ground(TerrainKind.Forest, TerrainSpeeds.NormalForest)));
+        // Rough open land (ISOM 403/404, light yellow): mostly clear-cuts, also heath and newly planted ground
+        AddRow(card.transform, "Clear-cut", "Like mid green", "Like open land", true,
+            s => s.roughOpen, (s, v) => s.roughOpen = v, s => Percent(s.Ground(TerrainKind.RoughOpen, TerrainSpeeds.NormalRoughOpen)));
+        AddRow(card.transform, "Marsh", "Very heavy", "Like white forest", true,
+            s => s.marsh, (s, v) => s.marsh = v, s => Percent(s.Ground(TerrainKind.Marsh, TerrainSpeeds.NormalMarsh)));
         AddRow(card.transform, "Light green", "Like mid green", "Like white forest", true,
             s => s.lightGreen, (s, v) => s.lightGreen = v, s => Percent(s.Ground(TerrainKind.LightGreen, TerrainSpeeds.NormalLight)));
         AddRow(card.transform, "Mid green", "Like dark green", "Like light green", true,
@@ -112,17 +121,12 @@ public class TerrainSpeedPanel : MonoBehaviour
         AddRow(card.transform, "Dark green", "No way through", "Like mid green", true,
             s => s.darkGreen, (s, v) => s.darkGreen = v,
             s => s.darkGreen <= 0.03f ? "Closed" : Percent(s.Ground(TerrainKind.DarkGreen, TerrainSpeeds.NormalDark)));
-        AddRow(card.transform, "Marsh", "Very heavy", "Like white forest", true,
-            s => s.marsh, (s, v) => s.marsh = v, s => Percent(s.Ground(TerrainKind.Marsh, TerrainSpeeds.NormalMarsh)));
-        AddRow(card.transform, "Open land", "Like white forest", "Like asphalt", true,
-            s => s.open, (s, v) => s.open = v, s => Percent(s.Ground(TerrainKind.Open, TerrainSpeeds.NormalOpen)));
-        AddRow(card.transform, "Clear-cut / rough open", "Like mid green", "Like open land", true,
-            s => s.roughOpen, (s, v) => s.roughOpen = v, s => Percent(s.Ground(TerrainKind.RoughOpen, TerrainSpeeds.NormalRoughOpen)));
-        AddRow(card.transform, "Asphalt / paved", "Like open land", "Quicker", true,
-            s => s.paved, (s, v) => s.paved = v, s => Percent(s.Ground(TerrainKind.Paved, TerrainSpeeds.NormalPaved)));
         AddRow(card.transform, "Stony ground", "Very slow", "No slower", true,
-            s => s.stony, (s, v) => s.stony = v,
-            s => "-" + Mathf.RoundToInt((1f - s.StonyFactor(0.85f)) * 100f) + " %");
+            s => s.stony, (s, v) => s.stony = v, s =>
+            {
+                int slower = Mathf.RoundToInt((1f - s.StonyFactor(TerrainSpeeds.NormalStony)) * 100f);
+                return slower <= 0 ? "0 %" : "-" + slower + " %";
+            });
 
         // Room above the buttons
         RectTransform spacer = CourseUI.Rect("Spacer", card.transform);

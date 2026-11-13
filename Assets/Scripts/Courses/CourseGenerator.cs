@@ -284,14 +284,17 @@ public static class CourseGenerator
 
     public const float MinLengthKm = 1.5f;
     public const float MaxLengthKm = 20f;       // the longest course the game makes; still well under a second
-    public const float SprintMinLengthKm = 1f;
+    public const float SprintMinLengthKm = 0.5f;
     public const float SprintMaxLengthKm = 6f;
     public const float MinMetersPerControl = 50f; // at most one control per 50 m
     public const float SprintMinMetersPerControl = 40f;
-    public const float MiddleMaxAverageLeg = 500f;
-    public const float LongMaxAverageLeg = 800f;   // fewer controls gives legs too long to fit the map and slow to place
-    public const float SprintMaxAverageLeg = 250f;
-    public const int MinControls = 3;
+    // The longest average leg allowed, which sets the fewest controls for a length. They were 500 / 800 / 250 m,
+    // which forced e.g. 19 controls on a 9.7 km middle course. Longer legs take a little longer to check for route
+    // choices and fit less well in a small drawn area, but the time budget still caps it (tested 2026-11-13).
+    public const float MiddleMaxAverageLeg = 1000f;
+    public const float LongMaxAverageLeg = 1600f;
+    public const float SprintMaxAverageLeg = 500f;
+    public const int MinControls = 1;
     const float MinLegMeters = 60f;
     const float SprintMinLegMeters = 40f;
     const float MinControlSpacing = 60f;        // two controls never closer than this
@@ -500,7 +503,9 @@ public static class CourseGenerator
         }
         if (best != null) return withBarriers ? best : WithBarriers(map, grid, best, settings);
         if (settings.HasRegion) return new Result { error = "Could not fit a " + lengthText + " course with " + controls + " controls in the area you drew. Draw a bigger area, or choose a shorter course or fewer controls." };
-        return new Result { error = "Could not make a course with these settings. Try a shorter course or fewer controls." };
+        return new Result { error = (length / (controls + 1) > (settings.kind == Kind.Sprint ? 300f : 700f))
+            ? "Could not make a course with these settings: the legs are too long to fit on this map. Try more controls or a shorter course."
+            : "Could not make a course with these settings. Try a shorter course or fewer controls." };
     }
 
     const double BarrierBudgetSeconds = 20.0;    // barriers on one course (about 1.5 per control, each one tried with the route choice search)
