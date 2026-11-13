@@ -22,7 +22,8 @@ public class CardDisplay : MonoBehaviour
     }
 
     public string runnerName;
-    public float speed;
+    public float speed;          // the card's physics (forest speed); the name is kept so saved scenes keep working
+    public float sprintSpeed = CardData.NoValue;
     public float technique;
     public Sprite country;
     public Sprite clubb;
@@ -49,7 +50,8 @@ public class CardDisplay : MonoBehaviour
         CardData = card;
 
         runnerName = card.RunnerName;
-        speed = card.speed;
+        speed = card.physics;
+        sprintSpeed = card.sprintSpeed;
         technique = card.technique;
         klass = card.klass;
         man = card.man;
@@ -73,7 +75,7 @@ public class CardDisplay : MonoBehaviour
     }
     public float getSpeed(CardData card)
     {
-        return card.speed;
+        return card.physics;
     }
     public void OnCardClick()
     {

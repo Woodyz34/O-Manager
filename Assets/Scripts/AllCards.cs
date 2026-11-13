@@ -27,7 +27,8 @@ public class AllCards : MonoBehaviour
     }
 
     // The runners come from the Eventor points (eventor/compute_points.py writes
-    // Resources/Runners/runners.json). Speed and technique are kept as decimals; cards show them rounded.
+    // Resources/Runners/runners.json). Physics, speed (sprint) and technique are kept as decimals; cards show them
+    // rounded. In the file "physics" is the forest speed and "speed" the sprint speed (-1 = no sprint race).
     public void SetAllCards()
     {
         AllCardsList.Clear();
@@ -53,7 +54,9 @@ public class AllCards : MonoBehaviour
             // A real photo in Resources/Profilbilder wins over the drawn placeholder
             Sprite photo = Emblems.Photo(r.name);
             if (photo == null) photo = Emblems.Portrait(string.IsNullOrEmpty(r.id) ? r.name : r.id, r.man);
-            CardData card = new CardData(r.name, r.speed, r.technique, Emblems.Flag(r.country), Emblems.Club(r.club), r.klass, r.man, photo);
+            CardData card = new CardData(r.name, r.physics, r.technique, Emblems.Flag(r.country), Emblems.Club(r.club), r.klass, r.man, photo);
+            card.sprintSpeed = r.speed >= 0f ? r.speed : CardData.NoValue;
+            card.sprintTechnique = r.sprintTechnique >= 0f ? r.sprintTechnique : CardData.NoValue;
             card.id = r.id;
             card.countryName = r.country;
             card.countryGuessed = r.countryGuessed;
@@ -89,8 +92,10 @@ public class AllCards : MonoBehaviour
         public string country;
         public bool countryGuessed;
         public string club;
-        public float speed;
+        public float physics;            // forest speed
+        public float speed = -1f;        // sprint speed, -1 = none
         public float technique;
+        public float sprintTechnique = -1f;
         public bool inPacks;
         public List<RunnerMerit> merits;
     }

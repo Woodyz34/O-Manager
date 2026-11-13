@@ -19,7 +19,8 @@ public class RunnerCardView : MonoBehaviour
     public TextMeshProUGUI overallText;
     public TextMeshProUGUI klassText;
     public TextMeshProUGUI nameText;
-    public TextMeshProUGUI speedText;
+    public TextMeshProUGUI speedText;           // physics (the forest speed); the name is kept for the saved prefabs
+    public TextMeshProUGUI sprintSpeedText;     // speed from the sprints, "-" when there is none (made when missing)
     public TextMeshProUGUI techniqueText;
     public TextMeshProUGUI tierText;
 
@@ -71,7 +72,9 @@ public class RunnerCardView : MonoBehaviour
         if (overallText != null) overallText.text = RunnerCards.Overall(card).ToString();
         if (klassText != null) klassText.text = card.klass;
         if (nameText != null) nameText.text = card.RunnerName != null ? card.RunnerName.ToUpperInvariant() : "";
-        if (speedText != null) speedText.text = Mathf.RoundToInt(card.speed).ToString();
+        MakeSprintColumn();
+        if (speedText != null) speedText.text = Mathf.RoundToInt(card.physics).ToString();
+        if (sprintSpeedText != null) sprintSpeedText.text = card.SprintSpeedText;
         if (techniqueText != null) techniqueText.text = Mathf.RoundToInt(card.technique).ToString();
         if (tierText != null) tierText.text = RunnerCards.TierName(tier);
 
@@ -80,6 +83,86 @@ public class RunnerCardView : MonoBehaviour
         Tint(inkedSoft, ink, 0.4f);
         if (countryNameText != null) countryNameText.color = ink;
         if (clubNameText != null) clubNameText.color = ink;
+    }
+
+    // Cards made before sprint speed existed have two stats under the name, SPEED and TECHNIQUE. This turns them into
+    // three columns, PHYSICS, SPEED and TECHNIQUE, so the saved prefabs need no rebuild.
+    public const float StatColumn = 124f;
+
+    void MakeSprintColumn()
+    {
+        if (sprintSpeedText != null || speedText == null || techniqueText == null) return;
+        Transform parent = speedText.transform.parent;
+        TextMeshProUGUI speedLabel = FindText(parent, "Speed label");
+        TextMeshProUGUI techniqueLabel = FindText(parent, "Technique label");
+
+        sprintSpeedText = Instantiate(speedText, parent);
+        sprintSpeedText.name = "Sprint speed";
+        sprintSpeedText.text = "-";
+        PlaceColumn(speedText, -StatColumn, 118f);
+        PlaceColumn(sprintSpeedText, 0f, 118f);
+        PlaceColumn(techniqueText, StatColumn, 118f);
+        foreach (TextMeshProUGUI value in new[] { speedText, sprintSpeedText, techniqueText }) value.fontSize = Mathf.Min(value.fontSize, 52f);
+
+        TextMeshProUGUI sprintLabel = null;
+        if (speedLabel != null)
+        {
+            sprintLabel = Instantiate(speedLabel, parent);
+            sprintLabel.name = "Sprint speed label";
+            StyleLabel(speedLabel, "PHYSICS", -StatColumn);
+            StyleLabel(sprintLabel, "SPEED", 0f);
+        }
+        if (techniqueLabel != null) StyleLabel(techniqueLabel, "TECHNIQUE", StatColumn);
+
+        // The line between the two stats becomes two lines between the three
+        Transform split = parent.Find("Split");
+        Graphic secondSplit = null;
+        if (split != null)
+        {
+            RectTransform first = (RectTransform)split;
+            first.anchoredPosition = new Vector2(-StatColumn / 2f, first.anchoredPosition.y);
+            GameObject copy = Instantiate(split.gameObject, parent);
+            copy.name = "Split 2";
+            RectTransform second = (RectTransform)copy.transform;
+            second.anchoredPosition = new Vector2(StatColumn / 2f, first.anchoredPosition.y);
+            secondSplit = copy.GetComponent<Graphic>();
+        }
+
+        inked = Append(inked, sprintSpeedText);
+        if (sprintLabel != null) inkedLabels = Append(inkedLabels, sprintLabel);
+        if (secondSplit != null) inkedSoft = Append(inkedSoft, secondSplit);
+    }
+
+    static TextMeshProUGUI FindText(Transform parent, string name)
+    {
+        Transform child = parent.Find(name);
+        return child != null ? child.GetComponent<TextMeshProUGUI>() : null;
+    }
+
+    static void PlaceColumn(TextMeshProUGUI text, float x, float width)
+    {
+        RectTransform rect = text.rectTransform;
+        rect.anchoredPosition = new Vector2(x, rect.anchoredPosition.y);
+        rect.sizeDelta = new Vector2(width, rect.sizeDelta.y);
+    }
+
+    static void StyleLabel(TextMeshProUGUI label, string caption, float x)
+    {
+        label.text = caption;
+        label.characterSpacing = 4f;
+        label.enableAutoSizing = true;
+        label.fontSizeMin = 10f;
+        label.fontSizeMax = 17f;
+        PlaceColumn(label, x, StatColumn - 6f);
+    }
+
+    static Graphic[] Append(Graphic[] list, Graphic extra)
+    {
+        if (extra == null) return list;
+        Graphic[] longer = new Graphic[(list != null ? list.Length : 0) + 1];
+        if (list != null) list.CopyTo(longer, 0);
+        longer[longer.Length - 1] = extra;
+        return longer;
     }
 
     void SetSlotText(ref TextMeshProUGUI text, Image slot, string objectName, float maxSize, float height, string value)

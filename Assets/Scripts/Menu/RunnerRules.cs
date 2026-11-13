@@ -20,11 +20,40 @@ public static class RunnerRules
 {
     public const float WomenSpeedFactor = 0.82f;
 
-    // The speed a runner races with
+    // The speed a runner races with in the forest (physics). On hard ground the race uses the sprint speed in part
+    // or in full, see SurfaceFactor.
     public static float RaceSpeed(CardData card)
     {
         if (card == null) return 0f;
-        return card.man ? card.speed : card.speed * WomenSpeedFactor;
+        return card.man ? card.physics : card.physics * WomenSpeedFactor;
+    }
+
+    // ---- Physics in the forest, speed on hard ground (2026-11-13) ----
+    //
+    // The grid only knows how fast each cell is, so the kind of ground is read from that (SymbolRules, normal sliders):
+    //   asphalt, paved areas 1.5 and up        -> all sprint speed
+    //   roads, gravel 1.4, vehicle tracks 1.35  -> about 80 % sprint speed, 20 % physics
+    //   footpaths 1.25, small paths 1.2         -> about half and half
+    //   open land, forest and slower (1.15 and below) -> all physics
+    // Grass and open land on a sprint map (1.3) end up at about 65 % sprint speed.
+    // Between the points the share goes in a straight line.
+    public static float SprintShare(float groundSpeed)
+    {
+        if (groundSpeed <= 1.15f) return 0f;
+        if (groundSpeed <= 1.2f) return Mathf.Lerp(0f, 0.5f, (groundSpeed - 1.15f) / 0.05f);
+        if (groundSpeed <= 1.4f) return Mathf.Lerp(0.5f, 0.8f, (groundSpeed - 1.2f) / 0.2f);
+        if (groundSpeed <= 1.5f) return Mathf.Lerp(0.8f, 1f, (groundSpeed - 1.4f) / 0.1f);
+        return 1f;
+    }
+
+    // What the race speed (made from physics) is multiplied by on ground of this grid speed: 1 in the forest, and on
+    // hard ground the mix of sprint speed and physics compared with physics. A runner without a sprint speed gets 1.
+    public static float SurfaceFactor(float physics, float sprintSpeed, float groundSpeed)
+    {
+        if (sprintSpeed < 0f || physics <= 0f) return 1f;
+        float share = SprintShare(groundSpeed);
+        if (share <= 0f) return 1f;
+        return (share * sprintSpeed + (1f - share) * physics) / physics;
     }
 
     // The overall a runner costs under a max average overall: the card's own overall (user's wish 2026-11-13: a
