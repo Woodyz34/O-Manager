@@ -112,7 +112,10 @@ namespace MapImport
             return TerrainKind.Other;
         }
 
-        // The rule with every slider in the middle
+        // The rule with every slider in the middle. Normal speeds (2026-11-13, the player's order, quickest first):
+        // asphalt 150 %, roads 140 % (vehicle tracks 135 %), small paths 120 %, open land 115 % (grass on a sprint map
+        // 130 %), white forest 100 %, rough open land / clear-cuts 95 %, marsh 80 %, light green 70 %, mid green 55 %,
+        // dark green 35 %; stony ground 20 % slower than the ground under it.
         static TerrainRule Normal(MapSymbol s, bool sprint)
         {
             if (s == null) return TerrainRule.None;
@@ -132,21 +135,21 @@ namespace MapImport
                     case 307: return Blocked();                                           // uncrossable marsh
                     case 308: return Ground(0.8f, sprint);                                // marsh
                     case 310: return Ground(0.9f, sprint);                                // indistinct marsh
-                    case 401: return Ground(1.3f, sprint);                                // open land
-                    case 402: return Ground(1.2f, sprint);                                // open land, scattered trees
-                    case 403: return Ground(1.3f, sprint);                                // rough open land
-                    case 404: return Ground(1.2f, sprint);                                // rough open, scattered trees
+                    case 401: return Ground(sprint ? 1.3f : 1.15f, sprint);                            // open land
+                    case 402: return Ground(sprint ? 1.2f : 1.1f, sprint);                             // open land, scattered trees
+                    case 403: return Ground(0.95f, sprint);                               // rough open land
+                    case 404: return Ground(0.9f, sprint);                                // rough open, scattered trees
                     case 405: return Ground(1.0f, sprint);                                // forest
                     case 406: return Ground(0.7f, sprint);                                // slow running
                     case 407: return Ground(0.7f, sprint);                                // slow running, good visibility
-                    case 408: return Ground(0.6f, sprint);                                // difficult to run
-                    case 409: return Ground(0.6f, sprint);                                // walk, good visibility
+                    case 408: return Ground(0.55f, sprint);                               // difficult to run
+                    case 409: return Ground(0.55f, sprint);                               // walk, good visibility
                     case 410:
                         // ISSprOM 410 is impassable vegetation; ISOM 410 is very difficult (fight)
                         if (sprint || name.Contains("impassable") || name.Contains("opasserbar")) return Blocked();
                         return Ground(TerrainSpeeds.NormalDark, sprint);
                     case 411: return Ground(sprint ? 0.6f : 0.8f, sprint);                // runnable in one direction
-                    case 412: return Ground(1.3f, sprint);                                // cultivated land
+                    case 412: return Ground(sprint ? 1.3f : 1.15f, sprint);                            // cultivated land
                     case 413: return Ground(1.0f, sprint);                                // orchard
                     case 414: return Ground(1.0f, sprint);                                // vineyard
                     case 113: return Ground(0.9f, sprint);                                // broken ground
@@ -155,7 +158,7 @@ namespace MapImport
                     // slower still), they don't replace it
                     case 208: return Stony(0.8f);                                         // boulder field
                     case 209: return Stony(0.6f);                                         // dense boulder field
-                    case 210: return Stony(0.85f);                                        // stony ground, slow running
+                    case 210: return Stony(0.8f) ;                                        // stony ground, slow running
                     case 211: return Stony(0.7f);                                         // stony ground, walk
                     case 212: return Stony(0.5f);                                         // stony ground, fight
                     case 213: return Ground(0.85f, sprint);                               // sandy ground
@@ -184,13 +187,13 @@ namespace MapImport
                     case 201: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // impassable cliff
                     case 301: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // lake shore
                     case 307: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // uncrossable marsh edge
-                    case 502: return Path(1.55f);                                         // wide road, cycle path
-                    case 503: return Path(1.5f);                                          // road
-                    case 504: return Path(1.55f);                                         // vehicle track
-                    case 505: return Path(1.45f);                                         // footpath
-                    case 506: return Path(1.35f);                                         // small path
-                    case 507: return Path(1.2f);                                          // less distinct path
-                    case 508: return Path(1.4f);                                          // narrow ride
+                    case 502: return Path(1.5f);                                          // wide road, cycle path
+                    case 503: return Path(1.4f);                                          // road
+                    case 504: return Path(1.35f);                                         // vehicle track
+                    case 505: return Path(1.25f);                                         // footpath
+                    case 506: return Path(1.2f);                                          // small path
+                    case 507: return Path(1.1f);                                          // less distinct path
+                    case 508: return Path(1.15f);                                         // narrow ride
                     case 509: return sprint ? TerrainRule.None : Path(1.3f);             // railway
                     case 512: return new TerrainRule(TerrainRole.Bridge, 1.4f);           // bridge / tunnel
                     case 513:
@@ -354,21 +357,21 @@ namespace MapImport
                     case 310: return Ground(0.8f, sprint);                                // marsh
                     case 311: return Ground(0.9f, sprint);                                // indistinct marsh
                     case 208: return Stony(0.8f);                                         // boulder field
-                    case 210: return Stony(0.85f);                                        // stony ground
+                    case 210: return Stony(0.8f) ;                                        // stony ground
                     case 211: return Ground(0.85f, sprint);                               // open sandy ground
                     case 212: return Ground(1.2f, sprint);                                // bare rock
-                    case 401: return Ground(1.3f, sprint);
-                    case 402: return Ground(1.2f, sprint);
-                    case 403: return Ground(1.3f, sprint);
-                    case 404: return Ground(1.2f, sprint);
+                    case 401: return Ground(sprint ? 1.3f : 1.15f, sprint);
+                    case 402: return Ground(sprint ? 1.2f : 1.1f, sprint);
+                    case 403: return Ground(0.95f, sprint);
+                    case 404: return Ground(0.9f, sprint);
                     case 405: return Ground(1.0f, sprint);
                     case 406: return Ground(0.7f, sprint);
                     case 407: return Ground(0.7f, sprint);
-                    case 408: return Ground(0.6f, sprint);
-                    case 409: return Ground(0.6f, sprint);
+                    case 408: return Ground(0.55f, sprint);
+                    case 409: return Ground(0.55f, sprint);
                     case 410: return impassable ? Blocked() : Ground(0.4f, sprint);       // vegetation, very difficult
                     case 411: return Ground(0.8f, sprint);
-                    case 412: case 415: return Ground(1.3f, sprint);                      // cultivated land
+                    case 412: case 415: return Ground(sprint ? 1.3f : 1.15f, sprint);                    // cultivated land
                     case 413: case 414: return Ground(1.0f, sprint);                      // orchard, vineyard
                     case 421: return Blocked();                                           // impassable vegetation (ISSOM)
                     case 526: return canopy ? Ground(1.4f, sprint) : Blocked();           // building (canopy: run under it)
@@ -393,15 +396,15 @@ namespace MapImport
                     case 304: return impassable ? new TerrainRule(TerrainRole.BlockingLine, 0f) : TerrainRule.None;
                     case 308: case 309: return impassable ? new TerrainRule(TerrainRole.BlockingLine, 0f) : TerrainRule.None;
                     case 421: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // impassable vegetation edge
-                    case 501: return Path(1.55f);                                         // motorway (ISOM 2000)
-                    case 502: return Path(1.55f);                                         // major road
-                    case 503: return Path(1.5f);                                          // minor road
-                    case 504: return Path(1.55f);                                         // road
-                    case 505: return Path(1.45f);                                         // vehicle track
-                    case 506: return Path(1.35f);                                         // footpath
+                    case 501: return Path(1.5f);                                          // motorway (ISOM 2000)
+                    case 502: return Path(1.5f);                                          // major road
+                    case 503: return Path(1.4f);                                          // minor road
+                    case 504: return Path(1.4f);                                          // road
+                    case 505: return Path(1.35f);                                         // vehicle track
+                    case 506: return Path(1.25f);                                         // footpath
                     case 507: return Path(1.2f);                                          // small path
-                    case 508: return Path(1.2f);                                          // less distinct path
-                    case 509: return Path(1.4f);                                          // narrow ride
+                    case 508: return Path(1.1f);                                          // less distinct path
+                    case 509: return Path(1.15f);                                         // narrow ride
                     case 512: return new TerrainRule(TerrainRole.Bridge, 1.4f);           // bridge
                     case 513: case 519:                                                   // stone wall (ISOM 2000 513, ISSOM 519)
                         if (impassable) return new TerrainRule(TerrainRole.BlockingLine, 0f);
