@@ -34,7 +34,9 @@ public class TvStickFigure
     // Going up to the flag to punch (TvWorldView.ToThePunch): 0 = on its route, 1 = to the flag, 2 = back to the route
     public int punch;
     public bool punched, tracked;
-    public float shownX, shownZ, realX, realZ, headX, headZ, punchedAt;
+    public float shownX, shownZ, realX, realZ, headX, headZ, punchedAt, swerveX, swerveZ;
+    public float nearest = float.MaxValue;
+    float pace = 4f;
 
     public TvStickFigure(Transform parent, string name, Color color, int seed)
     {
@@ -111,10 +113,19 @@ public class TvStickFigure
 
     // Moves the runner (on the ground at x, z) by the distance it ran since the last frame and poses it.
     // ground: the ground's height there; unit: the punching unit; near: 0 far from the control, 1 at it.
-    public void Pose(float x, float ground, float z, float moved, Vector3 unit, float near)
+    public void Pose(float x, float ground, float z, float moved, Vector3 unit, float near, float dt = 0f)
     {
         Style st = style;
-        phase += moved / 2.8f * 6.2831853f * st.cad;
+        // A slow runner (uphill, in a marsh) takes shorter steps at nearly the same rhythm; long slow strides would
+        // look like slow motion
+        if (dt > 1e-5f) pace = Mathf.Lerp(pace, moved / dt, 0.15f);
+        float stepShare = Mathf.Clamp(pace / 4.2f, 0.4f, 1.1f);
+        st.stride *= stepShare;
+        st.knee *= Mathf.Lerp(0.7f, 1f, stepShare);
+        st.arm *= Mathf.Lerp(0.7f, 1f, stepShare);
+        float steps = moved / (2.8f * stepShare);
+        if (dt > 1e-5f && pace > 0.4f) steps = Mathf.Max(steps, dt * 1.25f);
+        phase += steps * 6.2831853f * st.cad;
         position = new Vector3(x, ground, z);
         Vector3 fwd = forward;
         Vector3 right = Vector3.Cross(Vector3.up, fwd);

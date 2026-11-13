@@ -18,8 +18,8 @@ public class TvDirector : MonoBehaviour
     public static TvDirector Active { get; private set; }
 
     // The race clock runs 20 game seconds per real second (Clock); on TV the runners run a little faster than in real
-    // life (1.5 times), which looks right on a screen
-    public const float TvPace = 1.5f / 20f;
+    // life (1.4 times), which looks right on a screen
+    public const float TvPace = 1.4f / 20f;
     const int StartShot = 99;
     const float SeenWithin = 60f, Out = 5f;         // metres: how far the camera sees a runner; always shown this far out after the punch
     const float StartOut = 12f;                     // metres from the start
@@ -39,6 +39,7 @@ public class TvDirector : MonoBehaviour
         public TvWorldView view;
         public bool building, failed;
         public float lastUsed = -999f;
+        public float camE, camN;               // the side of the spot the TV camera should stand on (0, 0 = anywhere)
         public int ordinal = -1;               // its number among the leg's common points, for the split times
         // The producer's notes for the leg
         internal readonly Dictionary<IPackRunner, Pass> passes = new Dictionary<IPackRunner, Pass>();
@@ -173,6 +174,7 @@ public class TvDirector : MonoBehaviour
         }
         if (startSpot.view == null) startSpot.failed = false;
         startSpot.point = points[0];
+        CameraSide(startSpot, points, 0);
         startSpot.name = "Start · Leg " + (race.Leg + 1);
         for (int s = 0; s < spots.Count - 1; s++)
         {
@@ -182,10 +184,40 @@ public class TvDirector : MonoBehaviour
             {
                 if (!Same(points[i], spot.point)) continue;
                 spot.ordinal = route.commonOrdinal[i];
+                CameraSide(spot, points, i);
                 spot.name += i == points.Count - 1 ? " · Finish" : " · Control " + i;
                 break;
             }
         }
+    }
+
+    // Where the TV camera of a point on the course should stand, so the runners come in and go out in front of it
+    // without it having to turn round: on the outside of the turn, looking into it. On a straight line through the
+    // control it stands to the side; at the finish behind the control, facing the runners coming in; at the start
+    // behind the start, watching them go.
+    static void CameraSide(Spot spot, List<CoursePoint> points, int i)
+    {
+        Vector2 Way(int from, int to)
+        {
+            var d = new Vector2((float)(points[to].e - points[from].e), (float)(points[to].n - points[from].n));
+            return d.sqrMagnitude > 1f ? d.normalized : Vector2.zero;
+        }
+        Vector2 back = i > 0 ? Way(i, i - 1) : Vector2.zero, on = i < points.Count - 1 ? Way(i, i + 1) : Vector2.zero;
+        Vector2 side;
+        if (back == Vector2.zero || on == Vector2.zero) side = -(back + on);
+        else
+        {
+            side = -(back + on);
+            // Straight on: to the side of the line, the sunny one (the sun stands in the south-east)
+            if (side.magnitude < 0.5f)
+            {
+                side = new Vector2(-on.y, on.x);
+                if (side.x * 0.55f - side.y * 0.5f < 0f) side = -side;
+            }
+        }
+        side = side.sqrMagnitude > 1e-4f ? side.normalized : Vector2.zero;
+        spot.camE = side.x;
+        spot.camN = side.y;
     }
 
     Spot SpotOf(int number)
@@ -343,7 +375,8 @@ public class TvDirector : MonoBehaviour
         }
         if (current != null && IsProducer)
         {
-            bool stay = wanted == current || Wants(current);
+            // Never away from a runner who is on the way to the flag or punching
+            bool stay = wanted == current || Wants(current) || (current.view != null && current.view.Punching && now - shotStart < LongestShot);
             if (stay) lastWanted = now;
             bool tooLong = now - shotStart > LongestShot;
             if (tooLong)
@@ -554,7 +587,7 @@ public class TvDirector : MonoBehaviour
         TvWorldView made = null;
         try
         {
-            made = await TvWorldView.Create(map, spot.point, spot.start);
+            made = await TvWorldView.Create(map, spot.point, spot.start, spot.camE, spot.camN);
         }
         catch (System.Exception e)
         {

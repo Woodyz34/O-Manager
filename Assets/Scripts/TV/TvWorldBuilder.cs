@@ -79,6 +79,7 @@ public class TvWorldInput
     public double centerE, centerN;     // the control, in the game's map coordinates (metres)
     public float radius = 110f;         // the world is a square of 2 x radius
     public int seed = 1;
+    public float camDirX, camDirZ;      // where the TV camera should stand, as a direction from the control (0, 0 = anywhere)
     public bool start;                  // the start of a leg and not a control: no flag and no punching unit
 }
 
@@ -1137,11 +1138,15 @@ public class TvWorldBuilder
     {
         float bestScore = float.MaxValue, bx = 9f, bz = -9f;
         float y0 = H(world.flagX, world.flagZ);
-        for (int k = 0; k < 16; k++)
+        bool wish = input.camDirX != 0f || input.camDirZ != 0f;
+        for (int k = 0; k < 48; k++)
         {
-            float a = k / 16f * 6.2831853f, dx = (float)Math.Cos(a), dz = (float)Math.Sin(a);
-            float x = world.flagX + dx * 9f, z = world.flagZ + dz * 9f;
-            float score = 0f;
+            float a = (k / 2) / 24f * 6.2831853f, dx = (float)Math.Cos(a), dz = (float)Math.Sin(a);
+            float far = k % 2 == 0 ? 10f : 13f;
+            float x = world.flagX + dx * far, z = world.flagZ + dz * far;
+            float score = far > 10f ? 0.5f : 0f;
+            // The side the course asks for: where the runners come in and go out in front of the camera
+            if (wish) score += (1f - (dx * input.camDirX + dz * input.camDirZ)) * 14f;
             foreach (TvSolid s in world.solids)
             {
                 float d = DistSeg(s.x, s.z, world.flagX, world.flagZ, x, z, out _, out _);
