@@ -80,6 +80,14 @@ public class TvStickFigure
     System.Random mapRandom;
     public float Pace => pace;
     public float slope, hop, hopHeight = 0.4f;     // smoothed: the ground's rise ahead, and how far into a jump over a trunk
+    // After the finish: tired (0..1, bent over with the hands on the knees getting the breath back) and walking (0..1)
+    public float tired, walk;
+    public float leaveX, leaveZ;     // the way it walks off after the finish
+    // The map stays in one hand (the left for most runners); the other hand punches. Only when the unit is on the
+    // map hand's side does the runner take the map over to the other hand for the punch.
+    readonly int mapHand;
+    bool swapped;
+    float still, clock;
 
     public TvStickFigure(Transform parent, string name, Color color, int seed)
     {
@@ -96,6 +104,7 @@ public class TvStickFigure
         readFor = 1.2f + (float)random.NextDouble() * 1.8f;
         readClock = (float)random.NextDouble() * readEvery;
         mapRandom = random;
+        mapHand = random.NextDouble() < 0.85 ? -1 : 1;
         phase = (float)random.NextDouble() * 6.28f;
 
         jersey = Own(color);
@@ -349,16 +358,22 @@ public class TvStickFigure
         st.stride *= 1f - 0.3f * uphill + 0.12f * downhill * (1f - crouch) - 0.3f * climb - 0.45f * crouch;
         st.knee *= 1f + 0.35f * uphill - 0.25f * downhill;
         st.bounce *= 1f - 0.7f * Mathf.Max(climb, crouch);
-        // A slow runner (uphill, in a marsh) takes shorter steps at nearly the same rhythm; long slow strides would
-        // look like slow motion
-        if (dt > 1e-5f) pace = Mathf.Lerp(pace, moved / dt, 0.15f);
-        float stepShare = Mathf.Clamp(pace / 4.2f, 0.4f, 1.1f);
-        st.stride *= stepShare;
-        st.knee *= Mathf.Lerp(0.7f, 1f, stepShare);
-        st.arm *= Mathf.Lerp(0.7f, 1f, stepShare);
-        float steps = moved / (2.8f * stepShare);
-        if (dt > 1e-5f && pace > 0.4f) steps = Mathf.Max(steps, dt * 1.25f);
-        phase += steps * 6.2831853f * st.cad;
+        // Stride and rhythm follow the speed, as for a real runner: the rhythm changes only a little (about 75 double
+        // steps a minute slow, 95 fast) and the length of the step makes up the rest. A fast runner takes long strides
+        // (not quick little steps that look sped up); a slow one (thick forest, marsh, uphill) short choppy steps at
+        // nearly the same rhythm, which looks hard going rather than slow motion.
+        if (dt > 1e-5f) pace = Mathf.Lerp(pace, moved / dt, Mathf.Clamp01(dt * 9f));
+        float cadence = Mathf.Clamp(1.12f + 0.07f * pace, 1.18f, 1.62f) * st.cad * (1f - 0.22f * walk);
+        float cycle = Mathf.Max(pace, 0.3f) / cadence;            // metres per double step
+        float stepShare = Mathf.Clamp(cycle / 2.8f, 0.3f, 1.45f);
+        float effort = Mathf.InverseLerp(0.3f, 1.3f, stepShare);  // 0 short choppy steps .. 1 full flight
+        st.stride = Mathf.Min(st.stride * stepShare, 1.0f);
+        st.knee *= Mathf.Lerp(0.62f, 1.12f, effort) * (1f - 0.45f * walk);
+        st.arm *= Mathf.Lerp(0.72f, 1.1f, effort) * (1f - 0.45f * walk);
+        st.bounce *= Mathf.Lerp(0.55f, 1.15f, effort) * (1f - 0.85f * walk);
+        if (dt > 1e-5f && pace > 0.4f) phase += dt * cadence * 6.2831853f;
+        else phase += moved / 0.84f * 6.2831853f;
+        clock += dt;
         position = new Vector3(x, ground, z);
         Vector3 fwd = forward;
         Vector3 right = Vector3.Cross(Vector3.up, fwd);
@@ -372,10 +387,17 @@ public class TvStickFigure
             readEvery = 3f + (float)mapRandom.NextDouble() * 5f;
             readFor = 1f + (float)mapRandom.NextDouble() * 2f;
         }
-        bool reading = readClock > readEvery || near > 0.05f || climb > 0.3f;
+        // Standing still (and not at the unit, not done for): both hands on the map, reading it carefully
+        bool standing = pace < 0.7f && near < 0.05f && tired < 0.05f && walk < 0.05f && hop < 0.05f;
+        still = Mathf.MoveTowards(still, standing ? 1f : 0f, dt * 2.5f);
+        bool reading = (readClock > readEvery || near > 0.05f || climb > 0.3f || standing) && tired < 0.3f && walk < 0.5f;
         read = Mathf.MoveTowards(read, reading ? 1f : 0f, dt * 3f);
         float readNow = Mathf.SmoothStep(0f, 1f, read);
-        float lean = st.lean + near * 0.25f + 0.2f * uphill + 0.5f * climb - 0.16f * downhill * (1f - crouch) + 0.05f * crouch;
+        float stillNow = Mathf.SmoothStep(0f, 1f, still);
+        float lean = st.lean + near * 0.25f + 0.2f * uphill + 0.5f * climb - 0.16f * downhill * (1f - crouch) + 0.05f * crouch
+                     + 0.07f * (1f - effort) * (1f - walk) - 0.12f * walk - 0.1f * stillNow;
+        // Bent over getting the breath back, the back rising and falling with each breath
+        lean = Mathf.Lerp(lean, 0.75f + 0.05f * Mathf.Sin(clock * 6f), tired);
 
         // Legs: the angle of the thigh and of the shin, from straight down, forward positive
         float low = 0f;
@@ -418,7 +440,7 @@ public class TvStickFigure
         Segment(neck, chest - bodyUp * 0.03f, neckTop);
         Vector3 headPos = neckTop + Vector3.up * 0.095f + fwd * 0.025f;
         // Head bowed to the map while reading
-        Quaternion headTurn = Quaternion.LookRotation(fwd) * Quaternion.Euler(14f * readNow, 0f, 0f);
+        Quaternion headTurn = Quaternion.LookRotation(fwd) * Quaternion.Euler(14f * readNow + 8f * stillNow - 30f * tired, 0f, 0f);
         Vector3 headSize = new Vector3(0.103f, 0.121f, 0.112f);
         Ball(head, headPos, headTurn, headSize);
         // Hair: a cap that follows the head, tipped back so it covers the back of the head and stops above the forehead
@@ -442,11 +464,17 @@ public class TvStickFigure
 
         // Arms: one hand reaches for the punching unit near the control, the other holds the map up to read
         float sf = Mathf.Sin(lean) * 0.47f, su = hipY + 0.04f + Mathf.Cos(lean) * 0.47f;
-        int punchSide = Vector3.Dot(unit - position, right) > 0f ? 1 : -1;
-        int mapSide = -punchSide;
-        for (int k = 0; k < 2; k++)
+        int unitSide = Vector3.Dot(unit - position, right) > 0f ? 1 : -1;
+        if (near <= 0.001f) swapped = false;
+        else if (near > 0.15f && unitSide == mapHand && !swapped) swapped = true;   // stays swapped until it has left the unit
+        int mapSide = swapped ? -mapHand : mapHand;
+        int punchSide = -mapSide;
+        Vector3 mapHandAt = Vector3.zero;
+        // The map hand first, so the free hand knows where the map is
+        for (int i = 0; i < 2; i++)
         {
-            int side = k == 0 ? 1 : -1;
+            int side = i == 0 ? mapSide : -mapSide;
+            int k = side == 1 ? 0 : 1;
             Arm arm = arms[k];
             float p = ph + (side < 0 ? Mathf.PI : 0f);
             float a = -st.arm * Mathf.Sin(p) * 0.9f, el = st.elbow + 0.25f * Mathf.Sin(p), fl = st.flare * 0.16f * (1f + 0.6f * Mathf.Sin(p + 1f));
@@ -459,6 +487,10 @@ public class TvStickFigure
                 el = Mathf.Lerp(el, 1.55f, readNow);
                 fl = Mathf.Lerp(fl, 0.02f, readNow);
                 handIn = Mathf.Lerp(handIn, 0.08f, readNow);
+                // Standing: the map lower and nearer the middle, held in both hands
+                a = Mathf.Lerp(a, 0.3f, stillNow);
+                el = Mathf.Lerp(el, 1.35f, stillNow);
+                handIn = Mathf.Lerp(handIn, 0.03f, stillNow);
             }
             Vector3 shoulder = P(sf - Mathf.Sin(p) * 0.02f * side, su, 0.17f * side);
             Vector3 elbow = P(sf + 0.29f * Mathf.Sin(a), su - 0.29f * Mathf.Cos(a), (0.18f + fl) * side);
@@ -481,6 +513,17 @@ public class TvStickFigure
                 hand += (Vector3.up * 0.12f + right * 0.08f * side) * hop;
                 elbow += right * 0.06f * side * hop;
             }
+            if (tired > 0f)
+            {
+                // Hands on the knees
+                Reach(shoulder, P(0.24f, hipY - 0.2f, 0.11f * side), side, right, tired, ref elbow, ref hand);
+            }
+            if (side != mapSide && stillNow > 0f)
+            {
+                // The free hand on the other edge of the map
+                Reach(shoulder, mapHandAt + right * (0.15f * side) + Vector3.up * 0.01f, side, right, stillNow, ref elbow, ref hand);
+            }
+            if (side == mapSide) mapHandAt = hand;
             if (side == punchSide && near > 0f)
             {
                 Vector3 target = unit + Vector3.up * 0.05f, d = target - shoulder;
@@ -500,7 +543,7 @@ public class TvStickFigure
             if (side == mapSide)
             {
                 // The map in the hand, tipped up towards the face
-                map.localPosition = hand + Vector3.up * 0.025f + fwd * 0.03f;
+                map.localPosition = hand + Vector3.up * 0.025f + fwd * 0.03f - right * (0.075f * side * stillNow);   // in both hands: between them
                 // Read: tipped up to the face; carried: folded down along the forearm
                 Quaternion readTurn = Quaternion.LookRotation(fwd) * Quaternion.Euler(-50f, 0f, 12f * side);
                 Quaternion carryTurn = Quaternion.LookRotation(hand - elbow) * Quaternion.Euler(-10f, 0f, 75f * side);
