@@ -31,6 +31,9 @@ public class TvWorldView : MonoBehaviour
     float tvFov = 34f;
     Vector3 camShift;
     bool hadSubject;
+    // Free camera (only in the course builder's View): turns round a point
+    Vector3 orbitTarget;
+    float yaw, pitch = 18f, distance = 14f;
 
     // A new shot: the camera goes straight to the first runner
     public void NewShot()
@@ -611,5 +614,39 @@ public class TvWorldView : MonoBehaviour
         cam.transform.localPosition = position;
         cam.transform.localRotation = Quaternion.LookRotation(lookAt - position);
         cam.fieldOfView = tvFov;
+    }
+
+    // The free camera: drag turns it round the point it looks at, the wheel goes nearer, WASD and right-drag move
+    // move: how far to move the point, as a share of the distance to it (x right, y forward)
+    public void FreeCamera(Vector2 turn, Vector2 move, float zoom)
+    {
+        yaw += turn.x * 0.25f;
+        pitch = Mathf.Clamp(pitch - turn.y * 0.25f, -5f, 80f);
+        distance = Mathf.Clamp(distance * (1f - zoom * 0.12f), 2f, 160f);
+        Quaternion heading = Quaternion.Euler(0f, yaw, 0f);
+        Vector3 forward = heading * Vector3.forward, right = heading * Vector3.right;
+        orbitTarget += (forward * move.y + right * move.x) * Mathf.Max(2f, distance);
+        float limit = world.radius - 5f;
+        orbitTarget.x = Mathf.Clamp(orbitTarget.x, -limit, limit);
+        orbitTarget.z = Mathf.Clamp(orbitTarget.z, -limit, limit);
+        orbitTarget.y = world.HeightAt(orbitTarget.x, orbitTarget.z) + 0.8f;
+        Vector3 position = orbitTarget + Quaternion.Euler(pitch, yaw, 0f) * new Vector3(0f, 0f, -distance);
+        // Never under the ground
+        float ground = world.HeightAt(position.x, position.z) + 0.4f;
+        if (position.y < ground) position.y = ground;
+        cam.transform.localPosition = position;
+        cam.transform.localRotation = Quaternion.LookRotation(orbitTarget - position);
+        cam.fieldOfView = 50f;
+    }
+
+    // The free camera starts where the TV camera is
+    public void StartFreeCamera()
+    {
+        Vector3 position = cam.transform.localPosition;
+        orbitTarget = lookAt;
+        Vector3 back = position - orbitTarget;
+        distance = Mathf.Max(2f, back.magnitude);
+        yaw = Mathf.Atan2(-back.x, -back.z) * Mathf.Rad2Deg;
+        pitch = Mathf.Asin(Mathf.Clamp(back.y / distance, -1f, 1f)) * Mathf.Rad2Deg;
     }
 }
