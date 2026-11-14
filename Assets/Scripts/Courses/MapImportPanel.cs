@@ -111,7 +111,7 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.Size(nameLabel, -1, 70);
         nameField = CourseUI.Input("Map name", optionRow, "The map's name in the game", 32, null);
         CourseUI.Size(nameField, -1, 330);
-        typeButton = CourseUI.Button("Type", optionRow, "", CourseUI.ButtonKind.Light, NextType, 20);
+        typeButton = CourseUI.Button("Type", optionRow, "", CourseUI.ButtonKind.Light, PickType, 20);
         CourseUI.Size(typeButton, -1, 300);
         TextMeshProUGUI contourLabel = CourseUI.Text("Contour label", optionRow, "Contour interval (m):", 20, CourseUI.Ink, FontStyles.Bold);
         contourLabel.alignment = TextAlignmentOptions.MidlineRight;
@@ -435,9 +435,15 @@ public class MapImportPanel : MonoBehaviour
         return char.ToUpper(s[0]) + s.Substring(1);
     }
 
-    void NextType()
+    void PickType()
     {
-        mapType = MapTypes[(Array.IndexOf(MapTypes, mapType) + 1) % MapTypes.Length];
+        ChoiceDropdown.Open((RectTransform)typeButton.transform, new[] { "Forest map", "Sprint map", "Forest and sprint" },
+            Array.IndexOf(MapTypes, mapType), index => SetType(MapTypes[index]));
+    }
+
+    void SetType(string type)
+    {
+        mapType = type;
         if (!contourTyped) ShowTypicalContours();
         if (!edgeByHand) edge = GuessFor(mapType);
         Refresh();
