@@ -176,7 +176,6 @@
   /* ---------- Download: always the newest GitHub release ---------- */
   var cfg = window.OM_CONFIG || {}, release = null, releaseState = "loading";
   var repoUrl = "https://github.com/" + cfg.releasesRepo + "/releases";
-  $("dlAll").href = repoUrl;
   $("dlBtn").href = repoUrl + "/latest";
   function renderDownload() {
     var meta = $("dlMeta"), l = lang();
