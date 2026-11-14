@@ -73,6 +73,10 @@ public class NetworkRunnerHandler : MonoBehaviour
         
         Debug.Log($"Host migration started");
     }
+    // The most players one lobby holds. Photon's free plan has 20 players at once in total (all lobbies together):
+    // when that is reached nobody is thrown out, a new player just gets the "multiplayer is full" message (SessionGuard).
+    public const int MaxPlayersPerLobby = 20;
+
     protected virtual async Task InitializeNetworkRunner(NetworkRunner runner, GameMode gameMode, byte[] connectionToken, string sessionName, NetAddress address, SceneRef  scene, Action<NetworkRunner> initialized)
     {
         var sceneManager = GetSceneManager(runner);
@@ -86,6 +90,7 @@ public class NetworkRunnerHandler : MonoBehaviour
             Scene = scene,
             SessionName = sessionName,
             CustomLobbyName = "OurLobbyID",
+            PlayerCount = MaxPlayersPerLobby,
             SceneManager = sceneManager,
             ConnectionToken = connectionToken
         });
