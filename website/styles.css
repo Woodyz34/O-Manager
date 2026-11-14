@@ -410,3 +410,5 @@ section { position: relative; }
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
   .js .reveal, .js .hero-copy > * { opacity: 1; transform: none; }
 }
+.foot a:not(.brand), .faq-list p a { color: inherit; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.foot a:not(.brand):hover { color: var(--cream-50); }
