@@ -187,6 +187,11 @@ public class PathfindingManager : MonoBehaviour
         }
 
         TextAsset jsonAsset = Resources.Load<TextAsset>("2d-gridJson/" + gridName);
+        if (jsonAsset == null)
+        {
+            Debug.LogError("PathfindingManager: no grid called " + gridName + " (the maps are imported maps now)");
+            return;
+        }
         string jsonText = jsonAsset.text;
         gridData = JsonConvert.DeserializeObject<GridData>(jsonText);
         cellSize = gridData.grid_size * scaleFactor;

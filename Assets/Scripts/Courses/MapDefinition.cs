@@ -169,7 +169,8 @@ public class MapDefinition : ScriptableObject
 
     public static bool Exists(string mapId)
     {
-        return string.IsNullOrEmpty(mapId) || All.Exists(m => m.id == mapId);
+        // The old map built into the scenes is gone, so a course without a map id has no map either
+        return !string.IsNullOrEmpty(mapId) && All.Exists(m => m.id == mapId);
     }
 
     // The map with this id, or null
