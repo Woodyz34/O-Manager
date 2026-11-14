@@ -9,7 +9,14 @@ public class CardData
 {
 
     public float technique;
-    public float speed;
+    // Physics: how fast the runner is in the forest (from long and middle races). Was called "speed" before 2026-11-13.
+    public float physics;
+    // Speed: how fast the runner is on hard ground, from clean sprint times (VM and World Cup sprint = 100).
+    // Below 0 = no sprint race ("-" on the card); then the runner uses physics everywhere (RunnerRules.SurfaceFactor).
+    public float sprintSpeed = NoValue;
+    // Technique in sprints, kept for later and not shown yet (below 0 = none)
+    public float sprintTechnique = NoValue;
+    public const float NoValue = -1f;
     public string RunnerName;
     public Sprite country;
     public Sprite clubb;
@@ -28,7 +35,7 @@ public class CardData
     public CardData(string Name, float Speed, float Technique, Sprite Country, Sprite Clubb, string Klass, bool Man, Sprite Profile)
     {
         RunnerName = Name;
-        speed = Speed;
+        physics = Speed;
         technique = Technique;
         country = Country;
         clubb = Clubb;
@@ -37,11 +44,18 @@ public class CardData
         RunnerPicture = Profile;
     }
 
-    // The same runner with other values ("Same stats" in the lobby)
-    public CardData WithStats(float newSpeed, float newTechnique)
+    public bool HasSprintSpeed => sprintSpeed >= 0f;
+
+    // "87", or "-" when there is no sprint speed
+    public string SprintSpeedText => HasSprintSpeed ? Mathf.RoundToInt(sprintSpeed).ToString() : "-";
+
+    // The same runner with other values ("Same stats" in the lobby). Everybody gets the same number on every
+    // kind of ground, so the sprint speed is left out and physics is used everywhere.
+    public CardData WithStats(float newPhysics, float newTechnique)
     {
         CardData copy = (CardData)MemberwiseClone();
-        copy.speed = newSpeed;
+        copy.physics = newPhysics;
+        copy.sprintSpeed = NoValue;
         copy.technique = newTechnique;
         return copy;
     }

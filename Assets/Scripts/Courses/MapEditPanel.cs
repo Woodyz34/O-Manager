@@ -176,6 +176,21 @@ public class MapEditPanel : MonoBehaviour
         cancelButton = CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, Close, 24);
         saveButton = CourseUI.Button("Save", buttons, "Save", CourseUI.ButtonKind.Primary, Save, 24);
 
+        HoverTip.Add(nameField, "The name the map has in the game's map list.");
+        HoverTip.Add(clubField, "The club that owns the map, if you know it.");
+        HoverTip.Add(publicButton, "Everyone who plays the game can use this map, and it is shared through the cloud.");
+        HoverTip.Add(privateButton, "Only you can use this map. It is not shared.");
+        HoverTip.Add(senderField, "Your name. Only the game's owner sees it, so the owner knows who to ask about the map.");
+        HoverTip.Add(contactField, "E-mail or phone number where the game's owner can reach you about this map. It is not shown to other players.");
+        HoverTip.Add(forestButton, "A map for orienteering in the forest.");
+        HoverTip.Add(sprintButton, "A town or park map with streets, buildings and fences. Sprint maps use their own course rules and game modes.");
+        HoverTip.Add(edgeButton, "Shows where the game thinks the finished map ends. Parts outside it are left out. Move the edge if it is wrong.");
+        HoverTip.Add(terrainButton, "Set how quick each kind of ground is on this map: asphalt, roads, open land, forest, marsh and so on.");
+        HoverTip.Add(lookButton, "Set what the terrain looks like in the 3D view at a TV control. Only changes how it looks, not the running.");
+        HoverTip.Add(deleteButton, "Removes the map from the game for good.");
+        HoverTip.Add(cancelButton, "Closes this window without saving.");
+        HoverTip.Add(saveButton, "Saves your changes to the map.");
+
         Refresh();
     }
 

@@ -553,7 +553,8 @@ public class AgentMovement : NetworkBehaviour
 
 
                 // Kombinera bas-hastighet och lutning
-                float targetSpeed2 = (baseSpeed * cellSpeed2) * slopeFactor2 * TerrainSpeedModel.RaceSpeedScale() * ReadingFactor;
+                float targetSpeed2 = (baseSpeed * cellSpeed2) * slopeFactor2 * TerrainSpeedModel.RaceSpeedScale() * ReadingFactor
+                                     * RunnerRules.SurfaceFactor(cardPhysics, cardSprintSpeed, cellSpeed2);
 
                 // Lerp mot mål-hastighet för mjuk acceleration/deceleration
                 float maxDelta2 = acceleration * Time.deltaTime;
@@ -745,6 +746,8 @@ public class AgentMovement : NetworkBehaviour
             // Kombinera bas-hastighet och lutning
             // Sprint courses run slower than the grid alone says (see TerrainSpeedModel.SprintSpeedScale)
             float targetSpeed = (baseSpeed * cellSpeed) * slopeFactor * TerrainSpeedModel.RaceSpeedScale() * ReadingFactor;
+            // On asphalt, gravel and paths the runner's sprint speed counts instead of (or as well as) physics
+            targetSpeed *= RunnerRules.SurfaceFactor(cardPhysics, cardSprintSpeed, cellSpeed);
             // Relays: a runner just ahead helps, hanging on sets the pace, and a tired runner is slower
             if (packRunning != null)
             {
@@ -1648,9 +1651,15 @@ public class AgentMovement : NetworkBehaviour
         SetInitialPosition(snapshot.position);
     }
 
+    // The card's physics (forest) and sprint speed (hard ground, below 0 = none), for RunnerRules.SurfaceFactor
+    float cardPhysics;
+    float cardSprintSpeed = CardData.NoValue;
+
     public void SetRunner(CardDisplay card)
     {
         Debug.Log("SetRunner starts");
+        cardPhysics = card.CardData != null ? card.CardData.physics : card.speed;
+        cardSprintSpeed = card.CardData != null ? card.CardData.sprintSpeed : card.sprintSpeed;
         // Women run with RunnerRules.WomenSpeedFactor of their card speed (the cards' speed is measured within each class)
         float raceSpeed = card.CardData != null ? RunnerRules.RaceSpeed(card.CardData) : card.man ? card.speed : card.speed * RunnerRules.WomenSpeedFactor;
         baseSpeed = unscaledBaseSpeed * raceSpeed / 100;
@@ -1671,6 +1680,8 @@ public class AgentMovement : NetworkBehaviour
     // The runner for a relay leg
     public void SetRunner(CardData card)
     {
+        cardPhysics = card.physics;
+        cardSprintSpeed = card.sprintSpeed;
         baseSpeed = unscaledBaseSpeed * RunnerRules.RaceSpeed(card) / 100;
         runnerName = card.RunnerName;
         runnerStatTec = (100 - card.technique) / 100;

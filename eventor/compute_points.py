@@ -26,6 +26,16 @@ Calibration of c100 (separate scales for women and men, since classes never mix)
     but the race does not count. Everything is solved again until it stops
     changing, so a race can become adjusted through runners met later (or earlier).
 
+Sprint (distance "Sprint", WinSplits files with _sprint_, added 2026-11-13) is a separate scale:
+  * VM and World Cup sprint finals are the anchors (best clean time = 100); VM qualifications only chain,
+    SM, Swedish League, DM, O-Ringen and the rest give everyone a number. No minimum number of races.
+  * A sprint race with too few runners who have a sprint rating (the H/D18 sprints) is calibrated against its
+    runners' forest physics instead, since both scales put the world's best at 100.
+  * A leg that comes out negative (a wrongly recorded split) is joined with the next leg (sprint only).
+  * The result is the cards' "speed" (sprint speed, -1 = none, "-" on the card). Sprint technique is stored as
+    "sprintTechnique" but not shown. Sprint races never make a runner visible: that still takes forest races.
+  * The forest speed is now called physics ("physics" in the game file, "speed" before 2026-11-13).
+
 Rating per runner, over the last 365 days:
   * weight = 0.5 ** (age_days / 180)
   * physic: Tukey biweight (c = 4.685, scale = max(1.4826 * MAD, 5)) times weight
@@ -123,6 +133,12 @@ def match_name(name):
     return s
 
 
+def useful_club(club):
+    """Exports from abroad (Portugal O Meeting) give short codes like "HSK" or "Individual SUI": not shown."""
+    c = club.strip()
+    return not (c.lower().startswith("individual") or (len(c) <= 4 and c.upper() == c))
+
+
 class Identities:
     """Eventor person id is the key. WinSplits runners, and Eventor results without a person id,
     are matched to it by name and sex. Ids made from names use norm_name, so they stay the same
@@ -198,7 +214,7 @@ class Identities:
             # VM, EM and the World Cup are run for a country, so this one is sure
             inf["country"] = r["country"]
             inf["country_sure"] = True
-        if r.get("club") and not inf["club"]:
+        if r.get("club") and not inf["club"] and useful_club(r["club"]):
             inf["club"] = r["club"]
         return key
 
@@ -218,10 +234,21 @@ def leg_times(r):
     return out
 
 
-def analyse_group(runners):
-    """runners: OK runners on the same course. Adds mistake time and clean time in place."""
+def analyse_group(runners, merge_bad_legs=False):
+    """runners: OK runners on the same course. Adds mistake time and clean time in place.
+    merge_bad_legs (sprint only, so the forest numbers stay as they were): a leg that comes out negative for
+    anyone (a split time recorded wrongly, as at Sprint by Night 2026-11-06) is joined with the next leg for
+    everybody, so the error is not counted as a mistake."""
     legs = [leg_times(r) for r in runners]
     n_legs = len(legs[0])
+    if merge_bad_legs:
+        for i in range(n_legs):
+            if not any(l[i] is not None and l[i] < 0 for l in legs):
+                continue
+            for l in legs:
+                if i + 1 < n_legs:
+                    l[i + 1] = l[i] + l[i + 1] if l[i] is not None and l[i + 1] is not None else None
+                l[i] = None
     refs = []
     for i in range(n_legs):
         vals = sorted(l[i] for l in legs if l[i] is not None and l[i] > 0)
@@ -263,6 +290,8 @@ def build_entries(races, ids):
     """One entry per (race, class/course group) with OK runners and clean times."""
     eventor = [r for r in races if r.get("source") != "winsplits"]
     winsplits = [r for r in races if r.get("source") == "winsplits"]
+    # Sprints last, so names, clubs and countries come from the forest races first and the cards stay the same
+    winsplits.sort(key=lambda r: (r.get("distance") or "").lower() == "sprint")
     groups = []
     ids.prescan(eventor)
     for race in eventor + winsplits:     # Eventor first so WinSplits can match to Eventor ids
@@ -292,10 +321,11 @@ def build_entries(races, ids):
                     class_rows[id(original)] = r
                     copies.append(r)
                 rs = copies
-                analyse_group(rs)
+                analyse_group(rs, merge_bad_legs=(race.get("distance") or "").lower() == "sprint")
                 groups.append({
                     "id": f"{race['event_id']}|{race.get('race_id', '')}|{cls['class']}|{len(groups)}",
                     "event": race["event_name"], "class": cls["class"], "date": date,
+                    "sprint": (race.get("distance") or "").lower() == "sprint",
                     "anchor": anchor, "international": international, "level": race.get("level"), "controls": len(codes),
                     "runners": rs, "class_ok": len(ok), "class_best": class_best,
                     "file": class_file, "class_rows": None,
@@ -371,7 +401,10 @@ def ratings(per_runner, today):
     return out
 
 
-def solve(groups, today):
+def solve(groups, today, fallback=None, via_fallback=None):
+    """fallback (sprint only): the forest ratings. A sprint race with too few runners who have a sprint rating
+    (the H/D18 sprints had nobody who also ran a senior sprint) is calibrated against its runners' physics
+    instead, since both scales put the world's best at 100. Such races are added to via_fallback."""
     c100 = {}
     for g in groups:
         if g["anchor"]:
@@ -395,6 +428,17 @@ def solve(groups, today):
                 continue
             est = [r["_clean"] * rating[r["_key"]][0] / 100.0 for r in g["runners"]
                    if r["_key"] in rating and rating[r["_key"]][2] >= MIN_RACES_TO_CALIBRATE]
+            if fallback and len(est) < MIN_CALIBRATORS:
+                bridge = [r["_clean"] * fallback[r["_key"]][0] / 100.0 for r in g["runners"]
+                          if r["_key"] in fallback and fallback[r["_key"]][2] >= MIN_RACES_TO_CALIBRATE]
+                if len(bridge) >= MIN_CALIBRATORS:
+                    est = bridge
+                    if via_fallback is not None:
+                        via_fallback.add(g["id"])
+                elif via_fallback is not None:
+                    via_fallback.discard(g["id"])
+            elif via_fallback is not None:
+                via_fallback.discard(g["id"])
             if len(est) >= MIN_CALIBRATORS:
                 val = statistics.median(est)
                 new_adjusted.add(g["id"])
@@ -599,6 +643,7 @@ def write_game_file(runners, today, groups, merged_ids=None):
         previous = {c["id"]: c for c in old_file.get("runners", [])}
         renamed = old_file.get("renamed", [])
     cards = []
+    info_by_id = {r["id"]: r for r in runners}
     for r in runners:
         if not r["visible"]:
             continue
@@ -606,7 +651,9 @@ def write_game_file(runners, today, groups, merged_ids=None):
             "id": r["id"], "name": r["name"], "man": r["sex"] == "M", "klass": game_class(r, today),
             "country": country_name(r), "club": r.get("club") or "",
             **({} if r.get("country_sure") else {"countryGuessed": True}),
-            "speed": round(r["physic"], 2), "technique": round(r["technique"], 2), "inPacks": True,
+            # physics = forest speed (was "speed" before 2026-11-13); speed = sprint speed, -1 = none ("-" on the card)
+            "physics": round(r["physic"], 2), "speed": sprint_value(r["sprint_speed"]),
+            "technique": round(r["technique"], 2), "sprintTechnique": sprint_value(r["sprint_technique"]), "inPacks": True,
             "merits": r.get("merits", []),
         })
     clubs_by_hand(cards)
@@ -625,6 +672,11 @@ def write_game_file(runners, today, groups, merged_ids=None):
             if same is not None and not cid.startswith("e"):
                 merged.append((old["name"], same))
                 continue
+            old = upgrade_card(old)
+            now_info = info_by_id.get(cid)
+            if now_info is not None and now_info.get("sprint_speed") is not None:
+                old["speed"] = sprint_value(now_info["sprint_speed"])
+                old["sprintTechnique"] = sprint_value(now_info["sprint_technique"])
             cards.append({**old, "inPacks": False})
             frozen += 1
     # Two runners with the same name get their club (or birth year) added, because the
@@ -645,13 +697,30 @@ def write_game_file(runners, today, groups, merged_ids=None):
     # A name that was renamed earlier and is a card again is no longer moved
     names = {c["name"] for c in cards}
     renamed = [r for r in renamed if r["from"] not in names]
-    cards.sort(key=lambda c: (-(0.8 * c["speed"] + 0.2 * c["technique"]), c["name"]))   # overall = 80 % speed, 20 % technique
+    # overall = 40 % physics, 40 % speed (physics when there is no sprint speed), 20 % technique, as RunnerCards.OverallExact
+    cards.sort(key=lambda c: (-(0.4 * c["physics"] + 0.4 * (c["speed"] if c["speed"] >= 0 else c["physics"])
+                                + 0.2 * c["technique"]), c["name"]))
     os.makedirs(os.path.dirname(GAME_JSON), exist_ok=True)
     with open(GAME_JSON, "w", encoding="utf-8") as f:
         json.dump({"computed": today.isoformat(), "renamed": renamed, "runners": cards}, f, ensure_ascii=False, indent=0)
     write_emblem_list(cards, today)
     write_results(groups, cards)
     return frozen
+
+
+def sprint_value(v):
+    return round(v, 2) if v is not None else -1
+
+
+def upgrade_card(old):
+    """A card written before sprint speed existed had its forest speed in "speed": it becomes "physics"."""
+    if "physics" in old:
+        return dict(old)
+    card = dict(old)
+    card["physics"] = card.pop("speed", 0)
+    card["speed"] = -1
+    card["sprintTechnique"] = -1
+    return card
 
 
 def clubs_by_hand(cards):
@@ -697,7 +766,7 @@ def photo_section(cards, found):
     for c in cards:
         base = c["name"].split(" (")[0]
         ok = emblem_key(c["name"]) in found or emblem_key(base) in found
-        (done if ok else missing).append(f"  {c['name']}.jpg   ({c['klass']}, {c['speed']}/{c['technique']})")
+        (done if ok else missing).append(f"  {c['name']}.jpg   ({c['klass']}, {c['physics']}/{c['technique']})")
     return [f"PROFILBILDER ({len(done)} av {len(cards)} har foto)", "", "Har foto:", *(done or ["  (inga än)"]), "",
             "Saknar foto, bästa löparna först:", *missing, ""]
 
@@ -769,18 +838,27 @@ def main():
     today = dt.date.today()
     ids = Identities()
     races = load_races()
-    groups = build_entries(races, ids)
+    all_groups = build_entries(races, ids)
+    # Forest (long and middle) gives physics and technique, and decides who is in the game. Sprint is rated on its
+    # own scale (VM and World Cup sprint finals = 100) and gives the cards' sprint speed (user 2026-11-13).
+    groups = [g for g in all_groups if not g["sprint"]]
+    sprint_groups = [g for g in all_groups if g["sprint"]]
     c100, adjusted, rating, iterations = solve(groups, today)
+    via_physics = set()
+    s_c100, s_adjusted, s_rating, s_iterations = (solve(sprint_groups, today, fallback=rating, via_fallback=via_physics)
+                                                  if sprint_groups else ({}, set(), {}, 0))
 
     best = merits(groups, adjusted, c100, rating, today)
     anchored_keys = {r["_key"] for g in groups if g["international"] for r in g["runners"]}
-    all_keys = {r["_key"] for g in groups for r in g["runners"]}
+    all_keys = {r["_key"] for g in all_groups for r in g["runners"]}
     runners = []
     for key in all_keys:
         inf = ids.info[key]
         rt = rating.get(key)
+        st = s_rating.get(key)
         n_all = sum(1 for g in groups for r in g["runners"] if r["_key"] == key
                     and (today - g["date"]).days <= WINDOW_DAYS)
+        # Only forest races count here: a runner with sprints alone is saved but not in the game
         visible = bool(rt) and (rt[2] >= MIN_RACES_VISIBLE or key in anchored_keys)
         runners.append({
             "id": key, "name": inf["name"], "sex": inf["sex"], "birth_year": inf["birth_year"],
@@ -789,11 +867,15 @@ def main():
             "technique": round(rt[1], 2) if rt else None,
             "adjusted_races": rt[2] if rt else 0,
             "all_races": n_all,
+            # Sprint speed from clean sprint times, any number of races; sprint technique is kept for later
+            "sprint_speed": round(st[0], 2) if st else None,
+            "sprint_technique": round(st[1], 2) if st else None,
+            "sprint_races": st[2] if st else 0,
             "international": key in anchored_keys,
             "visible": visible,
             "merits": best.get(key, []) if visible else [],
         })
-    runners.sort(key=lambda r: (r["sex"] or "", -(r["physic"] or 0)))
+    runners.sort(key=lambda r: (r["sex"] or "", -(r["physic"] or 0), -(r["sprint_speed"] or 0)))
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump({"computed": today.isoformat(), "runners": runners}, f, ensure_ascii=False, indent=0)
     frozen = write_game_file(runners, today, groups, ids.merged)
@@ -820,11 +902,28 @@ def main():
         rep.append(f"| {g['date']} | {g['event']} | {g['class']} | {len(g['runners'])} | "
                    f"{'ankare' if g['anchor'] else ('ja' if g['id'] in adjusted else 'ojusterad')} | {m}:{s:02d} |")
     rep.append("")
+    with_sprint = [r for r in vis if r["sprint_speed"] is not None]
+    rep += ["## Sprint", "",
+            f"Sprintgrupper: {len(sprint_groups)}, justerade: {len(s_adjusted)}, ojusterade: {len(sprint_groups) - len(s_adjusted)}. "
+            f"Varv: {s_iterations}. Löpare med sprintfart: {len(s_rating)}, varav i spelet: {len(with_sprint)} av {len(vis)} "
+            f"(övriga visar - och springer med sin fysik).", ""]
+    for sex, title in (("M", "Herrar"), ("F", "Damer")):
+        rep += [f"### {title}, sprintfart topp 15 (synliga)", "", "| # | Namn | Speed | Fysik | Sprintlopp |", "| --- | --- | --- | --- | --- |"]
+        top = sorted((r for r in with_sprint if r["sex"] == sex), key=lambda r: -r["sprint_speed"])[:15]
+        for i, r in enumerate(top, 1):
+            rep.append(f"| {i} | {r['name']} | {r['sprint_speed']} | {r['physic']} | {r['sprint_races']} |")
+        rep.append("")
+    rep += ["### Sprintlopp", "", "| Datum | Tävling | Klass | Löpare | Justerad | c100 |", "| --- | --- | --- | --- | --- | --- |"]
+    for g in sorted(sprint_groups, key=lambda g: (g["date"], g["event"], g["class"])):
+        m, s = divmod(int(round(s_c100[g["id"]])), 60)
+        rep.append(f"| {g['date']} | {g['event']} | {g['class']} | {len(g['runners'])} | "
+                   f"{'ankare' if g['anchor'] else ('via fysik' if g['id'] in via_physics and g['id'] in s_adjusted else 'ja' if g['id'] in s_adjusted else 'ojusterad')} | {m}:{s:02d} |")
+    rep.append("")
     if ids.ambiguous:
         rep += ["## Tvetydiga namn i WinSplits-filer (granska)", ""]
         rep += [f"- {n} ({o}), {src}: {', '.join(c)}" for n, o, src, c in ids.ambiguous]
         rep.append("")
-    unmatched = sorted({(ids.info[r['_key']]['name'], ids.info[r['_key']]['country'] or '') for g in groups if g["international"]
+    unmatched = sorted({(ids.info[r['_key']]['name'], ids.info[r['_key']]['country'] or '') for g in all_groups if g["international"]
                         for r in g["runners"] if r["_key"].startswith("w:")})
     rep += [f"WinSplits-löpare utan Eventor-träff (oftast utländska): {len(unmatched)}.", ""]
     text = "\n".join(rep)

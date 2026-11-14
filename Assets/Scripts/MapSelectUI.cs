@@ -68,6 +68,8 @@ public class MapSelectUI : MonoBehaviour
         CourseUI.Size(ai, 56, 210);
         Button refresh = CourseUI.Button("Refresh", tabRow, "Refresh", CourseUI.ButtonKind.Light, () => FetchCommunity(true), 24);
         CourseUI.Size(refresh, 56, 170);
+        HoverTip.Add(ai, "Let the game lay a new course for you on any map, with the length and type you choose. AI courses are not saved.");
+        HoverTip.Add(refresh, "Fetch the newest community courses again.");
 
         // Search and relay/individual filter
         RectTransform searchRow = CourseUI.Rect("Course search", mapSelectPanel.transform);
@@ -75,6 +77,7 @@ public class MapSelectUI : MonoBehaviour
         CourseUI.Row(searchRow.gameObject, 16, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
         searchField = CourseUI.Input("Search", searchRow, "Search courses (name, author, relay...)", 40, _ => PopulateMapList());
         CourseUI.Size(searchField, 52, 600);
+        HoverTip.Add(searchField, "Search for a course by its name, its maker or its map.");
         kindButton = CourseUI.Button("Kind", searchRow, CourseFilter.KindLabel(kind), CourseUI.ButtonKind.Light, () =>
         {
             kind = CourseFilter.Next(kind);
@@ -83,6 +86,7 @@ public class MapSelectUI : MonoBehaviour
             PopulateMapList();
         }, 22);
         CourseUI.Size(kindButton, 52, 270);
+        HoverTip.Add(kindButton, "Click to filter the list: all courses, only individual courses or only relays.");
 
         statusText = CourseUI.Text("Course status", mapSelectPanel.transform, "", 24, CourseUI.InkMuted, FontStyles.Italic, TextAlignmentOptions.Center);
         CourseUI.Place(statusText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -262), new Vector2(1400, 34));
@@ -98,6 +102,9 @@ public class MapSelectUI : MonoBehaviour
             PopulateMapList();
         }, 24);
         CourseUI.Size(tab, 56, 210);
+        HoverTip.Add(tab, which == Filter.All ? "Every course: the ready-made ones, yours and the community's."
+            : which == Filter.Mine ? "Only the courses you have made yourself."
+            : "Courses that other players have made and shared.");
         tabs[which] = tab;
     }
 

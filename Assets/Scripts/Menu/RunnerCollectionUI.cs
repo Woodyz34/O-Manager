@@ -155,7 +155,8 @@ public class RunnerCollectionUI : MonoBehaviour
         detailInfo.text =
             "<color=#" + ColorUtility.ToHtmlStringRGB(RunnerCards.TierColor(tier)) + "><b>" + RunnerCards.TierName(tier) + "</b></color>\n\n" +
             Row("Overall", RunnerCards.Overall(card).ToString()) +
-            Row("Speed", Mathf.RoundToInt(card.speed).ToString()) +
+            Row("Physics", Mathf.RoundToInt(card.physics).ToString()) +
+            Row("Speed", card.SprintSpeedText) +
             Row("Technique", Mathf.RoundToInt(card.technique).ToString()) +
             Row("Class", card.klass) +
             Row("Country", Title(RunnerCards.CountryName(card)) +

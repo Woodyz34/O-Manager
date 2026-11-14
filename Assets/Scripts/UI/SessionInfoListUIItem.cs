@@ -37,6 +37,10 @@ public class SessionInfoListUIItem : MonoBehaviour
         }
 
         joinButton.gameObject.SetActive(isJoinButtonActive);
+        HoverTip.Add(joinButton, "Join this lobby.");
+        HoverTip.Add(transform, !sessionInfo.IsOpen ? "This lobby is out racing. You can join it when it is back in the lobby."
+            : sessionInfo.PlayerCount >= sessionInfo.MaxPlayers ? "This lobby is full."
+            : "Click Join to enter this lobby. The numbers show how many players are in it out of the most it can hold.");
     }
 
     public void OnClick()

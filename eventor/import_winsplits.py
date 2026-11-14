@@ -3,7 +3,11 @@
 
 Put the files in eventor/winsplits/ named
 
-    YYYY-MM-DD_<VM|EM|VC|niva2>_<lang|medel>_<class>[_kval][_race name].txt
+    YYYY-MM-DD_<VM|EM|VC|niva2>[-quali<n>]_<lang|medel|sprint>_<class>[_kval][_race name].txt
+
+(nivå2 works as niva2. A qualification is "_kval" after the class, "VM-quali", "VM-quali2" ... in the kind, or
+for a national race the word "kval" in its name, e.g. "SM, sprint (Swedish League, #4), kval". VM files name
+the federation, "Swiss Orienteering", which becomes the country. "[14896] Heming O" becomes "Heming O".)
 
 The class is H or D (meaning H21/D21), or the whole class name, e.g. D20, H18 or H21Kort.
 Two classes of the same race need different file names, and the class tells them apart:
@@ -35,10 +39,44 @@ IN_DIR = os.path.join(HERE, "winsplits")
 OUT_DIR = os.path.join(HERE, "data", "races")
 
 NAME_RE = re.compile(
-    r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<kind>VM|EM|VC|niva2)_(?P<dist>lang|lång|long|medel|mellan|middle)_(?P<sex>[HD])(?P<age>\d{2}[A-Za-zÅÄÖåäö0-9]*)?"
+    r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<kind>VM|EM|VC|niva2|nivå2)(?:-(?P<quali>quali|kval)(?P<heat>\d*))?"
+    r"_(?P<dist>lang|lång|long|medel|mellan|middle|sprint)_(?P<sex>[HD])(?P<age>\d{2}[A-Za-zÅÄÖåäö0-9]*)?"
     r"(?P<kval>_kval)?(?:_(?P<free>.*))?\.txt$", re.I)
-IMPORTER_VERSION = 5          # bump to re-import every file after a parser change
+IMPORTER_VERSION = 6          # bump to re-import every file after a parser change
 MIDDLE = ("medel", "mellan", "middle")
+# "kval" as a word in the free text of a national race (e.g. "SM, sprint (Swedish League, #4), kval")
+KVAL_WORD = re.compile(r"(?<![a-zåäö])(kval|quali\w*)(?![a-zåäö])", re.I)
+# VM files name the national federation instead of the country
+FEDERATIONS = {
+    "paraguaya": "Paraguay", "austrian": "Austria", "belgian": "Belgium", "brazilian": "Brazil",
+    "british": "Great Britain", "bulgarian": "Bulgaria", "chinese": "China", "colombian": "Colombia",
+    "croatian": "Croatia", "czech": "Czechia", "danish": "Denmark", "ecuadorian": "Ecuador", "estonian": "Estonia",
+    "finnish": "Finland", "french": "France", "hungarian": "Hungary", "iraq": "Iraq", "israel": "Israel",
+    "italian": "Italy", "japanese": "Japan", "latvian": "Latvia", "lithuanian": "Lithuania",
+    "macedonian": "North Macedonia", "moldavian": "Moldova", "nederlandse": "Netherlands", "dutch": "Netherlands",
+    "norwegian": "Norway", "mexico": "Mexico", "hong kong": "Hong Kong China", "australia": "Australia",
+    "canada": "Canada", "germany": "Germany", "german": "Germany", "ireland": "Ireland", "irish": "Ireland",
+    "new zealand": "New Zealand", "usa": "United States", "polish": "Poland", "portuguese": "Portugal",
+    "romanian": "Romania", "serbian": "Serbia", "slovak": "Slovakia", "slovenian": "Slovenia", "spanish": "Spain",
+    "swedish": "Sweden", "swiss": "Switzerland", "egyptian": "Egypt", "turkiye": "Turkey", "turkish": "Turkey",
+    "ukrainian": "Ukraine", "russian": "Russia", "korea": "South Korea", "south african": "South Africa",
+}
+
+
+def country_of(org):
+    """'Swiss Orienteering' -> 'Switzerland'; a plain country name ('Sweden') stays as it is."""
+    low = (org or "").lower()
+    if "orient" not in low and "association" not in low and "federation" not in low:
+        return org
+    for word, land in FEDERATIONS.items():
+        if re.search(r"(?<![a-z])" + re.escape(word) + r"(?![a-z])", low):
+            return land
+    return org
+
+
+def clean_club(org):
+    """Exports from other countries' Eventor put the club id first: '[14896] Heming O' -> 'Heming O'."""
+    return re.sub(r"^\[\d+\]\s*", "", org or "").strip()
 KIND_LEVEL = {"vm": 6, "em": 6, "vc": 6, "niva2": 2}
 KIND_NAME = {"vm": "World Championships", "em": "European Championships", "vc": "World Cup", "niva2": "National race"}
 STATUS = {"mp": "MissingPunch", "dns": "DidNotStart", "dnf": "DidNotFinish",
@@ -106,15 +144,23 @@ def parse_file(text):
     return controls, runners
 
 
-def race_name(kind, dist, kval, free):
+def distance_of(dist):
+    d = dist.lower()
+    return "Sprint" if d == "sprint" else "Middle" if d in MIDDLE else "Long"
+
+
+def race_name(kind, dist, kval, free, heat=""):
     """The name shown in the game, in English: "World Cup Long", "European Championships Middle
-    Qualification (final A)", or for a national race its own name, "O-Ringen E1, Middle"."""
-    distance = "Middle" if dist.lower() in MIDDLE else "Long"
+    Qualification (final A)", "World Championships Sprint Qualification 2", or for a national race its
+    own name, "O-Ringen E1, Middle" (a name that already says sprint gets no ", Sprint")."""
+    distance = distance_of(dist)
     extra = " ".join((free or "").replace("_", " ").split())
     if kind == "niva2" and extra:
+        if distance.lower() in extra.lower():
+            return extra
         name = f"{extra}, {distance}"
-        return name + (" Qualification" if kval else "")
-    name = f"{KIND_NAME[kind]} {distance}" + (" Qualification" if kval else "")
+        return name + (" Qualification" if kval and not KVAL_WORD.search(extra) else "")
+    name = f"{KIND_NAME[kind]} {distance}" + (f" Qualification{(' ' + heat) if heat else ''}" if kval else "")
     return name + (f" ({extra})" if extra else "")
 
 
@@ -129,7 +175,7 @@ def main():
             continue
         m = NAME_RE.match(fname)
         if not m:
-            errors.append(f"{fname}: namnet följer inte mönstret ÅÅÅÅ-MM-DD_VM|EM|VC|niva2_lang|medel_H|D|klass[_kval][_namn].txt")
+            errors.append(f"{fname}: namnet följer inte mönstret ÅÅÅÅ-MM-DD_VM|EM|VC|niva2[-quali]_lang|medel|sprint_H|D|klass[_kval][_namn].txt")
             continue
         with open(os.path.join(IN_DIR, fname), "rb") as f:
             raw = f.read()
@@ -151,23 +197,27 @@ def main():
         except Exception as e:
             errors.append(f"{fname}: {e}")
             continue
-        kind, sex = m.group("kind").lower(), m.group("sex").upper()
+        kind, sex = m.group("kind").lower().replace("å", "a"), m.group("sex").upper()
         international = kind != "niva2"
+        # Qualification: "_kval" after the class, "VM-quali2" in the kind, or "kval" in a national race's name
+        kval = bool(m.group("kval") or m.group("quali") or (kind == "niva2" and KVAL_WORD.search(m.group("free") or "")))
         # Plain H or D is the top class: H21/D21 at VM, EM and World Cup, H21 Elit/D21 Elit at a
         # national race, where H21 and D21 are other classes
         klass = sex + (m.group("age") or ("21" if international else "21 Elit"))
         for r in runners:
             r["sex"] = "M" if sex == "H" else "F"
             if international:
-                r["country"], r["club"] = r["club"], None
+                r["country"], r["club"] = country_of(r["club"]), None
+            else:
+                r["club"] = clean_club(r["club"])
         data = {
             "source": "winsplits", "source_file": fname, "source_sha1": digest,
             "importer_version": IMPORTER_VERSION,
             "event_id": f"ws:{stem}", "race_id": "", "single_race": True,
-            "event_name": race_name(kind, m.group("dist"), bool(m.group("kval")), m.group("free")),
+            "event_name": race_name(kind, m.group("dist"), kval, m.group("free"), m.group("heat") or ""),
             "race_name": "", "date": m.group("date"), "level": KIND_LEVEL[kind],
-            "distance": "Middle" if m.group("dist").lower() in MIDDLE else "Long",
-            "light": "Day", "qualification": bool(m.group("kval")),
+            "distance": distance_of(m.group("dist")),
+            "light": "Day", "qualification": kval,
             "classes": [{"class": klass, "course_length": None, "controls": controls, "runners": runners}],
         }
         with open(out_path, "w", encoding="utf-8") as f:

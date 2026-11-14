@@ -527,6 +527,15 @@ public class EscMenu : MonoBehaviour
         Button quit = CourseUI.Button("Quit", card.transform, "Quit game", CourseUI.ButtonKind.Light, OnQuit, 26);
         CourseUI.Size(quit, 68);
 
+        HoverTip.Add(volumeSlider, "The volume of all sounds in the game.");
+        HoverTip.Add(fullscreenButton, "Fill the whole screen. F11 also switches.");
+        HoverTip.Add(windowButton, "Play in a window you can resize. F11 also switches.");
+        HoverTip.Add(resume, "Close this menu and go on playing.");
+        HoverTip.Add(keys, "See which keys do what, and change them.");
+        HoverTip.Add(endButton, "Stops the competition for all players and takes everyone back to the lobby. Only the host can do it, and you have to confirm.");
+        HoverTip.Add(mainMenuButton, "Leave the competition and go back to the main menu. The others carry on without you.");
+        HoverTip.Add(quit, "Close the game.");
+
         TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, "Esc closes the menu  ·  F11 switches fullscreen", 18, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
         CourseUI.Size(hint, 24);
 

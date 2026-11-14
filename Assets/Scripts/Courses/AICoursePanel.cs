@@ -206,6 +206,18 @@ public class AICoursePanel : MonoBehaviour
         panel.useButton = CourseUI.Button("Use", buttons, "Use this course", CourseUI.ButtonKind.Primary, panel.Use, 24);
         panel.useButton.interactable = false;
 
+        HoverTip.Add(panel.mapButton, "Choose which map the course is laid on. Click to see all maps.");
+        HoverTip.Add(panel.areaButton, "Draw a ring on the map: all controls stay inside it. Handy for racing on just one part of a big map.");
+        HoverTip.Add(panel.wholeMapButton, "Remove the ring and use the whole map.");
+        HoverTip.Add(panel.kindButtons[CourseGenerator.Kind.Long], "Long legs and big route choices.");
+        HoverTip.Add(panel.kindButtons[CourseGenerator.Kind.Middle], "Shorter legs with more navigation in detailed terrain.");
+        HoverTip.Add(panel.kindButtons[CourseGenerator.Kind.Sprint], "Short, fast legs through streets and parks, with route choices around buildings and fences.");
+        HoverTip.Add(panel.lengthSlider, "How long the whole course is, measured as the straight line between the controls (in kilometres).");
+        HoverTip.Add(panel.controlsSlider, "How many controls the course has, not counting start and finish.");
+        HoverTip.Add(panel.generateButton, "Lets the game lay a new course with these settings. Press it again for a different one.");
+        HoverTip.Add(panel.useButton, "Race on this course. It is not saved in your course list.");
+        HoverTip.Add(cancel, "Close this window without a course.");
+
         panel.SetMap(MapDefinition.All.Count > 0 ? MapDefinition.All[0] : null);
         return panel;
     }

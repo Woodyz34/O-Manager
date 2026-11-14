@@ -86,7 +86,7 @@ public class SameStatsPopup : MonoBehaviour
             CourseUI.Size(legRow, 56);
         }
 
-        speedLabel = StatRow("Speed", GameModes.MinSpeed, GameModes.MaxSpeed, legs[0].x, v => { SetLeg(new Vector2Int(v, legs[leg].y)); }, card.transform, out speedSlider);
+        speedLabel = StatRow("Physics", GameModes.MinSpeed, GameModes.MaxSpeed, legs[0].x, v => { SetLeg(new Vector2Int(v, legs[leg].y)); }, card.transform, out speedSlider);
         techniqueLabel = StatRow("Technique", GameModes.MinTechnique, GameModes.MaxTechnique, legs[0].y, v => { SetLeg(new Vector2Int(legs[leg].x, v)); }, card.transform, out techniqueSlider);
 
         if (Relay)
@@ -164,7 +164,7 @@ public class SameStatsPopup : MonoBehaviour
     void Refresh()
     {
         string which = Relay ? "Leg " + (leg + 1) + "  " : "";
-        speedLabel.text = which + "Speed  <color=#E8742A>" + legs[leg].x + "</color>";
+        speedLabel.text = which + "Physics  <color=#E8742A>" + legs[leg].x + "</color>";
         techniqueLabel.text = which + "Technique  <color=#E8742A>" + legs[leg].y + "</color>";
         for (int i = 0; i < legTexts.Count && i < legs.Count; i++)
         {

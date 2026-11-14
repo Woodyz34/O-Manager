@@ -9,10 +9,12 @@ using UnityEngine.UI;
 // Choose a runner) asks it which runners to show and in what order.
 public class RunnerFilterBar : MonoBehaviour
 {
-    public enum SortBy { Overall, Speed, Technique, Name, Club, Country }
+    // Physics = forest speed (was "Speed" before 2026-11-13), SprintSpeed = the new speed from the sprints
+    public enum SortBy { Overall, Physics, Technique, Name, Club, Country, SprintSpeed }
 
     public TMP_InputField search;
-    public Button[] sortButtons;          // in the order of SortBy (the scenes have the first four, Club and Country are made here)
+    public Button[] sortButtons;          // the scenes have Overall, Speed (now Physics), Technique and Name; a Speed chip is made here
+    SortBy[] chipSorts;                   // what each chip in sortButtons sorts by (null = the order of SortBy)
     public Button[] tierButtons;          // All, Elite, Gold, Silver, Bronze
     public Slider minSpeed;
     public Slider minTechnique;
@@ -117,7 +119,7 @@ public class RunnerFilterBar : MonoBehaviour
         MakeSortChips();
         for (int i = 0; i < sortButtons.Length; i++)
         {
-            SortBy choice = (SortBy)i;
+            SortBy choice = SortOfChip(i);
             sortButtons[i].onClick.AddListener(() => ChooseSort(choice));
         }
         if (orderChip != null) orderChip.onClick.AddListener(() => { reversed = !reversed; Notify(); });
@@ -132,6 +134,55 @@ public class RunnerFilterBar : MonoBehaviour
         if (clearButton != null) clearButton.onClick.AddListener(Clear);
         MakeGenderChips();
         MakeClassChip();
+        AddTips();
+    }
+
+    // Hover texts for the chips and sliders
+    void AddTips()
+    {
+        HoverTip.Add(search, "Type part of a runner's name to find them.");
+        string[] sortTips =
+        {
+            "Sort by overall rating, the runner's stats put together.",
+            "Sort by the runner's speed stat.",
+            "Sort by technique: how few mistakes the runner makes.",
+            "Sort by name, A to Z.",
+        };
+        for (int i = 0; i < sortButtons.Length && i < sortTips.Length; i++) HoverTip.Add(sortButtons[i], sortTips[i]);
+        HoverTip.Add(orderChip, "Turns the order round: best first or worst first (A to Z or Z to A for names).");
+        for (int i = 0; i < tierButtons.Length; i++)
+        {
+            Button tier = tierButtons[i];
+            int choice = TierOfButton(i);
+            HoverTip.Add(tier, () => choice < 0
+                ? "Show runners of every card level."
+                : "Show only " + TierName(tier) + " cards. The card level comes from the runner's overall rating: Elite is the highest, then Gold, Silver and Bronze.");
+        }
+        HoverTip.Add(classChip, "Filter on age class: 21 is the senior class, 20 and 18 are the junior classes. You can tick several.");
+        HoverTip.Add(countryChip, "Filter on the runner's country. You can tick several.");
+        HoverTip.Add(clubChip, "Filter on the runner's club. You can tick several.");
+        HoverTip.Add(womenChip, "Show only women. Women and men are never shown together.");
+        HoverTip.Add(menChip, "Show only men. Women and men are never shown together.");
+        HoverTip.Add(minSpeed, () => "Hide runners below this value on the first stat. " + StatName(minSpeedLabel) + " is how quickly the runner can run.");
+        HoverTip.Add(minSpeedLabel, () => "Hide runners below this value on the first stat. " + StatName(minSpeedLabel) + " is how quickly the runner can run.");
+        HoverTip.Add(minTechnique, "Hide runners with a technique below this value. Technique is how few mistakes the runner makes.");
+        HoverTip.Add(minTechniqueLabel, "Hide runners with a technique below this value. Technique is how few mistakes the runner makes.");
+        if (clearButton != null) HoverTip.Add(clearButton, "Removes all filters and shows every runner again.");
+    }
+
+    static string TierName(Button tier)
+    {
+        TextMeshProUGUI text = tier != null ? tier.GetComponentInChildren<TextMeshProUGUI>(true) : null;
+        return text != null ? text.text : "these";
+    }
+
+    static string StatName(TextMeshProUGUI label)
+    {
+        if (label == null) return "Speed";
+        string text = label.text ?? "";
+        int bold = text.IndexOf("  <b>", StringComparison.Ordinal);
+        if (bold > 0) text = text.Substring(0, bold);
+        return text.StartsWith("Min ", StringComparison.Ordinal) ? text.Substring(4).Trim() : "Speed";
     }
 
     // Two chips, Women and Men, made from a tier chip and put between the search field and "Sort by".
@@ -161,13 +212,18 @@ public class RunnerFilterBar : MonoBehaviour
         RectTransform first = (RectTransform)sortButtons[0].transform;
         float y = first.anchoredPosition.y;
         float left = first.anchoredPosition.x - first.sizeDelta.x / 2f;
-        Button[] four = new Button[4];
-        for (int i = 0; i < 4; i++) four[i] = sortButtons[i];
-        sortButtons = four;
+        // Overall, Physics, Speed (sprint), Technique, Name: the scene's Speed chip is renamed Physics and a copy of it
+        // becomes Speed
+        Button speedChip = CopyChip("Speed", 0, y, 92, sortButtons[1]);
+        speedChip.name = "Sort Sprint speed";
+        TextMeshProUGUI physicsText = sortButtons[1].GetComponentInChildren<TextMeshProUGUI>(true);
+        if (physicsText != null) physicsText.text = "Physics";
+        sortButtons = new[] { sortButtons[0], sortButtons[1], speedChip, sortButtons[2], sortButtons[3] };
+        chipSorts = new[] { SortBy.Overall, SortBy.Physics, SortBy.SprintSpeed, SortBy.Technique, SortBy.Name };
         orderChip = CopyChip("Best first", 0, y, 150, sortButtons[0]);
         orderChip.name = "Sort order";
 
-        float[] widths = { 112, 92, 136, 88 };
+        float[] widths = { 112, 104, 92, 136, 88 };
         float x = left;
         for (int i = 0; i < sortButtons.Length; i++)
         {
@@ -184,6 +240,11 @@ public class RunnerFilterBar : MonoBehaviour
         rect.anchoredPosition = new Vector2(left + width / 2f, y);
         TextMeshProUGUI text = chip.GetComponentInChildren<TextMeshProUGUI>(true);
         if (text != null) text.fontSize = Mathf.Min(text.fontSize, 21f);
+    }
+
+    SortBy SortOfChip(int index)
+    {
+        return chipSorts != null && index < chipSorts.Length ? chipSorts[index] : (SortBy)index;
     }
 
     // Picking the chip that is already on turns the order round, like the order chip
@@ -373,7 +434,7 @@ public class RunnerFilterBar : MonoBehaviour
         if (!ClassMatches(card)) return false;
         if (countries.Count > 0 && !countries.Contains(RunnerCards.CountryName(card))) return false;
         if (clubs.Count > 0 && (card.clubName == null || !clubs.Contains(card.clubName))) return false;
-        if (Mathf.RoundToInt(card.speed) < minSpeed.value) return false;
+        if (Mathf.RoundToInt(card.physics) < minSpeed.value) return false;
         if (Mathf.RoundToInt(card.technique) < minTechnique.value) return false;
         return true;
     }
@@ -392,7 +453,9 @@ public class RunnerFilterBar : MonoBehaviour
         switch (sortBy)
         {
             case SortBy.Overall: result = RunnerCards.Overall(b).CompareTo(RunnerCards.Overall(a)); break;
-            case SortBy.Speed: result = b.speed.CompareTo(a.speed); break;
+            case SortBy.Physics: result = b.physics.CompareTo(a.physics); break;
+            // Runners without a sprint speed (-1) come last
+            case SortBy.SprintSpeed: result = b.sprintSpeed.CompareTo(a.sprintSpeed); break;
             case SortBy.Technique: result = b.technique.CompareTo(a.technique); break;
             case SortBy.Name: result = string.Compare(a.RunnerName, b.RunnerName, StringComparison.OrdinalIgnoreCase); break;
             case SortBy.Club: result = CompareText(a.clubName, b.clubName); break;
@@ -430,10 +493,10 @@ public class RunnerFilterBar : MonoBehaviour
 
     void Paint()
     {
-        minSpeedLabel.text = "Min speed  <b>" + Mathf.RoundToInt(minSpeed.value) + "</b>";
+        minSpeedLabel.text = "Min physics  <b>" + Mathf.RoundToInt(minSpeed.value) + "</b>";
         minTechniqueLabel.text = "Min technique  <b>" + Mathf.RoundToInt(minTechnique.value) + "</b>";
         if (clearButton != null) clearButton.gameObject.SetActive(Filtering);
-        for (int i = 0; i < sortButtons.Length; i++) PaintChip(sortButtons[i], i == (int)sortBy);
+        for (int i = 0; i < sortButtons.Length; i++) PaintChip(sortButtons[i], SortOfChip(i) == sortBy);
         if (orderChip != null)
         {
             PaintChip(orderChip, reversed);

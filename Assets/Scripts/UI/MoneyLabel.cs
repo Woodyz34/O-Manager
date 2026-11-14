@@ -19,6 +19,7 @@ public class MoneyLabel : MonoBehaviour
 
     void Start()
     {
+        HoverTip.Add(transform, UIHints.Money);
         Refresh();
     }
 
