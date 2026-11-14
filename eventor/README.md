@@ -15,7 +15,9 @@ API-nyckeln ligger som repo-hemligheten `EVENTOR_API_KEY` och skrivs aldrig ut e
 | `data/races/<tävling>_<etapp>.json` | Sparade resultat, bara klasser med 21, 20 eller 18 (och Men/Women). |
 | `data/unknown_classes.txt` | Klassnamn som varken var spelklasser eller vanliga åldersklasser. Gå igenom för hand. |
 
-Bara fot-O, individuella tävlingar, lång och medel. Inställda tävlingar, sprint, ultralång och stafetter hoppas över.
+Eventor-hämtningen tar bara fot-O, individuella tävlingar, lång och medel. Inställda tävlingar, sprint, ultralång och stafetter hoppas över.
+
+**Sprint** kommer bara från WinSplits-filer (`_sprint_` i namnet). Den ger kortens *Speed* (sprintfart) på en egen skala där VM- och världscupssprintens snabbaste rena tid är 100. Skogsloppen ger *Physics* (fysik, hette speed förut) och teknik, och bestämmer vilka som är med i spelet (5 skogslopp, eller VM/EM/VC i skog). Löpare utan sprint får `-` och springer med fysiken även på asfalt. Sprintteknik sparas (`sprintTechnique`) men visas inte.
 Etapper som redan finns sparade hämtas inte igen, och det är 20 sekunders paus mellan anropen.
 
 Köra lokalt: `EVENTOR_API_KEY=... python eventor/fetch_results.py --mode once`

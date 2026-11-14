@@ -255,17 +255,19 @@ public static class MenuUIBuilder
         runnerName.overflowMode = TextOverflowModes.Truncate;
         Image divider = Line(inside, "Divider", Top, new Vector2(0, -459), new Vector2(330, 2), ink);
 
-        TextMeshProUGUI speed = Label(inside, "Speed", "80", 58, ink, TextAlignmentOptions.Center);
-        UI.Place(speed.rectTransform, Top, UI.Center, new Vector2(-92, -498), new Vector2(160, 64));
-        TextMeshProUGUI speedLabel = Label(inside, "Speed label", "SPEED", 18, ink, TextAlignmentOptions.Center);
-        speedLabel.characterSpacing = 12;
-        UI.Place(speedLabel.rectTransform, Top, UI.Center, new Vector2(-92, -541), new Vector2(180, 26));
-        TextMeshProUGUI technique = Label(inside, "Technique", "99", 58, ink, TextAlignmentOptions.Center);
-        UI.Place(technique.rectTransform, Top, UI.Center, new Vector2(92, -498), new Vector2(160, 64));
-        TextMeshProUGUI techniqueLabel = Label(inside, "Technique label", "TECHNIQUE", 18, ink, TextAlignmentOptions.Center);
-        techniqueLabel.characterSpacing = 12;
-        UI.Place(techniqueLabel.rectTransform, Top, UI.Center, new Vector2(92, -541), new Vector2(180, 26));
-        Image split = Line(inside, "Split", Top, new Vector2(0, -514), new Vector2(2, 78), ink);
+        // Three stats: physics (forest), speed (sprint) and technique
+        float column = RunnerCardView.StatColumn;
+        TextMeshProUGUI speed = Label(inside, "Speed", "80", 52, ink, TextAlignmentOptions.Center);
+        UI.Place(speed.rectTransform, Top, UI.Center, new Vector2(-column, -498), new Vector2(118, 64));
+        TextMeshProUGUI speedLabel = StatCaption(inside, "Speed label", "PHYSICS", -column, ink);
+        TextMeshProUGUI sprintSpeed = Label(inside, "Sprint speed", "85", 52, ink, TextAlignmentOptions.Center);
+        UI.Place(sprintSpeed.rectTransform, Top, UI.Center, new Vector2(0, -498), new Vector2(118, 64));
+        TextMeshProUGUI sprintLabel = StatCaption(inside, "Sprint speed label", "SPEED", 0, ink);
+        TextMeshProUGUI technique = Label(inside, "Technique", "99", 52, ink, TextAlignmentOptions.Center);
+        UI.Place(technique.rectTransform, Top, UI.Center, new Vector2(column, -498), new Vector2(118, 64));
+        TextMeshProUGUI techniqueLabel = StatCaption(inside, "Technique label", "TECHNIQUE", column, ink);
+        Image split = Line(inside, "Split", Top, new Vector2(-column / 2f, -514), new Vector2(2, 78), ink);
+        Image split2 = Line(inside, "Split 2", Top, new Vector2(column / 2f, -514), new Vector2(2, 78), ink);
 
         TextMeshProUGUI tierText = Label(inside, "Tier", "GOLD", 17, ink, TextAlignmentOptions.Center);
         tierText.characterSpacing = 18;
@@ -286,11 +288,12 @@ public static class MenuUIBuilder
         view.klassText = klass;
         view.nameText = runnerName;
         view.speedText = speed;
+        view.sprintSpeedText = sprintSpeed;
         view.techniqueText = technique;
         view.tierText = tierText;
-        view.inked = new Graphic[] { overall, klass, runnerName, speed, technique };
-        view.inkedLabels = new Graphic[] { speedLabel, techniqueLabel, tierText };
-        view.inkedSoft = new Graphic[] { line1, line2, divider, split };
+        view.inked = new Graphic[] { overall, klass, runnerName, speed, sprintSpeed, technique };
+        view.inkedLabels = new Graphic[] { speedLabel, sprintLabel, techniqueLabel, tierText };
+        view.inkedSoft = new Graphic[] { line1, line2, divider, split, split2 };
         view.shine = shineImage.rectTransform;
 
         // A sample runner, so the prefab shows what a finished card looks like
@@ -460,7 +463,7 @@ public static class MenuUIBuilder
         UI.Place(klass.rectTransform, UI.Center, UI.Center, new Vector2(95, 0), new Vector2(230, 90));
 
         TextMeshProUGUI speedValue, techniqueValue, overallValue, speedLabel, techniqueLabel, overallLabel;
-        CanvasGroup speedBlock = StatBlock(stats, "Speed", "SPEED", new Vector2(-400, -20), 180, out speedValue, out speedLabel);
+        CanvasGroup speedBlock = StatBlock(stats, "Speed", "PHYSICS", new Vector2(-400, -20), 180, out speedValue, out speedLabel);
         CanvasGroup techniqueBlock = StatBlock(stats, "Technique", "TECHNIQUE", new Vector2(400, -20), 180, out techniqueValue, out techniqueLabel);
         CanvasGroup overallBlock = StatBlock(stats, "Overall", "OVERALL", new Vector2(0, -20), 250, out overallValue, out overallLabel);
         overallLabel.color = UI.Cream;
@@ -609,6 +612,18 @@ public static class MenuUIBuilder
         PrefabUtility.SaveAsPrefabAsset(root, OpeningPath);
         UnityEngine.Object.DestroyImmediate(root);
         UI.log.AppendLine("pack opening prefab built");
+    }
+
+    // A small caption under one of the card's three stats
+    static TextMeshProUGUI StatCaption(Transform parent, string name, string caption, float x, Color ink)
+    {
+        TextMeshProUGUI label = Label(parent, name, caption, 17, ink, TextAlignmentOptions.Center);
+        label.characterSpacing = 4;
+        label.enableAutoSizing = true;
+        label.fontSizeMin = 10;
+        label.fontSizeMax = 17;
+        UI.Place(label.rectTransform, Top, UI.Center, new Vector2(x, -541), new Vector2(RunnerCardView.StatColumn - 6, 26));
+        return label;
     }
 
     static CanvasGroup StatBlock(Transform parent, string name, string caption, Vector2 position, float size, out TextMeshProUGUI value, out TextMeshProUGUI label)
@@ -909,7 +924,7 @@ public static class MenuUIBuilder
         ((TextMeshProUGUI)search.placeholder).fontSize = 28;
 
         Caption(bar, "Sort label", "SORT BY", new Vector2(-282, 36), 130);
-        string[] sortNames = { "Overall", "Speed", "Technique", "Name" };
+        string[] sortNames = { "Overall", "Physics", "Technique", "Name" };
         float[] sortWidths = { 140, 130, 170, 120 };
         Button[] sortButtons = new Button[sortNames.Length];
         float x = -200;

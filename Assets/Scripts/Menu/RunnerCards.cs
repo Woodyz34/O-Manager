@@ -21,7 +21,7 @@ public static class RunnerCards
     public const float SpeedWeight = 0.8f;
     public static float OverallExact(CardData card)
     {
-        return SpeedWeight * card.speed + (1f - SpeedWeight) * card.technique;
+        return SpeedWeight * card.physics + (1f - SpeedWeight) * card.technique;
     }
 
     public static List<CardData> All()

@@ -543,7 +543,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
             + CourseData.KmText(route.course.LengthMeters()) + "  ·  " + route.course.controls.Count + " controls</color></size>";
         if (runner != null)
         {
-            text += "\n<size=85%><color=#5B7563>Speed " + Mathf.RoundToInt(runner.speed) + "  ·  Technique " + Mathf.RoundToInt(runner.technique) + "</color></size>";
+            text += "\n<size=85%><color=#5B7563>Physics " + Mathf.RoundToInt(runner.physics) + "  ·  Speed " + runner.SprintSpeedText + "  ·  Technique " + Mathf.RoundToInt(runner.technique) + "</color></size>";
         }
         legText.text = text;
         bool showHang = LegIsStraight && !raceStarted;

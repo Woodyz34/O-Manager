@@ -1,7 +1,7 @@
-# Poäng 2026-11-07
+# Poäng 2026-11-13
 
 Grupper (klass/bana per lopp): 383, justerade: 368, ojusterade: 15. Varv: 106.
-Löpare: 3060, med betyg: 3026, synliga i spelet: 978 (576 herrar, 402 damer). Frysta kort (inte längre med i paketen): 0.
+Löpare: 3454, med betyg: 3026, synliga i spelet: 978 (576 herrar, 402 damer). Frysta kort (inte längre med i paketen): 0.
 
 ## Herrar, topp 25 (synliga)
 
@@ -451,6 +451,106 @@ Löpare: 3060, med betyg: 3026, synliga i spelet: 978 (576 herrar, 402 damer). F
 | 2026-10-11 | 25mannamedeln (WRE) | M21E3 | 43 | ja | 33:32 |
 | 2026-10-11 | 25mannamedeln (WRE) | W21E1 | 85 | ja | 32:39 |
 
+## Sprint
+
+Sprintgrupper: 51, justerade: 51, ojusterade: 0. Varv: 15. Löpare med sprintfart: 1466, varav i spelet: 611 av 978 (övriga visar - och springer med sin fysik).
+
+### Herrar, sprintfart topp 15 (synliga)
+
+| # | Namn | Speed | Fysik | Sprintlopp |
+| --- | --- | --- | --- | --- |
+| 1 | Kasper Harlem Fosser | 98.29 | 97.83 | 5 |
+| 2 | Tuomas Heikkila | 96.48 | 87.88 | 4 |
+| 3 | Tino Polsini | 96.38 | 91.55 | 3 |
+| 4 | Jerker Lysell | 96.05 | 91.42 | 1 |
+| 5 | Fabian Aebersold | 95.75 | 94.65 | 1 |
+| 6 | Martin Hubmann | 95.54 | 86.93 | 1 |
+| 7 | Emil Svensk | 94.84 | 95.31 | 2 |
+| 8 | Zoltán Bujdosó | 94.65 | 81.61 | 4 |
+| 9 | Lukas Novak | 94.28 | 81.74 | 1 |
+| 10 | Jürgen Joonas | 94.18 | 91.62 | 3 |
+| 11 | Isac von Krusenstierna | 94.11 | 89.29 | 7 |
+| 12 | Riccardo Rancan | 93.98 | 85.44 | 1 |
+| 13 | Daniel Hubmann | 93.66 | 92.43 | 1 |
+| 14 | Francesco Mariani | 93.61 | 85.38 | 4 |
+| 15 | Gustav Runefors | 93.57 | 89.46 | 7 |
+
+### Damer, sprintfart topp 15 (synliga)
+
+| # | Namn | Speed | Fysik | Sprintlopp |
+| --- | --- | --- | --- | --- |
+| 1 | Simona Aebersold | 97.55 | 99.25 | 5 |
+| 2 | Pia Young Vik | 94.83 | 96.15 | 5 |
+| 3 | Sanna Fast | 93.48 | 97.16 | 4 |
+| 4 | Malin Agervig Kristiansson | 92.99 | 92.98 | 3 |
+| 5 | Hanna Lundberg | 92.82 | 93.44 | 3 |
+| 6 | Tereza Rauturier | 92.21 | 88.5 | 3 |
+| 7 | Venla Harju | 92.04 | 92.02 | 2 |
+| 8 | Lucie Dittrichová | 91.96 | 90.79 | 4 |
+| 9 | Tove Alexandersson | 91.61 | 96.84 | 1 |
+| 10 | Lilly Graber | 91.54 | 82.58 | 1 |
+| 11 | Hedvig Valbjorn Gydesen | 91.37 | 81.95 | 3 |
+| 12 | Vilma Von Krusenstierna | 90.8 | 78.68 | 5 |
+| 13 | Frida Vikström | 90.56 | 88.78 | 5 |
+| 14 | Florence Hanauer | 90.33 | 81.52 | 1 |
+| 15 | Ane Dyrkorn | 90.17 | 87.38 | 3 |
+
+### Sprintlopp
+
+| Datum | Tävling | Klass | Löpare | Justerad | c100 |
+| --- | --- | --- | --- | --- | --- |
+| 2026-02-13 | Portugal O Meeting 2026, Sprint | D21E | 83 | ja | 13:47 |
+| 2026-02-13 | Portugal O Meeting 2026, Sprint | H21E | 72 | ja | 13:30 |
+| 2026-02-13 | Portugal O Meeting 2026, Sprint | H21E2 | 71 | ja | 12:28 |
+| 2026-04-03 | Swedish League, #1, sprint (WRE) | D18 | 77 | ja | 10:34 |
+| 2026-04-03 | Swedish League, #1, sprint (WRE) | D20 | 46 | ja | 12:37 |
+| 2026-04-03 | Swedish League, #1, sprint (WRE) | D21 | 77 | ja | 13:57 |
+| 2026-04-03 | Swedish League, #1, sprint (WRE) | H18 | 87 | ja | 11:12 |
+| 2026-04-03 | Swedish League, #1, sprint (WRE) | H20 | 65 | ja | 11:47 |
+| 2026-04-03 | Swedish League, #1, sprint (WRE) | H21 | 114 | ja | 14:07 |
+| 2026-05-09 | DM, sprint, Göteborgs OF | D21 | 15 | ja | 13:02 |
+| 2026-05-09 | DM, sprint, Göteborgs OF | H21 | 24 | ja | 12:16 |
+| 2026-05-10 | DM, sprint, Småland | D21 | 11 | ja | 16:07 |
+| 2026-05-10 | DM, sprint, Småland | H21 | 12 | ja | 14:14 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), final | D18 | 41 | ja | 10:03 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), final | D20 | 41 | ja | 12:56 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), final | D21A | 40 | ja | 14:13 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), final | H18 | 41 | ja | 11:19 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), final | H20 | 37 | ja | 12:05 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), final | H21A | 41 | ja | 14:52 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), final | H21B | 31 | ja | 14:39 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | D18A | 41 | ja | 7:15 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | D18B | 37 | ja | 6:52 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | D20A | 23 | ja | 9:48 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | D20B | 23 | ja | 10:00 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | D21A | 24 | ja | 10:58 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | D21B | 28 | ja | 10:52 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H18A | 32 | ja | 8:45 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H18B | 30 | ja | 9:20 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H18C | 30 | ja | 9:20 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H20A | 32 | ja | 10:21 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H20B | 26 | ja | 9:49 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H21A | 40 | ja | 11:40 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H21B | 37 | ja | 11:37 |
+| 2026-05-30 | World Cup Sprint | D21 | 110 | ankare | 13:42 |
+| 2026-05-30 | World Cup Sprint | H21 | 134 | ankare | 14:17 |
+| 2026-07-07 | World Championships Sprint | D21 | 46 | ankare | 15:59 |
+| 2026-07-07 | World Championships Sprint | H21 | 45 | ankare | 15:50 |
+| 2026-07-07 | World Championships Sprint Qualification | D21 | 31 | ja | 11:47 |
+| 2026-07-07 | World Championships Sprint Qualification | H21 | 31 | ja | 13:50 |
+| 2026-07-07 | World Championships Sprint Qualification 2 | D21 | 32 | ja | 11:48 |
+| 2026-07-07 | World Championships Sprint Qualification 2 | H21 | 36 | ja | 13:37 |
+| 2026-07-07 | World Championships Sprint Qualification 3 | D21 | 31 | ja | 11:03 |
+| 2026-07-07 | World Championships Sprint Qualification 3 | H21 | 32 | ja | 13:10 |
+| 2026-07-22 | O-Ringen Göteborg, Elitsprinten | D18 | 112 | ja | 11:13 |
+| 2026-07-22 | O-Ringen Göteborg, Elitsprinten | D20 | 110 | ja | 13:44 |
+| 2026-07-22 | O-Ringen Göteborg, Elitsprinten | D21 | 67 | ja | 14:37 |
+| 2026-07-22 | O-Ringen Göteborg, Elitsprinten | H18 | 113 | ja | 11:16 |
+| 2026-07-22 | O-Ringen Göteborg, Elitsprinten | H20 | 103 | ja | 12:33 |
+| 2026-07-22 | O-Ringen Göteborg, Elitsprinten | H21 | 66 | ja | 14:22 |
+| 2026-11-06 | O-event, dag 1 - Sprint by Night | D21 | 33 | ja | 13:20 |
+| 2026-11-06 | O-event, dag 1 - Sprint by Night | H21 | 58 | ja | 11:01 |
+
 ## Tvetydiga namn i WinSplits-filer (granska)
 
 - Alva Olsson (Åmåls OK), O-Ringen E1, Long: e141027, e26287
@@ -513,6 +613,35 @@ Löpare: 3060, med betyg: 3026, synliga i spelet: 978 (576 herrar, 402 damer). F
 - Erik Eriksson (OK Skogsfalken), O-Ringen E4, Middle: e17592, e75224
 - Edvin Nilsson (Gotlands Bro OK), O-Ringen E4, Middle: e48672, e86144
 - Erik Johansson (FK Boken), O-Ringen E4, Middle: e138443, e94151
+- Lukas Larsson (OPOR Ok Skogshjortar), Portugal O Meeting 2026, Sprint: e141511, e59017
+- Alva Olsson (Åmåls OK), Swedish League, #1, sprint (WRE): e141027, e26287
+- Lukas Larsson (OK Roxen), Swedish League, #1, sprint (WRE): e141511, e59017
+- Isak Bengtsson (Umeå OK), Swedish League, #1, sprint (WRE): e156986, e26009
+- Emil Åberg (OK Linné), Swedish League, #1, sprint (WRE): e16082, e76525
+- Jonas Gustafsson (Bredaryds SOK), Swedish League, #1, sprint (WRE): e16764, e22239
+- Lukas Larsson (OK Skogshjortarna), Swedish League, #1, sprint (WRE): e141511, e59017
+- Jonas Andersson (Kils OK), Swedish League, #1, sprint (WRE): e28469, e48547
+- Lukas Larsson (OK Skogshjortarna), DM, sprint, Göteborgs OF: e141511, e59017
+- Jonas Gustafsson (Bredaryds SOK), DM, sprint, Småland: e16764, e22239
+- Alva Olsson (Åmåls OK), SM, sprint (Swedish League, #4), kval: e141027, e26287
+- Alva Olsson (Åmåls OK), SM, sprint (Swedish League, #4), final: e141027, e26287
+- Isak Gustafsson (Lunds OK), SM, sprint (Swedish League, #4), kval: e161468, e59497
+- Lukas Larsson (OK Roxen), SM, sprint (Swedish League, #4), kval: e141511, e59017
+- Melker Sundström (OK Skogshjortarna), SM, sprint (Swedish League, #4), kval: e61487, e78429
+- Isak Gustafsson (Lunds OK), SM, sprint (Swedish League, #4), kval: e161468, e59497
+- Lukas Larsson (OK Roxen), SM, sprint (Swedish League, #4), kval: e141511, e59017
+- Melker Sundström (OK Skogshjortarna), SM, sprint (Swedish League, #4), kval: e61487, e78429
+- Isak Gustafsson (Lunds OK), SM, sprint (Swedish League, #4), final: e161468, e59497
+- Emil Åberg (OK Linné), SM, sprint (Swedish League, #4), kval: e16082, e76525
+- Emil Åberg (OK Linné), SM, sprint (Swedish League, #4), final: e16082, e76525
+- Lukas Larsson (OK Skogshjortarna), SM, sprint (Swedish League, #4), final: e141511, e59017
+- Lukas Larsson (OK Skogshjortarna), SM, sprint (Swedish League, #4), kval: e141511, e59017
+- Alva Olsson (Åmåls OK), O-Ringen Göteborg, Elitsprinten: e141027, e26287
+- Isak Gustafsson (Lunds OK), O-Ringen Göteborg, Elitsprinten: e161468, e59497
+- Lukas Larsson (OK Roxen), O-Ringen Göteborg, Elitsprinten: e141511, e59017
+- Melker Sundström (OK Skogshjortarna), O-Ringen Göteborg, Elitsprinten: e61487, e78429
+- Emil Åberg (OK Linné), O-Ringen Göteborg, Elitsprinten: e16082, e76525
+- Jonas Gustafsson (Andrarums IF), O-event, dag 1 - Sprint by Night: e16764, e22239
 
-WinSplits-löpare utan Eventor-träff (oftast utländska): 118.
+WinSplits-löpare utan Eventor-träff (oftast utländska): 307.
 

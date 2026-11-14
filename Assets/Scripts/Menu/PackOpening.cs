@@ -44,8 +44,10 @@ public class PackOpening : MonoBehaviour
     public CanvasGroup metaRow;
     public Image clubImage;
     public TextMeshProUGUI klassText;
-    public CanvasGroup speedBlock;
+    public CanvasGroup speedBlock;          // physics (forest speed); the name is kept for the saved scene
     public TextMeshProUGUI speedValue;
+    public CanvasGroup sprintBlock;         // speed from the sprints, made from speedBlock when missing
+    public TextMeshProUGUI sprintValue;
     public CanvasGroup techniqueBlock;
     public TextMeshProUGUI techniqueValue;
     public CanvasGroup overallBlock;
@@ -207,7 +209,9 @@ public class PackOpening : MonoBehaviour
         if (clubTitle != null) clubTitle.alpha = 0f;
         statsGroup.gameObject.SetActive(false);
         metaRow.alpha = 0f;
+        MakeSprintBlock();
         speedBlock.alpha = 0f;
+        if (sprintBlock != null) sprintBlock.alpha = 0f;
         techniqueBlock.alpha = 0f;
         overallBlock.alpha = 0f;
         portraitGroup.gameObject.SetActive(false);
@@ -457,6 +461,7 @@ public class PackOpening : MonoBehaviour
         klassText.alignment = TextAlignmentOptions.Center;
         klassText.text = runner.klass;
         speedValue.text = "0";
+        if (sprintValue != null) sprintValue.text = "0";
         techniqueValue.text = "0";
         overallValue.text = RunnerCards.Overall(runner).ToString();
         overallLabel.text = "OVERALL";
@@ -467,7 +472,17 @@ public class PackOpening : MonoBehaviour
         Sound(whoosh, 0.35f);
         yield return UIAnim.Run(0.35f, t => metaRow.alpha = t);
         yield return UIAnim.Wait(0.1f);
-        yield return CountUp(speedBlock, speedValue, Mathf.RoundToInt(runner.speed), 1.0f);
+        yield return CountUp(speedBlock, speedValue, Mathf.RoundToInt(runner.physics), 1.0f);
+        if (sprintBlock != null)
+        {
+            if (runner.HasSprintSpeed) yield return CountUp(sprintBlock, sprintValue, Mathf.RoundToInt(runner.sprintSpeed), 1.03f);
+            else
+            {
+                // Never ran a sprint: a dash, and the race uses physics on hard ground too
+                sprintValue.text = "-";
+                yield return UIAnim.Run(0.3f, t => sprintBlock.alpha = t);
+            }
+        }
         yield return CountUp(techniqueBlock, techniqueValue, Mathf.RoundToInt(runner.technique), 1.06f);
         yield return UIAnim.Wait(0.35f);
 
@@ -506,6 +521,41 @@ public class PackOpening : MonoBehaviour
             float e = UIAnim.InOutCubic(t);
             Place(statsGroup, Vector2.Lerp(Vector2.zero, ChipRight, e), Mathf.Lerp(1f, 0.34f, e));
         });
+    }
+
+    // The left side shows two stats since 2026-11-13: PHYSICS above and SPEED (sprint) below, a little smaller.
+    // Made here from the physics block so the saved scene needs no rebuild.
+    void MakeSprintBlock()
+    {
+        if (sprintBlock != null || speedBlock == null) return;
+        RectTransform physicsRect = (RectTransform)speedBlock.transform;
+        sprintBlock = Instantiate(speedBlock, physicsRect.parent);
+        sprintBlock.name = "Sprint speed";
+        RectTransform sprintRect = (RectTransform)sprintBlock.transform;
+        Vector2 at = physicsRect.anchoredPosition;
+        physicsRect.anchoredPosition = new Vector2(at.x, at.y + 115f);
+        sprintRect.anchoredPosition = new Vector2(at.x, at.y - 145f);
+        foreach (RectTransform block in new[] { physicsRect, sprintRect })
+        {
+            TextMeshProUGUI[] texts = block.GetComponentsInChildren<TextMeshProUGUI>(true);
+            foreach (TextMeshProUGUI text in texts)
+            {
+                bool isValue = text.name == "Value";
+                if (isValue)
+                {
+                    text.fontSize = 120f;
+                    text.rectTransform.anchoredPosition = new Vector2(0f, 20f);
+                    text.rectTransform.sizeDelta = new Vector2(text.rectTransform.sizeDelta.x, 140f);
+                }
+                else
+                {
+                    text.fontSize = 26f;
+                    text.rectTransform.anchoredPosition = new Vector2(0f, -82f);
+                    text.text = block == physicsRect ? "PHYSICS" : "SPEED";
+                }
+                if (isValue && block == sprintRect) sprintValue = text;
+            }
+        }
     }
 
     IEnumerator CountUp(CanvasGroup block, TextMeshProUGUI value, int target, float pitch)
