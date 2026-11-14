@@ -509,7 +509,11 @@ public class TvWorldView : MonoBehaviour
             bool leaving = toUnit > f.nearest + 1f;
             if (toUnit < f.nearest) f.nearest = toUnit;
             // A runner who has finished in the race runs the last metres on its own, at running pace
-            float step = f.finishing ? Mathf.Max(moved, Time.unscaledDeltaTime * 5f) : moved * (leaving ? 1.9f : 1.2f);
+            // On the way in: as fast as the real runner, so they get to the control together (no waiting at the flag).
+            // A runner whose route passes some metres off gets a little quicker, and catches up once it is leaving.
+            float toStand = (new Vector2(f.shownX, f.shownZ) - stand).magnitude;
+            float keepUp = Mathf.Clamp(toStand / Mathf.Max(toUnit - 0.55f, 0.3f), 0.85f, 1.35f);
+            float step = f.finishing ? Mathf.Max(moved, Time.unscaledDeltaTime * 5f) : moved * (leaving ? 1.9f : keepUp);
             Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), stand, step);
             f.shownX = at.x;
             f.shownZ = at.y;
