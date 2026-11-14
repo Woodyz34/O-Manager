@@ -37,7 +37,7 @@ public class OpenPacks : MonoBehaviour
         PackOpening prefab = Resources.Load<PackOpening>("UI/PackOpening");
         if (prefab == null)
         {
-            Debug.LogWarning("OpenPacks: PackOpening prefab is missing (Tools > O-Manager > Apply Menu UI); the runners are given without the show.");
+            Debug.LogWarning("OpenPacks: PackOpening prefab is missing (Tools > O-Manager > Developer > Apply Menu UI); the runners are given without the show.");
             Finish();
             return;
         }

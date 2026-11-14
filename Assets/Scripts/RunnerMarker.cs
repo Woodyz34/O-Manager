@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 //  - no trail streak when the runner is moved to a new place (joining the lobby, starting a competition)
 //  - hidden while the player draws the route (circle, name and trail), so it does not cover the start of the line
 //  - smaller on sprint maps, which are drawn at a larger scale (1:4000), so it looks as big on the picture as in the forest
-// The ring, the copy and the name tag are objects in NetworkPlayerPF. Tools > O-Manager > Apply Runner Marker builds them.
+// The ring, the copy and the name tag are objects in NetworkPlayerPF. Tools > O-Manager > Developer > Apply Runner Marker builds them.
 public class RunnerMarker : MonoBehaviour
 {
     [Header("Circle")]

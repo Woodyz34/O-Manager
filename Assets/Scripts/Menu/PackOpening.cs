@@ -7,7 +7,7 @@ using UnityEngine.UI;
 // The pack opening show. The pack flies in, shakes and bursts, and then the runner is revealed
 // piece by piece: country, club, stats, photo, name and finally the card itself.
 // The timings and sizes are all in this file; the objects it moves are in Resources/UI/PackOpening.prefab,
-// which is built by Tools > O-Manager > Apply Menu UI.
+// which is built by Tools > O-Manager > Developer > Apply Menu UI.
 public class PackOpening : MonoBehaviour
 {
     public enum Exit { Continue, OpenAnother, Runners }

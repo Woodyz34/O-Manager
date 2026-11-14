@@ -16,7 +16,7 @@ public class GridBinaryBaker : AssetPostprocessor
         EditorApplication.delayCall += () => BakeAll(false);
     }
 
-    [MenuItem("Tools/O-Manager/Baka om grid-data")]
+    [MenuItem("Tools/O-Manager/Developer (rarely needed)/Rebake old Illern grid data", false, 120)]
     private static void BakeAllFromMenu()
     {
         BakeAll(true);

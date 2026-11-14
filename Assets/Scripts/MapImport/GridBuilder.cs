@@ -12,8 +12,11 @@ using System.Collections.Generic;
 //   4. impassable lines (cliffs, high fences, impassable walls): no way through, except where a path crosses one
 //      on a forest map (there is a gate, even if it is not drawn)
 //   5. bridges and crossing points open the way again
-//   6. everything outside the map is closed: beyond the edge of what is drawn, and under white "mask" areas that
-//      mappers put over the parts that are not part of the map
+//   6. everything outside the map is closed: beyond the edge of what is drawn, under white "mask" areas that
+//      mappers put over the parts that are not part of the map, under symbols named as a club badge or logo, and
+//      under small groups of drawn things out in the white margin (logos, the legend, a sponsor)
+//   7. narrow passages are opened again on sprint maps
+//   8. small runnable islands nobody can get to from the rest of the map are closed (the legend, a badge)
 namespace MapImport
 {
     public class MapGrid2
@@ -48,6 +51,11 @@ namespace MapImport
                 int opened = OpenNarrowPassages(g, fine);
                 log?.Invoke($"Narrow passages: {opened} cells opened in {passSw.ElapsedMilliseconds} ms");
             }
+
+            // 8. Small islands: runnable bits that can't be reached from the rest of the map (a club badge or the
+            //    legend in the white margin, a courtyard shut in by buildings) are closed, so nothing can be put there
+            int islands = CloseIslands(g, out int islandCells);
+            if (islands > 0) log?.Invoke($"Islands: {islands} small parts that can't be reached closed ({islandCells} cells)");
 
             // Heights from the contour lines
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -491,6 +499,12 @@ namespace MapImport
             {
                 MapSymbol s = o.symbol;
                 if (s == null) continue;
+                // A club badge or logo is often drawn with map symbols ("Blå för klubbmärke" 302.1): it is not ground
+                if (IsDecoration(s))
+                {
+                    if (o.kind == SymbolKind.Area) FillCells(o.parts, ox, oy, scale, cols, rows, (r, c) => outside[r * cols + c] = true);
+                    continue;
+                }
                 if (o.kind == SymbolKind.Area && s.major >= 600 && IsWhiteFill(map, s))
                 {
                     FillCells(o.parts, ox, oy, scale, cols, rows, (r, c) => outside[r * cols + c] = true);
@@ -521,8 +535,101 @@ namespace MapImport
             }
 
             int reach = Math.Max(1, (int)Math.Round((sprint ? 20.0 : 50.0) / g.cellSize));
+            // Logos, the legend and the like out in the white margin: small groups of drawn things set apart from the map
+            CloseMarginGroups(covered, outside, rows, cols, reach);
+            bool[] far = FarFromDrawn(covered, rows, cols, reach);
+            // Back towards the drawn map by the same distance, so the edge of the map is the edge of what is drawn
+            int[] fromFar = Distance(far, rows, cols, reach + 2);
+            int closed = 0;
+            for (int i = 0; i < n; i++)
+            {
+                bool isOutside = outside[i] || (fromFar[i] <= reach + 1 && !covered[i]);
+                if (!isOutside) continue;
+                g.speed[i] = 0f;
+                closed++;
+            }
+            return closed;
+        }
+
+        // Symbols for what is printed round the map, not the terrain, going by their names. Mappers often draw a club
+        // badge with copies of map symbols ("Blå för klubbmärke", "Röd för klubbmärke"), so the number does not tell.
+        static readonly string[] DecorationWords =
+        {
+            "klubbmärke", "klubbmarke", "klubbemblem", "logo", "logga", "emblem", "sponsor", "reklam",
+            "teckenförklaring", "teckenforklaring", "legend", "kartfakta", "copyright"
+        };
+
+        public static bool IsDecoration(MapSymbol s)
+        {
+            if (s == null || string.IsNullOrEmpty(s.name)) return false;
+            string name = s.name.ToLowerInvariant();
+            foreach (string word in DecorationWords)
+                if (name.Contains(word)) return true;
+            return false;
+        }
+
+        // Closes every part of the open ground that is cut off from the main part of the map and is much smaller than
+        // it (under 3 %), moving like the runners do (8 ways, no cutting a corner between two closed cells). Nobody can
+        // run there from the rest of the map, so a start or control there could never be reached anyway.
+        public static int CloseIslands(MapGrid2 g, out int closedCells)
+        {
+            closedCells = 0;
+            int rows = g.rows, cols = g.cols, n = rows * cols;
+            var label = new int[n];
+            var sizes = new List<int> { 0 };
+            var stack = new Stack<int>();
+            for (int start = 0; start < n; start++)
+            {
+                if (label[start] != 0 || g.speed[start] <= 0.01f) continue;
+                int id = sizes.Count, size = 0;
+                label[start] = id;
+                stack.Push(start);
+                while (stack.Count > 0)
+                {
+                    int idx = stack.Pop();
+                    size++;
+                    int r = idx / cols, c = idx % cols;
+                    for (int dr = -1; dr <= 1; dr++)
+                        for (int dc = -1; dc <= 1; dc++)
+                        {
+                            if (dr == 0 && dc == 0) continue;
+                            int rr = r + dr, cc = c + dc;
+                            if (rr < 0 || cc < 0 || rr >= rows || cc >= cols) continue;
+                            int j = rr * cols + cc;
+                            if (label[j] != 0 || g.speed[j] <= 0.01f) continue;
+                            if (dr != 0 && dc != 0 && (g.speed[r * cols + cc] <= 0.01f || g.speed[rr * cols + c] <= 0.01f)) continue;
+                            label[j] = id;
+                            stack.Push(j);
+                        }
+                }
+                sizes.Add(size);
+            }
+            int largest = 0;
+            for (int i = 1; i < sizes.Count; i++) largest = Math.Max(largest, sizes[i]);
+            int keepFrom = (int)Math.Ceiling(largest * 0.03);
+            var close = new bool[sizes.Count];
+            int islands = 0;
+            for (int i = 1; i < sizes.Count; i++)
+            {
+                if (sizes[i] >= keepFrom) continue;
+                close[i] = true;
+                islands++;
+            }
+            if (islands == 0) return 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (label[i] == 0 || !close[label[i]]) continue;
+                g.speed[i] = 0f;
+                closedCells++;
+            }
+            return islands;
+        }
+
+        // Cells that can be reached from the edge of the grid without coming within reach of anything drawn
+        static bool[] FarFromDrawn(bool[] covered, int rows, int cols, int reach)
+        {
+            int n = rows * cols;
             int[] near = Distance(covered, rows, cols, reach + 1);
-            // Flood from the edge through cells that are not near anything drawn
             var far = new bool[n];
             var queue = new Queue<int>();
             for (int r = 0; r < rows; r++)
@@ -546,17 +653,81 @@ namespace MapImport
                     queue.Enqueue(j);
                 }
             }
-            // Back towards the drawn map by the same distance, so the edge of the map is the edge of what is drawn
-            int[] fromFar = Distance(far, rows, cols, reach + 2);
-            int closed = 0;
+            return far;
+        }
+
+        // A club badge, a sponsor's logo or the legend printed in the white margin is drawn, so the white paper round
+        // it would count as ground. The drawn cells are put in groups (things within a quarter of the reach of each
+        // other, 10 m on a forest map, belong together); a group much smaller than the map itself (under 5 % of the biggest) that lies out in the
+        // white margin, next to paper that is far from the map, is taken off the map: its cells are closed and it no
+        // longer counts as drawn. A lone stone in a big white forest is not touched, since it is not near the margin.
+        // Returns how many groups were taken off.
+        static int CloseMarginGroups(bool[] covered, bool[] outside, int rows, int cols, int reach)
+        {
+            int n = rows * cols;
+            int link = Math.Max(1, reach / 4);
+            int[] toDrawn = Distance(covered, rows, cols, link + 1);
+            var group = new int[n];
+            var drawnCount = new List<int> { 0 };
+            var stack = new Stack<int>();
+            for (int start = 0; start < n; start++)
+            {
+                if (group[start] != 0 || toDrawn[start] > link) continue;
+                int id = drawnCount.Count, count = 0;
+                group[start] = id;
+                stack.Push(start);
+                while (stack.Count > 0)
+                {
+                    int idx = stack.Pop();
+                    if (covered[idx]) count++;
+                    int r = idx / cols, c = idx % cols;
+                    for (int dr = -1; dr <= 1; dr++)
+                        for (int dc = -1; dc <= 1; dc++)
+                        {
+                            int rr = r + dr, cc = c + dc;
+                            if (rr < 0 || cc < 0 || rr >= rows || cc >= cols) continue;
+                            int j = rr * cols + cc;
+                            if (group[j] != 0 || toDrawn[j] > link) continue;
+                            group[j] = id;
+                            stack.Push(j);
+                        }
+                }
+                drawnCount.Add(count);
+            }
+            int groups = drawnCount.Count - 1;
+            if (groups < 2) return 0;
+            int biggest = 0;
+            for (int i = 1; i <= groups; i++) biggest = Math.Max(biggest, drawnCount[i]);
+            int smallBelow = Math.Max(1, (int)(biggest * 0.05));
+            var small = new bool[groups + 1];
+            bool any = false;
+            for (int i = 1; i <= groups; i++)
+            {
+                small[i] = drawnCount[i] < smallBelow;
+                any |= small[i];
+            }
+            if (!any) return 0;
+
+            // The white margin as it would be without the small groups
+            var mapOnly = new bool[n];
+            for (int i = 0; i < n; i++) mapOnly[i] = covered[i] && !small[group[i]];
+            bool[] far = FarFromDrawn(mapOnly, rows, cols, reach);
+            int[] toFar = Distance(far, rows, cols, reach + 3);
+            var inMargin = new bool[groups + 1];
             for (int i = 0; i < n; i++)
             {
-                bool isOutside = outside[i] || (fromFar[i] <= reach + 1 && !covered[i]);
-                if (!isOutside) continue;
-                g.speed[i] = 0f;
-                closed++;
+                if (covered[i] && small[group[i]] && toFar[i] <= reach + 2) inMargin[group[i]] = true;
             }
-            return closed;
+            int taken = 0;
+            for (int i = 1; i <= groups; i++) if (inMargin[i]) taken++;
+            if (taken == 0) return 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (!covered[i] || !inMargin[group[i]]) continue;
+                covered[i] = false;
+                outside[i] = true;
+            }
+            return taken;
         }
 
         static void Mark(bool[] cells, double cx, double cy, int cols, int rows)

@@ -17,7 +17,7 @@ using Menu = MenuUIBuilder;
 //  - the loading page (the prefab used between network scenes and the copy in each scene)
 // It also makes the multiplayer page show the loading page while a lobby is created or joined.
 // The lobby page is not touched.
-// Run it again from Tools > O-Manager > Apply Pre-game UI after changing layout or colours here.
+// Run it again from Tools > O-Manager > Developer > Apply Pre-game UI after changing layout or colours here.
 public static class PreGameUIBuilder
 {
     const string NewCompetitionScene = "Assets/Scenes/NewCompetition.unity";
@@ -45,7 +45,7 @@ public static class PreGameUIBuilder
 
     static Sprite flag, ring;
 
-    [MenuItem("Tools/O-Manager/Apply Pre-game UI (new competition, choose runner, loading page)")]
+    [MenuItem("Tools/O-Manager/Developer (rarely needed)/Apply Pre-game UI (new competition, choose runner, loading page)", false, 104)]
     public static void ApplyAllMenu()
     {
         Debug.Log(ApplyAll());

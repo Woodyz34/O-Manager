@@ -17,7 +17,7 @@ public static class MapImportMenu
     const double PixelsPerMm = 24;      // about 600 dpi, sharp even when zoomed far in
     const int MaxPictureSide = 16384;
 
-    [MenuItem("Tools/O-Manager/Import map file (OCAD or OOM)...")]
+    [MenuItem("Tools/O-Manager/Import map file (OCAD or OOM)...", false, 1)]
     public static void ImportFile()
     {
         if (EditorApplication.isPlaying)
@@ -155,7 +155,7 @@ public static class MapImportMenu
         }
     }
 
-    [MenuItem("Tools/O-Manager/Build imported maps into the game")]
+    [MenuItem("Tools/O-Manager/Build imported maps into the game", false, 2)]
     public static void BuildLocalMaps()
     {
         if (EditorApplication.isPlaying)

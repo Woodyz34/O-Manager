@@ -6,7 +6,7 @@ using UnityEngine.UI;
 using UI = ModernUIBuilder;
 
 // Adds the ring, the coloured copy of the circle and the name tag to the runner prefab (NetworkPlayerPF),
-// and hooks them up to RunnerMarker. Run it again from Tools > O-Manager > Apply Runner Marker
+// and hooks them up to RunnerMarker. Run it again from Tools > O-Manager > Developer > Apply Runner Marker
 // after changing sizes or colours here.
 public static class RunnerMarkerBuilder
 {
@@ -20,7 +20,7 @@ public static class RunnerMarkerBuilder
 
     const float NameFontSize = 64f;
 
-    [MenuItem("Tools/O-Manager/Apply Runner Marker (ring and name tag on the runner)")]
+    [MenuItem("Tools/O-Manager/Developer (rarely needed)/Apply Runner Marker (ring and name tag on the runner)", false, 105)]
     public static void ApplyMenu()
     {
         Debug.Log(Apply());
