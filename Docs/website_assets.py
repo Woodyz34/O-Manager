@@ -10,23 +10,31 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else "/mnt/project-files"
 OUT = "website/assets/img"
 os.makedirs(OUT, exist_ok=True)
 
-# name: (source, crop box as fractions (l, t, r, b) or None)
+# name: (source, crop box as fractions (l, t, r, b) or None). Crops are cut to the shape the page shows
+# (16:9 everywhere, 4:3 for the big TV picture). New game screenshots from 2026-11-14 are in hemsida/spelbilder.
+B = "hemsida/spelbilder/"
 PICS = {
-    "menu":      ("main-menu.png", None),
-    "shop":      ("pack-shop.png", None),
-    "race":      ("competition-runner-and-timer.png", None),
-    "overview":  ("8-ai-bana-i-spelet.png", None),
-    "lobby":     ("lobby_set2.png", None),
-    "courses":   ("2-lobby-banlista.png", None),
-    "builder":   ("1-banbyggare-ej-nabar-kontroll.png", None),
-    "tv":        ("tv-kontroll/steg2/tv-kamera-illern.jpg", None),
+    "menu":      (B + "huvudmeny.png", None),
+    "runners":   (B + "mina-lopare-herr.png", None),
+    "runnersw":  (B + "mina-lopare-dam.png", None),
+    "shop":      (B + "paketbutik.png", None),
+    "aicourse":  (B + "ai-bana.png", None),
+    "maps":      (B + "valj-karta.png", None),
+    "route":     (B + "rita-vagval.png", None),
+    "race":      (B + "folj-loparen.png", None),
+    "finished":  (B + "tavling-slut.png", None),
+    "reward":    (B + "belooning.png", None),
+    "rcforest":  (B + "vagvalsspel-skog.png", None),
+    "rcsprint":  (B + "vagvalsspel-sprint.png", None),
+    "lobby":     (B + "lobby.png", None),
+    "builder":   (B + "banlaggare.png", None),
+    "tvlive":    (B + "tv-live-kontroll4.png", (0.2414, 0.073, 0.7586, 1.0)),
+    "tvfinish":  (B + "tv-mal-strack1.png", (0.128, 0.0, 0.872, 1.0)),
+    "tvcontrol": (B + "3d-kontroll-sten.png", (0.0526, 0.0, 0.9474, 1.0)),
+    "tvrunner":  (B + "3d-lopare-kontroll.png", None),
+    "tvforest":  (B + "3d-grantskog-ovan.png", (0.0625, 0.0, 0.9375, 1.0)),
     "tvhouse":   ("tv-kontroll/steg3/hus.jpg", None),
     "tvspruce":  ("tv-kontroll/steg3/tatt-grant.jpg", None),
-    "tvair":     ("tv-kontroll/steg2/ovanifran-illern.jpg", None),
-    "tvpunch":   ("tv-kontroll/prov-stampling.png", (0.0, 0.0, 0.76, 1.0)),
-    "imposter":  ("end-screen-and-imposter.jpg", (0.5, 0.335, 1.0, 0.64)),
-    "loading":   ("loading-page.png", None),
-    "maps":      ("lobby-choose-map.png", None),
 }
 WIDTHS = [(800, "s"), (1600, "l")]
 
