@@ -31,6 +31,7 @@ public class MapImportPanel : MonoBehaviour
     MapFile mapFile;
     MapPreview preview;                     // small picture of the whole file, for the map edge
     double[] guessedEdge, edge;             // paper mm; null = the whole map
+    bool edgeByHand;                        // the player chose the edge: changing the type no longer changes it
     string version;
     string mapType = "forest";
     bool contourTyped;   // the player wrote the contour interval: changing the type no longer changes it
@@ -137,7 +138,7 @@ public class MapImportPanel : MonoBehaviour
         edgeText = CourseUI.Text("Edge", edgeRow, "", 20, CourseUI.Ink);
         edgeText.alignment = TextAlignmentOptions.MidlineLeft;
         CourseUI.Size(edgeText, -1, -1, 1);
-        edgeButton = CourseUI.Button("Edge button", edgeRow, "Check map edge...", CourseUI.ButtonKind.Secondary, OpenEdge, 20);
+        edgeButton = CourseUI.Button("Edge button", edgeRow, "Map edge...", CourseUI.ButtonKind.Secondary, OpenEdge, 20);
         CourseUI.Size(edgeButton, -1, 300);
 
         // How quick the kinds of ground are on this map (sliders, normal in the middle)
@@ -231,7 +232,7 @@ public class MapImportPanel : MonoBehaviour
         HoverTip.Add(contourField, "The distance in metres between two contour lines on the map. Forest maps are usually 5, sprint maps 2.5. The game uses it to work out hills and slopes.");
         HoverTip.Add(pictureField, "Optional. A picture of the finished map that the game shows instead of drawing the map itself. Leave empty if you are not sure.");
         HoverTip.Add(pictureButton, "Optional: use your own picture of the map instead of the one the game draws.");
-        HoverTip.Add(edgeButton, "Shows where the game thinks the finished map ends. Parts outside it, like unfinished mapping, are left out. Check it and move the edge if it is wrong.");
+        HoverTip.Add(edgeButton, "Draw where the finished map ends. Parts outside the edge, like unfinished mapping, are left out. On sprint maps the game guesses the edge for you; check it and move it if it is wrong. Forest maps use the whole map unless you draw an edge.");
         HoverTip.Add(terrainButton, "Set how quick each kind of ground is on this map: asphalt, roads, open land, forest, marsh and so on. If you change nothing, the game's normal speeds are used.");
         HoverTip.Add(lookButton, "Set what the terrain looks like in the 3D view at a TV control: ground, trees and undergrowth. Only changes how it looks, not the running.");
         HoverTip.Add(publicButton, "Everyone who plays the game can use this map, and it is shared through the cloud.");
@@ -308,6 +309,7 @@ public class MapImportPanel : MonoBehaviour
         mapFile = null;
         preview = null;
         guessedEdge = edge = null;
+        edgeByHand = false;
         version = null;
         nameField.text = NiceName(Path.GetFileNameWithoutExtension(path));
         SetStatus("Reading " + Path.GetFileName(path) + " ...", false);
@@ -357,13 +359,15 @@ public class MapImportPanel : MonoBehaviour
                 version = t.Result.Item1;
                 mapFile = t.Result.Item2;
                 preview = t.Result.Item3;
-                guessedEdge = edge = t.Result.Item4;
+                guessedEdge = t.Result.Item4;
                 mapType = SymbolRules.LooksLikeSprint(mapFile) ? "sprint" : "forest";
+                edgeByHand = false;
+                edge = GuessFor(mapType);
                 contourTyped = false;
                 ShowTypicalContours();
                 string warnings = mapFile.warnings.Count > 0 ? "  (" + mapFile.warnings.Count + " things in the file were skipped)" : "";
                 SetStatus($"{version}, 1:{mapFile.scale:0}, {mapFile.objects.Count} objects. Looks like a {mapType} map." + warnings
-                    + (guessedEdge != null ? " Parts look unfinished: check the map edge." : ""), false);
+                    + (edge != null ? " Parts look unfinished: check the map edge." : ""), false);
             }
             Refresh();
         }
@@ -394,8 +398,17 @@ public class MapImportPanel : MonoBehaviour
     void OpenEdge()
     {
         if (working || preview == null) return;
-        MapEdgeEditor.Open(transform, preview, edge, guessedEdge, chosen => { edge = chosen; Refresh(); });
+        MapEdgeEditor.Open(transform, preview, edge, mapType == "forest" ? null : guessedEdge, chosen =>
+        {
+            if (!ReferenceEquals(chosen, edge)) edgeByHand = true;
+            edge = chosen;
+            Refresh();
+        });
     }
+
+    // The game only cuts sprint maps by itself. On forest maps (and maps that are both) plain white forest looks like
+    // unfinished mapping to the guess, so the whole file is used and the player draws an edge if one is needed.
+    double[] GuessFor(string type) => type == "sprint" ? guessedEdge : null;
 
     void OpenTerrain()
     {
@@ -426,6 +439,7 @@ public class MapImportPanel : MonoBehaviour
     {
         mapType = MapTypes[(Array.IndexOf(MapTypes, mapType) + 1) % MapTypes.Length];
         if (!contourTyped) ShowTypicalContours();
+        if (!edgeByHand) edge = GuessFor(mapType);
         Refresh();
     }
 
@@ -442,7 +456,7 @@ public class MapImportPanel : MonoBehaviour
         CourseUI.SetButtonText(pictureButton, string.IsNullOrEmpty(picturePath)
             ? (NativeFiles.CanBrowse ? "Choose picture..." : "Drawn by the game") : "Remove picture");
         edgeText.text = mapFile == null ? "Map edge: choose a map file first."
-            : edge == null ? "Map edge: the whole map file is used."
+            : edge == null ? "Map edge: the whole map file is used. Draw an edge if parts of it are unfinished."
             : edge == guessedEdge ? "Map edge: the game left out parts that look unfinished. Check that it is right."
             : "Map edge: your own edge. Everything outside it is left out.";
         edgeText.color = edge != null && edge == guessedEdge ? CourseUI.Accent : CourseUI.Ink;

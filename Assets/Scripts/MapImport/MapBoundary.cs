@@ -8,6 +8,9 @@ using System.Collections.Generic;
 // polygon on the paper. The player sees it on a small picture of the map and can move its corners before importing.
 // Everything outside the edge is left out of the picture, the grid and the map objects.
 // Tried on Ängaryd sprint (2026-11-05) against the mapper's own export: 99.5 % of the finished map inside the edge.
+// Only for sprint maps (2026-11-14): on forest maps plain white forest is most of the map and the guess cut away big
+// finished parts (Nya Slogebo, Stoeryd, Ängaryd 2009), so forest maps use the whole file unless the player draws an
+// edge by hand. Blocks with terrain detail count as drawn, so a finished white-forest part of a sprint map stays in.
 namespace MapImport
 {
     public class MapPreview
@@ -29,6 +32,7 @@ namespace MapImport
         const int ContourReachBlocks = 16;    // 80 m: finished ground is this close to a contour line
         const int CoverBlocks = 9;            // 45 m square for "drawn edge to edge"
         const double CoverShare = 0.5;        // at least half of it not white paper
+        const double DetailShare = 0.1;       // or at least a tenth of its blocks hold terrain detail (white forest)
         const int CloseBlocks = 4;            // 20 m: small notches in the edge are filled
         const int MarginBlocks = 1;           // 5 m added all round, so nothing at the edge is cut
 
@@ -108,8 +112,9 @@ namespace MapImport
             // Finished: near a contour, and drawn edge to edge round about
             int[] toContour = Distance(contour, bw, bh, ContourReachBlocks + 1);
             float[] cover = BoxMean(fill, bw, bh, CoverBlocks / 2);
+            float[] detail = BoxMean(TerrainDetail(map, e, blockMm, bw, bh), bw, bh, CoverBlocks / 2);
             var finished = new bool[n];
-            for (int i = 0; i < n; i++) finished[i] = toContour[i] <= ContourReachBlocks && cover[i] > CoverShare;
+            for (int i = 0; i < n; i++) finished[i] = toContour[i] <= ContourReachBlocks && (cover[i] > CoverShare || detail[i] > DetailShare);
             finished = Largest(finished, bw, bh);
             if (finished == null) return null;
             finished = Grow(Shrink(Grow(finished, bw, bh, CloseBlocks), bw, bh, CloseBlocks), bw, bh, MarginBlocks);
@@ -137,6 +142,31 @@ namespace MapImport
                 poly.Add(Math.Max(e.minY, e.maxY - y * blockMm));
             }
             return poly.Count >= 6 ? poly.ToArray() : null;
+        }
+
+        // Blocks with terrain detail (boulders, knolls, cliffs, streams, vegetation edges: ISOM/ISSprOM 1xx-4xx points
+        // and lines, not contours). White forest is white paper, but it is full of such things; an unfinished street
+        // area (roads and contours only) is not.
+        static float[] TerrainDetail(MapFile map, MapExtent e, double blockMm, int bw, int bh)
+        {
+            var d = new float[bw * bh];
+            foreach (MapObject o in map.objects)
+            {
+                MapSymbol s = o.symbol;
+                if (s == null) continue;
+                bool point = s.kind == SymbolKind.Point, line = s.kind == SymbolKind.Line;
+                if (!point && !line) continue;
+                if (s.major >= 500 || s.major < 100) continue;
+                if (s.major == 101 || s.major == 102 || s.major == 103) continue;
+                foreach (double[] p in o.parts)
+                    for (int i = 0; i + 1 < p.Length; i += 2)
+                    {
+                        int bx = (int)((p[i] - e.minX) / blockMm), by = (int)((e.maxY - p[i + 1]) / blockMm);
+                        if (bx < 0 || by < 0 || bx >= bw || by >= bh) continue;
+                        d[by * bw + bx] = 1;
+                    }
+            }
+            return d;
         }
 
         // ---- Using the edge ----
