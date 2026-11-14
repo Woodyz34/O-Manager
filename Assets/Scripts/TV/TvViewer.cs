@@ -36,7 +36,7 @@ public class TvViewer : MonoBehaviour
     RawImage panelImage;
     TextMeshProUGUI panelTitle, panelCaption, splitText;
     RectTransform splitBox;
-    GameObject paceChip, captionChip;
+    GameObject captionChip;
     GameObject full;
     RawImage fullImage;
     RectTransform topBar;
@@ -161,10 +161,7 @@ public class TvViewer : MonoBehaviour
         splitText.raycastTarget = false;
         panel.SetActive(false);
 
-        // On the map half: the race runs at TV pace now
-        TextMeshProUGUI pace = Chip("Pace", root, new Vector2(0f, 1f), new Vector2(20f, -20f), new Vector2(440f, 44f), 20, out paceChip);
-        pace.text = "<color=#E8742A>ON TV</color>  ·  the race runs in real time";
-        paceChip.SetActive(false);
+        // No chip on the map half (2026-11-14, user's wish): the TV label on the TV half says enough
 
         // Full screen
         Image back = CourseUI.Panel("TV full screen", root, Color.black, false);
@@ -310,7 +307,6 @@ public class TvViewer : MonoBehaviour
         SetSplit(onAir && !fullscreen);
         RestMap(onAir && fullscreen);
         if (panel.activeSelf != split) panel.SetActive(split);
-        if (paceChip.activeSelf != split) paceChip.SetActive(split);
         ShowMistakes();
 
         // Only the world on TV is drawn

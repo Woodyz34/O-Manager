@@ -373,6 +373,8 @@ public class GameUpdater : MonoBehaviour
 
         bool show = menu && (state == State.Downloading || state == State.Ready || state == State.Installing || state == State.Failed);
         card.SetActive(show);
+        // Off everywhere but the main menu, so no other page takes it for an open pop-up
+        root.SetActive(menu);
         if (!show) return;
 
         titleText.text = "Updating to version " + newVersion;

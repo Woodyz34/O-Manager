@@ -108,13 +108,17 @@ public class MainMenuUI : MonoBehaviour
         PackOpening prefab = Resources.Load<PackOpening>("UI/PackOpening");
         if (prefab == null)
         {
+            // Nothing to open it in: the runner goes straight into the collection rather than being lost
             Debug.LogWarning("PackOpening prefab is missing. Run Tools > O-Manager > Developer > Apply Menu UI.");
+            PackShop.Commit(result);
             Refresh();
             return;
         }
-        // The show has its own camera and canvas, so the menu steps aside while it plays
+        // The show has its own camera and canvas, so the menu steps aside while it plays.
+        // The pack is only paid for and the runner only added when the player opens it.
         opening = Instantiate(prefab);
         canvas.enabled = false;
+        opening.Opened = () => PackShop.Commit(result);
         opening.Play(result, OnOpeningClosed);
     }
 

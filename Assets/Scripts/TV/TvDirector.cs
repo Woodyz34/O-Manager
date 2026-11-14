@@ -109,6 +109,26 @@ public class TvDirector : MonoBehaviour
     // What the local player sends to the others: the producer's choice from the host, nothing from the others
     public int ShotToSend => IsProducer ? produced : 0;
 
+    // True while the finish is on TV and a runner who has just finished is still on the way to the finish unit, or
+    // punched it less than a second ago. The relay's statistics wait for it (RelayRace), so they do not cover the
+    // runner before it has punched.
+    public bool FinishStillOnTheWay()
+    {
+        if (current == null || current != finishSpot || finishSpot.view == null || finishing.Count == 0) return false;
+        float now = Time.unscaledTime;
+        foreach (Finishing f in finishing.Values)
+        {
+            float at = finishSpot.view.PunchedAt(f.runner);
+            if (at < 0f)
+            {
+                if (now - f.since < FinishLongest) return true;
+            }
+            else if (now - at < AfterFinishPunch) return true;
+        }
+        return false;
+    }
+    const float AfterFinishPunch = 1f;
+
     static bool IsProducer => NetworkPlayer.Local == null || CompetitionFlow.LocalIsHost();
 
     static readonly Color[] Palette =

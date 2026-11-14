@@ -140,6 +140,9 @@ public class PackOpening : MonoBehaviour
         runnersButton.onClick.AddListener(() => Close(Exit.Runners));
     }
 
+    // Called once when the player opens the pack (clicks it). The shop pays for the pack and adds the runner then.
+    public Action Opened;
+
     public void Play(PackResult packResult, Action<Exit> closed)
     {
         result = packResult;
@@ -245,6 +248,7 @@ public class PackOpening : MonoBehaviour
             yield return null;
         }
         packButton.interactable = false;
+        Opened?.Invoke();
 
         yield return Charge();
         yield return Burst();

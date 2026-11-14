@@ -168,11 +168,16 @@ public class MapSelectUI : MonoBehaviour
         if (filter == Filter.All && IsAICourse(mapHandler.course))
             list.Add((mapHandler.course, "AI"));
         // No built-in courses are listed (the game has none to offer): only the players' own, the community's and AI courses
+        List<CourseData> mine = CourseLibrary.Mine();
         if (filter == Filter.All || filter == Filter.Mine)
-            foreach (CourseData course in CourseLibrary.Mine()) list.Add((course, "Yours"));
+            foreach (CourseData course in mine) list.Add((course, "Yours"));
+        // A course of your own is only listed as "Yours", also when it comes back from the cloud under another
+        // player id (made in the Unity Editor, which signs in as its own anonymous player, or before a reinstall)
+        HashSet<string> mineIds = new HashSet<string>();
+        foreach (CourseData course in mine) if (!string.IsNullOrEmpty(course.id)) mineIds.Add(course.id);
         if (filter == Filter.All || filter == Filter.Community)
             foreach (CourseData course in CourseLibrary.Community)
-                if (course.authorId != myId) list.Add((course, "Community"));
+                if (course.authorId != myId && !mineIds.Contains(course.id)) list.Add((course, "Community"));
 
         string search = searchField != null ? searchField.text : "";
         list.RemoveAll(entry => !CourseFilter.Matches(entry.course, search, kind));
