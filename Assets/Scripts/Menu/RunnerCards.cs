@@ -7,21 +7,26 @@ public enum RunnerTier { Bronze, Silver, Gold, Elite }
 // Change the limits and colours here and every screen follows.
 public static class RunnerCards
 {
-    // A runner's tier comes from their overall rating (80 % speed, 20 % technique, see Overall).
-    // Set again 2026-11-09 for the 80/20 overall (978 runners in packs): Elite about the top 8 %,
-    // Gold the next 15 %, Silver the next 26 %, Bronze the rest.
+    // A runner's tier comes from their overall rating (40 % physics, 40 % speed, 20 % technique, see Overall).
+    // Set 2026-11-09 for the 80/20 overall (978 runners in packs): Elite about the top 10 %, Gold the next 15 %,
+    // Silver the next 25 %, Bronze the rest. With speed in the overall (2026-11-14) the same limits give almost the
+    // same shares (Elite 10.8 %, Gold and up 24.9 %, Silver and up 50.6 %), so they are kept.
     public const int EliteFrom = 88;
     public const int GoldFrom = 82;
     public const int SilverFrom = 73;
 
-    // Speed counts four times as much as technique (user's choice 2026-11-09). One point of speed costs about
-    // 1.8 s per control at speed 75 (legs of about 125 s for a speed-100 runner), one point of technique 0.3 s
-    // (2 points per mistake minute per 100 controls): 6 to 8 times as much. 80/20 ranks the cards almost exactly
-    // as the expected race time does and still lets technique count.
+    // Running counts four times as much as technique (user's choice 2026-11-09). One point of speed costs about
+    // 1.8 s per control at speed 75, one point of technique 0.3 s: 6 to 8 times as much. Since 2026-11-14 (user's
+    // wish) the running part is split evenly between physics (forest) and speed (sprint). A runner without a sprint
+    // speed ("-") counts physics in its place, which is also what they run with on hard ground, so they are neither
+    // helped nor hurt. Sprint technique is not used anywhere yet.
     public const float SpeedWeight = 0.8f;
+    public const float PhysicsShare = 0.5f;    // of SpeedWeight; the rest is sprint speed
+
     public static float OverallExact(CardData card)
     {
-        return SpeedWeight * card.physics + (1f - SpeedWeight) * card.technique;
+        float running = PhysicsShare * card.physics + (1f - PhysicsShare) * (card.HasSprintSpeed ? card.sprintSpeed : card.physics);
+        return SpeedWeight * running + (1f - SpeedWeight) * card.technique;
     }
 
     public static List<CardData> All()
