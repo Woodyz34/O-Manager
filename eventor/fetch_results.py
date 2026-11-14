@@ -9,7 +9,7 @@ Modes
 
 Load on Eventor
   1 call for the event list, then 1 call per race that is foot-O,
-  individual and long or middle distance. Races already stored in
+  individual and long, middle or sprint distance (sprint since 2026-11-14: it gives the cards' sprint speed). Races already stored in
   eventor/data/races/ are skipped, so a re-run does not call again.
   The script waits --pause seconds (default 20) between calls.
 
@@ -49,7 +49,7 @@ CACHE_DIR = os.path.join(HERE, "cache")
 PARSER_VERSION = 2               # bump to rebuild stored races from cached raw XML
 FOOT_O = "1"
 INDIVIDUAL_FORMS = {"IndSingleDay", "IndMultiDay"}
-WANTED_DISTANCES = {"Long", "Middle"}
+WANTED_DISTANCES = {"Long", "Middle", "Sprint"}
 CANCELLED_STATUS = "10"
 
 EXTRA_EVENTS_FILE = os.path.join(HERE, "extra_events.txt")
@@ -180,7 +180,7 @@ def select_races(events_xml, mode, extra=()):
         races = children(ev, "EventRace")
         good = [r for r in races if r.get("raceDistance", "Middle") in WANTED_DISTANCES]
         if not good:
-            skip("ingen lång/medel"); continue
+            skip("ingen lång/medel/sprint"); continue
         for r in good:
             picked.append({
                 "race_number": races.index(r) + 1,
