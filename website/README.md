@@ -19,16 +19,13 @@ Sidan finns på svenska och engelska (knappen SV/EN uppe till höger).
 När ändringen är på `main` uppdateras hemsidan av sig själv efter någon minut.
 
 ## Släppa en ny version av spelet
-Spelet laddas ner från GitHub Releases i det **publika** repot som står i `config.js`
-(`Woodyz34/O-Manager-Download`). Själva spelkoden ligger kvar privat.
-
-1. Bygg spelet i Unity (File > Build Profiles > Windows > Build).
-2. Zippa hela byggmappen och döp zip-filen till exakt `O-Manager-Windows.zip`.
-3. Gå till `https://github.com/Woodyz34/O-Manager-Download/releases/new`.
-4. Skriv ett versionsnummer som tagg (t.ex. `v1.0.0`), en titel och vad som är nytt.
-5. Dra in zip-filen och tryck **Publish release**.
+Spelet laddas ner som `O-Manager-Setup.exe` från GitHub Releases i det **publika** repot som står i `config.js`
+(`Woodyz34/O-Manager-Download`). Själva spelkoden ligger kvar privat. Hela gången steg för steg finns i
+[`installer/README.md`](../installer/README.md): kortversionen är **Tools > O-Manager > Build release** i Unity,
+dra in `O-Manager-Setup.exe` på GitHub-sidan som öppnas och tryck **Publish release**.
 
 Ladda ner-knappen pekar alltid på den senaste versionen och visar versionsnummer, storlek och datum.
+Spelen som redan är installerade uppdaterar sig själva nästa gång de startas.
 
 ## Publicera hemsidan (Cloudflare Pages, gratis)
 1. Skapa ett gratis konto på https://dash.cloudflare.com/sign-up.
