@@ -620,9 +620,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bf83f30313ac4bc4eab030b0322fde34, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  pointGeoJsonFile: {fileID: 4900000, guid: 8a1b086355e84b54cb0ad998d00dd574, type: 3}
-  lineGeoJsonFile: {fileID: 4900000, guid: fe0f881a7adb21942bf0ae72682894e2, type: 3}
-  polygonGeoJsonFile: {fileID: 4900000, guid: 1cb87398a400aca41b55752e813ac3ef, type: 3}
+  pointGeoJsonFile: {fileID: 0}
+  lineGeoJsonFile: {fileID: 0}
+  polygonGeoJsonFile: {fileID: 0}
   defaultLineMaterial: {fileID: 2100000, guid: 097611b4c977d9346a4279abda34e02a, type: 2}
   polygonColor: {r: 0, g: 0.5, b: 1, a: 0.3}
   objectsVisible: 0
@@ -10774,7 +10774,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: c4553adb6cead664babf082cce3c89e6, type: 3}
+  m_Sprite: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0

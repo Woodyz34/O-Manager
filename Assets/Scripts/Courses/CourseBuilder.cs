@@ -186,7 +186,9 @@ public class CourseBuilder : MonoBehaviour
         List<MapDefinition> maps = MapDefinition.All;
         if (maps.Count == 0)
         {
-            SetStatus("No maps found in Resources/MapDefs.", true);
+            // No map has been imported yet: Import map in the top-right corner is the way forward
+            SetStatus("There are no maps yet. Press Import map to add one.", false);
+            RefreshMyCourses();
             return;
         }
         SelectMap(maps[0]);
@@ -243,6 +245,7 @@ public class CourseBuilder : MonoBehaviour
         {
             if (imported == null) return;
             SelectMap(imported);
+            RefreshMyCourses();
             // Whether it was also sent in is said in the message at the bottom of the screen
             SetStatus("Imported " + imported.displayName + ". You can lay courses on it now.", false);
         });
@@ -2089,6 +2092,7 @@ public class CourseBuilder : MonoBehaviour
     async Task<string> CheckCourseAsync()
     {
         errorPoint = null;
+        if (map == null) return "There is no map yet. Import one first.";
         if (!relay)
         {
             EditCourse single = Cur;
@@ -2205,6 +2209,11 @@ public class CourseBuilder : MonoBehaviour
         if (string.IsNullOrWhiteSpace(nameField.text))
         {
             SetStatus("Give the course a name.", true);
+            return;
+        }
+        if (map == null)
+        {
+            SetStatus("There is no map yet. Import one first.", true);
             return;
         }
         if (string.IsNullOrWhiteSpace(authorField.text))
