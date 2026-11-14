@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O-Manager – Orienteering Manager</title>
+<meta name="description" content="O-Manager är ett gratis orienteringsspel. Samla riktiga elitlöpare, rita vägval på riktiga kartor och tävla mot dina vänner.">
+<meta name="theme-color" content="#11291d">
+<link rel="icon" href="assets/icon-32.png" sizes="32x32">
+<link rel="icon" href="assets/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="O-Manager – Orienteering Manager">
+<meta property="og:description" content="Samla riktiga elitlöpare, rita vägval på riktiga kartor och tävla mot dina vänner. Gratis.">
+<meta property="og:image" content="assets/share.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="assets/fonts/bigshoulders.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/video/hero-poster.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="styles.css">
+<script>
+  // Pick language before first paint: saved choice, else browser language.
+  (function () {
+    var l; try { l = localStorage.getItem("om-lang"); } catch (e) {}
+    if (!l) l = /^(sv|nb|nn|no|da)/i.test(navigator.language || "") ? "sv" : "en";
+    document.documentElement.lang = l;
+    document.documentElement.classList.add("js");
+  })();
+</script>
+<script src="config.js" defer></script>
+<script src="main.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main"><span data-l="sv">Hoppa till innehållet</span><span data-l="en">Skip to content</span></a>
+
+<header class="nav" id="nav">
+  <div class="nav-in">
+    <a class="brand" href="#top" aria-label="O-Manager">
+      <img src="assets/img/logo.webp" width="36" height="36" alt="">
+      <span>O-MANAGER</span>
+    </a>
+    <nav class="links" id="links" aria-label="Meny">
+      <a href="#how"><span data-l="sv">Så funkar det</span><span data-l="en">How it works</span></a>
+      <a href="#modes"><span data-l="sv">Spellägen</span><span data-l="en">Game modes</span></a>
+      <a href="#tv"><span data-l="sv">TV-kontroller</span><span data-l="en">TV controls</span></a>
+      <a href="#news"><span data-l="sv">Nyheter</span><span data-l="en">News</span></a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-end">
+      <button class="lang" id="lang" type="button" aria-label="Byt språk / Change language">
+        <span class="lang-opt" data-v="sv">SV</span><span class="lang-opt" data-v="en">EN</span>
+      </button>
+      <a class="btn btn-sm btn-orange" href="#download"><span data-l="sv">Ladda ner</span><span data-l="en">Download</span></a>
+      <button class="burger" id="burger" type="button" aria-label="Meny" aria-expanded="false" aria-controls="links"><i></i><i></i></button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="top">
+  <div class="hero-media" aria-hidden="true">
+    <video id="heroVideo" muted playsinline loop preload="none" poster="assets/video/hero-poster.jpg">
+      <source data-src="assets/video/hero.webm" type="video/webm">
+      <source data-src="assets/video/hero.mp4" type="video/mp4">
+    </video>
+  </div>
+  <div class="hero-shade" aria-hidden="true"></div>
+  <div class="wrap hero-in">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="dot"></span><span data-l="sv">Gratis orienteringsspel för PC</span><span data-l="en">Free orienteering game for PC</span></p>
+      <h1 class="hero-title">O-MANAGER</h1>
+      <p class="hero-lead">
+        <span data-l="sv">Samla riktiga elitlöpare. Rita vägvalen på riktiga kartor. Slå dina vänner.</span>
+        <span data-l="en">Collect real elite runners. Draw the route choices on real maps. Beat your friends.</span>
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-orange btn-lg" href="#download">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16" /></svg>
+          <span data-l="sv">Ladda ner gratis</span><span data-l="en">Download for free</span>
+        </a>
+        <a class="btn btn-ghost btn-lg" href="#how"><span data-l="sv">Se hur det funkar</span><span data-l="en">See how it works</span></a>
+      </div>
+      <p class="hero-meta" id="heroMeta"><span data-l="sv">Windows 10 / 11 · Spela själv eller med upp till 10 vänner</span><span data-l="en">Windows 10 / 11 · Play alone or with up to 10 friends</span></p>
+    </div>
+
+    <div class="hero-cards" id="heroCards" aria-hidden="true">
+      <div class="om-card tier-gold c-left">
+        <div class="c-top"><b>87</b><span>D21</span><i class="flag-se"></i></div>
+        <img src="assets/img/card-dam_21.webp" width="360" height="540" alt="" decoding="async">
+        <div class="c-name">SAGA MOSSBERG</div>
+        <div class="c-stats"><div><b>84</b><small>PHY</small></div><div><b>86</b><small>SPD</small></div><div><b>91</b><small>TEC</small></div></div>
+      </div>
+      <div class="om-card tier-silver c-right">
+        <div class="c-top"><b>81</b><span>H21</span><i class="flag-se"></i></div>
+        <img src="assets/img/card-herr_19.webp" width="360" height="540" alt="" decoding="async">
+        <div class="c-name">TEO LJUNGMARK</div>
+        <div class="c-stats"><div><b>83</b><small>PHY</small></div><div><b>79</b><small>SPD</small></div><div><b>80</b><small>TEC</small></div></div>
+      </div>
+      <div class="om-card tier-elite c-mid">
+        <div class="c-shine"></div>
+        <div class="c-top"><b>93</b><span>H21</span><i class="flag-se"></i></div>
+        <img src="assets/img/card-herr_07.webp" width="360" height="540" alt="" decoding="async">
+        <div class="c-name">EDVIN GRANLUND</div>
+        <div class="c-stats"><div><b>94</b><small>PHY</small></div><div><b>90</b><small>SPD</small></div><div><b>95</b><small>TEC</small></div></div>
+        <div class="c-tier">ELITE</div>
+      </div>
+    </div>
+  </div>
+  <a class="scroll-cue" href="#stats" aria-label="Scrolla ner"><span></span></a>
+</section>
+
+<!-- ============ STATS ============ -->
+<section class="stats" id="stats">
+  <div class="wrap stats-in">
+    <div class="stat reveal"><b data-count="600" data-suffix="+">600+</b><span data-l="sv">riktiga elitlöpare</span><span data-l="en">real elite runners</span></div>
+    <div class="stat reveal"><b data-count="10">10</b><span data-l="sv">spelare i samma lobby</span><span data-l="en">players in one lobby</span></div>
+    <div class="stat reveal"><b data-count="8">8</b><span data-l="sv">spellägen att blanda</span><span data-l="en">game modes to mix</span></div>
+    <div class="stat reveal"><b>0 kr</b><span data-l="sv">gratis att spela</span><span data-l="en">free to play</span></div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="how topo" id="how">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="kicker"><span data-l="sv">Så funkar det</span><span data-l="en">How it works</span></p>
+      <h2><span data-l="sv">Från startpunkt till mål</span><span data-l="en">From start to finish</span></h2>
+      <p class="sec-lead"><span data-l="sv">Du är managern. Löparna springer, men det är du som väljer vem som springer och vilken väg de tar.</span><span data-l="en">You are the manager. The runners run, but you choose who runs and which way they go.</span></p>
+    </header>
+
+    <ol class="course" id="course">
+      <svg class="course-line" id="courseLine" aria-hidden="true"><path id="coursePath" /></svg>
+
+      <li class="leg reveal">
+        <div class="marker"><svg viewBox="0 0 60 60" aria-hidden="true"><path d="M30 8 54 50H6Z" /></svg></div>
+        <div class="leg-text">
+          <p class="leg-no"><span data-l="sv">Start</span><span data-l="en">Start</span></p>
+          <h3><span data-l="sv">Samla ditt lag</span><span data-l="en">Build your team</span></h3>
+          <p><span data-l="sv">Tjäna pengar i tävlingar och öppna paket. Varje kort är en riktig löpare, med Physics, Speed och Technique räknade från riktiga resultat. Första paketet är gratis.</span><span data-l="en">Earn money in races and open packs. Every card is a real runner, with Physics, Speed and Technique worked out from real results. Your first pack is free.</span></p>
+        </div>
+        <figure class="leg-pic shot"><picture><source type="image/avif" srcset="assets/img/shop-s.avif 800w, assets/img/shop-l.avif 1600w" sizes="(min-width: 900px) 46vw, 92vw"><img src="assets/img/shop-s.webp" srcset="assets/img/shop-s.webp 800w, assets/img/shop-l.webp 1600w" sizes="(min-width: 900px) 46vw, 92vw" width="1600" height="900" loading="lazy" decoding="async" alt="The pack shop with a Runner Pack"></picture></figure>
+      </li>
+
+      <li class="leg reveal">
+        <div class="marker"><svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="22" /></svg><span>1</span></div>
+        <div class="leg-text">
+          <p class="leg-no"><span data-l="sv">Kontroll 1</span><span data-l="en">Control 1</span></p>
+          <h3><span data-l="sv">Välj karta och bana</span><span data-l="en">Pick a map and a course</span></h3>
+          <p><span data-l="sv">Spring på riktiga orienteringskartor, i skog eller sprint. Låt datorn lägga en bana, bygg en egen i banläggaren eller importera din klubbs OCAD-karta.</span><span data-l="en">Race on real orienteering maps, in the forest or in a sprint. Let the computer set a course, build your own in the course builder, or import your club's OCAD map.</span></p>
+        </div>
+        <figure class="leg-pic shot"><picture><source type="image/avif" srcset="assets/img/maps-s.avif 800w, assets/img/maps-l.avif 1600w" sizes="(min-width: 900px) 46vw, 92vw"><img src="assets/img/maps-s.webp" srcset="assets/img/maps-s.webp 800w, assets/img/maps-l.webp 1600w" sizes="(min-width: 900px) 46vw, 92vw" width="1600" height="900" loading="lazy" decoding="async" alt="Choosing a map"></picture></figure>
+      </li>
+
+      <li class="leg reveal">
+        <div class="marker"><svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="22" /></svg><span>2</span></div>
+        <div class="leg-text">
+          <p class="leg-no"><span data-l="sv">Kontroll 2</span><span data-l="en">Control 2</span></p>
+          <h3><span data-l="sv">Rita vägvalet</span><span data-l="en">Draw the route</span></h3>
+          <p><span data-l="sv">Dra vägen på kartan. Löparen följer den, tröttnar i backar och tappar fart i grönt. Ju sämre teknik, desto större risk för en bom.</span><span data-l="en">Draw the way on the map. Your runner follows it, tires on hills and slows down in green. The weaker the technique, the bigger the risk of a mistake.</span></p>
+        </div>
+        <figure class="leg-pic shot"><picture><source type="image/avif" srcset="assets/img/race-s.avif 800w, assets/img/race-l.avif 1600w" sizes="(min-width: 900px) 46vw, 92vw"><img src="assets/img/race-s.webp" srcset="assets/img/race-s.webp 800w, assets/img/race-l.webp 1600w" sizes="(min-width: 900px) 46vw, 92vw" width="1600" height="900" loading="lazy" decoding="async" alt="A runner following a drawn route on the map"></picture></figure>
+      </li>
+
+      <li class="leg reveal">
+        <div class="marker"><svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="24" /><circle cx="30" cy="30" r="15" /></svg></div>
+        <div class="leg-text">
+          <p class="leg-no"><span data-l="sv">Mål</span><span data-l="en">Finish</span></p>
+          <h3><span data-l="sv">Tävla och följ loppet</span><span data-l="en">Race and follow it live</span></h3>
+          <p><span data-l="sv">Följ alla löpare live på kartan, se mellantider och reprisen efteråt. Bäst placering ger mest pengar till nästa paket.</span><span data-l="en">Follow every runner live on the map, check split times and watch the replay. The better you place, the more money for your next pack.</span></p>
+        </div>
+        <figure class="leg-pic shot"><picture><source type="image/avif" srcset="assets/img/overview-s.avif 800w, assets/img/overview-l.avif 1280w" sizes="(min-width: 900px) 46vw, 92vw"><img src="assets/img/overview-s.webp" srcset="assets/img/overview-s.webp 800w, assets/img/overview-l.webp 1280w" sizes="(min-width: 900px) 46vw, 92vw" width="1280" height="720" loading="lazy" decoding="async" alt="A full course on the map during a race"></picture></figure>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ GAME MODES ============ -->
+<section class="modes" id="modes">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="kicker"><span data-l="sv">Spellägen</span><span data-l="en">Game modes</span></p>
+      <h2><span data-l="sv">Samma skog. Helt nya regler.</span><span data-l="en">Same forest. Brand new rules.</span></h2>
+      <p class="sec-lead"><span data-l="sv">Många lägen går att kombinera, så ingen kväll i lobbyn blir den andra lik.</span><span data-l="en">Many modes can be combined, so no two evenings in the lobby are alike.</span></p>
+    </header>
+    <div class="mode-grid">
+      <article class="mode reveal">
+        <div class="mode-ico"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="14"/><path d="M24 4v8M24 36v8M4 24h8M36 24h8"/></svg></div>
+        <h3><span data-l="sv">Klassisk</span><span data-l="en">Classic</span></h3>
+        <p><span data-l="sv">Snabbaste vägen runt banan vinner. Enkelt, ärligt och svårt.</span><span data-l="en">Fastest way round the course wins. Simple, honest and hard.</span></p>
+      </article>
+      <article class="mode reveal">
+        <div class="mode-ico"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 30c0-9 6-18 14-18s14 9 14 18v10l-4-3-3 3-4-3-3 3-4-3-3 3-3-3-4 3Z"/><circle cx="19" cy="26" r="2.5" class="f"/><circle cx="29" cy="26" r="2.5" class="f"/></svg></div>
+        <h3>Imposter</h3>
+        <p><span data-l="sv">En spelare är hemligt ute efter att komma sist. Hitta bluffen innan målgång.</span><span data-l="en">One player secretly wants to finish last. Find the fraud before the finish.</span></p>
+      </article>
+      <article class="mode reveal">
+        <div class="mode-ico"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="8" width="28" height="34" rx="4"/><path d="M17 18h14M17 25h14M17 32h8"/></svg></div>
+        <h3><span data-l="sv">Hemligt uppdrag</span><span data-l="en">Secret task</span></h3>
+        <p><span data-l="sv">Alla får ett hemligt uppdrag. Klara ditt utan att någon märker vad du håller på med.</span><span data-l="en">Everyone gets a secret task. Complete yours without anyone noticing what you are up to.</span></p>
+      </article>
+      <article class="mode reveal">
+        <div class="mode-ico"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="13" cy="13" r="5"/><circle cx="35" cy="13" r="5"/><path d="M8 28a16 14 0 0 1 32 0c0 7-7 12-16 12S8 35 8 28Z"/><circle cx="24" cy="32" r="3" class="f"/></svg></div>
+        <h3><span data-l="sv">Björnar</span><span data-l="en">Bears</span></h3>
+        <p><span data-l="sv">Björnar strövar i skogen. Kommer en löpare för nära blir det en omväg.</span><span data-l="en">Bears roam the forest. Get too close and your runner takes a detour.</span></p>
+      </article>
+      <article class="mode reveal">
+        <div class="mode-ico"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="16" cy="30" r="9" stroke-dasharray="3 4"/><circle cx="32" cy="18" r="9"/><path d="M22 25l5-4m0 0h-5m5 0v5"/></svg></div>
+        <h3><span data-l="sv">Flytta en kontroll</span><span data-l="en">Move a control</span></h3>
+        <p><span data-l="sv">Flytta en kontroll mitt i loppet och ställ till det för motståndarna.</span><span data-l="en">Move a control mid-race and cause trouble for your rivals.</span></p>
+      </article>
+      <article class="mode reveal">
+        <div class="mode-ico"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 40V8M8 40h32"/><path d="M14 32l7-9 6 5 9-14"/></svg></div>
+        <h3><span data-l="sv">Vägvalsanalys</span><span data-l="en">Route analysis</span></h3>
+        <p><span data-l="sv">Rita alla vägval först, se sedan vem som valde bäst sträcka för sträcka.</span><span data-l="en">Draw every route first, then see who chose best, leg by leg.</span></p>
+      </article>
+      <article class="mode reveal">
+        <div class="mode-ico"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="10" cy="38" r="4"/><circle cx="38" cy="10" r="4"/><path d="M13 35C13 20 20 14 35 13M13 35c12 0 22-8 22-22"/></svg></div>
+        <h3><span data-l="sv">Vägvalsspelet</span><span data-l="en">Route choice game</span></h3>
+        <p><span data-l="sv">Två vägar, en är snabbast. Hur ofta väljer du rätt?</span><span data-l="en">Two routes, one is faster. How often do you pick right?</span></p>
+      </article>
+      <article class="mode reveal">
+        <div class="mode-ico"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="12" cy="24" r="5"/><circle cx="36" cy="12" r="5"/><circle cx="36" cy="36" r="5"/><path d="M17 22l14-8M17 26l14 8"/></svg></div>
+        <h3><span data-l="sv">Stafett</span><span data-l="en">Relay</span></h3>
+        <p><span data-l="sv">Upp till tio sträckor med gafflingar, jaktstart och rygghäng. Precis som Tiomila.</span><span data-l="en">Up to ten legs with forkings, chasing starts and drafting. Just like the big Nordic relays.</span></p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TV CONTROLS ============ -->
+<section class="tv" id="tv">
+  <div class="wrap tv-in">
+    <div class="tv-copy reveal">
+      <p class="kicker light"><span data-l="sv">Nyhet · TV-kontroller</span><span data-l="en">New · TV controls</span></p>
+      <h2><span data-l="sv">Varje karta blir en levande 3D-skog</span><span data-l="en">Every map becomes a living 3D forest</span></h2>
+      <p><span data-l="sv">När en karta importeras byggs skogen upp i 3D direkt från kartan: stenar, branter, hus, staket och tät granskog där kartan säger det. Under stafetten klipper TV-produktionen till kameran vid kontrollen, precis som på riktig orienterings-TV.</span><span data-l="en">When a map is imported, the forest is built in 3D straight from the map: boulders, cliffs, houses, fences and dense spruce where the map says so. During the relay the TV production cuts to the camera at the control, just like real orienteering on TV.</span></p>
+      <ul class="ticks">
+        <li><span data-l="sv">Loppet saktar in till riktig fart vid TV-kontrollen</span><span data-l="en">The race slows to real pace at the TV control</span></li>
+        <li><span data-l="sv">Karta och TV-bild delar skärmen</span><span data-l="en">Map and TV picture share the screen</span></li>
+        <li><span data-l="sv">Mellantider och startbild som i en riktig sändning</span><span data-l="en">Split times and a start shot like a real broadcast</span></li>
+      </ul>
+    </div>
+    <div class="tv-screen reveal">
+      <div class="tv-frame">
+        <span class="live"><i></i>LIVE</span>
+        <picture><source type="image/avif" srcset="assets/img/tvpunch-s.avif 800w, assets/img/tvpunch-l.avif 972w" sizes="(min-width: 900px) 50vw, 92vw"><img src="assets/img/tvpunch-s.webp" srcset="assets/img/tvpunch-s.webp 800w, assets/img/tvpunch-l.webp 972w" sizes="(min-width: 900px) 50vw, 92vw" width="972" height="720" loading="lazy" decoding="async" alt="A runner punching at a TV control in the 3D forest"></picture>
+      </div>
+    </div>
+  </div>
+  <div class="wrap tv-strip">
+    <figure class="reveal"><img src="assets/img/tv-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="TV camera view of a control by a boulder"><figcaption><span data-l="sv">Kamera vid kontrollen</span><span data-l="en">Camera at the control</span></figcaption></figure>
+    <figure class="reveal"><img src="assets/img/tvhouse-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="A red house in the 3D forest"><figcaption><span data-l="sv">Hus från kartan</span><span data-l="en">Houses from the map</span></figcaption></figure>
+    <figure class="reveal"><img src="assets/img/tvspruce-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="Dense spruce forest in 3D"><figcaption><span data-l="sv">Tät granskog</span><span data-l="en">Dense spruce</span></figcaption></figure>
+    <figure class="reveal"><img src="assets/img/tvair-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="The 3D forest seen from above"><figcaption><span data-l="sv">Skogen från ovan</span><span data-l="en">The forest from above</span></figcaption></figure>
+  </div>
+</section>
+
+<!-- ============ PLAY TOGETHER ============ -->
+<section class="duo topo">
+  <div class="wrap duo-in">
+    <figure class="duo-pic shot reveal">
+      <picture><source type="image/avif" srcset="assets/img/lobby-s.avif 800w, assets/img/lobby-l.avif 1280w" sizes="(min-width: 900px) 52vw, 92vw"><img src="assets/img/lobby-s.webp" srcset="assets/img/lobby-s.webp 800w, assets/img/lobby-l.webp 1280w" sizes="(min-width: 900px) 52vw, 92vw" width="1280" height="720" loading="lazy" decoding="async" alt="The multiplayer lobby"></picture>
+    </figure>
+    <div class="duo-copy reveal">
+      <p class="kicker"><span data-l="sv">Spela tillsammans</span><span data-l="en">Play together</span></p>
+      <h2><span data-l="sv">Starta en lobby, bjud in klubben</span><span data-l="en">Start a lobby, invite the club</span></h2>
+      <p><span data-l="sv">Upp till tio spelare i samma lopp. Värden väljer karta, bana och spelläge, alla väljer en löpare och färg. Medan ni väntar kan du handla paket eller titta i din samling.</span><span data-l="en">Up to ten players in the same race. The host picks map, course and game mode, everyone picks a runner and a colour. While you wait you can buy packs or browse your collection.</span></p>
+      <p><span data-l="sv">Hellre själv? Singleplayer funkar likadant, mot datorstyrda löpare.</span><span data-l="en">Rather play alone? Singleplayer works the same, against computer runners.</span></p>
+    </div>
+  </div>
+  <div class="wrap duo-in flip">
+    <figure class="duo-pic shot reveal">
+      <picture><source type="image/avif" srcset="assets/img/builder-s.avif 800w, assets/img/builder-l.avif 1280w" sizes="(min-width: 900px) 52vw, 92vw"><img src="assets/img/builder-s.webp" srcset="assets/img/builder-s.webp 800w, assets/img/builder-l.webp 1280w" sizes="(min-width: 900px) 52vw, 92vw" width="1280" height="720" loading="lazy" decoding="async" alt="The course builder"></picture>
+    </figure>
+    <div class="duo-copy reveal">
+      <p class="kicker"><span data-l="sv">Banläggaren</span><span data-l="en">Course builder</span></p>
+      <h2><span data-l="sv">Lägg banor. Dela dem med alla.</span><span data-l="en">Set courses. Share them with everyone.</span></h2>
+      <p><span data-l="sv">Klicka ut start, kontroller och mål, rita avspärrningar och spara. Publicerade banor hamnar i molnet så att andra spelare kan springa dem. Har din klubb en OCAD-karta kan du importera den och ställa in hur lättlöpt varje terräng är.</span><span data-l="en">Click out start, controls and finish, draw out-of-bounds areas and save. Published courses go to the cloud so other players can run them. If your club has an OCAD map, import it and set how runnable each terrain is.</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GALLERY ============ -->
+<section class="gallery" id="gallery">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="kicker"><span data-l="sv">Bilder</span><span data-l="en">Screenshots</span></p>
+      <h2><span data-l="sv">Kika in i spelet</span><span data-l="en">Take a look inside</span></h2>
+    </header>
+  </div>
+  <div class="rail" id="rail" tabindex="0" aria-label="Screenshots">
+    <button class="g-item" type="button" data-full="assets/img/menu-l.webp"><img src="assets/img/menu-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="Main menu"><span data-l="sv">Huvudmenyn</span><span data-l="en">Main menu</span></button>
+    <button class="g-item" type="button" data-full="assets/img/race-l.webp"><img src="assets/img/race-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="Racing on the map"><span data-l="sv">Mitt i loppet</span><span data-l="en">Mid-race</span></button>
+    <button class="g-item" type="button" data-full="assets/img/overview-l.webp"><img src="assets/img/overview-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="A whole course on the map"><span data-l="sv">Hela banan</span><span data-l="en">The whole course</span></button>
+    <button class="g-item" type="button" data-full="assets/img/tvhouse-l.webp"><img src="assets/img/tvhouse-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="3D forest with a house"><span data-l="sv">3D-skogen</span><span data-l="en">The 3D forest</span></button>
+    <button class="g-item" type="button" data-full="assets/img/imposter-l.webp"><img src="assets/img/imposter-s.webp" width="800" height="439" loading="lazy" decoding="async" alt="Imposter mode"><span data-l="sv">Du är imposter</span><span data-l="en">You are the imposter</span></button>
+    <button class="g-item" type="button" data-full="assets/img/tv-l.webp"><img src="assets/img/tv-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="TV control"><span data-l="sv">TV-kontroll</span><span data-l="en">TV control</span></button>
+    <button class="g-item" type="button" data-full="assets/img/loading-l.webp"><img src="assets/img/loading-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="Loading screen"><span data-l="sv">Laddar lobbyn</span><span data-l="en">Loading the lobby</span></button>
+    <button class="g-item" type="button" data-full="assets/img/courses-l.webp"><img src="assets/img/courses-s.webp" width="800" height="450" loading="lazy" decoding="async" alt="Course list"><span data-l="sv">Välj bana</span><span data-l="en">Choose a course</span></button>
+  </div>
+  <div class="wrap rail-nav">
+    <button type="button" class="round" id="railPrev" aria-label="Föregående / Previous"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button type="button" class="round" id="railNext" aria-label="Nästa / Next"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+</section>
+
+<!-- ============ NEWS ============ -->
+<section class="news topo" id="news">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="kicker"><span data-l="sv">Nyheter</span><span data-l="en">News</span></p>
+      <h2><span data-l="sv">Senaste från skogen</span><span data-l="en">Latest from the forest</span></h2>
+    </header>
+    <div class="news-list" id="newsList" aria-live="polite"></div>
+    <div class="news-more"><button class="btn btn-line" type="button" id="newsMore" hidden><span data-l="sv">Visa äldre nyheter</span><span data-l="en">Show older news</span></button></div>
+  </div>
+</section>
+
+<!-- ============ DOWNLOAD ============ -->
+<section class="download" id="download">
+  <div class="wrap">
+    <div class="dl-card reveal">
+      <img class="dl-logo" src="assets/img/logo.webp" width="96" height="96" alt="" loading="lazy">
+      <h2><span data-l="sv">Ladda ner O-Manager</span><span data-l="en">Download O-Manager</span></h2>
+      <p class="dl-sub"><span data-l="sv">Gratis. Inget konto behövs.</span><span data-l="en">Free. No account needed.</span></p>
+      <a class="btn btn-orange btn-xl" id="dlBtn" href="#">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10 4.5v7H3Zm8-1.1L21 3v8.5H11ZM3 12.5h7v7L3 18.5Zm8 0h10V21l-10-1.4Z" class="f"/></svg>
+        <span data-l="sv">Ladda ner för Windows</span><span data-l="en">Download for Windows</span>
+      </a>
+      <p class="dl-meta" id="dlMeta"><span data-l="sv">Hämtar senaste versionen…</span><span data-l="en">Checking the latest version…</span></p>
+      <ol class="dl-steps">
+        <li><b>1</b><span data-l="sv">Packa upp zip-filen var du vill.</span><span data-l="en">Unzip the file anywhere you like.</span></li>
+        <li><b>2</b><span data-l="sv">Starta <code>O-Manager.exe</code>.</span><span data-l="en">Start <code>O-Manager.exe</code>.</span></li>
+        <li><b>3</b><span data-l="sv">Ny version? Ladda ner igen och ersätt mappen. Dina löpare och pengar finns kvar.</span><span data-l="en">New version? Download again and replace the folder. Your runners and money stay.</span></li>
+      </ol>
+      <p class="dl-all"><a id="dlAll" href="#"><span data-l="sv">Alla versioner och ändringar</span><span data-l="en">All versions and changes</span></a></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="faq" id="faq">
+  <div class="wrap faq-in">
+    <header class="sec-head reveal">
+      <p class="kicker">FAQ</p>
+      <h2><span data-l="sv">Vanliga frågor</span><span data-l="en">Questions</span></h2>
+    </header>
+    <div class="faq-list">
+      <details class="reveal"><summary><span data-l="sv">Kostar spelet något?</span><span data-l="en">Does the game cost anything?</span></summary>
+        <p><span data-l="sv">Nej. O-Manager är gratis. Pengarna i spelet tjänar du genom att tävla, det finns inga riktiga köp.</span><span data-l="en">No. O-Manager is free. You earn the in-game money by racing; there are no real-money purchases.</span></p></details>
+      <details class="reveal"><summary><span data-l="sv">Windows säger "Windows skyddade datorn". Vad gör jag?</span><span data-l="en">Windows says "Windows protected your PC". What now?</span></summary>
+        <p><span data-l="sv">Det visas för nya program som inte är signerade. Klicka på <b>Mer information</b> och sedan <b>Kör ändå</b>.</span><span data-l="en">It shows for new programs that are not signed. Click <b>More info</b> and then <b>Run anyway</b>.</span></p></details>
+      <details class="reveal"><summary><span data-l="sv">Hur uppdaterar jag?</span><span data-l="en">How do I update?</span></summary>
+        <p><span data-l="sv">Ladda ner den nya versionen här och ersätt den gamla mappen. Dina sparade löpare och pengar ligger kvar på datorn.</span><span data-l="en">Download the new version here and replace the old folder. Your saved runners and money stay on your computer.</span></p></details>
+      <details class="reveal"><summary><span data-l="sv">Är löparna riktiga?</span><span data-l="en">Are the runners real?</span></summary>
+        <p><span data-l="sv">Ja. Korten bygger på riktiga resultat från elittävlingar, och betygen räknas om när nya tävlingar läggs in. Korten här på sidan är bara exempel.</span><span data-l="en">Yes. The cards are based on real results from elite races, and ratings are recalculated as new races are added. The cards on this page are just examples.</span></p></details>
+      <details class="reveal"><summary><span data-l="sv">Kan jag spela på Mac?</span><span data-l="en">Can I play on a Mac?</span></summary>
+        <p><span data-l="sv">Inte än. Just nu finns spelet för Windows.</span><span data-l="en">Not yet. The game is available for Windows right now.</span></p></details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <a class="brand" href="#top"><img src="assets/img/logo.webp" width="32" height="32" alt="" loading="lazy"><span>O-MANAGER</span></a>
+    <p><span data-l="sv">Ett orienteringsspel gjort med kärlek till sporten.</span><span data-l="en">An orienteering game made with love for the sport.</span></p>
+    <p class="small">© <span id="year">2026</span> O-Manager</p>
+  </div>
+</footer>
+
+<dialog class="lightbox" id="lightbox" aria-label="Screenshot">
+  <img id="lbImg" alt="">
+  <button class="round lb-close" type="button" id="lbClose" aria-label="Stäng / Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+</dialog>
+</body>
+</html>
