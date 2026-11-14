@@ -24,7 +24,53 @@ public class LobbyPlayerListUI : MonoBehaviour
     void Start()
     {
         rowTemplate.SetActive(false);
+        MakeScrollable();
         Refresh();
+    }
+
+    // With up to 20 players the list is taller than the screen, so it sits in a box that scrolls
+    const float MaxListHeight = 560f;
+    LayoutElement viewportSize;
+    RectTransform content;
+
+    void MakeScrollable()
+    {
+        content = listParent as RectTransform;
+        if (content == null || content.parent == null) return;
+        Transform panel = content.parent;
+
+        GameObject viewport = new GameObject("Players viewport", typeof(RectTransform), typeof(RectMask2D), typeof(Image), typeof(ScrollRect), typeof(LayoutElement));
+        RectTransform viewportRect = viewport.GetComponent<RectTransform>();
+        viewportRect.SetParent(panel, false);
+        viewportRect.SetSiblingIndex(content.GetSiblingIndex());
+        viewport.GetComponent<Image>().color = new Color(0, 0, 0, 0);   // invisible, but catches the mouse wheel
+        viewportSize = viewport.GetComponent<LayoutElement>();
+
+        content.SetParent(viewportRect, false);
+        content.anchorMin = new Vector2(0, 1);
+        content.anchorMax = new Vector2(1, 1);
+        content.pivot = new Vector2(0.5f, 1);
+        content.anchoredPosition = Vector2.zero;
+        content.sizeDelta = Vector2.zero;
+        ContentSizeFitter fitter = content.GetComponent<ContentSizeFitter>();
+        if (fitter == null) fitter = content.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        ScrollRect scroll = viewport.GetComponent<ScrollRect>();
+        scroll.viewport = viewportRect;
+        scroll.content = content;
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 40f;
+    }
+
+    void FitViewport()
+    {
+        if (viewportSize == null || content == null) return;
+        LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+        viewportSize.preferredHeight = Mathf.Min(LayoutUtility.GetPreferredHeight(content), MaxListHeight);
     }
 
     void Update()
@@ -88,6 +134,8 @@ public class LobbyPlayerListUI : MonoBehaviour
             tagText.text = isLocal ? (localIsHost ? "You (host)" : "You") : "";
             dot.color = isLocal ? localDotColor : otherDotColor;
         }
+
+        FitViewport();
 
         if (countText != null)
         {
