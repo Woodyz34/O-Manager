@@ -22,7 +22,7 @@ public class TvDirector : MonoBehaviour
     public const float TvPace = 1.4f / 20f;
     const int StartShot = 99, FinishShot = 98;
     const float SeenWithin = 60f, Out = 5f;         // metres: how far the camera sees a runner; always shown this far out after the punch
-    const float StartOut = 12f;                     // metres from the start
+    const float StartOut = 45f;                     // metres from the start: the runners are followed well down the first leg
     const float LongestShot = 25f, Linger = 0.1f;   // real seconds
     const float ShownWithin = 100f;                                             // runners this near are in the 3D world
     const int WorldsKept = 3;
@@ -70,7 +70,8 @@ public class TvDirector : MonoBehaviour
         public float since;
     }
     readonly Dictionary<IPackRunner, Finishing> finishing = new Dictionary<IPackRunner, Finishing>();
-    const float FinishHold = 0.5f, FinishLongest = 8f;
+    // After the finish punch the runner gets its breath back and walks off; the shot stays a moment on that
+    const float FinishHold = 4.5f, FinishLongest = 12f;
 
     class Track
     {
@@ -529,7 +530,13 @@ public class TvDirector : MonoBehaviour
                     }
                     else if (d > 40f) pass = Pass.Done;   // was never seen at the start; not on the way back either
                 }
-                else if (pass == Pass.In && (d > StartOut || now - spot.since[runner] > 6f)) pass = Pass.Done;
+                else if (pass == Pass.In)
+                {
+                    // On TV while the camera can still see the runner, up to 12 s
+                    if (InSight(spot, t, d, true, 0f)) spot.seen[runner] = now;
+                    spot.seen.TryGetValue(runner, out float seenAt);
+                    if (d > StartOut || now - spot.since[runner] > 12f || (d > 12f && now - seenAt > 0.6f)) pass = Pass.Done;
+                }
             }
             else if (pass == Pass.None)
             {

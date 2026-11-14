@@ -361,6 +361,8 @@ public class TvWorldView : MonoBehaviour
             figure.hop = Mathf.Lerp(figure.hop, jump, Mathf.Clamp01(dt * 18f));
             if (jump > 0f) figure.hopHeight = hurdle;
             figure.Pose(x, world.HeightAt(x, z), z, moved, unit, near, dt, figure.slope, figure.hop, figure.hopHeight);
+            figure.SetVisible(!WalkedOff(figure));
+            if (Leaving(figure)) continue;   // the camera lets it walk out of the picture
             float d = x * x + z * z;
             if (d < best)
             {
@@ -465,13 +467,48 @@ public class TvWorldView : MonoBehaviour
         else if (f.punch == 2)
         {
             // A touch of the unit, then back onto the route
-            if (Time.unscaledTime - f.punchedAt < 0.25f || f.finishing) return;   // a finisher stays at the finish
+            if (f.finishing) { WalkOff(f); return; }   // a finisher gets its breath back and walks away
+            if (Time.unscaledTime - f.punchedAt < 0.25f) return;
             Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), new Vector2(x, z), moved * 1.6f + 0.002f);
             f.shownX = at.x;
             f.shownZ = at.y;
             if ((at - new Vector2(x, z)).sqrMagnitude < 0.02f) f.punch = 0;
         }
     }
+
+    // After the finish punch: bent over getting the breath back, then a slow walk sideways and away from the camera,
+    // out of the picture, and gone after a few seconds
+    const float BreathFrom = 0.3f, WalkFrom = 1.8f, GoneAt = 6f;
+    void WalkOff(TvStickFigure f)
+    {
+        float since = Time.unscaledTime - f.punchedAt, dt = Time.unscaledDeltaTime;
+        if (since < WalkFrom)
+        {
+            f.tired = Mathf.MoveTowards(f.tired, since > BreathFrom ? 1f : 0f, dt * 2.5f);
+            return;
+        }
+        if (f.leaveX == 0f && f.leaveZ == 0f)
+        {
+            // Across the camera's view, on the side the runner was going anyway, and a little away from the camera
+            float cx = world.unitX - world.camX, cz = world.unitZ - world.camZ, c = Mathf.Sqrt(cx * cx + cz * cz);
+            if (c < 0.01f) { cx = 1f; cz = 0f; c = 1f; }
+            cx /= c; cz /= c;
+            float px = -cz, pz = cx;
+            if (px * f.headX + pz * f.headZ < 0f) { px = -px; pz = -pz; }
+            float lx = px * 0.8f + cx * 0.6f, lz = pz * 0.8f + cz * 0.6f, l = Mathf.Sqrt(lx * lx + lz * lz);
+            f.leaveX = lx / l;
+            f.leaveZ = lz / l;
+        }
+        f.tired = Mathf.MoveTowards(f.tired, 0f, dt * 1.5f);
+        f.walk = Mathf.MoveTowards(f.walk, 1f, dt * 1.5f);
+        float speed = 1.3f * f.walk;
+        f.shownX += f.leaveX * speed * dt;
+        f.shownZ += f.leaveZ * speed * dt;
+    }
+
+    // Gone off after the finish: not shown, and the camera does not follow it
+    static bool WalkedOff(TvStickFigure f) => f.finishing && f.punch == 2 && f.everPunched && Time.unscaledTime - f.punchedAt > GoneAt;
+    static bool Leaving(TvStickFigure f) => f.finishing && f.punch == 2 && f.everPunched && Time.unscaledTime - f.punchedAt > WalkFrom;
 
     // ---- The camera ----
 
