@@ -1,0 +1,74 @@
+[
+  {
+    "date": "2026-11-14",
+    "tag": "update",
+    "title": { "sv": "Snabbare på svagare datorer", "en": "Faster on weaker computers" },
+    "text": {
+      "sv": "TV-skogen laddas i bitar, långa listor visar bara det som syns och en FPS-mätare finns på F3. Spelet ska flyta även på äldre datorer.",
+      "en": "The TV forest now loads in pieces, long lists only draw what is on screen, and F3 shows an FPS meter. The game should run smoothly on older computers too."
+    }
+  },
+  {
+    "date": "2026-11-14",
+    "tag": "new",
+    "title": { "sv": "TV-kontroller i 3D", "en": "TV controls in 3D" },
+    "text": {
+      "sv": "Varje karta blir en 3D-skog. Under stafetter klipper TV-produktionen till kameror vid kontrollerna, med mellantider och startbild.",
+      "en": "Every map becomes a 3D forest. During relays the TV production cuts to cameras at the controls, with split times and a start shot."
+    }
+  },
+  {
+    "date": "2026-11-14",
+    "tag": "new",
+    "title": { "sv": "Sprintfart på korten", "en": "Sprint speed on the cards" },
+    "text": {
+      "sv": "Korten har nu Physics, Speed och Technique. Speed räknas fram från riktiga sprinttävlingar.",
+      "en": "Cards now have Physics, Speed and Technique. Speed comes from real sprint races."
+    }
+  },
+  {
+    "date": "2026-11-13",
+    "tag": "new",
+    "title": { "sv": "Damer och herrar i samma stafett", "en": "Women and men in the same relay" },
+    "text": {
+      "sv": "Välj kön per sträcka i stafetten, och öppna flera paket på en gång.",
+      "en": "Choose gender per relay leg, and open several packs at once."
+    }
+  },
+  {
+    "date": "2026-11-06",
+    "tag": "new",
+    "title": { "sv": "Egna OCAD-kartor och sprint", "en": "Your own OCAD maps and sprint" },
+    "text": {
+      "sv": "Importera OCAD-kartor, ställ in hur snabbt det går i varje terräng och spring sprint med smala passager och avspärrningar.",
+      "en": "Import OCAD maps, set how fast each terrain is, and race sprints with narrow passages and barriers."
+    }
+  },
+  {
+    "date": "2026-11-02",
+    "tag": "new",
+    "title": { "sv": "Över 600 riktiga elitlöpare", "en": "Over 600 real elite runners" },
+    "text": {
+      "sv": "Alla kort bygger nu på riktiga resultat från Eventor och WinSplits, med meriter och sträcktider du kan klicka på.",
+      "en": "Every card is now based on real results from Eventor and WinSplits, with merits and split times you can click."
+    }
+  },
+  {
+    "date": "2026-10-16",
+    "tag": "new",
+    "title": { "sv": "Stafetter med gafflingar", "en": "Relays with forkings" },
+    "text": {
+      "sv": "Upp till tio sträckor, jaktstarter, rygghäng och statistik efter varje sträcka med repris.",
+      "en": "Up to ten legs, chasing starts, drafting and stats after every leg with a replay."
+    }
+  },
+  {
+    "date": "2026-10-09",
+    "tag": "new",
+    "title": { "sv": "Paketöppning och Mina löpare", "en": "Pack opening and My Runners" },
+    "text": {
+      "sv": "Tjäna pengar i tävlingar, köp paket och samla löpare. Första paketet är gratis.",
+      "en": "Earn money in races, buy packs and collect runners. Your first pack is free."
+    }
+  }
+]
