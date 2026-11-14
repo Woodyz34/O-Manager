@@ -103,7 +103,8 @@ public class TvWorldView : MonoBehaviour
     }
 
     // Builds the world of a control. The heavy part runs on a background thread; returns null when the map has none.
-    public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control, bool start = false, float camDirX = 0f, float camDirZ = 0f)
+    public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control, bool start = false, float camDirX = 0f, float camDirZ = 0f,
+                                                  float legDirX = 0f, float legDirZ = 0f)
     {
         TvWorldData.Data data = await TvWorldData.LoadAsync(map);
         if (data == null) return null;
@@ -118,7 +119,9 @@ public class TvWorldView : MonoBehaviour
             seed = 1,
             start = start,
             camDirX = camDirX,
-            camDirZ = camDirZ
+            camDirZ = camDirZ,
+            legDirX = legDirX,
+            legDirZ = legDirZ
         };
         var watch = System.Diagnostics.Stopwatch.StartNew();
         TvWorld world = await Task.Run(() => TvWorldBuilder.Build(input));
@@ -285,6 +288,7 @@ public class TvWorldView : MonoBehaviour
         public string label;
         public Color color;
         public float x, z;      // metres from the control, east and north
+        public bool finishing;  // finished in the race already: runs the last metres to the finish unit on its own
     }
 
     readonly Dictionary<object, TvStickFigure> figures = new Dictionary<object, TvStickFigure>();
@@ -292,6 +296,12 @@ public class TvWorldView : MonoBehaviour
     readonly List<object> gone = new List<object>();
     bool punching;
     // The runner's figure is in the picture and has not touched the punching unit yet: its split time waits for the punch
+    // When the runner touched the punching unit on this pass (unscaled time), or -1
+    public float PunchedAt(object key)
+    {
+        return figures.TryGetValue(key, out TvStickFigure figure) && figure.everPunched ? figure.punchedAt : -1f;
+    }
+
     public bool PunchToCome(object key)
     {
         return world.hasUnit && figures.TryGetValue(key, out TvStickFigure figure) && !figure.everPunched;
@@ -316,6 +326,7 @@ public class TvWorldView : MonoBehaviour
                 figure = new TvStickFigure(transform, r.label, r.color, (r.label ?? "").GetHashCode());
                 figures[r.key] = figure;
             }
+            figure.finishing = r.finishing;
             ToThePunch(figure, r.x, r.z);
             // Round the trees and stones with room to spare, and smoothly: the runner swerves, it does not bump
             float px = figure.shownX, pz = figure.shownZ;
@@ -345,9 +356,13 @@ public class TvWorldView : MonoBehaviour
                 rise = (world.HeightAt(x + f.x * 0.6f, z + f.z * 0.6f) - world.HeightAt(x - f.x * 0.6f, z - f.z * 0.6f)) / 1.2f;
             }
             figure.slope = Mathf.Lerp(figure.slope, rise, Mathf.Clamp01(dt * 8f));
-            float jump = figure.Pace > 1f && near < 0.5f ? world.Hurdle(x, z) : 0f;
+            float hurdle = 0f;
+            float jump = figure.Pace > 1f && near < 0.5f ? world.Hurdle(x, z, out hurdle) : 0f;
             figure.hop = Mathf.Lerp(figure.hop, jump, Mathf.Clamp01(dt * 18f));
-            figure.Pose(x, world.HeightAt(x, z), z, moved, unit, near, dt, figure.slope, figure.hop);
+            if (jump > 0f) figure.hopHeight = hurdle;
+            figure.Pose(x, world.HeightAt(x, z), z, moved, unit, near, dt, figure.slope, figure.hop, figure.hopHeight);
+            figure.SetVisible(!WalkedOff(figure));
+            if (Leaving(figure)) continue;   // the camera lets it walk out of the picture
             float d = x * x + z * z;
             if (d < best)
             {
@@ -413,16 +428,18 @@ public class TvWorldView : MonoBehaviour
             f.shownZ = z;
             if (f.punched)
             {
-                if (toUnit > 25f) f.punched = false;   // gone; ready for the next time it comes
+                // Gone well away: ready for the next time it comes. Until then it does not punch again,
+                // however it turns on its way out.
+                if (toUnit > 45f) { f.punched = false; f.nearest = float.MaxValue; }
             }
             else
             {
                 // Every runner that comes near punches: within 16 m whatever way it is heading, or when it has
                 // passed its nearest point a little further off
                 if (toUnit < f.nearest) f.nearest = toUnit;
-                if (toUnit < 16f || (f.nearest < 32f && toUnit > f.nearest + 1.5f)) f.punch = 1;
+                if (toUnit < 16f || (f.nearest < 32f && toUnit > f.nearest + 1.5f) || f.finishing) f.punch = 1;
             }
-            if (toUnit > 45f) f.nearest = float.MaxValue;
+            if (toUnit > 45f && !f.punched) f.nearest = float.MaxValue;
         }
         if (f.punch == 1)
         {
@@ -433,7 +450,9 @@ public class TvWorldView : MonoBehaviour
             // A little quicker than the runner really moves, and more so once the runner is on its way out again
             bool leaving = toUnit > f.nearest + 1f;
             if (toUnit < f.nearest) f.nearest = toUnit;
-            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), stand, moved * (leaving ? 1.9f : 1.2f));
+            // A runner who has finished in the race runs the last metres on its own, at running pace
+            float step = f.finishing ? Mathf.Max(moved, Time.unscaledDeltaTime * 5f) : moved * (leaving ? 1.9f : 1.2f);
+            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), stand, step);
             f.shownX = at.x;
             f.shownZ = at.y;
             if ((at - stand).sqrMagnitude < 0.01f)
@@ -443,11 +462,12 @@ public class TvWorldView : MonoBehaviour
                 f.everPunched = true;
                 f.punchedAt = Time.unscaledTime;
             }
-            else if (toUnit > 60f) f.punch = 2;   // the runner is far away by now: give up
+            else if (toUnit > 60f) { f.punch = 2; f.punched = true; }   // the runner is far away by now: give up
         }
         else if (f.punch == 2)
         {
             // A touch of the unit, then back onto the route
+            if (f.finishing) { WalkOff(f); return; }   // a finisher gets its breath back and walks away
             if (Time.unscaledTime - f.punchedAt < 0.25f) return;
             Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), new Vector2(x, z), moved * 1.6f + 0.002f);
             f.shownX = at.x;
@@ -455,6 +475,40 @@ public class TvWorldView : MonoBehaviour
             if ((at - new Vector2(x, z)).sqrMagnitude < 0.02f) f.punch = 0;
         }
     }
+
+    // After the finish punch: bent over getting the breath back, then a slow walk sideways and away from the camera,
+    // out of the picture, and gone after a few seconds
+    const float BreathFrom = 0.3f, WalkFrom = 1.8f, GoneAt = 6f;
+    void WalkOff(TvStickFigure f)
+    {
+        float since = Time.unscaledTime - f.punchedAt, dt = Time.unscaledDeltaTime;
+        if (since < WalkFrom)
+        {
+            f.tired = Mathf.MoveTowards(f.tired, since > BreathFrom ? 1f : 0f, dt * 2.5f);
+            return;
+        }
+        if (f.leaveX == 0f && f.leaveZ == 0f)
+        {
+            // Across the camera's view, on the side the runner was going anyway, and a little away from the camera
+            float cx = world.unitX - world.camX, cz = world.unitZ - world.camZ, c = Mathf.Sqrt(cx * cx + cz * cz);
+            if (c < 0.01f) { cx = 1f; cz = 0f; c = 1f; }
+            cx /= c; cz /= c;
+            float px = -cz, pz = cx;
+            if (px * f.headX + pz * f.headZ < 0f) { px = -px; pz = -pz; }
+            float lx = px * 0.8f + cx * 0.6f, lz = pz * 0.8f + cz * 0.6f, l = Mathf.Sqrt(lx * lx + lz * lz);
+            f.leaveX = lx / l;
+            f.leaveZ = lz / l;
+        }
+        f.tired = Mathf.MoveTowards(f.tired, 0f, dt * 1.5f);
+        f.walk = Mathf.MoveTowards(f.walk, 1f, dt * 1.5f);
+        float speed = 1.3f * f.walk;
+        f.shownX += f.leaveX * speed * dt;
+        f.shownZ += f.leaveZ * speed * dt;
+    }
+
+    // Gone off after the finish: not shown, and the camera does not follow it
+    static bool WalkedOff(TvStickFigure f) => f.finishing && f.punch == 2 && f.everPunched && Time.unscaledTime - f.punchedAt > GoneAt;
+    static bool Leaving(TvStickFigure f) => f.finishing && f.punch == 2 && f.everPunched && Time.unscaledTime - f.punchedAt > WalkFrom;
 
     // ---- The camera ----
 
