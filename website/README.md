@@ -38,7 +38,21 @@ Ladda ner-knappen pekar alltid på den senaste versionen och visar versionsnumme
 4. Under Build watch paths, ta med bara `website/*` så att sidan bara byggs om när hemsidan ändras.
 5. Save and Deploy. Sidan hamnar på `https://<namn>.pages.dev`.
 
-Egen domän (t.ex. `o-manager.se`) går att lägga till senare under Custom domains, utan att ändra något här.
+## Koppla o-manager.se (köpt hos Loopia)
+Domänen stannar hos Loopia (där betalar du den varje år), men Cloudflare får sköta DNS:en.
+Du behöver inget webbhotell hos Loopia.
+
+1. Cloudflare: **Add a domain** > skriv `o-manager.se` > välj **Free**. Cloudflare visar två namnservrar,
+   t.ex. `anna.ns.cloudflare.com` och `bob.ns.cloudflare.com`.
+2. Loopia Kundzon: klicka på `o-manager.se` > **Namnservrar / DNS-servrar** > byt Loopias namnservrar mot
+   Cloudflares två. Det kan ta från några minuter upp till ett dygn innan det slår igenom.
+3. Cloudflare: Workers & Pages > ditt Pages-projekt > **Custom domains** > lägg till `o-manager.se`
+   och sedan `www.o-manager.se`. Cloudflare skapar DNS-posterna och HTTPS-certifikatet själv.
+4. (Valfritt) Gör samma steg 1–2 för `omanager.se` och lägg en Redirect Rule som skickar allt till
+   `https://o-manager.se`, så hamnar folk rätt även om de skriver utan bindestreck.
+
+Adressen `https://<namn>.pages.dev` fortsätter fungera. Domänen går att byta eller lägga till när som helst
+utan att något i hemsidan ändras.
 
 ## Bilder och video
 `Docs/website_assets.py` gör om skärmdumparna till små AVIF/WebP-bilder och klipper introfilmen
