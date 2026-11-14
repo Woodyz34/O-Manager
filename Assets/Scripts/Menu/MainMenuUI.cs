@@ -108,7 +108,7 @@ public class MainMenuUI : MonoBehaviour
         PackOpening prefab = Resources.Load<PackOpening>("UI/PackOpening");
         if (prefab == null)
         {
-            Debug.LogWarning("PackOpening prefab is missing. Run Tools > O-Manager > Apply Menu UI.");
+            Debug.LogWarning("PackOpening prefab is missing. Run Tools > O-Manager > Developer > Apply Menu UI.");
             Refresh();
             return;
         }

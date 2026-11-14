@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
-// Tools > O-Manager > Download sent-in maps: fetches the maps players have sent in (Cloud Save Player Files named
+// Tools > O-Manager > Download sent-in maps (settings and list): fetches the maps players have sent in (Cloud Save Player Files named
 // map-<id>-*, see CloudMaps) with the Cloud Save admin API, so the browser is not needed, and imports them.
 //
 // It needs a service account (Unity Cloud dashboard > Administration > Service accounts) with the project role
@@ -40,7 +40,7 @@ public class SentMapsDownloader : EditorWindow
 
     static string DownloadRoot => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "SentInMaps"));
 
-    [MenuItem("Tools/O-Manager/Download sent-in maps...")]
+    [MenuItem("Tools/O-Manager/Download sent-in maps (settings and list)...", false, 21)]
     static void Open()
     {
         var window = GetWindow<SentMapsDownloader>(true, "Download sent-in maps");
@@ -79,7 +79,7 @@ public class SentMapsDownloader : EditorWindow
         EditorApplication.delayCall += () => _ = CheckForNew(false);
     }
 
-    [MenuItem("Tools/O-Manager/Check for new sent-in maps")]
+    [MenuItem("Tools/O-Manager/Check for new sent-in maps", false, 20)]
     static void CheckNow() => _ = CheckForNew(true);
 
     static async Task CheckForNew(bool askedFor)

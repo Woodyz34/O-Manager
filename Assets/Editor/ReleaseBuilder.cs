@@ -33,7 +33,7 @@ public class ReleaseBuilder : EditorWindow
     static string ScriptPath => Path.Combine(ProjectRoot, "installer", "O-Manager.iss");
     static string SetupPath => Path.Combine(ReleaseDir, GameUpdater.SetupAssetName);
 
-    [MenuItem("Tools/O-Manager/Build release (setup.exe)...")]
+    [MenuItem("Tools/O-Manager/Build release (setup.exe)...", false, 40)]
     static void Open()
     {
         ReleaseBuilder window = GetWindow<ReleaseBuilder>(true, "Build release", true);

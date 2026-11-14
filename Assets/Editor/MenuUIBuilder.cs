@@ -12,7 +12,7 @@ using UnityEngine.UI;
 using UI = ModernUIBuilder;
 
 // Builds the main menu (home, pack shop, My Runners), the runner card and the pack opening show.
-// Uses the same theme as ModernUIBuilder. Run it again from Tools > O-Manager > Apply Menu UI
+// Uses the same theme as ModernUIBuilder. Run it again from Tools > O-Manager > Developer > Apply Menu UI
 // after changing layout or colours here.
 public static class MenuUIBuilder
 {
@@ -38,13 +38,13 @@ public static class MenuUIBuilder
     static Material additive;
     static GameObject cardPrefab;
 
-    [MenuItem("Tools/O-Manager/Apply Menu UI (main menu, packs, runner cards)")]
+    [MenuItem("Tools/O-Manager/Developer (rarely needed)/Apply Menu UI (main menu, packs, runner cards)", false, 102)]
     public static void ApplyAllMenu()
     {
         Debug.Log(ApplyAll());
     }
 
-    [MenuItem("Tools/O-Manager/Testing/Add 1000 kr (in Play mode)")]
+    [MenuItem("Tools/O-Manager/Testing/Add 1000 kr (in Play mode)", false, 60)]
     public static void AddTestMoney()
     {
         if (Money.Instance == null)
@@ -55,7 +55,7 @@ public static class MenuUIBuilder
         Money.Instance.AddMoney(1000);
     }
 
-    [MenuItem("Tools/O-Manager/Testing/Add 100 000 kr (in Play mode)")]
+    [MenuItem("Tools/O-Manager/Testing/Add 100 000 kr (in Play mode)", false, 61)]
     public static void AddLotsOfTestMoney()
     {
         if (Money.Instance == null)
@@ -66,7 +66,7 @@ public static class MenuUIBuilder
         Money.Instance.AddMoney(100000);
     }
 
-    [MenuItem("Tools/O-Manager/Testing/Reset runner collection")]
+    [MenuItem("Tools/O-Manager/Testing/Reset runner collection", false, 62)]
     public static void ResetCollection()
     {
         RunnerCollection.Reset();

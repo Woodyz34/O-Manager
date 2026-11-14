@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // Applies the modern look to the MultiPlayer and Lobby scenes.
-// Change the colours below and run Tools > O-Manager > Apply Modern UI to restyle both scenes again.
+// Change the colours below and run Tools > O-Manager > Developer > Apply Modern UI to restyle both scenes again.
 public static class ModernUIBuilder
 {
     // ---- Theme ----
@@ -39,7 +39,7 @@ public static class ModernUIBuilder
     internal static Material shadowMaterial;
     internal static StringBuilder log;
 
-    [MenuItem("Tools/O-Manager/Apply Modern UI (MultiPlayer + Lobby)")]
+    [MenuItem("Tools/O-Manager/Developer (rarely needed)/Apply Modern UI (MultiPlayer + Lobby)", false, 103)]
     public static void ApplyAllMenu()
     {
         Debug.Log(ApplyAll());

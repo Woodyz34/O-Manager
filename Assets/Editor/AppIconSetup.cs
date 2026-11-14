@@ -5,7 +5,7 @@ using UnityEngine;
 // Makes the O-Manager icon (Assets/Art/Icon/OManagerIcon.png, drawn by Docs/app_icon.py) the game's icon,
 // so the built game shows it on the .exe, in the taskbar and on the window instead of the Unity logo.
 // It is set when Unity opens the project (and again if someone clears it). It can also be set from
-// Tools > O-Manager > Set game icon.
+// Tools > O-Manager > Developer > Set game icon.
 [InitializeOnLoad]
 public class AppIconSetup : AssetPostprocessor
 {
@@ -16,7 +16,7 @@ public class AppIconSetup : AssetPostprocessor
         EditorApplication.delayCall += () => Apply(false);
     }
 
-    [MenuItem("Tools/O-Manager/Set game icon")]
+    [MenuItem("Tools/O-Manager/Developer (rarely needed)/Set game icon", false, 122)]
     static void ApplyFromMenu()
     {
         Apply(true);

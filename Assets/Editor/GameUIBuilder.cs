@@ -12,7 +12,7 @@ using UI = ModernUIBuilder;
 
 // Builds the results screen and the imposter overlay prefabs, and restyles the in-game HUD
 // (leaderboard, clock, buttons) in the competition scenes. Uses the same theme as ModernUIBuilder.
-// Run it again from Tools > O-Manager > Apply Game UI after changing colours or layout here.
+// Run it again from Tools > O-Manager > Developer > Apply Game UI after changing colours or layout here.
 public static class GameUIBuilder
 {
     const string EndScreenPath = "Assets/Resources/UI/EndScreen.prefab";
@@ -40,7 +40,7 @@ public static class GameUIBuilder
 
     static Sprite vignette;
 
-    [MenuItem("Tools/O-Manager/Apply Game UI (end screen + in-game HUD)")]
+    [MenuItem("Tools/O-Manager/Developer (rarely needed)/Apply Game UI (end screen + in-game HUD)", false, 101)]
     public static void ApplyAllMenu()
     {
         Debug.Log(ApplyAll());

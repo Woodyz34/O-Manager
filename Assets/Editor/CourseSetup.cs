@@ -47,7 +47,7 @@ public static class CourseSetup
 
     static StringBuilder log;
 
-    [MenuItem("Tools/O-Manager/Set up courses (map, courses, scenes)")]
+    [MenuItem("Tools/O-Manager/Developer (rarely needed)/Set up courses (map, courses, scenes)", false, 121)]
     public static void RunMenu()
     {
         Debug.Log(Run());
