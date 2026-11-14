@@ -1,4 +1,4 @@
-# Poäng 2026-11-13
+# Poäng 2026-11-14
 
 Grupper (klass/bana per lopp): 383, justerade: 368, ojusterade: 15. Varv: 106.
 Löpare: 3454, med betyg: 3026, synliga i spelet: 978 (576 herrar, 402 damer). Frysta kort (inte längre med i paketen): 0.
