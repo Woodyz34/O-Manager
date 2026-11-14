@@ -99,10 +99,14 @@ public class MapEdgeEditor : MonoBehaviour
         CourseUI.Size(zoomOut, -1, 70, 0);
         Button zoomIn = CourseUI.Button("Zoom in", buttons, "+", CourseUI.ButtonKind.Light, () => Zoom(Vector2.zero, 1.5f), 28);
         CourseUI.Size(zoomIn, -1, 70, 0);
-        CourseUI.Button("Whole map", buttons, "Use the whole map", CourseUI.ButtonKind.Light, () => { chosen = null; moved = false; points = null; Redraw(); }, 22);
+        HoverTip.Add(zoomOut, "Zoom out. The mouse wheel does the same.");
+        HoverTip.Add(zoomIn, "Zoom in. The mouse wheel does the same.");
+        HoverTip.Add(CourseUI.Button("Whole map", buttons, "Use the whole map", CourseUI.ButtonKind.Light, () => { chosen = null; moved = false; points = null; Redraw(); }, 22),
+            "Use the whole picture, with no edge. Nothing is left out.");
         Button guess = CourseUI.Button("Guess", buttons, "Use the guess", CourseUI.ButtonKind.Secondary, () => { chosen = guessed; moved = false; points = ToPixels(guessed); Redraw(); }, 22);
         guess.interactable = guessed != null;
-        CourseUI.Button("Done", buttons, "Done", CourseUI.ButtonKind.Primary, Done, 22);
+        HoverTip.Add(guess, "Use the edge that the game guessed from the map file.");
+        HoverTip.Add(CourseUI.Button("Done", buttons, "Done", CourseUI.ButtonKind.Primary, Done, 22), "Keep this edge for the map.");
         Redraw();
     }
 

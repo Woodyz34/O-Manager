@@ -122,6 +122,11 @@ public class SinglePlayerMenu : MonoBehaviour
         poolValue = HeaderColumn(setup.transform, "RUNNER POOL", 300);
         modeValue = HeaderColumn(setup.transform, "GAME MODE", 300);
         courseValue = HeaderColumn(setup.transform, "COURSE", 460);
+        HoverTip.Add(poolValue.transform.parent, UIHints.RunnerPool);
+        HoverTip.Add(modeValue.transform.parent, UIHints.GameMode);
+        HoverTip.Add(courseValue.transform.parent, UIHints.Course);
+        HoverTip.Add(leave, "Back to the main menu.");
+        HoverTip.Add(moneyPill, UIHints.Money);
 
         // Left: the lobby's "Runner setup" card
         Image left = CourseUI.CardPanel("Runner setup", page);
@@ -129,10 +134,10 @@ public class SinglePlayerMenu : MonoBehaviour
         CourseUI.Column(left.gameObject, 14, new RectOffset(28, 28, 24, 24));
         TextMeshProUGUI setupTitle = CourseUI.Text("Title", left.transform, "Runner setup", 36, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(setupTitle, 48);
-        SetupButton(left.transform, "Change color", PlayerColorPicker.Open);
-        SetupButton(left.transform, "Change course", OpenCourses);
-        SetupButton(left.transform, "Runner pool", OpenPools);
-        SetupButton(left.transform, "Game mode", OpenModes);
+        SetupButton(left.transform, "Change color", PlayerColorPicker.Open, UIHints.ChangeColor);
+        SetupButton(left.transform, "Change course", OpenCourses, UIHints.ChangeCourse);
+        SetupButton(left.transform, "Runner pool", OpenPools, UIHints.RunnerPool);
+        SetupButton(left.transform, "Game mode", OpenModes, UIHints.GameMode);
         poolInfo = CourseUI.Text("Pool info", left.transform, "", 20, CourseUI.InkMuted);
         CourseUI.Size(poolInfo, 120);
 
@@ -164,6 +169,9 @@ public class SinglePlayerMenu : MonoBehaviour
         startButton = CourseUI.Button("Start game", page, "Start game", CourseUI.ButtonKind.Primary, StartGame, 40);
         CourseUI.Place((RectTransform)startButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 56), new Vector2(400, 100));
 
+        HoverTip.Add(startButton, "Start the race with these settings.");
+        HoverTip.Add(frame, "The course you will race. Click to choose another one.");
+
         BuildCourseWindow(page);
     }
 
@@ -185,10 +193,11 @@ public class SinglePlayerMenu : MonoBehaviour
         return value;
     }
 
-    static void SetupButton(Transform parent, string label, UnityEngine.Events.UnityAction click)
+    static void SetupButton(Transform parent, string label, UnityEngine.Events.UnityAction click, string tip)
     {
         Button button = CourseUI.Button(label, parent, label, CourseUI.ButtonKind.Light, click, 26);
         CourseUI.Size(button, 66);
+        HoverTip.Add(button, tip);
     }
 
     // The lobby's course window (MapSelectUI) with its tabs, search and AI course, built here in code
@@ -212,6 +221,7 @@ public class SinglePlayerMenu : MonoBehaviour
 
         Button close = CourseUI.Button("Close", window.transform, "Close", CourseUI.ButtonKind.Light, courseWindow.ClosePanel, 26);
         CourseUI.Place((RectTransform)close.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36, -36), new Vector2(180, 60));
+        HoverTip.Add(close, "Close this window.");
         window.gameObject.SetActive(false);
     }
 

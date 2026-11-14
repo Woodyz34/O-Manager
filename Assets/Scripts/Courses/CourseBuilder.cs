@@ -2542,6 +2542,7 @@ public class CourseBuilder : MonoBehaviour
         else CourseUI.Button("Back", bottomRow, "Back to menu", CourseUI.ButtonKind.Light, () => SceneLoader.Load("MainMenu", "Back to the menu"), 22);
 
         BuildRelayPanel(canvasObject.transform);
+        AddBuilderTips(importMap, newCourse);
 
         // The label next to the mouse; it never takes clicks
         Image tip = CourseUI.Panel("Mouse label", canvasObject.transform, CourseUI.CardSolid);
@@ -2557,6 +2558,31 @@ public class CourseBuilder : MonoBehaviour
         cursorTipText.enableWordWrapping = false;
         cursorTipText.overflowMode = TextOverflowModes.Overflow;
         tip.gameObject.SetActive(false);
+    }
+
+    // Hover texts for the course builder's side panel
+    void AddBuilderTips(Button importMap, Button newCourse)
+    {
+        HoverTip.Add(undoButton, "Takes back your last change. Ctrl+Z does the same.");
+        HoverTip.Add(importMap, "Bring a new map into the game from an OCAD or OpenOrienteering Mapper file. You choose the terrain speeds and look when you import it.");
+        HoverTip.Add(mapButton, "Choose which map you lay the course on.");
+        HoverTip.Add(typeButton, "Click to switch. Individual: one course that everyone runs. Relay: several legs, each with its own course, and forks if you want them.");
+        HoverTip.Add(nameField, "The course's name in the course lists.");
+        HoverTip.Add(authorField, "Your name, shown as the maker of the course.");
+        HoverTip.Add(toolButtons[Tool.Start], "Click on the map to place the start triangle.");
+        HoverTip.Add(toolButtons[Tool.Control], "Click on the map to add the next control. Drag a control to move it, click on the line to add one in between.");
+        HoverTip.Add(toolButtons[Tool.Finish], "Click on the map to place the finish.");
+        HoverTip.Add(forbiddenButton, "Draw an area that is out of bounds. Runners never run through it, like a private garden or a marked-off area.");
+        HoverTip.Add(boundaryButton, "Draw a line that cannot be crossed, such as a wall or a fence that runners have to go around.");
+        HoverTip.Add(forestButton, "Mark the course as a forest course. This decides which kind of runner speed and game rules it uses.");
+        HoverTip.Add(sprintButton, "Mark the course as a sprint course: short, fast legs in a town or park.");
+        HoverTip.Add(saveButton, "Saves the course and shares it with the other players, so they can pick it in the lobby.");
+        HoverTip.Add(myCoursesButton, "Open the list of the courses you have made. You can edit or delete them.");
+        HoverTip.Add(newCourse, "Clear everything and start a new course. You can undo it.");
+        HoverTip.Add(sameCourseButton, "Use the same course on this leg as on the leg before it, or give this leg its own course.");
+        HoverTip.Add(legSexButton, "Who may run this leg: anyone, only women or only men. Click to change.");
+        HoverTip.Add(forkModeButton, "Click to switch. Random: each team gets a random branch of every fork. Every branch: each team runs every branch once, so a fork needs as many legs as it has branches.");
+        HoverTip.Add(otherLegsButton, "Show the other legs' controls faded on the map, so you can line the legs up, or hide them.");
     }
 
     void BuildRelayPanel(Transform canvas)
@@ -2577,6 +2603,8 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Size(legsLabel, 46, 150);
         Button plus = CourseUI.Button("More", legsRow, "+", CourseUI.ButtonKind.Light, () => ChangeLegs(1), 28);
         CourseUI.Size(plus, 46, 60);
+        HoverTip.Add(minus, "One leg fewer in the relay.");
+        HoverTip.Add(plus, "One leg more in the relay.");
 
         TextMeshProUGUI legHint = CourseUI.Text("Leg hint", relayPanel.transform, "Click a leg to lay its course:", 19, CourseUI.InkMuted);
         CourseUI.Size(legHint, 26);

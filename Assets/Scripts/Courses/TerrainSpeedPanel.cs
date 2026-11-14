@@ -93,6 +93,7 @@ public class TerrainSpeedPanel : MonoBehaviour
         CourseUI.Size(detailBar, 50);
         detailsButton = CourseUI.Button("Details", detailBar, "", CourseUI.ButtonKind.Light, () => { showDetails = !showDetails; Refresh(); }, 20);
         CourseUI.Size(detailsButton, -1, 300);
+        HoverTip.Add(detailsButton, "Shows or hides one slider per kind of ground, if you want to fine-tune roads, marsh, green areas and so on.");
         summary = CourseUI.Text("Summary", detailBar, "", 18, CourseUI.InkMuted);
         summary.alignment = TextAlignmentOptions.MidlineLeft;
         summary.textWrappingMode = TextWrappingModes.Normal;
@@ -136,9 +137,9 @@ public class TerrainSpeedPanel : MonoBehaviour
         RectTransform buttons = CourseUI.Rect("Buttons", card.transform);
         CourseUI.Row(buttons.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(buttons, 58);
-        CourseUI.Button("Normal", buttons, "All normal", CourseUI.ButtonKind.Light, ResetAll, 22);
-        CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, () => Destroy(gameObject), 22);
-        CourseUI.Button("Done", buttons, "Done", CourseUI.ButtonKind.Primary, Done, 22);
+        HoverTip.Add(CourseUI.Button("Normal", buttons, "All normal", CourseUI.ButtonKind.Light, ResetAll, 22), "Puts every slider back in the middle, the game's normal speeds.");
+        HoverTip.Add(CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, () => Destroy(gameObject), 22), "Closes this window and throws away your changes.");
+        HoverTip.Add(CourseUI.Button("Done", buttons, "Done", CourseUI.ButtonKind.Primary, Done, 22), "Keeps these speeds for the map.");
 
         Refresh();
     }
@@ -176,7 +177,25 @@ public class TerrainSpeedPanel : MonoBehaviour
         r.value.alignment = TextAlignmentOptions.MidlineRight;
         CourseUI.Size(r.value, -1, 100);
         rows.Add(r);
+        if (Tips.TryGetValue(name, out string tip)) HoverTip.Add(row, tip);
     }
+
+    // Hover texts: what each kind of ground is on the map
+    static readonly Dictionary<string, string> Tips = new Dictionary<string, string>
+    {
+        { "Overall", "Moves every kind of ground at once. Towards 'Very tough' the whole map is slower, towards 'Easy running' it is quicker. Use it for a map that is generally harder or easier than normal." },
+        { "Asphalt", "Hard paved ground: tarmac roads, car parks, paved squares and pavements. The quickest ground in the game, mostly found on sprint maps." },
+        { "Roads", "Roads drawn as lines on the map, such as gravel and forest roads. Quick to run on. Move the slider if the roads on this map are sandy (slower) or hard and smooth (quicker)." },
+        { "Small paths", "Small paths and tracks drawn as thin lines. Quicker than the forest around them, slower than a road." },
+        { "Open land", "Open ground without trees: fields, meadows and lawns. Quicker than white forest. Slide towards the slow end for tussocks or ploughed fields." },
+        { "White forest", "Ordinary forest you can run straight through, shown white on the map. This is the speed everything else is compared with (100 %)." },
+        { "Felled area (hygge)", "Light yellow areas on the map: felled forest with branches and stumps, heath and newly planted ground. Open to look at, but rough to run on." },
+        { "Marsh", "Marshes and bogs. Soft and heavy ground that slows the runners a lot. Slide it towards 'Like white forest' for a dry marsh that is easy to cross." },
+        { "Light green", "Slow-running forest, shown light green on the map: thick undergrowth or young trees you have to push through." },
+        { "Mid green", "Very slow-running forest, shown mid green: really thick vegetation. Runners avoid it when there is a way around." },
+        { "Dark green", "Almost impassable thicket, shown dark green. At the left end it is closed: runners cannot go through at all and have to run around." },
+        { "Stony ground", "How much stones and boulders slow the runner on top of the ground below them. 'No slower' means stones make no difference." },
+    };
 
     void Refresh()
     {

@@ -121,11 +121,19 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
         RectTransform buttons = CourseUI.Rect("Buttons", card.transform);
         CourseUI.Place(buttons, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 30), new Vector2(820, 60));
         CourseUI.Row(buttons.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
-        CourseUI.Size(CourseUI.Button("Zoom out", buttons, "-", CourseUI.ButtonKind.Light, () => drawer.Zoom(Vector2.zero, 0.67f), 28), 60, 70);
-        CourseUI.Size(CourseUI.Button("Zoom in", buttons, "+", CourseUI.ButtonKind.Light, () => drawer.Zoom(Vector2.zero, 1.5f), 28), 60, 70);
-        CourseUI.Size(CourseUI.Button("Whole map", buttons, "Whole map", CourseUI.ButtonKind.Light, () => { drawer.stroke.Clear(); drawer.closed = false; drawer.warnOpen = false; drawer.Redraw(); }, 22), 60, -1, 1);
-        CourseUI.Size(CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, () => Destroy(shade.gameObject), 22), 60, -1, 1);
-        CourseUI.Size(CourseUI.Button("Use", buttons, "Use", CourseUI.ButtonKind.Primary, () =>
+        Button zoomOutButton = CourseUI.Button("Zoom out", buttons, "-", CourseUI.ButtonKind.Light, () => drawer.Zoom(Vector2.zero, 0.67f), 28);
+        CourseUI.Size(zoomOutButton, 60, 70);
+        HoverTip.Add(zoomOutButton, "Zoom out. The mouse wheel does the same.");
+        Button zoomInButton = CourseUI.Button("Zoom in", buttons, "+", CourseUI.ButtonKind.Light, () => drawer.Zoom(Vector2.zero, 1.5f), 28);
+        CourseUI.Size(zoomInButton, 60, 70);
+        HoverTip.Add(zoomInButton, "Zoom in. The mouse wheel does the same.");
+        Button wholeButton = CourseUI.Button("Whole map", buttons, "Whole map", CourseUI.ButtonKind.Light, () => { drawer.stroke.Clear(); drawer.closed = false; drawer.warnOpen = false; drawer.Redraw(); }, 22);
+        CourseUI.Size(wholeButton, 60, -1, 1);
+        HoverTip.Add(wholeButton, "Throw away the ring and use the whole map.");
+        Button cancelButton = CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, () => Destroy(shade.gameObject), 22);
+        CourseUI.Size(cancelButton, 60, -1, 1);
+        HoverTip.Add(cancelButton, "Close without changing the area.");
+        Button useButton = CourseUI.Button("Use", buttons, "Use", CourseUI.ButtonKind.Primary, () =>
         {
             if (!drawer.closed && drawer.stroke.Count > 0)
             {
@@ -137,7 +145,9 @@ public class AICourseAreaDrawer : MonoBehaviour, IPointerDownHandler, IDragHandl
             List<CoursePoint> ring = drawer.closed ? drawer.ToMap() : null;
             Destroy(shade.gameObject);
             onDone?.Invoke(ring);
-        }, 22), 60, -1, 1);
+        }, 22);
+        CourseUI.Size(useButton, 60, -1, 1);
+        HoverTip.Add(useButton, "Use the ring you drew: the controls will stay inside it.");
 
         // Show the area chosen before
         if (current != null && current.Count >= 3 && background != null)

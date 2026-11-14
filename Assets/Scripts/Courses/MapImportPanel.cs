@@ -218,7 +218,30 @@ public class MapImportPanel : MonoBehaviour
         cancelButton = CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, Close, 24);
         importButton = CourseUI.Button("Import", buttons, "Import map", CourseUI.ButtonKind.Primary, () => StartCoroutine(Import()), 24);
 
+        AddTips();
         Refresh();
+    }
+
+    // Hover texts for everything in the window that needs an explanation
+    void AddTips()
+    {
+        HoverTip.Add(pathField, "Where the map file is on your computer. You can also drag the file onto the game window.");
+        HoverTip.Add(nameField, "The name the map gets in the game's map list.");
+        HoverTip.Add(typeButton, "Click to change. Forest map: for orienteering in the forest. Sprint map: for town and park maps, with streets, buildings and fences. Forest and sprint: a map that has both. This sets how the game reads the map and which game modes it can be used for.");
+        HoverTip.Add(contourField, "The distance in metres between two contour lines on the map. Forest maps are usually 5, sprint maps 2.5. The game uses it to work out hills and slopes.");
+        HoverTip.Add(pictureField, "Optional. A picture of the finished map that the game shows instead of drawing the map itself. Leave empty if you are not sure.");
+        HoverTip.Add(pictureButton, "Optional: use your own picture of the map instead of the one the game draws.");
+        HoverTip.Add(edgeButton, "Shows where the game thinks the finished map ends. Parts outside it, like unfinished mapping, are left out. Check it and move the edge if it is wrong.");
+        HoverTip.Add(terrainButton, "Set how quick each kind of ground is on this map: asphalt, roads, open land, forest, marsh and so on. If you change nothing, the game's normal speeds are used.");
+        HoverTip.Add(lookButton, "Set what the terrain looks like in the 3D view at a TV control: ground, trees and undergrowth. Only changes how it looks, not the running.");
+        HoverTip.Add(publicButton, "Everyone who plays the game can use this map, and it is shared through the cloud.");
+        HoverTip.Add(privateButton, "Only you can use this map. It stays on your computer and is not shared.");
+        HoverTip.Add(permissionButton, "Public maps must be allowed to be shared. Tick this when you are sure the map's owner is fine with it.");
+        HoverTip.Add(senderField, "Your name. Only the game's owner sees it, so the owner knows who to ask if a club asks about its map.");
+        HoverTip.Add(clubField, "The club that owns the map, if you know it.");
+        HoverTip.Add(contactField, "E-mail or phone number where the game's owner can reach you about this map. It is not shown to other players.");
+        HoverTip.Add(cancelButton, "Closes this window without importing anything.");
+        HoverTip.Add(importButton, "Builds the map from the file and adds it to the game. It can take a while for big maps.");
     }
 
     // ---- Choosing files ----

@@ -82,6 +82,9 @@ public static class LobbyVisit
         CourseUI.Size(runners, 60);
         Button builder = CourseUI.Button("Course builder", card.transform, "Course builder", CourseUI.ButtonKind.Light, () => Open(Place.CourseBuilder), 24);
         CourseUI.Size(builder, 60);
+        HoverTip.Add(shop, "Open runner packs while you wait. You come straight back to the lobby when you leave.");
+        HoverTip.Add(runners, "Look at the runner cards you own. You come straight back to the lobby when you leave.");
+        HoverTip.Add(builder, "Build your own courses or import maps while you wait. You come straight back to the lobby when you leave.");
     }
 
     // Money always sits in the top right corner, as in the main menu, so "Leave lobby" moves to the top left

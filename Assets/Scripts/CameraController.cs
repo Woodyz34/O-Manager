@@ -49,9 +49,20 @@ public class CameraController : MonoBehaviour
     private TextMeshProUGUI followButtonText;
 
 
+    private AudioListener ear;
+
     public void Awake()
     {
         SceneManager.sceneLoaded += OnSceneLoaded;
+
+        // Every player has a camera with its own AudioListener, but only the local player's camera is switched
+        // on. Listeners of switched-off cameras stay enabled otherwise, and Unity then warns that there are
+        // several in the scene. The listener follows its camera (LateUpdate) and starts off.
+        if (cam != null)
+        {
+            ear = cam.GetComponent<AudioListener>();
+            if (ear != null) ear.enabled = false;
+        }
 
         if (SceneManager.GetActiveScene().name == "Lobby")
         {
@@ -161,6 +172,11 @@ public class CameraController : MonoBehaviour
 
     void LateUpdate()
     {
+        if (ear != null)
+        {
+            bool wanted = cam != null && cam.enabled;
+            if (ear.enabled != wanted) ear.enabled = wanted;
+        }
         if (cam == null || !cam.enabled || !IsFollowingRunner())
         {
             return;
