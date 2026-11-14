@@ -48,6 +48,8 @@ for name, (src, crop) in PICS.items():
         t = im if im.width <= width else im.resize((width, round(im.height*width/im.width)), Image.LANCZOS)
         t.save(f"{OUT}/{name}-{tag}.webp", quality=80, method=6)
         t.save(f"{OUT}/{name}-{tag}.avif", quality=58)
+    # Full size for the zoom viewer (opened only when someone clicks a picture)
+    im.save(f"{OUT}/{name}-x.webp", quality=82, method=6)
     print(name, im.size)
 
 # Fictional runner portraits for the card stack (Blender placeholder people, not real athletes)

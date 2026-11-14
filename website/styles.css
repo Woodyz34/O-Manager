@@ -335,13 +335,52 @@ section { position: relative; }
 .foot p { margin: 0; }
 .foot .small { font-size: .85rem; }
 
-/* ---------- Lightbox ---------- */
-.lightbox { padding: 0; border: 0; background: transparent; max-width: min(1600px, 94vw); max-height: 92vh; overflow: visible; }
-.lightbox::backdrop { background: rgba(6, 16, 11, .88); backdrop-filter: blur(6px); }
-.lightbox img { max-height: 88vh; width: auto; border-radius: 14px; box-shadow: 0 40px 80px rgba(0, 0, 0, .6); }
-.lightbox[open] img { animation: pop .4s var(--ease); }
+/* ---------- Picture viewer (click any screenshot) ---------- */
+[data-zoomable] { cursor: zoom-in; }
+.shot, .tv-frame, .tv-strip figure { position: relative; }
+.zoom-badge { position: absolute; right: 12px; bottom: 12px; z-index: 2; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: rgba(11, 31, 21, .72); color: #fff; backdrop-filter: blur(6px); opacity: 0; transform: scale(.8); transition: opacity .3s, transform .3s var(--ease); pointer-events: none; }
+.zoom-badge svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.shot:hover .zoom-badge, .tv-frame:hover .zoom-badge, .tv-strip figure:hover .zoom-badge, .g-item:hover .zoom-badge { opacity: 1; transform: none; }
+@media (hover: none) { .zoom-badge { opacity: .9; transform: none; width: 32px; height: 32px; } }
+.g-item { position: relative; }
+.g-item .zoom-badge { bottom: auto; top: 12px; }
+.tv-strip .zoom-badge { bottom: auto; top: 10px; right: 10px; width: 32px; height: 32px; }
+.tv-frame .zoom-badge { right: auto; left: 16px; bottom: 16px; }
+
+.viewer { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #07120c; color: var(--cream-50); overflow: hidden; outline: none; overscroll-behavior: contain; }
+.viewer::backdrop { background: transparent; }
+.viewer[open] { animation: vwFade .3s ease; }
+@keyframes vwFade { from { opacity: 0; } }
+.vw-stage { position: absolute; inset: 0; display: grid; place-items: center; touch-action: none; cursor: zoom-in; user-select: none; }
+.vw-stage.zoomed { cursor: grab; }
+.vw-stage.dragging { cursor: grabbing; }
+.vw-stage img { max-width: calc(100vw - 48px); max-height: calc(100vh - 150px); width: auto; height: auto; border-radius: 10px; box-shadow: 0 40px 90px rgba(0, 0, 0, .6); transform-origin: 0 0; will-change: transform; }
+.vw-stage img.anim { transition: transform .28s var(--ease); }
+.viewer[open] .vw-stage img.pop { animation: pop .35s var(--ease); }
 @keyframes pop { from { opacity: 0; transform: scale(.94); } }
-.lb-close { position: absolute; right: -12px; top: -12px; }
+.vw-top { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; background: linear-gradient(rgba(6, 16, 11, .75), transparent); pointer-events: none; }
+.vw-top > * { pointer-events: auto; }
+.vw-count { font-size: .9rem; font-weight: 600; letter-spacing: .08em; opacity: .8; }
+.vw-tools { display: flex; align-items: center; gap: 6px; }
+.vw-zoom { min-width: 52px; text-align: center; font-size: .85rem; font-variant-numeric: tabular-nums; opacity: .85; }
+.vw-btn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .08); color: #fff; display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(8px); transition: background .2s, transform .2s var(--ease); }
+.vw-btn:hover { background: rgba(255, 255, 255, .18); }
+.vw-btn:active { transform: scale(.94); }
+.vw-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.vw-btn[disabled] { opacity: .35; cursor: default; }
+.vw-nav { position: absolute; top: 50%; margin-top: -26px; width: 52px; height: 52px; }
+.vw-prev { left: 16px; }
+.vw-next { right: 16px; }
+.vw-bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 16px 16px; text-align: center; background: linear-gradient(transparent, rgba(6, 16, 11, .8)); pointer-events: none; }
+.vw-cap { margin: 0 0 4px; font-weight: 600; font-size: 1.02rem; }
+.vw-hint { margin: 0; font-size: .82rem; opacity: .6; }
+.viewer.is-zoomed .vw-nav, .viewer.is-zoomed .vw-bottom { opacity: 0; pointer-events: none; }
+.vw-nav, .vw-bottom { transition: opacity .25s; }
+@media (max-width: 700px) {
+  .vw-nav { top: auto; bottom: 64px; margin: 0; width: 44px; height: 44px; }
+  .vw-stage img { max-width: 100vw; border-radius: 0; max-height: calc(100vh - 170px); }
+  .vw-zoom { display: none; }
+}
 
 /* ---------- Scroll reveal ---------- */
 .js .reveal { opacity: 0; transform: translateY(36px); transition: opacity .9s var(--ease), transform .9s var(--ease); }
