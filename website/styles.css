@@ -315,9 +315,7 @@ section { position: relative; }
 .dl-meta { margin: 16px 0 0; font-size: .92rem; color: var(--ink-soft); min-height: 1.6em; }
 .dl-steps { list-style: none; padding: 0; margin: 34px 0 0; display: grid; gap: 12px; text-align: left; }
 .dl-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; background: var(--cream-100); }
-.dl-steps b { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--cream-50); font-size: .85rem; }
-.dl-all { margin: 22px 0 0; font-size: .95rem; }
-.dl-all a { color: var(--orange-lo); font-weight: 600; }
+.dl-steps li > b { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--cream-50); font-size: .85rem; }
 
 /* ---------- FAQ ---------- */
 .faq { background: var(--cream-50); }
