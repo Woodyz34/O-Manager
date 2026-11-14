@@ -71,6 +71,10 @@ public class LobbySettingsUI : MonoBehaviour
             mapText.fontSizeMin = Mathf.Min(14f, mapText.fontSize);
         }
         MoveHeaderUp();
+        // Hover texts explain what is shown now (the pool and modes that are picked), not every possible choice
+        if (modeText != null) HoverTip.Add(modeText.transform.parent, () => poolTip);
+        if (imposterText != null) HoverTip.Add(imposterText.transform.parent, () => modeTip);
+        if (mapText != null) HoverTip.Add(mapText.transform.parent, UIHints.Course + " The host decides.");
         Show("...", ExtraMode.None, "...");
         LobbyVisit.AddButtons();
     }
@@ -307,8 +311,14 @@ public class LobbySettingsUI : MonoBehaviour
         return course.name + "  <size=70%><b>" + type + "</b>" + by + "</size>";
     }
 
+    string poolTip = "";
+    string modeTip = "";
+
     void Show(string mode, ExtraMode extra, string map)
     {
+        bool noRunners = (extra & ExtraModes.NoRunners) != 0;
+        poolTip = GameModes.ExplainPool(mode, noRunners);
+        modeTip = mode == "..." ? "" : ExtraModes.Explain(extra);
         // Route analysis and the route choice game give everyone the same runner, so the pool does not matter then
         modeText.text = mode == "..." ? mode : (extra & ExtraModes.NoRunners) != 0 ? "No runners" : GameModes.PoolName(mode);
         imposterText.text = mode == "..." ? "..." : ExtraModes.Describe(extra);

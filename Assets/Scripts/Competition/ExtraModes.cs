@@ -105,6 +105,18 @@ public static class ExtraModes
         }
     }
 
+    // The hover text of the game mode shown in the lobby: explains the modes that are on now, nothing else
+    public static string Explain(ExtraMode modes)
+    {
+        if (modes == ExtraMode.None) return "Normal: no extra game modes. Everyone just races to finish first.";
+        List<string> lines = new List<string>();
+        foreach (ExtraMode mode in All)
+        {
+            if ((modes & mode) != 0) lines.Add(Title(mode) + ": " + Description(mode));
+        }
+        return string.Join("\n", lines);
+    }
+
     // "Normal", or the modes that are on: "Imposter + Bears"
     public static string Describe(ExtraMode modes)
     {

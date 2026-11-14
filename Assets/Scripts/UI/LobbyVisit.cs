@@ -270,6 +270,7 @@ public class LobbyVisitCard : MonoBehaviour
             if (other.renderMode != RenderMode.ScreenSpaceOverlay || other.sortingOrder <= canvas.sortingOrder) continue;
             if (other.name == "Toast" || other.name == "Esc menu") continue;
             if (other.GetComponent<LoadingScreenUI>() != null) continue;
+            if (other.GetComponent<HoverTip>() != null) continue;   // the hover text's canvas is always there
             return true;
         }
         return false;
