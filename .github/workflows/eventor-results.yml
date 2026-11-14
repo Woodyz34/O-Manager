@@ -5,7 +5,12 @@ name: Eventor resultat
 # week = senaste veckan (nivå 1, 2 och internationellt)
 # Ett anrop för listan + ett per etapp, med 20 s paus mellan anropen.
 # Etapper som redan finns i eventor/data/races hämtas inte igen.
+#
+# Veckojobb: ta bort # framför de tre schedule-raderna nedan för att köra "week" varje måndag kl 05:00 (svensk tid
+# ungefär 06-07). Avstängt tills Anders säger till.
 on:
+  # schedule:
+  #   - cron: "0 5 * * 1"
   workflow_dispatch:
     inputs:
       mode:
@@ -49,7 +54,8 @@ jobs:
       - name: Hämta resultat
         env:
           EVENTOR_API_KEY: ${{ secrets.EVENTOR_API_KEY }}
-        run: python eventor/fetch_results.py --mode "${{ inputs.mode }}"
+        # Schemalagd körning har inga inputs: då blir det "week"
+        run: python eventor/fetch_results.py --mode "${{ inputs.mode || 'week' }}"
       - name: Räkna poäng
         run: python eventor/compute_points.py
       - name: Spara resultaten i repot
@@ -61,7 +67,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Inget nytt att spara."
           else
-            git commit -m "Eventor-data: ${{ inputs.mode }} $(date -u +%F)"
+            git commit -m "Eventor-data: ${{ inputs.mode || 'week' }} $(date -u +%F)"
             git pull --rebase origin main
             git push
           fi
@@ -69,7 +75,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eventor-raw-${{ inputs.mode }}
+          name: eventor-raw-${{ inputs.mode || 'week' }}
           path: eventor/cache/
           if-no-files-found: ignore
           retention-days: 90

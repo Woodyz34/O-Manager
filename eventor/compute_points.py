@@ -294,6 +294,14 @@ def build_entries(races, ids):
     winsplits.sort(key=lambda r: (r.get("distance") or "").lower() == "sprint")
     groups = []
     ids.prescan(eventor)
+    # The same race can come from Eventor and from a WinSplits file (e.g. SM sprint): the WinSplits copy is skipped.
+    # Known by date and the three fastest runners with their times.
+    seen_results = set()
+
+    def podium(date, rs):
+        top = sorted(rs, key=lambda r: r["time"])[:3]
+        return (date, tuple((match_name(r["name"]), int(round(r["time"]))) for r in top))
+
     for race in eventor + winsplits:     # Eventor first so WinSplits can match to Eventor ids
         date = dt.date.fromisoformat(race["date"])
         is_ws = race.get("source") == "winsplits"
@@ -301,6 +309,11 @@ def build_entries(races, ids):
         anchor = international and not is_side_race(race)
         for cls in race["classes"]:
             ok = [r for r in cls["runners"] if r["status"] == "OK" and r.get("time")]
+            if ok:
+                sig = podium(date, ok)
+                if is_ws and sig in seen_results:
+                    continue
+                seen_results.add(sig)
             by_course = collections.defaultdict(list)
             for r in ok:
                 by_course[tuple(s[0] for s in r["splits"])].append(r)
