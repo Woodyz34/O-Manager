@@ -43,7 +43,7 @@ Rating per runner, over the last 365 days:
   * visible in the game with >= 5 adjusted races, or any VM/EM/VC race (finals,
     qualifications and B finals alike; national qualifications do not count).
 
-Merits (best races of the last 365 days, shown on the card close-up):
+Merits (best races of the last 365 days, forest and sprint together since 2026-11-14, shown on the card close-up):
   * race score = 100 * c100 / finish time, mistakes included, only adjusted races.
     c100 already carries the strength of the field, so 20th against a strong field
     can beat a win against a weak one.
@@ -470,9 +470,20 @@ def solve(groups, today, fallback=None, via_fallback=None):
 
 # ---------- merits ----------
 
-def merits(groups, adjusted, c100, rating, today):
-    """key -> the runner's best races of the last year, best first."""
+def merits(scales, today):
+    """key -> the runner's best races of the last year, best first. scales = one (groups, adjusted, c100, rating)
+    per scale: forest and sprint (since 2026-11-14, user's wish: sprint-strong runners show their best sprints).
+    Both scales put the world's best at 100, so a sprint score and a forest score compare directly."""
     out = collections.defaultdict(list)
+    for groups, adjusted, c100, rating in scales:
+        add_merits(out, groups, adjusted, c100, rating, today)
+    for key in out:
+        out[key].sort(key=lambda m: (-m["score"], m["date"]))
+        out[key] = out[key][:MERITS_PER_RUNNER]
+    return out
+
+
+def add_merits(out, groups, adjusted, c100, rating, today):
     for g in groups:
         if g["id"] not in adjusted or (today - g["date"]).days > WINDOW_DAYS:
             continue
@@ -487,10 +498,6 @@ def merits(groups, adjusted, c100, rating, today):
                 "score": round(100.0 * c100[g["id"]] / r["time"], 2), "field": round(field, 2),
                 "results": g["file"],
             })
-    for key in out:
-        out[key].sort(key=lambda m: (-m["score"], m["date"]))
-        out[key] = out[key][:MERITS_PER_RUNNER]
-    return out
 
 
 # ---------- full results for the merit races ----------
@@ -861,7 +868,7 @@ def main():
     s_c100, s_adjusted, s_rating, s_iterations = (solve(sprint_groups, today, fallback=rating, via_fallback=via_physics)
                                                   if sprint_groups else ({}, set(), {}, 0))
 
-    best = merits(groups, adjusted, c100, rating, today)
+    best = merits([(groups, adjusted, c100, rating), (sprint_groups, s_adjusted, s_c100, s_rating)], today)
     anchored_keys = {r["_key"] for g in groups if g["international"] for r in g["runners"]}
     all_keys = {r["_key"] for g in all_groups for r in g["runners"]}
     runners = []
@@ -891,7 +898,7 @@ def main():
     runners.sort(key=lambda r: (r["sex"] or "", -(r["physic"] or 0), -(r["sprint_speed"] or 0)))
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump({"computed": today.isoformat(), "runners": runners}, f, ensure_ascii=False, indent=0)
-    frozen = write_game_file(runners, today, groups, ids.merged)
+    frozen = write_game_file(runners, today, all_groups, ids.merged)
     for ws_id, key in sorted(ids.merged.items()):
         print(f"Samma löpare utan mellannamn: {ws_id} -> {ids.info[key]['name']}")
 

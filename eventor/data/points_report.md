@@ -453,7 +453,7 @@ Löpare: 3454, med betyg: 3026, synliga i spelet: 978 (576 herrar, 402 damer). F
 
 ## Sprint
 
-Sprintgrupper: 51, justerade: 51, ojusterade: 0. Varv: 15. Löpare med sprintfart: 1466, varav i spelet: 611 av 978 (övriga visar - och springer med sin fysik).
+Sprintgrupper: 50, justerade: 50, ojusterade: 0. Varv: 15. Löpare med sprintfart: 1466, varav i spelet: 611 av 978 (övriga visar - och springer med sin fysik).
 
 ### Herrar, sprintfart topp 15 (synliga)
 
@@ -515,7 +515,7 @@ Sprintgrupper: 51, justerade: 51, ojusterade: 0. Varv: 15. Löpare med sprintfar
 | 2026-05-16 | SM, sprint (Swedish League, #4), final | D18 | 41 | ja | 10:03 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), final | D20 | 41 | ja | 12:56 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), final | D21A | 40 | ja | 14:13 |
-| 2026-05-16 | SM, sprint (Swedish League, #4), final | H18 | 41 | ja | 11:19 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), final | H18 | 41 | ja | 11:17 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), final | H20 | 37 | ja | 12:05 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), final | H21A | 41 | ja | 14:52 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), final | H21B | 31 | ja | 14:39 |
@@ -525,9 +525,8 @@ Sprintgrupper: 51, justerade: 51, ojusterade: 0. Varv: 15. Löpare med sprintfar
 | 2026-05-16 | SM, sprint (Swedish League, #4), kval | D20B | 23 | ja | 10:00 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), kval | D21A | 24 | ja | 10:58 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), kval | D21B | 28 | ja | 10:52 |
-| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H18A | 32 | ja | 8:45 |
+| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H18A | 32 | ja | 8:44 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), kval | H18B | 30 | ja | 9:20 |
-| 2026-05-16 | SM, sprint (Swedish League, #4), kval | H18C | 30 | ja | 9:20 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), kval | H20A | 32 | ja | 10:21 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), kval | H20B | 26 | ja | 9:49 |
 | 2026-05-16 | SM, sprint (Swedish League, #4), kval | H21A | 40 | ja | 11:40 |
@@ -625,9 +624,6 @@ Sprintgrupper: 51, justerade: 51, ojusterade: 0. Varv: 15. Löpare med sprintfar
 - Jonas Gustafsson (Bredaryds SOK), DM, sprint, Småland: e16764, e22239
 - Alva Olsson (Åmåls OK), SM, sprint (Swedish League, #4), kval: e141027, e26287
 - Alva Olsson (Åmåls OK), SM, sprint (Swedish League, #4), final: e141027, e26287
-- Isak Gustafsson (Lunds OK), SM, sprint (Swedish League, #4), kval: e161468, e59497
-- Lukas Larsson (OK Roxen), SM, sprint (Swedish League, #4), kval: e141511, e59017
-- Melker Sundström (OK Skogshjortarna), SM, sprint (Swedish League, #4), kval: e61487, e78429
 - Isak Gustafsson (Lunds OK), SM, sprint (Swedish League, #4), kval: e161468, e59497
 - Lukas Larsson (OK Roxen), SM, sprint (Swedish League, #4), kval: e141511, e59017
 - Melker Sundström (OK Skogshjortarna), SM, sprint (Swedish League, #4), kval: e61487, e78429
