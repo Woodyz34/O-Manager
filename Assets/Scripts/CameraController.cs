@@ -87,6 +87,11 @@ public class CameraController : MonoBehaviour
             SceneManager.sceneLoaded -= OnSceneLoaded;
             return;
         }
+        // The route choice game, the route comparison and the relay replay switch this controller off while they
+        // own the camera. The player (and so this controller) lives on into the next race, so a view that was closed
+        // by a scene change (the host taking everyone back to the lobby) left zoom, panning and Follow runner off in
+        // every race after it. A new scene always starts with the player's own camera control on.
+        if (!enabled) enabled = true;
         if (scene.name == "Lobby") return;
         InitializeCamera();
     }

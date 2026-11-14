@@ -391,4 +391,10 @@ public class RelayReplayView : MonoBehaviour
         Destroy(gameObject);
         onClose?.Invoke();
     }
+
+    // Closed by a scene change (the host took everyone back to the lobby) rather than by Close()
+    void OnDestroy()
+    {
+        if (cameraController != null) cameraController.enabled = true;
+    }
 }

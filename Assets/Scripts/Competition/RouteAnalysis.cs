@@ -941,6 +941,8 @@ public class RouteCompareView : MonoBehaviour
     {
         stopWorking = true;
         HideRunners(false);
+        // Closed by a scene change (the host took everyone back to the lobby) rather than by Close()
+        if (cameraController != null) cameraController.enabled = true;
         foreach (GameObject go in drawn) if (go != null) Destroy(go);
         if (panel != null) Destroy(panel);
     }

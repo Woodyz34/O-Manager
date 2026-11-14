@@ -1268,6 +1268,10 @@ public class RouteChoiceView : MonoBehaviour
         foreach (GameObject hidden in hiddenHud) if (hidden != null) hidden.SetActive(true);
         RouteChoiceGame.KeysChanged -= RefreshChoiceKeys;
         RouteCompareView.HideRunners(false);
+        // Start() switched the player's camera control off; the player lives on into the next race
+        NetworkPlayer local = NetworkPlayer.Local;
+        CameraController controller = local != null ? local.GetComponent<CameraController>() : null;
+        if (controller != null) controller.enabled = true;
         ClearDrawn();
         if (panel != null) Destroy(panel);
         if (overlay != null) Destroy(overlay);
