@@ -697,7 +697,9 @@ def write_game_file(runners, today, groups, merged_ids=None):
     # A name that was renamed earlier and is a card again is no longer moved
     names = {c["name"] for c in cards}
     renamed = [r for r in renamed if r["from"] not in names]
-    cards.sort(key=lambda c: (-(0.8 * c["physics"] + 0.2 * c["technique"]), c["name"]))   # overall = 80 % physics, 20 % technique
+    # overall = 40 % physics, 40 % speed (physics when there is no sprint speed), 20 % technique, as RunnerCards.OverallExact
+    cards.sort(key=lambda c: (-(0.4 * c["physics"] + 0.4 * (c["speed"] if c["speed"] >= 0 else c["physics"])
+                                + 0.2 * c["technique"]), c["name"]))
     os.makedirs(os.path.dirname(GAME_JSON), exist_ok=True)
     with open(GAME_JSON, "w", encoding="utf-8") as f:
         json.dump({"computed": today.isoformat(), "renamed": renamed, "runners": cards}, f, ensure_ascii=False, indent=0)
