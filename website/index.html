@@ -377,9 +377,23 @@
   </div>
 </footer>
 
-<dialog class="lightbox" id="lightbox" aria-label="Screenshot">
-  <img id="lbImg" alt="">
-  <button class="round lb-close" type="button" id="lbClose" aria-label="Stäng / Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+<dialog class="viewer" id="viewer" aria-label="Bild / Picture" tabindex="-1">
+  <div class="vw-stage" id="vwStage"><img id="vwImg" alt="" draggable="false"></div>
+  <div class="vw-top">
+    <span class="vw-count" id="vwCount"></span>
+    <div class="vw-tools">
+      <button class="vw-btn" type="button" id="vwOut" aria-label="Zooma ut / Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <span class="vw-zoom" id="vwZoom">100%</span>
+      <button class="vw-btn" type="button" id="vwIn" aria-label="Zooma in / Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg></button>
+      <button class="vw-btn" type="button" id="vwClose" aria-label="Stäng / Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+  </div>
+  <button class="vw-btn vw-nav vw-prev" type="button" id="vwPrev" aria-label="Föregående / Previous"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <button class="vw-btn vw-nav vw-next" type="button" id="vwNext" aria-label="Nästa / Next"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+  <div class="vw-bottom">
+    <p class="vw-cap" id="vwCap"></p>
+    <p class="vw-hint"><span data-l="sv">Scrolla, nyp eller dubbelklicka för att zooma. Dra för att flytta.</span><span data-l="en">Scroll, pinch or double-click to zoom. Drag to move.</span></p>
+  </div>
 </dialog>
 </body>
 </html>

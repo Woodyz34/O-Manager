@@ -134,14 +134,138 @@
   };
   $("railPrev").addEventListener("click", function () { railStep(-1); });
   $("railNext").addEventListener("click", function () { railStep(1); });
-  var lb = $("lightbox"), lbImg = $("lbImg");
-  rail.addEventListener("click", function (e) {
-    var b = e.target.closest(".g-item"); if (!b) return;
-    lbImg.src = b.dataset.full; lbImg.alt = b.querySelector("img").alt;
-    if (lb.showModal) lb.showModal(); else window.open(b.dataset.full);
+
+  /* ---------- Picture viewer: click any screenshot to see it big, zoom and pan ---------- */
+  var vw = $("viewer"), stage = $("vwStage"), vImg = $("vwImg");
+  var shots = Array.prototype.slice.call(document.querySelectorAll(".shot img, .tv-frame img, .tv-strip img, .g-item img"));
+  var badge = '<span class="zoom-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5M11 8v6M8 11h6"/></svg></span>';
+  shots.forEach(function (img, i) {
+    var box = img.closest(".g-item") || img.closest("figure") || img.closest(".tv-frame");
+    box.setAttribute("data-zoomable", "");
+    box.insertAdjacentHTML("beforeend", badge);
+    if (!img.closest("button")) {
+      img.tabIndex = 0;
+      img.setAttribute("role", "button");
+      img.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openViewer(i); } });
+    }
+    box.addEventListener("click", function (e) { e.preventDefault(); openViewer(i); });
   });
-  $("lbClose").addEventListener("click", function () { lb.close(); });
-  lb.addEventListener("click", function (e) { if (e.target === lb) lb.close(); });
+  var fullSrc = function (img) { return img.getAttribute("src").replace(/-[sl]\.webp/, "-x.webp"); };
+  var caption = function (img) {
+    var l = lang(), q = '[data-l="' + l + '"]';
+    var c = img.closest(".g-item, figure") && (img.closest(".g-item") || img.closest("figure")).querySelector(".g-item > " + q + ", figcaption " + q);
+    if (!c) { var part = img.closest(".leg, .tv-in, .duo-in"); c = part && part.querySelector("h3 " + q + ", h2 " + q); }
+    return c ? c.textContent : img.alt;
+  };
+
+  var cur = 0, k = 1, tx = 0, ty = 0, MAXK = 6;
+  // Where the picture sits before zoom (offsets ignore the transform; the stage covers the whole window)
+  var base = function () { return { x: vImg.offsetLeft, y: vImg.offsetTop, w: vImg.offsetWidth, h: vImg.offsetHeight }; };
+  function apply(anim) {
+    vImg.classList.toggle("anim", !!anim);
+    vImg.style.transform = "translate(" + tx + "px," + ty + "px) scale(" + k + ")";
+    $("vwZoom").textContent = Math.round(k * 100) + "%";
+    var z = k > 1.01;
+    stage.classList.toggle("zoomed", z); vw.classList.toggle("is-zoomed", z);
+    $("vwOut").disabled = !z; $("vwIn").disabled = k >= MAXK;
+  }
+  function clamp() {
+    var b = base(), W = window.innerWidth, H = window.innerHeight, sw = b.w * k, sh = b.h * k;
+    tx = sw <= W ? (W - sw) / 2 - b.x : Math.min(-b.x, Math.max(W - sw - b.x, tx));
+    ty = sh <= H ? (H - sh) / 2 - b.y : Math.min(-b.y, Math.max(H - sh - b.y, ty));
+  }
+  function zoomAt(nk, cx, cy, anim) {
+    nk = Math.max(1, Math.min(MAXK, nk));
+    var b = base(), px = (cx - b.x - tx) / k, py = (cy - b.y - ty) / k;
+    tx = cx - b.x - px * nk; ty = cy - b.y - py * nk; k = nk;
+    if (k === 1) { tx = 0; ty = 0; } else clamp();
+    apply(anim);
+  }
+  function reset(anim) { k = 1; tx = 0; ty = 0; apply(anim); }
+  function show(i) {
+    cur = (i + shots.length) % shots.length;
+    var img = shots[cur];
+    reset(false);
+    vImg.classList.remove("pop"); void vImg.offsetWidth; vImg.classList.add("pop");
+    vImg.src = img.currentSrc || img.src;           // the small one is already loaded: show it at once
+    var big = new Image(), want = fullSrc(img);
+    big.onload = function () { if (shots[cur] === img) vImg.src = want; };
+    big.src = want;
+    vImg.alt = img.alt;
+    $("vwCap").textContent = caption(img);
+    $("vwCount").textContent = (cur + 1) + " / " + shots.length;
+  }
+  function openViewer(i) {
+    show(i);
+    if (vw.showModal) { vw.showModal(); vw.focus(); document.documentElement.style.overflow = "hidden"; }
+    else window.open(fullSrc(shots[i]));
+  }
+  function closeViewer() { vw.close(); }
+  vw.addEventListener("close", function () { document.documentElement.style.overflow = ""; vImg.removeAttribute("src"); });
+  $("vwClose").addEventListener("click", closeViewer);
+  $("vwPrev").addEventListener("click", function () { show(cur - 1); });
+  $("vwNext").addEventListener("click", function () { show(cur + 1); });
+  var center = function () { return [window.innerWidth / 2, window.innerHeight / 2]; };
+  $("vwIn").addEventListener("click", function () { var m = center(); zoomAt(k * 1.6, m[0], m[1], true); });
+  $("vwOut").addEventListener("click", function () { var m = center(); zoomAt(k / 1.6, m[0], m[1], true); });
+  vw.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") show(cur - 1);
+    else if (e.key === "ArrowRight") show(cur + 1);
+    else if (e.key === "+" || e.key === "=") $("vwIn").click();
+    else if (e.key === "-") $("vwOut").click();
+  });
+  stage.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    zoomAt(k * Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0018)), e.clientX, e.clientY, false);
+  }, { passive: false });
+  stage.addEventListener("dblclick", function (e) { k > 1.01 ? reset(true) : zoomAt(2.5, e.clientX, e.clientY, true); });
+
+  // Mouse drag, touch pan, pinch, swipe between pictures, tap outside to close
+  var pts = {}, start = null, moved = false, lastTap = 0;
+  var list = function () { return Object.keys(pts).map(function (id) { return pts[id]; }); };
+  stage.addEventListener("pointerdown", function (e) {
+    stage.setPointerCapture(e.pointerId);
+    pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var p = list();
+    moved = false;
+    start = p.length === 2
+      ? { k: k, d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), tx: tx, ty: ty, mx: (p[0].x + p[1].x) / 2, my: (p[0].y + p[1].y) / 2 }
+      : { x: e.clientX, y: e.clientY, tx: tx, ty: ty };
+  });
+  stage.addEventListener("pointermove", function (e) {
+    if (!pts[e.pointerId] || !start) return;
+    pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var p = list();
+    if (p.length === 2 && start.d) {
+      var d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), mx = (p[0].x + p[1].x) / 2, my = (p[0].y + p[1].y) / 2;
+      k = start.k; tx = start.tx + (mx - start.mx); ty = start.ty + (my - start.my);
+      zoomAt(start.k * d / start.d, mx, my, false);
+      moved = true;
+    } else if (p.length === 1 && start.x != null) {
+      var dx = e.clientX - start.x, dy = e.clientY - start.y;
+      if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+      if (k > 1.01) { tx = start.tx + dx; ty = start.ty + dy; clamp(); apply(false); stage.classList.add("dragging"); }
+    }
+  });
+  function up(e) {
+    if (!pts[e.pointerId]) return;
+    var wasPinch = list().length === 2;
+    delete pts[e.pointerId];
+    stage.classList.remove("dragging");
+    if (wasPinch) { start = null; return; }
+    if (!start || start.x == null) return;
+    var dx = e.clientX - start.x, dy = e.clientY - start.y;
+    if (k <= 1.01 && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) show(cur + (dx < 0 ? 1 : -1));
+    else if (!moved && e.pointerType !== "mouse") {
+      var now = Date.now();                          // double tap = zoom, like on a phone photo
+      if (now - lastTap < 300) { k > 1.01 ? reset(true) : zoomAt(2.5, e.clientX, e.clientY, true); lastTap = 0; }
+      else { lastTap = now; if (e.target === stage && k <= 1.01) setTimeout(function () { if (lastTap === now) closeViewer(); }, 310); }
+    } else if (!moved && e.target === stage && k <= 1.01) closeViewer();
+    start = null;
+  }
+  stage.addEventListener("pointerup", up);
+  stage.addEventListener("pointercancel", up);
+  window.addEventListener("resize", function () { if (vw.open) reset(false); });
 
   /* ---------- News (from news.json) ---------- */
   var news = [], newsAll = false, NEWS_FIRST = 5;
