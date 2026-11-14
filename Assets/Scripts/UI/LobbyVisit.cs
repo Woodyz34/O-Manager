@@ -271,6 +271,9 @@ public class LobbyVisitCard : MonoBehaviour
             if (other.name == "Toast" || other.name == "Esc menu") continue;
             if (other.GetComponent<LoadingScreenUI>() != null) continue;
             if (other.GetComponent<HoverTip>() != null) continue;   // the hover text's canvas is always there
+            // Canvases that live for the whole game (the updater's version label, the F3 FPS meter...) are not
+            // lobby pop-ups. The updater's canvas (2026-11-14) was always there and hid this card for good.
+            if (other.gameObject.scene.name == "DontDestroyOnLoad") continue;
             return true;
         }
         return false;

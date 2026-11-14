@@ -8,7 +8,8 @@
 ;
 ; The game is installed per user in %LOCALAPPDATA%\Programs\O-Manager (like Discord or VS Code), so
 ; neither the install nor the automatic updates need the "Do you want to allow this app to make changes"
-; box. Saved runners and money live in the registry (PlayerPrefs) and are never touched.
+; box. Saved runners and money live in the registry (PlayerPrefs); updates never touch them, and uninstalling
+; asks whether to delete them (CurUninstallStepChanged below).
 ;
 ; The game's own updater (Assets/Scripts/UI/GameUpdater.cs) runs this setup with
 ;   /SILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE=1
@@ -112,6 +113,24 @@ begin
     begin
       Sleep(250);
       Waited := Waited + 250;
+    end;
+  end;
+end;
+
+// Uninstalling asks whether the saved progress should go too (runners, money, player name, lobby name and the
+// cloud sign-in). Saves live in the registry (Unity PlayerPrefs) and outlive an uninstall, so without this a
+// reinstall on the same computer starts with everything from before. Updates never uninstall, so they keep it.
+// Own courses and maps (in %USERPROFILE%\AppData\LocalLow\DefaultCompany\O-Manager) are left alone: the Unity
+// Editor uses the same folder on a developer's computer.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if (CurUninstallStep = usPostUninstall) and not UninstallSilent then
+  begin
+    if MsgBox('Also delete your saved progress (runners, money, player name and lobby name)?' + #13#10#13#10 +
+              'Choose No to keep it for the next time you install the game.',
+              mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+    begin
+      RegDeleteKeyIncludingSubkeys(HKEY_CURRENT_USER, 'Software\DefaultCompany\O-Manager');
     end;
   end;
 end;

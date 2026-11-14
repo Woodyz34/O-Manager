@@ -7,6 +7,7 @@ public class PackResult
     public CardData card;
     public bool isNew;
     public int paid;
+    public bool committed;   // paid for and added to the collection (PackShop.Commit)
 }
 
 // Prices and odds for runner packs. One pack always holds exactly one runner,
@@ -77,22 +78,29 @@ public static class PackShop
         return total > 0f ? ofTier / total : 0f;
     }
 
-    // Pays for a pack and adds its runner to the collection. Returns null when the player cannot afford it.
+    // Picks the runner a pack will hold, without paying or adding anything yet. The pack is paid for and its runner
+    // added by Commit, the moment the player actually opens it in the pack opening. Before (until 2026-11-14) the
+    // runner was added at once, so a pack opening that never got shown (game closed, error) still gave the runner
+    // and used up the free pack. Returns null when the player cannot afford it.
     public static PackResult Buy()
     {
         if (!CanBuy())
         {
             return null;
         }
-        int price = CurrentPrice();
-        CardData card = Draw();
-        if (price > 0)
+        return new PackResult { card = Draw(), paid = CurrentPrice(), isNew = true };
+    }
+
+    // Pays for the pack and puts its runner in the collection. Safe to call more than once.
+    public static void Commit(PackResult result)
+    {
+        if (result == null || result.committed) return;
+        result.committed = true;
+        if (result.paid > 0 && Money.Instance != null)
         {
-            Money.Instance.AddMoney(-price);
+            Money.Instance.AddMoney(-result.paid);
         }
-        PackResult result = new PackResult { card = card, paid = price };
-        result.isNew = RunnerCollection.AddFromPack(card.RunnerName);
-        return result;
+        result.isNew = RunnerCollection.AddFromPack(result.card.RunnerName);
     }
 
     static CardData Draw()

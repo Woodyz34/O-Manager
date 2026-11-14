@@ -445,9 +445,35 @@ public class RelayRace : MonoBehaviour, IRaceStats
     // Every team has finished the leg (NetworkPlayer saw everyone reach the finish)
     public void OnAllFinishedLeg(AgentMovement agent)
     {
-        if (statsShownForLeg >= leg) return;
+        if (statsShownForLeg >= leg || statsDueForLeg >= leg) return;
         agent.relayHold = true; // the clock stands still while everyone looks at the statistics
-        ShowStats(false);
+        AskForStats(false);
+    }
+
+    // The statistics are due. They come up in Update, at once, or when the finish is on TV only once the runner
+    // there has punched the finish unit and a second has gone (2026-11-14: they came up as the runner reached the
+    // finish circle, about two seconds before the punch on TV).
+    int statsDueForLeg = -1;
+    bool statsDueFinal;
+    float statsDueSince;
+    const float StatsLongestWait = 10f;
+
+    void AskForStats(bool final)
+    {
+        statsDueForLeg = leg;
+        statsDueFinal = final;
+        statsDueSince = Time.unscaledTime;
+    }
+
+    bool TvHoldsStats()
+    {
+        TvDirector tv = TvDirector.Active;
+        if (tv == null) return false;
+        float waited = Time.unscaledTime - statsDueSince;
+        if (waited > StatsLongestWait) return false;
+        // The TV notices a finished runner on its next update, so give it a moment
+        if (waited < 0.3f) return true;
+        return tv.FinishStillOnTheWay();
     }
 
     void ShowStats(bool final)
@@ -553,9 +579,13 @@ public class RelayRace : MonoBehaviour, IRaceStats
     void Update()
     {
         // After the last leg: the statistics come up once every team is in, before the results
-        if (leg >= 0 && leg == course.legs - 1 && statsShownForLeg < leg && AllTeamsFinished(leg))
+        if (leg >= 0 && leg == course.legs - 1 && statsShownForLeg < leg && statsDueForLeg < leg && AllTeamsFinished(leg))
         {
-            ShowStats(true);
+            AskForStats(true);
+        }
+        if (leg >= 0 && statsDueForLeg == leg && statsShownForLeg < leg && !TvHoldsStats())
+        {
+            ShowStats(statsDueFinal);
         }
         if (CompetitionFlow.ResultsShown && statsUI != null && statsUI.IsOpen)
         {
