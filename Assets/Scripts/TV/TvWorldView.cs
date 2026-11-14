@@ -526,8 +526,20 @@ public class TvWorldView : MonoBehaviour
         {
             // A touch of the unit, then back onto the route
             if (f.finishing) { WalkOff(f); return; }   // a finisher gets its breath back and walks away
-            if (Time.unscaledTime - f.punchedAt < 0.25f) return;
-            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), new Vector2(x, z), moved * 1.6f + 0.002f);
+            float since = Time.unscaledTime - f.punchedAt;
+            if (since < 0.25f) return;
+            // The figure often gets to the flag before the real runner does (it goes a little quicker). It must not
+            // then back off towards the real runner and come past the flag again: it waits at the flag until the real
+            // runner has passed the control and is on its way out, then catches up from behind, aiming a little ahead
+            // along the runner's way so it never turns back.
+            if (toUnit < f.nearest) f.nearest = toUnit;
+            float rx = x - f.shownX, rz = z - f.shownZ, gap = Mathf.Sqrt(rx * rx + rz * rz);
+            bool leaving = toUnit > f.nearest + 0.5f;
+            bool ahead = rx * f.headX + rz * f.headZ > 0f;
+            if (!(leaving && ahead) && since < 4f) return;
+            float lead = Mathf.Min(3f, gap);
+            Vector2 aim = new Vector2(x + f.headX * lead, z + f.headZ * lead);
+            Vector2 at = Vector2.MoveTowards(new Vector2(f.shownX, f.shownZ), aim, moved * 1.6f + 0.002f);
             f.shownX = at.x;
             f.shownZ = at.y;
             if ((at - new Vector2(x, z)).sqrMagnitude < 0.02f) f.punch = 0;
