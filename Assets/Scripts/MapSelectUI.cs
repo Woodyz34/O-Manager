@@ -56,7 +56,7 @@ public class MapSelectUI : MonoBehaviour
         }
 
         // A pop-up card over the lobby, so its Close button doesn't cover "Leave lobby"
-        CourseUI.MakePopup(mapSelectPanel, mapListParent.parent as RectTransform, 272f);
+        CourseUI.MakePopup(mapSelectPanel, mapListParent.parent as RectTransform, 330f);
 
         RectTransform tabRow = CourseUI.Rect("Course tabs", mapSelectPanel.transform);
         CourseUI.Place(tabRow, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(1700, 64));
@@ -80,16 +80,19 @@ public class MapSelectUI : MonoBehaviour
         HoverTip.Add(searchField, "Search for a course by its name, its maker or its map.");
         kindButton = CourseUI.Button("Kind", searchRow, CourseFilter.KindLabel(kind), CourseUI.ButtonKind.Light, () =>
         {
-            kind = CourseFilter.Next(kind);
-            CourseUI.SetButtonText(kindButton, CourseFilter.KindLabel(kind));
-            CourseUI.SetButtonColor(kindButton, kind == CourseFilter.Kind.All ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
-            PopulateMapList();
+            ChoiceDropdown.Open((RectTransform)kindButton.transform, CourseFilter.KindNames, (int)kind, index =>
+            {
+                kind = (CourseFilter.Kind)index;
+                CourseUI.SetButtonText(kindButton, CourseFilter.KindLabel(kind));
+                CourseUI.SetButtonColor(kindButton, kind == CourseFilter.Kind.All ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
+                PopulateMapList();
+            });
         }, 22);
         CourseUI.Size(kindButton, 52, 270);
-        HoverTip.Add(kindButton, "Click to filter the list: all courses, only individual courses or only relays.");
+        HoverTip.Add(kindButton, "Pick what to list: all courses, only individual courses, relays, forest or sprint courses.");
 
         statusText = CourseUI.Text("Course status", mapSelectPanel.transform, "", 24, CourseUI.InkMuted, FontStyles.Italic, TextAlignmentOptions.Center);
-        CourseUI.Place(statusText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -262), new Vector2(1400, 34));
+        CourseUI.Place(statusText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -288), new Vector2(1400, 34));
         UpdateTabs();
     }
 

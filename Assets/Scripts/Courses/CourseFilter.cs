@@ -17,6 +17,8 @@ public static class CourseFilter
         }
     }
 
+    public static readonly string[] KindNames = { "All courses", "Individual", "Relay", "Forest", "Sprint" };
+
     public static Kind Next(Kind kind) => (Kind)(((int)kind + 1) % 5);
 
     // The search matches the course name, the author and words like "relay" or "forked"

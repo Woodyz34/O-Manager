@@ -2476,7 +2476,15 @@ public class CourseBuilder : MonoBehaviour
         CourseUI.Row(mapRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(mapRow, 48);
         mapButton = CourseUI.Button("Map", mapRow, "Map", CourseUI.ButtonKind.Light, OpenMapPicker, 22);
-        typeButton = CourseUI.Button("Type", mapRow, "Type: Individual", CourseUI.ButtonKind.Light, () => { PushUndo(); SetRelay(!relay); }, 22);
+        typeButton = CourseUI.Button("Type", mapRow, "Type: Individual", CourseUI.ButtonKind.Light, () =>
+        {
+            ChoiceDropdown.Open((RectTransform)typeButton.transform, new[] { "Individual", "Relay" }, relay ? 1 : 0, index =>
+            {
+                if ((index == 1) == relay) return;
+                PushUndo();
+                SetRelay(index == 1);
+            });
+        }, 22);
 
         nameField = CourseUI.Input("Course name", panel.transform, "Course name", CourseData.MaxNameLength, null);
         CourseUI.Size(nameField, 54);
