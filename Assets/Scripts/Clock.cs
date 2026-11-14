@@ -86,7 +86,7 @@ public class Clock : MonoBehaviour
         {
             return;
         }
-        if (SceneManager.GetActiveScene().name == "Lobby" || !agentMovement.HasStateAuthority)
+        if (ActiveScene.Name == "Lobby" || !agentMovement.HasStateAuthority)
         {
             return;
         }
@@ -304,7 +304,7 @@ public class Clock : MonoBehaviour
             && agentMovement.Object != null && agentMovement.Object.IsValid
             && agentMovement.HasStateAuthority
             && IsHost()
-            && SceneManager.GetActiveScene().name != "Lobby";
+            && ActiveScene.Name != "Lobby";
 
         if (show && testEndButton == null)
         {

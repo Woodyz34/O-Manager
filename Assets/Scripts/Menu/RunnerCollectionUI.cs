@@ -31,7 +31,9 @@ public class RunnerCollectionUI : MonoBehaviour
     TextMeshProUGUI meritsText;
     CardData shownCard;
     RaceResults openResults;
-    readonly List<RunnerCell> cells = new List<RunnerCell>();
+    // Only the cards that can be seen are made (VirtualGrid); they show the runners in 'shownCards'
+    VirtualGrid virtualGrid;
+    readonly List<CardData> shownCards = new List<CardData>();
 
     void Awake()
     {
@@ -46,6 +48,25 @@ public class RunnerCollectionUI : MonoBehaviour
         cellTemplate.gameObject.SetActive(false);
         MakeMeritsText();
         FastScroll.Add(scroll);
+        virtualGrid = new VirtualGrid(scroll, grid, MakeCell, FillCell);
+    }
+
+    RectTransform MakeCell()
+    {
+        RunnerCell cell = Instantiate(cellTemplate, grid);
+        RunnerCell captured = cell;
+        cell.button.onClick.AddListener(() => ShowDetail(captured.view.Card));
+        return (RectTransform)cell.transform;
+    }
+
+    void FillCell(RectTransform card, int index)
+    {
+        card.GetComponent<RunnerCell>().Show(shownCards[index]);
+    }
+
+    void LateUpdate()
+    {
+        virtualGrid?.Refresh();
     }
 
     // The close-up gets a "best races" list under the numbers. Made here so the saved scene needs no rebuild.
@@ -95,7 +116,8 @@ public class RunnerCollectionUI : MonoBehaviour
         List<CardData> owned = RunnerCollection.OwnedCards();
         int total = RunnerCards.InPacks().Count;
 
-        List<CardData> shown = new List<CardData>();
+        List<CardData> shown = shownCards;
+        shown.Clear();
         foreach (CardData card in owned)
         {
             if (filters.Matches(card))
@@ -105,24 +127,8 @@ public class RunnerCollectionUI : MonoBehaviour
         }
         shown.Sort(filters.Compare);
 
-        // Reuse the cells that are already there
-        while (cells.Count < shown.Count)
-        {
-            RunnerCell cell = Instantiate(cellTemplate, grid);
-            cell.gameObject.SetActive(true);
-            RunnerCell captured = cell;
-            cell.button.onClick.AddListener(() => ShowDetail(captured.view.Card));
-            cells.Add(cell);
-        }
-        for (int i = 0; i < cells.Count; i++)
-        {
-            bool used = i < shown.Count;
-            cells[i].gameObject.SetActive(used);
-            if (used)
-            {
-                cells[i].Show(shown[i]);
-            }
-        }
+        // Only the cards in sight are made and filled; the others when the list is scrolled to them
+        virtualGrid.SetCount(shown.Count, true);
 
         countText.text = owned.Count + " of " + total + " collected";
 
@@ -135,7 +141,6 @@ public class RunnerCollectionUI : MonoBehaviour
                 : "No runners match your search.";
             if (emptyShopButton != null) emptyShopButton.SetActive(nothingOwned);
         }
-        if (scroll != null) scroll.verticalNormalizedPosition = 1f;
     }
 
     void ShowDetail(CardData card)

@@ -53,7 +53,7 @@ public class CameraController : MonoBehaviour
     {
         SceneManager.sceneLoaded += OnSceneLoaded;
 
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             return;
         }
@@ -101,7 +101,7 @@ public class CameraController : MonoBehaviour
         {
             return;
         }
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             return;
         }

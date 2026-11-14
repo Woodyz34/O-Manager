@@ -109,10 +109,48 @@ public class MapSelectUI : MonoBehaviour
         }
     }
 
+    // The course pictures are made when their card comes into sight (a long community list made them all at once,
+    // which froze the screen), a few each frame. A picture that was thrown out of CourseThumbnail's store to save
+    // memory is made again when its card is seen.
+    readonly List<(RawImage picture, CourseData course)> pictures = new List<(RawImage, CourseData)>();
+    readonly Vector3[] corners = new Vector3[4];
+    ScrollRect listScroll;
+
+    void LateUpdate()
+    {
+        if (pictures.Count == 0 || mapSelectPanel == null || !mapSelectPanel.activeInHierarchy) return;
+        if (listScroll == null) listScroll = mapListParent.GetComponentInParent<ScrollRect>(true);
+        RectTransform view = listScroll != null && listScroll.viewport != null ? listScroll.viewport
+            : listScroll != null ? (RectTransform)listScroll.transform : mapListParent.parent as RectTransform;
+        if (view == null) return;
+        Rect seen = WorldRect(view);
+        // Half a screen more above and below, so the pictures are there when they scroll in
+        seen.yMin -= seen.height * 0.5f;
+        seen.yMax += seen.height * 0.5f;
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        foreach (var entry in pictures)
+        {
+            if (entry.picture == null || entry.picture.texture != null) continue;
+            if (!seen.Overlaps(WorldRect(entry.picture.rectTransform))) continue;
+            Texture2D thumbnail = CourseThumbnail.Get(entry.course);
+            // No picture to be had (the map has none): a stand-in, so it is not tried again every frame
+            entry.picture.texture = thumbnail != null ? thumbnail : Texture2D.blackTexture;
+            entry.picture.enabled = thumbnail != null;
+            if (watch.ElapsedMilliseconds > 8) break;   // the rest next frame
+        }
+    }
+
+    Rect WorldRect(RectTransform rect)
+    {
+        rect.GetWorldCorners(corners);
+        return Rect.MinMaxRect(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+    }
+
     void PopulateMapList()
     {
         foreach (Transform child in mapListParent)
             Destroy(child.gameObject);
+        pictures.Clear();
 
         string myId = CloudCourses.PlayerId;
         List<(CourseData course, string tag)> list = new List<(CourseData, string)>();
@@ -171,14 +209,12 @@ public class MapSelectUI : MonoBehaviour
         Image frame = CourseUI.Panel("Picture", card.transform, CourseUI.CardSolid);
         CourseUI.Place(frame.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -16), new Vector2(368, 300));
         frame.gameObject.AddComponent<RectMask2D>();
-        Texture2D thumbnail = CourseThumbnail.Get(course);
-        if (thumbnail != null)
-        {
-            RawImage picture = CourseUI.Rect("Map", frame.transform).gameObject.AddComponent<RawImage>();
-            picture.texture = thumbnail;
-            picture.raycastTarget = false;
-            CourseUI.Stretch(picture.rectTransform);
-        }
+        // The picture itself is made when the card comes into sight (LateUpdate)
+        RawImage picture = CourseUI.Rect("Map", frame.transform).gameObject.AddComponent<RawImage>();
+        picture.raycastTarget = false;
+        picture.enabled = false;
+        CourseUI.Stretch(picture.rectTransform);
+        pictures.Add((picture, course));
 
         Color tagColor = tag == "Built-in" ? CourseUI.Forest : tag == "Yours" ? CourseUI.Accent : tag == "AI" ? (Color)CourseRenderer.CoursePurple : CourseUI.Ink;
         Image tagPill = CourseUI.Panel("Tag", card.transform, tagColor);

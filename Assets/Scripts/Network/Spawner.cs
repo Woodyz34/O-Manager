@@ -112,7 +112,7 @@ public class Spawner : MonoBehaviour, INetworkRunnerCallbacks
 
     private void SpawnNewPlayer(NetworkRunner runner, PlayerRef player, int playerToken)
     {
-        bool isLobbyScene = SceneManager.GetActiveScene().name == "Lobby";
+        bool isLobbyScene = ActiveScene.Name == "Lobby";
         Vector3 spawnPosition;
 
         if (isLobbyScene)

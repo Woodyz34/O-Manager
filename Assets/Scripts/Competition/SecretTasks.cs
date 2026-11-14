@@ -166,7 +166,7 @@ public static class SecretTasks
             }
         }
         code = remembered;
-        return code != 0 && SceneManager.GetActiveScene().name != "Lobby";
+        return code != 0 && ActiveScene.Name != "Lobby";
     }
 }
 

@@ -184,6 +184,8 @@ public class TvWorldBuilder
     float baseHeight;
 
     const int TreeTiles = 4;
+    // Tiles the finished world is cut into for drawing: 10 x 10 of 22 m
+    const int DrawTiles = 10;
     TvMesh groundMesh, rockMesh, thingMesh, wireMesh;
     TvMesh[] treeMeshes, tuftMeshes;
 
@@ -322,13 +324,14 @@ public class TvWorldBuilder
         Undergrowth();
 
         world.ground = F;
-        world.meshes.Add(groundMesh);
-        world.meshes.Add(rockMesh);
-        world.meshes.Add(thingMesh);
-        if (waterMesh.VertexCount > 0) world.meshes.Add(waterMesh);
-        if (wireMesh.VertexCount > 0) world.meshes.Add(wireMesh);
-        foreach (TvMesh m in treeMeshes) if (m.VertexCount > 0) world.meshes.Add(m);
-        foreach (TvMesh m in tuftMeshes) if (m.VertexCount > 0) world.meshes.Add(m);
+        // Everything in small tiles, so only what the TV camera looks at is drawn (see TvMesh.SplitIntoTiles)
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { groundMesh }, "Ground", false, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { rockMesh }, "Rocks", true, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { thingMesh }, "Things", true, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { waterMesh }, "Water", false, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { wireMesh }, "Wires", false, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh>(treeMeshes), "Trees", true, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh>(tuftMeshes), "Undergrowth", false, R, DrawTiles));
         foreach (TvMesh m in world.meshes)
         {
             world.vertices += m.VertexCount;

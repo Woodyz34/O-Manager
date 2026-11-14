@@ -35,7 +35,7 @@ public class ManualPathDrawer : MonoBehaviour
         agent = GetComponent<AgentMovement>();
         SceneManager.sceneLoaded += OnSceneLoaded;
 
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             return;
         }
@@ -77,7 +77,7 @@ public class ManualPathDrawer : MonoBehaviour
         // Vänta tills PathfindingManager dyker upp i scenen
         while (manager == null)
         {
-            if(SceneManager.GetActiveScene().name == "Lobby")
+            if(ActiveScene.Name == "Lobby")
             {
                 break;
             }
@@ -101,7 +101,7 @@ public class ManualPathDrawer : MonoBehaviour
         {
             return;
         }
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             return;
         }
@@ -161,14 +161,26 @@ public class ManualPathDrawer : MonoBehaviour
         }
     }
 
+    // Kept between frames: this runs every frame while the player draws, and new ones each time made garbage
+    static readonly List<RaycastResult> uiHits = new List<RaycastResult>();
+    static PointerEventData uiPointer;
+    static EventSystem uiPointerSystem;
+
     public bool IsPointerOverTaggedCanvas(string tag = "Canvas")
     {
-        // Skapa ett nytt PointerEventData för nuvarande musposition
-        PointerEventData eventData = new PointerEventData(EventSystem.current);
+        if (EventSystem.current == null) return false;
+        // PointerEventData för nuvarande musposition
+        if (uiPointer == null || uiPointerSystem != EventSystem.current)
+        {
+            uiPointerSystem = EventSystem.current;
+            uiPointer = new PointerEventData(uiPointerSystem);
+        }
+        PointerEventData eventData = uiPointer;
         eventData.position = Input.mousePosition;
 
         // Samla alla UI-element under musen
-        List<RaycastResult> results = new List<RaycastResult>();
+        List<RaycastResult> results = uiHits;
+        results.Clear();
         EventSystem.current.RaycastAll(eventData, results);
 
         // Kolla om något av de träffade objekten tillhör en Canvas med rätt tag

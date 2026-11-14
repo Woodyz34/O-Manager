@@ -8,8 +8,7 @@ using UnityEngine.UI;
 //    map (GPS) on the left half and the TV picture on the right, with the split times of the TV control. A click on
 //    the picture makes it fill the screen. Mistakes are marked on the map while they happen.
 //  - In the course builder ("View" on a TV control): straight to full screen, with three test runners passing.
-// Full screen has the TV camera (stands beside the control and turns after the runners) and a free camera (drag to
-// turn, right-drag or WASD to move, wheel to go nearer). Close or Escape goes back.
+// Full screen shows the TV camera (it stands beside the control and turns after the runners). Close or Escape goes back.
 public class TvViewer : MonoBehaviour
 {
     static TvViewer instance;
@@ -39,13 +38,9 @@ public class TvViewer : MonoBehaviour
     GameObject full;
     RawImage fullImage;
     RectTransform topBar;
-    TextMeshProUGUI fullTitle, help, status;
-    Button cameraButton;
+    TextMeshProUGUI fullTitle, status;
     bool fullscreen;
     bool split;                 // the screen is shared between the map and the TV
-    bool freeCamera;
-    Vector3 lastMouse;
-    bool dragging;
     Camera mapCamera;
     TvWorldView drawn;
     readonly List<TvDirector.Split> splits = new List<TvDirector.Split>();
@@ -184,15 +179,9 @@ public class TvViewer : MonoBehaviour
         fullTitle = CourseUI.Text("Title", bar.transform, "", 28, Color.white, FontStyles.Bold);
         fullTitle.alignment = TextAlignmentOptions.MidlineLeft;
         CourseUI.Size(fullTitle, 56, -1, 1);
-        cameraButton = CourseUI.Button("Camera", bar.transform, "Free camera", CourseUI.ButtonKind.Secondary, ToggleCamera, 22);
-        CourseUI.Size(cameraButton, 56, 220);
         Button close = CourseUI.Button("Close", bar.transform, "Close", CourseUI.ButtonKind.Primary, CloseFullscreen, 22);
         CourseUI.Size(close, 56, 160);
 
-        help = CourseUI.Text("Help", full.transform, "", 20, Color.white);
-        CourseUI.Place(help.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(1400f, 34f));
-        help.alignment = TextAlignmentOptions.Center;
-        help.raycastTarget = false;
         status = CourseUI.Text("Status", full.transform, "", 30, Color.white, FontStyles.Bold);
         CourseUI.Place(status.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1400f, 80f));
         status.alignment = TextAlignmentOptions.Center;
@@ -203,6 +192,7 @@ public class TvViewer : MonoBehaviour
     void OnDestroy()
     {
         if (instance == this) instance = null;
+        RestMap(false);
         if (previewView != null) Destroy(previewView.gameObject);
         CameraController.LookHere = null;
         SetSplit(false);
@@ -212,7 +202,6 @@ public class TvViewer : MonoBehaviour
     {
         fullscreen = true;
         full.SetActive(true);
-        RefreshButtons();
     }
 
     void CloseFullscreen()
@@ -224,22 +213,7 @@ public class TvViewer : MonoBehaviour
         }
         fullscreen = false;
         full.SetActive(false);
-        freeCamera = false;
-        dragging = false;
-    }
-
-    void ToggleCamera()
-    {
-        freeCamera = !freeCamera;
-        TvWorldView view = CurrentView;
-        if (freeCamera && view != null) view.StartFreeCamera();
-        RefreshButtons();
-    }
-
-    void RefreshButtons()
-    {
-        CourseUI.SetButtonText(cameraButton, freeCamera ? "TV camera" : "Free camera");
-        help.text = freeCamera ? "Drag to turn  ·  right-drag or WASD to move  ·  wheel to go nearer" : "";
+        RestMap(false);
     }
 
     TvWorldView CurrentView => preview ? previewView : director != null ? director.View : null;
@@ -271,6 +245,28 @@ public class TvViewer : MonoBehaviour
         if (cam.rect != rect) cam.rect = rect;
     }
 
+    // While the TV fills the whole screen the map under it can not be seen: its camera draws nothing meanwhile,
+    // so the computer has only the TV picture to draw
+    Camera restingCamera;
+    int restingMask;
+
+    void RestMap(bool rest)
+    {
+        if (rest && restingCamera == null)
+        {
+            Camera cam = MapCamera();
+            if (cam == null || cam.cullingMask == 0) return;
+            restingCamera = cam;
+            restingMask = cam.cullingMask;
+            cam.cullingMask = 0;
+        }
+        else if (!rest && restingCamera != null)
+        {
+            if (restingCamera.cullingMask == 0) restingCamera.cullingMask = restingMask;
+            restingCamera = null;
+        }
+    }
+
     void Update()
     {
         if (preview)
@@ -288,6 +284,7 @@ public class TvViewer : MonoBehaviour
         TvWorldView view = director.View;
         if (!onAir && fullscreen) CloseFullscreen();
         SetSplit(onAir && !fullscreen);
+        RestMap(onAir && fullscreen);
         if (panel.activeSelf != split) panel.SetActive(split);
         if (paceChip.activeSelf != split) paceChip.SetActive(split);
         ShowMistakes();
@@ -303,7 +300,7 @@ public class TvViewer : MonoBehaviour
         string title = "<color=#E8742A>LIVE</color>  " + director.Title;
         if (fullscreen)
         {
-            fullTitle.text = title + (freeCamera ? "  ·  free camera" : "");
+            fullTitle.text = title;
             status.text = caption;
         }
         else
@@ -329,8 +326,7 @@ public class TvViewer : MonoBehaviour
             panelImage.texture = view.Texture(Screen.width / 2, Screen.height);
             panelImage.color = Color.white;
         }
-        if (fullscreen && freeCamera) FreeCameraInput(view);
-        else view.TvShot(director.Subject, Time.unscaledDeltaTime);
+        view.TvShot(director.Subject, Time.unscaledDeltaTime);
     }
 
     void UpdatePreview()
@@ -340,9 +336,8 @@ public class TvViewer : MonoBehaviour
         ShowTestRunners(view);
         view.SetDrawing(true);
         fullImage.texture = view.Texture(Screen.width, Screen.height);
-        fullTitle.text = "TV control" + (freeCamera ? "  ·  free camera" : "");
-        if (freeCamera) FreeCameraInput(view);
-        else view.TvShot(testSubject, Time.unscaledDeltaTime);
+        fullTitle.text = "TV control";
+        view.TvShot(testSubject, Time.unscaledDeltaTime);
     }
 
     // The split times at the TV control: the leader's time and how far behind the others are
@@ -419,28 +414,6 @@ public class TvViewer : MonoBehaviour
             GameObject box = mistakeLabels[i].transform.parent.gameObject;
             if (box.activeSelf) box.SetActive(false);
         }
-    }
-
-    void FreeCameraInput(TvWorldView view)
-    {
-        Vector3 mouse = Input.mousePosition;
-        bool overBar = RectTransformUtility.RectangleContainsScreenPoint(topBar, mouse, null);
-        bool pressed = Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
-        if (pressed) lastMouse = mouse;
-        if (pressed && !overBar) dragging = true;
-        if (!Input.GetMouseButton(0) && !Input.GetMouseButton(1) && !Input.GetMouseButton(2)) dragging = false;
-        Vector3 delta = mouse - lastMouse;
-        lastMouse = mouse;
-        Vector2 turn = Vector2.zero, move = Vector2.zero;
-        if (dragging && Input.GetMouseButton(0)) turn = new Vector2(delta.x, delta.y);
-        if (dragging && (Input.GetMouseButton(1) || Input.GetMouseButton(2))) move = new Vector2(-delta.x, -delta.y) * 0.0025f;
-        float dt = Time.unscaledDeltaTime;
-        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) move.y += dt;
-        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) move.y -= dt;
-        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) move.x += dt;
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) move.x -= dt;
-        float zoom = overBar ? 0f : Input.mouseScrollDelta.y;
-        view.FreeCamera(turn, move, zoom);
     }
 
     // ---- Test runners in the course builder: three runners pass through the control again and again ----

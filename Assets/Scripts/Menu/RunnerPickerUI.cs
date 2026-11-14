@@ -3,8 +3,10 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// The Choose a runner screen before a competition. CardManager still decides which cards are offered
-// and puts them in the grid; this hides, sorts and sizes them after what is set in the filter bar.
+// The Choose a runner screen before a competition. CardManager decides which runners are offered (CardManager.Offered);
+// this hides and sorts them after what is set in the filter bar, and shows them as cards. Only the cards that can be
+// seen are made (VirtualGrid), and they are filled with other runners as the list scrolls: with hundreds of runners
+// the screen used to freeze while every card was made, and scrolled slowly.
 public class RunnerPickerUI : MonoBehaviour
 {
     public RunnerFilterBar filters;
@@ -15,12 +17,15 @@ public class RunnerPickerUI : MonoBehaviour
     [Tooltip("Scale given to every card, so they are the same size as in My Runners.")]
     public float cardScale = 1f;
 
-    int seenCards = -1;
+    CardManager manager;
+    VirtualGrid virtualGrid;
+    int seenVersion = -1;
+    readonly List<CardData> shown = new List<CardData>();
 
     void OnEnable()
     {
         filters.Changed += Apply;
-        seenCards = -1;
+        seenVersion = -1;
         FastScroll.Add(scroll);
     }
 
@@ -29,46 +34,56 @@ public class RunnerPickerUI : MonoBehaviour
         filters.Changed -= Apply;
     }
 
+    CardManager Manager()
+    {
+        if (manager == null) manager = FindAnyObjectByType<CardManager>(FindObjectsInactive.Include);
+        return manager;
+    }
+
     void LateUpdate()
     {
-        // The cards arrive a moment after the screen opens
-        if (grid.childCount != seenCards)
+        // The runners arrive a moment after the screen opens, and change between the legs of a relay
+        CardManager cards = Manager();
+        if (cards != null && cards.OfferedVersion != seenVersion)
         {
             Apply();
         }
+        virtualGrid?.Refresh();
+    }
+
+    RectTransform MakeCard()
+    {
+        GameObject card = Instantiate(Manager().CardPrefab, grid);
+        card.transform.localScale = new Vector3(cardScale, cardScale, 1f);
+        return (RectTransform)card.transform;
+    }
+
+    void FillCard(RectTransform card, int index)
+    {
+        CardData data = shown[index];
+        card.GetComponent<CardDisplay>().SetValues(data);
+        Manager().MarkCard(card, data);
     }
 
     void Apply()
     {
-        seenCards = grid.childCount;
-        List<CardDisplay> cards = new List<CardDisplay>();
-        foreach (Transform child in grid)
-        {
-            CardDisplay card = child.GetComponent<CardDisplay>();
-            if (card != null && card.CardData != null)
-            {
-                cards.Add(card);
-            }
-        }
+        CardManager cards = Manager();
+        if (cards == null) return;
+        seenVersion = cards.OfferedVersion;
+        if (virtualGrid == null) virtualGrid = new VirtualGrid(scroll, grid, MakeCard, FillCard);
 
-        List<CardDisplay> shown = new List<CardDisplay>();
-        foreach (CardDisplay card in cards)
+        shown.Clear();
+        foreach (CardData card in cards.Offered)
         {
-            bool match = filters.Matches(card.CardData);
-            card.transform.localScale = new Vector3(cardScale, cardScale, 1f);
-            if (card.gameObject.activeSelf != match) card.gameObject.SetActive(match);
-            if (match) shown.Add(card);
+            if (filters.Matches(card)) shown.Add(card);
         }
-        shown.Sort((a, b) => filters.Compare(a.CardData, b.CardData));
-        for (int i = 0; i < shown.Count; i++)
-        {
-            shown[i].transform.SetSiblingIndex(i);
-        }
+        shown.Sort(filters.Compare);
+        virtualGrid.SetCount(shown.Count, true);
 
-        countText.text = shown.Count == cards.Count
-            ? cards.Count + " runners to choose from"
-            : shown.Count + " of " + cards.Count + " runners shown";
-        emptyState.SetActive(shown.Count == 0 && cards.Count > 0);
-        if (scroll != null) scroll.verticalNormalizedPosition = 1f;
+        int total = cards.Offered.Count;
+        countText.text = shown.Count == total
+            ? total + " runners to choose from"
+            : shown.Count + " of " + total + " runners shown";
+        emptyState.SetActive(shown.Count == 0 && total > 0);
     }
 }
