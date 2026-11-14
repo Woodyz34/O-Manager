@@ -124,7 +124,7 @@ public class EscMenu : MonoBehaviour
             return;
         }
         // Escape skips the intro film; the menu is not opened on top of it
-        if (SceneManager.GetActiveScene().name == "Intro")
+        if (ActiveScene.Name == "Intro")
         {
             return;
         }
@@ -214,7 +214,7 @@ public class EscMenu : MonoBehaviour
         {
             return false;
         }
-        string scene = SceneManager.GetActiveScene().name;
+        string scene = ActiveScene.Name;
         foreach (string menu in MenuScenes)
         {
             if (scene == menu)
@@ -241,13 +241,13 @@ public class EscMenu : MonoBehaviour
         }
         hostNote.gameObject.SetActive(inCompetition && !host);
 
-        mainMenuButton.gameObject.SetActive(SceneManager.GetActiveScene().name != "MainMenu");
+        mainMenuButton.gameObject.SetActive(ActiveScene.Name != "MainMenu");
 
         if (inCompetition && !single)
         {
             subtitle.text = "The race keeps running while the menu is open";
         }
-        else if (runner != null && !single && SceneManager.GetActiveScene().name == "Lobby")
+        else if (runner != null && !single && ActiveScene.Name == "Lobby")
         {
             subtitle.text = "Going to the main menu leaves the lobby";
         }

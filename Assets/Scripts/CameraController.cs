@@ -64,7 +64,7 @@ public class CameraController : MonoBehaviour
             if (ear != null) ear.enabled = false;
         }
 
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             return;
         }
@@ -112,7 +112,7 @@ public class CameraController : MonoBehaviour
         {
             return;
         }
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             return;
         }

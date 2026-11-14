@@ -102,7 +102,7 @@ public static class SessionGuard
         {
             return;
         }
-        string scene = SceneManager.GetActiveScene().name;
+        string scene = ActiveScene.Name;
         // A single-player game has no connection to lose (its own page says so when it can not start)
         if (scene == "SingelPlayer" || IsSingle(runner))
         {

@@ -211,7 +211,7 @@ public static class ExtraModes
     static void Refresh()
     {
         if (known) return;
-        if (SceneManager.GetActiveScene().name == "Lobby") return;
+        if (ActiveScene.Name == "Lobby") return;
         NetworkPlayer local = NetworkPlayer.Local;
         if (local != null && local.Runner != null && local.Runner.GameMode == GameMode.Single)
         {

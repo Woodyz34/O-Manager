@@ -8,8 +8,9 @@ using UnityEngine.UI;
 //    map (GPS) on the left half and the TV picture on the right, with the split times of the TV control. A click on
 //    the picture makes it fill the screen. Mistakes are marked on the map while they happen.
 //  - In the course builder ("View" on a TV control): straight to full screen, with three test runners passing.
-// Full screen has the TV camera (stands beside the control and turns after the runners) and a free camera (drag to
-// turn, right-drag or WASD to move, wheel to go nearer). Close or Escape goes back.
+// Full screen shows the TV camera (it stands beside the control and turns after the runners). In the course builder's
+// View there is also a free camera (drag to turn, right-drag or WASD to move, wheel to go nearer) to walk round the
+// world; in a race there is only the TV camera. Close or Escape goes back.
 public class TvViewer : MonoBehaviour
 {
     static TvViewer instance;
@@ -41,11 +42,11 @@ public class TvViewer : MonoBehaviour
     RectTransform topBar;
     TextMeshProUGUI fullTitle, help, status;
     Button cameraButton;
-    bool fullscreen;
-    bool split;                 // the screen is shared between the map and the TV
     bool freeCamera;
     Vector3 lastMouse;
     bool dragging;
+    bool fullscreen;
+    bool split;                 // the screen is shared between the map and the TV
     Camera mapCamera;
     TvWorldView drawn;
     readonly List<TvDirector.Split> splits = new List<TvDirector.Split>();
@@ -68,6 +69,7 @@ public class TvViewer : MonoBehaviour
         if (instance != null) Destroy(instance.gameObject);
         TvViewer viewer = Make();
         viewer.preview = true;
+        viewer.cameraButton.gameObject.SetActive(true);
         viewer.OpenFullscreen();
         viewer.status.text = "Building the 3D view of the control ...";
         viewer.BuildPreview(map, point);
@@ -186,6 +188,7 @@ public class TvViewer : MonoBehaviour
         CourseUI.Size(fullTitle, 56, -1, 1);
         cameraButton = CourseUI.Button("Camera", bar.transform, "Free camera", CourseUI.ButtonKind.Secondary, ToggleCamera, 22);
         CourseUI.Size(cameraButton, 56, 220);
+        cameraButton.gameObject.SetActive(false);   // only in the course builder's View (OpenPreview)
         Button close = CourseUI.Button("Close", bar.transform, "Close", CourseUI.ButtonKind.Primary, CloseFullscreen, 22);
         CourseUI.Size(close, 56, 160);
 
@@ -203,6 +206,7 @@ public class TvViewer : MonoBehaviour
     void OnDestroy()
     {
         if (instance == this) instance = null;
+        RestMap(false);
         if (previewView != null) Destroy(previewView.gameObject);
         CameraController.LookHere = null;
         SetSplit(false);
@@ -212,7 +216,16 @@ public class TvViewer : MonoBehaviour
     {
         fullscreen = true;
         full.SetActive(true);
-        RefreshButtons();
+    }
+
+    void ToggleCamera()
+    {
+        if (!preview) return;
+        freeCamera = !freeCamera;
+        dragging = false;
+        if (freeCamera && previewView != null) previewView.StartFreeCamera();
+        CourseUI.SetButtonText(cameraButton, freeCamera ? "TV camera" : "Free camera");
+        help.text = freeCamera ? "Drag to turn  ·  right-drag or WASD to move  ·  wheel to go nearer" : "";
     }
 
     void CloseFullscreen()
@@ -224,22 +237,7 @@ public class TvViewer : MonoBehaviour
         }
         fullscreen = false;
         full.SetActive(false);
-        freeCamera = false;
-        dragging = false;
-    }
-
-    void ToggleCamera()
-    {
-        freeCamera = !freeCamera;
-        TvWorldView view = CurrentView;
-        if (freeCamera && view != null) view.StartFreeCamera();
-        RefreshButtons();
-    }
-
-    void RefreshButtons()
-    {
-        CourseUI.SetButtonText(cameraButton, freeCamera ? "TV camera" : "Free camera");
-        help.text = freeCamera ? "Drag to turn  ·  right-drag or WASD to move  ·  wheel to go nearer" : "";
+        RestMap(false);
     }
 
     TvWorldView CurrentView => preview ? previewView : director != null ? director.View : null;
@@ -271,6 +269,28 @@ public class TvViewer : MonoBehaviour
         if (cam.rect != rect) cam.rect = rect;
     }
 
+    // While the TV fills the whole screen the map under it can not be seen: its camera draws nothing meanwhile,
+    // so the computer has only the TV picture to draw
+    Camera restingCamera;
+    int restingMask;
+
+    void RestMap(bool rest)
+    {
+        if (rest && restingCamera == null)
+        {
+            Camera cam = MapCamera();
+            if (cam == null || cam.cullingMask == 0) return;
+            restingCamera = cam;
+            restingMask = cam.cullingMask;
+            cam.cullingMask = 0;
+        }
+        else if (!rest && restingCamera != null)
+        {
+            if (restingCamera.cullingMask == 0) restingCamera.cullingMask = restingMask;
+            restingCamera = null;
+        }
+    }
+
     void Update()
     {
         if (preview)
@@ -288,6 +308,7 @@ public class TvViewer : MonoBehaviour
         TvWorldView view = director.View;
         if (!onAir && fullscreen) CloseFullscreen();
         SetSplit(onAir && !fullscreen);
+        RestMap(onAir && fullscreen);
         if (panel.activeSelf != split) panel.SetActive(split);
         if (paceChip.activeSelf != split) paceChip.SetActive(split);
         ShowMistakes();
@@ -303,7 +324,7 @@ public class TvViewer : MonoBehaviour
         string title = "<color=#E8742A>LIVE</color>  " + director.Title;
         if (fullscreen)
         {
-            fullTitle.text = title + (freeCamera ? "  ·  free camera" : "");
+            fullTitle.text = title;
             status.text = caption;
         }
         else
@@ -329,8 +350,7 @@ public class TvViewer : MonoBehaviour
             panelImage.texture = view.Texture(Screen.width / 2, Screen.height);
             panelImage.color = Color.white;
         }
-        if (fullscreen && freeCamera) FreeCameraInput(view);
-        else view.TvShot(director.Subject, Time.unscaledDeltaTime);
+        view.TvShot(director.Subject, Time.unscaledDeltaTime);
     }
 
     void UpdatePreview()

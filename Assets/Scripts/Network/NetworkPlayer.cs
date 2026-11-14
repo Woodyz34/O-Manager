@@ -238,7 +238,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             return;
         }
         RelayRace relay = RelayRace.Active;
-        if ((relay == null && IndividualRace.Active == null) || SceneManager.GetActiveScene().name == "Lobby")
+        if ((relay == null && IndividualRace.Active == null) || ActiveScene.Name == "Lobby")
         {
             relayLeg = -1;
             relayRunning = false;
@@ -298,7 +298,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         if (Object == null || !Object.IsValid || !Object.HasStateAuthority || Runner == null) return;
         if (Time.unscaledTime < nextSpotCheck) return;
         nextSpotCheck = Time.unscaledTime + 0.5f;
-        if (SceneManager.GetActiveScene().name != "Lobby") return;
+        if (ActiveScene.Name != "Lobby") return;
         Vector3 spot = LobbySpot(Runner, Runner.LocalPlayer);
         if ((transform.position - spot).sqrMagnitude < 0.01f) return;
         // Someone before us left: step into the free place
@@ -369,16 +369,31 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         return true;
     }
 
+    // The runner's three map sensors (RunnerMap, WhatRunnerAreStandingOn, WhatRunnerSees) count the stones, paths and
+    // cliffs round the runner for the mistakes. Only the player's own runner uses them (the scripts on them do nothing
+    // for the others), so on the other players' runners they are switched off: the physics engine then does not have
+    // to follow what every other runner touches on the map, which is a lot of work on a big map with many players.
+    void SenseTheMapOnlyIfOwn()
+    {
+        bool own = Object != null && Object.HasStateAuthority;
+        foreach (Collider2D sensor in GetComponentsInChildren<Collider2D>(true))
+        {
+            if (sensor.GetComponent<RunnerMapCollision>() == null && sensor.GetComponent<RunnerCollision>() == null) continue;
+            if (sensor.enabled != own) sensor.enabled = own;
+        }
+    }
+
     public override async void Spawned()
     {
         DontDestroyOnLoad(gameObject);
         PackRegistry.Add(this);
+        SenseTheMapOnlyIfOwn();
 
         changeDetector = GetChangeDetector(ChangeDetector.Source.SimulationState);
 
-        Debug.Log($"{Runner.LocalPlayer}: Spawned player {Object.Id} in scene {SceneManager.GetActiveScene().name}");
+        Debug.Log($"{Runner.LocalPlayer}: Spawned player {Object.Id} in scene {ActiveScene.Name}");
         TrailRenderer trailRenderer = GetComponent<TrailRenderer>();
-        bool isReadyScene = SceneManager.GetActiveScene().name == "Lobby";
+        bool isReadyScene = ActiveScene.Name == "Lobby";
         Vector3 spawnPosition;
         if (isReadyScene)
         {
@@ -405,7 +420,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             // Klienten ska ta emot den från nätverket
             transform.position = agentMovement.NetPosition;
         }  
-        Debug.Log("player: " + Runner.LocalPlayer.PlayerId + " position: " + transform.position + "in scene" + SceneManager.GetActiveScene().name);
+        Debug.Log("player: " + Runner.LocalPlayer.PlayerId + " position: " + transform.position + "in scene" + ActiveScene.Name);
         CameraController localCamera = GetComponent<CameraController>();
         if (Object.HasStateAuthority)
         {
@@ -805,7 +820,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     void InitializeAfterSceneLoad()
     {
-        Debug.Log("Initilize after scene load körs av " + Local.name + " scen: " + SceneManager.GetActiveScene().name);
+        Debug.Log("Initilize after scene load körs av " + Local.name + " scen: " + ActiveScene.Name);
         
         CameraController cameraController = GetComponent<CameraController>();
         ManualPathDrawer manualPathDrawer = GetComponent<ManualPathDrawer>();

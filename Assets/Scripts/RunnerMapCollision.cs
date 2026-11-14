@@ -21,7 +21,7 @@ public class RunnerMapCollision : MonoBehaviour
     }
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             return;
         }

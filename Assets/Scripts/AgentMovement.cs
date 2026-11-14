@@ -218,7 +218,7 @@ public class AgentMovement : NetworkBehaviour
         {
             Debug.Log("Player has no camera");
         }
-        if(SceneManager.GetActiveScene().name == "Lobby")
+        if(ActiveScene.Name == "Lobby")
         {
             return;
         }
@@ -241,7 +241,7 @@ public class AgentMovement : NetworkBehaviour
         while (pathfindingManager == null)
         {
             Debug.Log("WaitingForPathFindingManager");
-            if (SceneManager.GetActiveScene().name == "Lobby")
+            if (ActiveScene.Name == "Lobby")
             {
                 break;
             }
@@ -300,7 +300,7 @@ public class AgentMovement : NetworkBehaviour
             clock = GetComponent<Clock>();
         }
         Debug.Log("agentmovemoen awake " + currentKontroll + " " + currentTargetIndex);
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             return;
         }
@@ -398,7 +398,7 @@ public class AgentMovement : NetworkBehaviour
 
     void Update()
     {
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             // De andra spelarnas objekt ligger annars kvar där de stod när banan tog slut
             if (Object != null && Object.IsValid && !Object.HasStateAuthority && NetPosition != default)
@@ -686,7 +686,7 @@ public class AgentMovement : NetworkBehaviour
                                     np.RPC_UpdateLeaderboardStep1();
                                     WaitingForAllPlayersToReachKontroll = true;
                                     Debug.Log("Paleyr " + np.name + " har kommit till en kontroll");
-                                    if (SceneManager.GetActiveScene().name == "Lobby")
+                                    if (ActiveScene.Name == "Lobby")
                                         return;
                                     Debug.Log("Scenen är inte Lobby");
                                 }

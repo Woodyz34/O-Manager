@@ -51,6 +51,62 @@ public class TvMesh
         for (int i = 0; i < t.Length; i++) triangles.Add(first + t[i]);
     }
 
+    // Cuts meshes into square tiles (tiles x tiles over the square of 2 x radius round the control), each triangle to
+    // the tile its middle is in. The TV camera stands still and sees only a narrow slice of the world, and the
+    // graphics card skips every tile outside the picture (and its shadow), so less is drawn. The picture is the same:
+    // every triangle is kept as it was, only in another mesh.
+    public static List<TvMesh> SplitIntoTiles(List<TvMesh> sources, string name, bool castShadows, float radius, int tiles)
+    {
+        var result = new TvMesh[tiles * tiles];
+        float size = 2f * radius / tiles;
+        foreach (TvMesh source in sources)
+        {
+            List<float> p = source.positions, n = source.normals;
+            List<byte> c = source.colors;
+            List<int> t = source.triangles;
+            // Which tile each triangle goes to, then each tile's triangles with their own corners
+            var byTile = new List<int>[tiles * tiles];
+            var remap = new int[source.VertexCount];   // the corner's number in the tile being made, + 1 (0 = not yet)
+            var stamp = new int[source.VertexCount];   // which tile that number belongs to, + 1
+            for (int i = 0; i + 2 < t.Count; i += 3)
+            {
+                int a = t[i] * 3, b = t[i + 1] * 3, d = t[i + 2] * 3;
+                float x = (p[a] + p[b] + p[d]) / 3f, z = (p[a + 2] + p[b + 2] + p[d + 2]) / 3f;
+                int ti = (int)((x + radius) / size), tj = (int)((z + radius) / size);
+                ti = ti < 0 ? 0 : ti >= tiles ? tiles - 1 : ti;
+                tj = tj < 0 ? 0 : tj >= tiles ? tiles - 1 : tj;
+                int k = tj * tiles + ti;
+                (byTile[k] ?? (byTile[k] = new List<int>())).Add(i);
+            }
+            for (int k = 0; k < byTile.Length; k++)
+            {
+                if (byTile[k] == null) continue;
+                TvMesh tile = result[k] ?? (result[k] = new TvMesh { name = name + " " + k, castShadows = castShadows });
+                foreach (int i in byTile[k])
+                {
+                    for (int corner = 0; corner < 3; corner++)
+                    {
+                        int v = t[i + corner];
+                        int nv = remap[v] - 1;
+                        if (stamp[v] != k + 1)
+                        {
+                            stamp[v] = k + 1;
+                            nv = tile.VertexCount;
+                            tile.positions.Add(p[v * 3]); tile.positions.Add(p[v * 3 + 1]); tile.positions.Add(p[v * 3 + 2]);
+                            tile.normals.Add(n[v * 3]); tile.normals.Add(n[v * 3 + 1]); tile.normals.Add(n[v * 3 + 2]);
+                            tile.colors.Add(c[v * 3]); tile.colors.Add(c[v * 3 + 1]); tile.colors.Add(c[v * 3 + 2]);
+                            remap[v] = nv + 1;
+                        }
+                        tile.triangles.Add(nv);
+                    }
+                }
+            }
+        }
+        var list = new List<TvMesh>();
+        foreach (TvMesh m in result) if (m != null && m.VertexCount > 0) list.Add(m);
+        return list;
+    }
+
     static byte Tint(byte v, float tint)
     {
         float f = v * tint;

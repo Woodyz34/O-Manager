@@ -12,7 +12,7 @@ public class MistakeLogic : MonoBehaviour
     // Start is called before the first frame update
     public void Start()
     {
-        if (SceneManager.GetActiveScene().name == "Lobby")
+        if (ActiveScene.Name == "Lobby")
         {
             return;
         }
@@ -22,7 +22,7 @@ public class MistakeLogic : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (SceneManager.GetActiveScene().name == "Lobby" || agentMovement == null || !agentMovement.Object.HasInputAuthority)
+        if (ActiveScene.Name == "Lobby" || agentMovement == null || !agentMovement.Object.HasInputAuthority)
         {
             return;
         }

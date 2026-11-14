@@ -166,7 +166,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     {
         CardManager cards = FindObjectOfType<CardManager>();
         if (cards == null) return;
-        foreach (Transform child in cards.parent.transform) Destroy(child.gameObject);
+        cards.ClearOffered();
 
         // Runners not picked yet that may run this leg (women's/men's leg, and with a max average overall the legs
         // after it must still be possible), or everyone again when there are more legs than runners.
@@ -185,9 +185,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
 
         foreach (CardData data in left)
         {
-            GameObject cardObject = Instantiate(cards.CardPrefab, cards.parent.transform);
-            cardObject.GetComponent<CardDisplay>().SetValues(data);
-            cards.MarkCard(cardObject.transform, data);
+            cards.Offer(data);
         }
         RunnerFilterBar.NotifyAll();
         RefreshPickHeader();

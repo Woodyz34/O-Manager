@@ -27,11 +27,13 @@ public class TvWorldView : MonoBehaviour
     readonly List<Mesh> meshes = new List<Mesh>();
 
     // ---- Camera ----
-    public bool freeCamera;
     Vector3 lookAt;
     float tvFov = 34f;
     Vector3 camShift;
     bool hadSubject;
+    // Free camera (only in the course builder's View): turns round a point
+    Vector3 orbitTarget;
+    float yaw, pitch = 18f, distance = 14f;
 
     // A new shot: the camera goes straight to the first runner
     public void NewShot()
@@ -39,9 +41,6 @@ public class TvWorldView : MonoBehaviour
         hadSubject = false;
         camShift = Vector3.zero;
     }
-    // Free camera: turns round a point
-    Vector3 orbitTarget;
-    float yaw, pitch = 18f, distance = 14f;
 
     static Shader shader;
     static Texture2D grain;
@@ -82,21 +81,45 @@ public class TvWorldView : MonoBehaviour
 
     public static Mesh ToMesh(TvMesh source)
     {
-        int count = source.VertexCount;
-        var vertices = new Vector3[count];
-        var normals = new Vector3[count];
-        var colors = new Color32[count];
-        for (int i = 0; i < count; i++)
+        return ToMesh(new MeshArrays(source));
+    }
+
+    // A mesh's corners as Unity wants them. Made on a background thread, so the main thread only hands them over.
+    public class MeshArrays
+    {
+        public string name;
+        public bool castShadows;
+        public Vector3[] vertices, normals;
+        public Color32[] colors;
+        public int[] triangles;
+
+        public MeshArrays(TvMesh source)
         {
-            vertices[i] = new Vector3(source.positions[i * 3], source.positions[i * 3 + 1], source.positions[i * 3 + 2]);
-            normals[i] = new Vector3(source.normals[i * 3], source.normals[i * 3 + 1], source.normals[i * 3 + 2]);
-            colors[i] = new Color32(source.colors[i * 3], source.colors[i * 3 + 1], source.colors[i * 3 + 2], 255);
+            name = source.name;
+            castShadows = source.castShadows;
+            int count = source.VertexCount;
+            vertices = new Vector3[count];
+            normals = new Vector3[count];
+            colors = new Color32[count];
+            List<float> p = source.positions, n = source.normals;
+            List<byte> c = source.colors;
+            for (int i = 0; i < count; i++)
+            {
+                vertices[i] = new Vector3(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
+                normals[i] = new Vector3(n[i * 3], n[i * 3 + 1], n[i * 3 + 2]);
+                colors[i] = new Color32(c[i * 3], c[i * 3 + 1], c[i * 3 + 2], 255);
+            }
+            triangles = source.triangles.ToArray();
         }
+    }
+
+    static Mesh ToMesh(MeshArrays source)
+    {
         var mesh = new Mesh { name = source.name };
-        if (count > 65000) mesh.indexFormat = IndexFormat.UInt32;
-        mesh.vertices = vertices;
-        mesh.normals = normals;
-        mesh.colors32 = colors;
+        if (source.vertices.Length > 65000) mesh.indexFormat = IndexFormat.UInt32;
+        mesh.vertices = source.vertices;
+        mesh.normals = source.normals;
+        mesh.colors32 = source.colors;
         mesh.SetTriangles(source.triangles, 0);
         mesh.RecalculateBounds();
         return mesh;
@@ -124,7 +147,15 @@ public class TvWorldView : MonoBehaviour
             legDirZ = legDirZ
         };
         var watch = System.Diagnostics.Stopwatch.StartNew();
-        TvWorld world = await Task.Run(() => TvWorldBuilder.Build(input));
+        // The world and the meshes' corners are made in the background; the race goes on meanwhile
+        List<MeshArrays> arrays = null;
+        TvWorld world = await Task.Run(() =>
+        {
+            TvWorld w = TvWorldBuilder.Build(input);
+            arrays = new List<MeshArrays>(w.meshes.Count);
+            foreach (TvMesh m in w.meshes) arrays.Add(new MeshArrays(m));
+            return w;
+        });
         long built = watch.ElapsedMilliseconds;
         var go = new GameObject("TV world");
         go.transform.position = Origin + new Vector3(nextPlace * Apart, 0f, 0f);
@@ -134,33 +165,59 @@ public class TvWorldView : MonoBehaviour
         view.mapId = map.id;
         view.world = world;
         view.Make();
-        Debug.Log($"TvWorldView: built the world at ({control.e:0}, {control.n:0}) on {map.id} in {built} ms (+ {watch.ElapsedMilliseconds - built} ms meshes): "
-                  + $"{world.vertices} corners, {world.trees} trees, {world.rocks} stones, {world.tufts} tufts");
+        // The meshes go to the graphics card a few at a time, a little every frame, so the race never stops for it
+        var frame = System.Diagnostics.Stopwatch.StartNew();
+        long onMain = 0;
+        foreach (MeshArrays m in arrays)
+        {
+            if (view == null) return null;   // the race ended meanwhile
+            if (frame.ElapsedMilliseconds >= 4)
+            {
+                onMain += frame.ElapsedMilliseconds;
+                await Task.Yield();          // the rest next frame
+                if (view == null) return null;
+                frame.Restart();
+            }
+            view.AddMesh(m);
+        }
+        onMain += frame.ElapsedMilliseconds;
+        world.meshes.Clear();                // the plain copies are not needed any more
+        Debug.Log($"TvWorldView: built the world at ({control.e:0}, {control.n:0}) on {map.id} in {built} ms (+ {onMain} ms meshes over {watch.ElapsedMilliseconds - built} ms): "
+                  + $"{world.vertices} corners in {arrays.Count} tiles, {world.trees} trees, {world.rocks} stones, {world.tufts} tufts");
         return view;
+    }
+
+    Transform drawn;            // the meshes; switched off while this world is not on TV
+    Material plainMaterial, groundMaterial;
+
+    void AddMesh(MeshArrays source)
+    {
+        Mesh mesh = ToMesh(source);
+        mesh.UploadMeshData(true);   // the graphics card has it now; no copy kept in memory
+        meshes.Add(mesh);
+        var go = new GameObject(source.name);
+        go.transform.SetParent(drawn, false);
+        go.AddComponent<MeshFilter>().sharedMesh = mesh;
+        var r = go.AddComponent<MeshRenderer>();
+        r.sharedMaterial = source.name.StartsWith("Ground", StringComparison.Ordinal) ? groundMaterial : plainMaterial;
+        r.shadowCastingMode = source.castShadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
+        r.receiveShadows = true;
+        r.lightProbeUsage = LightProbeUsage.Off;
+        r.reflectionProbeUsage = ReflectionProbeUsage.Off;
     }
 
     void Make()
     {
-        Material material = NewMaterial(Color.white);
-        materials.Add(material);
+        plainMaterial = NewMaterial(Color.white);
+        materials.Add(plainMaterial);
         // The ground has a fine grain, so it does not look painted
-        Material ground = NewMaterial(Color.white);
-        ground.SetTexture("_DetailTex", Grain());
-        ground.SetFloat("_Detail", 1f);
-        materials.Add(ground);
-        foreach (TvMesh source in world.meshes)
-        {
-            Mesh mesh = ToMesh(source);
-            mesh.UploadMeshData(true);   // the graphics card has it now; no copy kept in memory
-            meshes.Add(mesh);
-            var go = new GameObject(source.name);
-            go.transform.SetParent(transform, false);
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var r = go.AddComponent<MeshRenderer>();
-            r.sharedMaterial = source.name == "Ground" ? ground : material;
-            r.shadowCastingMode = source.castShadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
-            r.receiveShadows = true;
-        }
+        groundMaterial = NewMaterial(Color.white);
+        groundMaterial.SetTexture("_DetailTex", Grain());
+        groundMaterial.SetFloat("_Detail", 1f);
+        materials.Add(groundMaterial);
+        drawn = new GameObject("Meshes").transform;
+        drawn.SetParent(transform, false);
+        drawn.gameObject.SetActive(false);   // until it is on TV
 
         // The sun in the south-east, a little low, as in the look test
         sun = new GameObject("TV sun").AddComponent<Light>();
@@ -193,7 +250,6 @@ public class TvWorldView : MonoBehaviour
         cam.transform.localPosition = new Vector3(world.camX, y, world.camZ);
         lookAt = new Vector3(world.flagX, world.HeightAt(world.flagX, world.flagZ) + 0.8f, world.flagZ);
         cam.transform.localRotation = Quaternion.LookRotation(lookAt - cam.transform.localPosition);
-        StartFreeCamera();
 
         Camera.onPreCull += BeforeDraw;
         Camera.onPostRender += AfterDraw;
@@ -221,9 +277,11 @@ public class TvWorldView : MonoBehaviour
         return texture;
     }
 
+    // Only the world on TV is drawn; the others are switched off altogether, so no camera spends time on them
     public void SetDrawing(bool on)
     {
         if (cam != null && cam.enabled != on) cam.enabled = on;
+        if (drawn != null && drawn.gameObject.activeSelf != on) drawn.gameObject.SetActive(on);
     }
 
     float savedShadowDistance;

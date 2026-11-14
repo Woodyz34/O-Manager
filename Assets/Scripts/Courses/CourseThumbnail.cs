@@ -40,13 +40,32 @@ public static class CourseThumbnail
         Texture2D texture = new Texture2D(Width, Height, TextureFormat.RGB24, false);
         texture.wrapMode = TextureWrapMode.Clamp;
         Color32[] pixels = new Color32[Width * Height];
-        for (int y = 0; y < Height; y++)
+        // The same as GetPixelBilinear on every pixel, but on the source's pixels read once: many times quicker
+        Color32[] from = SourcePixels(source);
+        int sw = source.width, sh = source.height;
+        for (int y = 0; y < Height && from == null; y++)
+        {
+            // A picture whose pixels can not be read in one go: one pixel at a time, as before
+            float v = area.yMin + (y + 0.5f) / Height * area.height;
+            for (int x = 0; x < Width; x++)
+                pixels[y * Width + x] = source.GetPixelBilinear(area.xMin + (x + 0.5f) / Width * area.width, v);
+        }
+        for (int y = 0; y < Height && from != null; y++)
         {
             float v = area.yMin + (y + 0.5f) / Height * area.height;
+            float fy = Mathf.Clamp(v * sh - 0.5f, 0f, sh - 1f);
+            int y0 = (int)fy, y1 = Mathf.Min(y0 + 1, sh - 1);
+            float ty = fy - y0;
+            int row0 = y0 * sw, row1 = y1 * sw;
             for (int x = 0; x < Width; x++)
             {
                 float u = area.xMin + (x + 0.5f) / Width * area.width;
-                pixels[y * Width + x] = source.GetPixelBilinear(u, v);
+                float fx = Mathf.Clamp(u * sw - 0.5f, 0f, sw - 1f);
+                int x0 = (int)fx, x1 = Mathf.Min(x0 + 1, sw - 1);
+                float tx = fx - x0;
+                Color32 a = from[row0 + x0], b = from[row0 + x1], c = from[row1 + x0], d = from[row1 + x1];
+                pixels[y * Width + x] = new Color32(
+                    Mix(a.r, b.r, c.r, d.r, tx, ty), Mix(a.g, b.g, c.g, d.g, tx, ty), Mix(a.b, b.b, c.b, d.b, tx, ty), 255);
             }
         }
         texture.SetPixels32(pixels);
@@ -64,6 +83,27 @@ public static class CourseThumbnail
             cache.Remove(oldest);
         }
         return texture;
+    }
+
+    static byte Mix(byte a, byte b, byte c, byte d, float tx, float ty)
+    {
+        float top = a + (b - a) * tx, bottom = c + (d - c) * tx;
+        return (byte)(top + (bottom - top) * ty + 0.5f);
+    }
+
+    // The map thumbnails' pixels, read once per map picture (they are small, under 1000 x 1000)
+    static readonly Dictionary<Texture2D, Color32[]> sourcePixels = new Dictionary<Texture2D, Color32[]>();
+
+    static Color32[] SourcePixels(Texture2D source)
+    {
+        if (sourcePixels.TryGetValue(source, out Color32[] known) && known != null && known.Length == source.width * source.height) return known;
+        if (sourcePixels.Count > 8) sourcePixels.Clear();
+        Color32[] pixels;
+        try { pixels = source.GetPixels32(); }
+        catch (System.Exception) { pixels = null; }
+        if (pixels == null || pixels.Length != source.width * source.height) return null;
+        sourcePixels[source] = pixels;
+        return pixels;
     }
 
     // The part of the picture around the course (0..1 UV rect), widened to the given width/height ratio

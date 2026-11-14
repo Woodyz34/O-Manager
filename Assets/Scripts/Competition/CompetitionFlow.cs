@@ -60,7 +60,7 @@ public static class CompetitionFlow
 
     static bool InCompetition()
     {
-        return SceneManager.GetActiveScene().name != "Lobby";
+        return ActiveScene.Name != "Lobby";
     }
 
     // Called every frame for the local player's own NetworkPlayer.

@@ -12,6 +12,24 @@ public class CardManager : MonoBehaviour
     //MyCards MyCards = MyCards.getInstance();
     CardDisplay cardDisplay = CardDisplay.getInstance();
     public List<CardDisplay> SelectedCards = new List<CardDisplay>();
+
+    // The runners offered on the Choose a runner screen. RunnerPickerUI shows them, and makes cards only for the ones
+    // that can be seen (a long list used to make hundreds of cards at once, which froze the screen for a moment).
+    public readonly List<CardData> Offered = new List<CardData>();
+    public int OfferedVersion { get; private set; }
+
+    public void Offer(CardData card)
+    {
+        if (card == null) return;
+        Offered.Add(card);
+        OfferedVersion++;
+    }
+
+    public void ClearOffered()
+    {
+        Offered.Clear();
+        OfferedVersion++;
+    }
     Dictionary<int, CardData> LocalCardDatabase;
     PathfindingManager pathfindingManager;
 
@@ -43,11 +61,7 @@ public class CardManager : MonoBehaviour
         foreach (CardData card in GameModes.WithSameStats(UnderCap(RunnerCards.InPacks())))
         {
 
-            GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
-            CardDisplay cardDisplay = cardInstance.GetComponent<CardDisplay>();
-
-            // Anropa SetValues för att sätta värden för varje instans separat
-            cardDisplay.SetValues(card);
+            Offer(card);
         }
 
     }
@@ -60,9 +74,7 @@ public class CardManager : MonoBehaviour
             : RunnerCollection.CardsForRace();
         foreach (CardData card in owned)
         {
-            GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
-            cardInstance.GetComponent<CardDisplay>().SetValues(card);
-            MarkCard(cardInstance.transform, card);
+            Offer(card);
         }
     }
 
@@ -71,9 +83,7 @@ public class CardManager : MonoBehaviour
     {
         foreach (CardData card in cards)
         {
-            GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
-            cardInstance.GetComponent<CardDisplay>().SetValues(card);
-            MarkCard(cardInstance.transform, card);
+            Offer(card);
         }
     }
 
@@ -84,11 +94,14 @@ public class CardManager : MonoBehaviour
         return cards.FindAll(c => RunnerRules.BudgetCost(c) <= RunnerRules.Cap);
     }
 
-    // The ON LOAN ribbon on runners the player only has for this round (lent, or out of an "Open packs" pack)
+    // The ON LOAN ribbon on runners the player only has for this round (lent, or out of an "Open packs" pack).
+    // The cards are used again for other runners as the list scrolls, so the ribbon is also taken off.
     public void MarkCard(Transform card, CardData data)
     {
-        if (data == null) return;
-        if (RunnerCollection.IsOnLoan(data.RunnerName) || RunnerRules.IsOpened(data.RunnerName)) MarkOnLoan(card);
+        bool onLoan = data != null && (RunnerCollection.IsOnLoan(data.RunnerName) || RunnerRules.IsOpened(data.RunnerName));
+        Transform ribbon = card.Find("On loan");
+        if (ribbon != null) ribbon.gameObject.SetActive(onLoan);
+        else if (onLoan) MarkOnLoan(card);
     }
 
     // A small orange tag on a runner the player only borrows for this round. It sits like a ribbon across the
@@ -135,9 +148,7 @@ public class CardManager : MonoBehaviour
         // Instansiera korten
         foreach (CardData card in randomCards)
         {
-            GameObject cardInstance = Instantiate(CardPrefab, parent.transform);
-            CardDisplay cardDisplay = cardInstance.GetComponent<CardDisplay>();
-            cardDisplay.SetValues(card);
+            Offer(card);
         }
     }
 
