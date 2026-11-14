@@ -134,6 +134,55 @@ public class RunnerFilterBar : MonoBehaviour
         if (clearButton != null) clearButton.onClick.AddListener(Clear);
         MakeGenderChips();
         MakeClassChip();
+        AddTips();
+    }
+
+    // Hover texts for the chips and sliders
+    void AddTips()
+    {
+        HoverTip.Add(search, "Type part of a runner's name to find them.");
+        string[] sortTips =
+        {
+            "Sort by overall rating, the runner's stats put together.",
+            "Sort by the runner's speed stat.",
+            "Sort by technique: how few mistakes the runner makes.",
+            "Sort by name, A to Z.",
+        };
+        for (int i = 0; i < sortButtons.Length && i < sortTips.Length; i++) HoverTip.Add(sortButtons[i], sortTips[i]);
+        HoverTip.Add(orderChip, "Turns the order round: best first or worst first (A to Z or Z to A for names).");
+        for (int i = 0; i < tierButtons.Length; i++)
+        {
+            Button tier = tierButtons[i];
+            int choice = TierOfButton(i);
+            HoverTip.Add(tier, () => choice < 0
+                ? "Show runners of every card level."
+                : "Show only " + TierName(tier) + " cards. The card level comes from the runner's overall rating: Elite is the highest, then Gold, Silver and Bronze.");
+        }
+        HoverTip.Add(classChip, "Filter on age class: 21 is the senior class, 20 and 18 are the junior classes. You can tick several.");
+        HoverTip.Add(countryChip, "Filter on the runner's country. You can tick several.");
+        HoverTip.Add(clubChip, "Filter on the runner's club. You can tick several.");
+        HoverTip.Add(womenChip, "Show only women. Women and men are never shown together.");
+        HoverTip.Add(menChip, "Show only men. Women and men are never shown together.");
+        HoverTip.Add(minSpeed, () => "Hide runners below this value on the first stat. " + StatName(minSpeedLabel) + " is how quickly the runner can run.");
+        HoverTip.Add(minSpeedLabel, () => "Hide runners below this value on the first stat. " + StatName(minSpeedLabel) + " is how quickly the runner can run.");
+        HoverTip.Add(minTechnique, "Hide runners with a technique below this value. Technique is how few mistakes the runner makes.");
+        HoverTip.Add(minTechniqueLabel, "Hide runners with a technique below this value. Technique is how few mistakes the runner makes.");
+        if (clearButton != null) HoverTip.Add(clearButton, "Removes all filters and shows every runner again.");
+    }
+
+    static string TierName(Button tier)
+    {
+        TextMeshProUGUI text = tier != null ? tier.GetComponentInChildren<TextMeshProUGUI>(true) : null;
+        return text != null ? text.text : "these";
+    }
+
+    static string StatName(TextMeshProUGUI label)
+    {
+        if (label == null) return "Speed";
+        string text = label.text ?? "";
+        int bold = text.IndexOf("  <b>", StringComparison.Ordinal);
+        if (bold > 0) text = text.Substring(0, bold);
+        return text.StartsWith("Min ", StringComparison.Ordinal) ? text.Substring(4).Trim() : "Speed";
     }
 
     // Two chips, Women and Men, made from a tier chip and put between the search field and "Sort by".

@@ -62,6 +62,7 @@ public class TerrainLookPanel : MonoBehaviour
         TextMeshProUGUI label = CourseUI.Text("Name", row, "Undergrowth", 22, CourseUI.Ink, FontStyles.Bold);
         label.alignment = TextAlignmentOptions.MidlineLeft;
         CourseUI.Size(label, -1, 170);
+        HoverTip.Add(row, "How much bushes, brush and low branches there are between the trees in the 3D view. Only changes how it looks, not how fast the runners are.");
         TextMeshProUGUI left = CourseUI.Text("Low end", row, "Clean forest floor", 17, CourseUI.InkMuted);
         left.alignment = TextAlignmentOptions.MidlineRight;
         CourseUI.Size(left, -1, 200);
@@ -83,6 +84,7 @@ public class TerrainLookPanel : MonoBehaviour
         textField = CourseUI.Input("Text", card.transform, "For example: flat pine heath with sandy ground and a lot of heather, few stones",
             TerrainLook.MaxTextLength, null);
         CourseUI.Size(textField, 110);
+        HoverTip.Add(textField, "Write in your own words what the terrain is like. It is saved with the map so you and others can remember it.");
         textField.lineType = TMP_InputField.LineType.MultiLineSubmit;
         if (textField.textComponent != null)
         {
@@ -104,13 +106,13 @@ public class TerrainLookPanel : MonoBehaviour
         RectTransform buttons = CourseUI.Rect("Buttons", card.transform);
         CourseUI.Row(buttons.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
         CourseUI.Size(buttons, 58);
-        CourseUI.Button("Normal", buttons, "All normal", CourseUI.ButtonKind.Light, () =>
+        HoverTip.Add(CourseUI.Button("Normal", buttons, "All normal", CourseUI.ButtonKind.Light, () =>
         {
             look = new TerrainLook { text = textField.text };
             Refresh();
-        }, 22);
-        CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, () => Destroy(gameObject), 22);
-        CourseUI.Button("Done", buttons, "Done", CourseUI.ButtonKind.Primary, Done, 22);
+        }, 22), "Goes back to the normal look: moss, mixed conifer forest and normal undergrowth. Your own text stays.");
+        HoverTip.Add(CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, () => Destroy(gameObject), 22), "Closes this window and throws away your changes.");
+        HoverTip.Add(CourseUI.Button("Done", buttons, "Done", CourseUI.ButtonKind.Primary, Done, 22), "Keeps this look for the map.");
 
         Refresh();
     }
@@ -131,6 +133,33 @@ public class TerrainLookPanel : MonoBehaviour
                     Refresh();
                 }, 19);
             into.Add((button, value));
+            HoverTip.Add(button, ground ? GroundTip(value) : ForestTip(value));
+        }
+    }
+
+    static string GroundTip(string value)
+    {
+        switch (value)
+        {
+            case TerrainLook.Heather: return "Heather and heath ground between the trees, purple and brown in the 3D view.";
+            case TerrainLook.Grass: return "Tall grass covers the forest floor. Typical for broad-leaved forest and old meadows.";
+            case TerrainLook.Hard: return "Bare, hard ground with little growing on it. Common in dry pine forest and on rock.";
+            case TerrainLook.Sand: return "Sandy ground, light in colour. Typical for sandy pine heath.";
+            case TerrainLook.Stone: return "Stony ground with short grass between the stones, like on limestone ground.";
+            case TerrainLook.Lichen: return "Pale lichen and fallen needles. Typical for dry, open pine forest.";
+            default: return "Moss and blueberry bushes, the usual forest floor in Swedish spruce and pine forest.";
+        }
+    }
+
+    static string ForestTip(string value)
+    {
+        switch (value)
+        {
+            case TerrainLook.Pine: return "Pine trees: tall, bare trunks with a crown at the top.";
+            case TerrainLook.Spruce: return "Spruce trees: dark, dense and low-branched.";
+            case TerrainLook.Birch: return "Birch trees: pale trunks and light green leaves.";
+            case TerrainLook.Beech: return "Broad-leaved forest such as beech and oak, with wide round crowns.";
+            default: return "A mix of pine and spruce, the most common forest in Sweden.";
         }
     }
 
