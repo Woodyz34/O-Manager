@@ -7,8 +7,9 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 // The "Map edge" pop-up of the map import: a small picture of the whole map file with the edge of the finished map
-// drawn on it (MapBoundary.Guess). Everything outside the edge is left out of the game. The player drags the corners,
-// drags the small dot halfway along a side to make a new corner, and right-clicks a corner to remove it.
+// drawn on it (MapBoundary.Guess, sprint maps only). Everything outside the edge is left out of the game. The player drags
+// the corners, drags the small dot halfway along a side to make a new corner, and right-clicks a corner to remove it.
+// "Draw new edge" starts over: each click on the map adds a corner, and a click on the first corner (or Done) closes it.
 public class MapEdgeEditor : MonoBehaviour
 {
     MapPreview preview;
@@ -17,6 +18,8 @@ public class MapEdgeEditor : MonoBehaviour
     List<Vector2> points;              // corners in picture pixels (x right, y down); null = the whole map
     double[] chosen;                   // what Done gives back while no corner has been moved
     bool moved;
+    bool drawing;                      // "Draw new edge": clicks on the map add corners
+    double[] beforeDrawing;            // the edge to go back to if fewer than 3 corners are drawn
 
     RectTransform imageRect, frameRect;
     Vector2 shown;                     // size of the picture on screen (grows when zoomed in)
@@ -101,19 +104,62 @@ public class MapEdgeEditor : MonoBehaviour
         CourseUI.Size(zoomIn, -1, 70, 0);
         HoverTip.Add(zoomOut, "Zoom out. The mouse wheel does the same.");
         HoverTip.Add(zoomIn, "Zoom in. The mouse wheel does the same.");
-        HoverTip.Add(CourseUI.Button("Whole map", buttons, "Use the whole map", CourseUI.ButtonKind.Light, () => { chosen = null; moved = false; points = null; Redraw(); }, 22),
+        HoverTip.Add(CourseUI.Button("Whole map", buttons, "Whole map", CourseUI.ButtonKind.Light, () => { drawing = false; chosen = null; moved = false; points = null; Redraw(); }, 22),
             "Use the whole picture, with no edge. Nothing is left out.");
-        Button guess = CourseUI.Button("Guess", buttons, "Use the guess", CourseUI.ButtonKind.Secondary, () => { chosen = guessed; moved = false; points = ToPixels(guessed); Redraw(); }, 22);
-        guess.interactable = guessed != null;
-        HoverTip.Add(guess, "Use the edge that the game guessed from the map file.");
+        HoverTip.Add(CourseUI.Button("Draw", buttons, "Draw new edge", CourseUI.ButtonKind.Secondary, StartDrawing, 22),
+            "Draw the edge yourself: click on the map for each corner, then click the first corner (or Done) to close it. Drag the map to move it while you draw.");
+        if (guessed != null)
+        {
+            Button guess = CourseUI.Button("Guess", buttons, "Use the guess", CourseUI.ButtonKind.Secondary, () => { drawing = false; chosen = guessed; moved = false; points = ToPixels(guessed); Redraw(); }, 22);
+            HoverTip.Add(guess, "Use the edge that the game guessed from the map file.");
+        }
         HoverTip.Add(CourseUI.Button("Done", buttons, "Done", CourseUI.ButtonKind.Primary, Done, 22), "Keep this edge for the map.");
         Redraw();
     }
 
     void Done()
     {
+        if (drawing && !FinishDrawing()) { onDone?.Invoke(beforeDrawing); Destroy(gameObject); return; }
         onDone?.Invoke(moved ? ToPaper(points) : chosen);
         Destroy(gameObject);
+    }
+
+    // ---- Drawing a new edge ----
+
+    void StartDrawing()
+    {
+        if (!drawing) beforeDrawing = moved ? ToPaper(points) : chosen;
+        drawing = true;
+        points = new List<Vector2>();
+        moved = true;
+        Redraw();
+    }
+
+    // Closes the drawn line; false when it has fewer than 3 corners (then the old edge comes back)
+    bool FinishDrawing()
+    {
+        drawing = false;
+        if (points != null && points.Count >= 3) { Redraw(); return true; }
+        chosen = beforeDrawing;
+        moved = false;
+        points = ToPixels(beforeDrawing);
+        Redraw();
+        return false;
+    }
+
+    // A click on the map (not a drag): a new corner while drawing
+    internal void ClickAt(Vector2 screen, Camera cam)
+    {
+        if (!drawing) return;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(imageRect, screen, cam, out Vector2 local)) return;
+        points.Add(ToPixel(local));
+        Redraw();
+    }
+
+    // A left click on a corner: the first one closes the line while drawing
+    internal void CornerClicked(EdgeHandle handle)
+    {
+        if (drawing && !handle.middle && handle.index == 0 && points.Count >= 3) FinishDrawing();
     }
 
     // ---- Corners ----
@@ -148,19 +194,23 @@ public class MapEdgeEditor : MonoBehaviour
     {
         foreach (GameObject h in handles) Destroy(h);
         handles.Clear();
-        hint.text = points == null
-            ? "The whole map file is used. \"Use the guess\" shows where the game thinks the finished map ends."
+        hint.text = drawing
+            ? (points.Count < 3 ? "Click on the map where the edge should go, one click per corner. Drag the map to move it; the wheel zooms."
+                                : "Keep clicking to add corners. Click the first corner (or Done) to close the edge. Right-click a corner to remove it.")
+            : points == null
+            ? "The whole map file is used. Click \"Draw new edge\" to leave out unfinished parts" + (guessed != null ? ", or \"Use the guess\" to see where the game thinks the finished map ends." : ".")
             : "Everything outside the orange line is left out. Drag the corners; drag a small dot to make a new corner; right-click a corner to remove it. The wheel or + and - zoom; drag the map to move it.";
         if (points == null)
         {
             lines.SetPoints(null);
             return;
         }
+        lines.closed = !drawing;
         for (int i = 0; i < points.Count; i++)
         {
             int next = (i + 1) % points.Count;
             AddHandle(i, false, ToLocal(points[i]));
-            AddHandle(i, true, (ToLocal(points[i]) + ToLocal(points[next])) / 2f);
+            if (!drawing) AddHandle(i, true, (ToLocal(points[i]) + ToLocal(points[next])) / 2f);
         }
         UpdateLines();
     }
@@ -191,7 +241,7 @@ public class MapEdgeEditor : MonoBehaviour
     // A corner (or a new one from a side's middle) follows the pointer
     internal void BeginDrag(EdgeHandle handle)
     {
-        if (!handle.middle) return;
+        if (!handle.middle || points == null) return;
         int at = handle.index + 1;
         points.Insert(at, ToPixel(handle.Rect.anchoredPosition));
         handle.index = at;
@@ -255,7 +305,7 @@ public class MapEdgeEditor : MonoBehaviour
 
     internal void Remove(EdgeHandle handle)
     {
-        if (handle.middle || points == null || points.Count <= 3) return;
+        if (handle.middle || points == null || (!drawing && points.Count <= 3)) return;
         points.RemoveAt(handle.index);
         moved = true;
         Redraw();

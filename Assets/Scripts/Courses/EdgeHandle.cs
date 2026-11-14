@@ -17,5 +17,6 @@ public class EdgeHandle : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     public void OnPointerClick(PointerEventData data)
     {
         if (data.button == PointerEventData.InputButton.Right) editor.Remove(this);
+        else if (data.button == PointerEventData.InputButton.Left && !data.dragging) editor.CornerClicked(this);
     }
 }

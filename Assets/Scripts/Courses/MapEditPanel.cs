@@ -184,7 +184,7 @@ public class MapEditPanel : MonoBehaviour
         HoverTip.Add(contactField, "E-mail or phone number where the game's owner can reach you about this map. It is not shown to other players.");
         HoverTip.Add(forestButton, "A map for orienteering in the forest.");
         HoverTip.Add(sprintButton, "A town or park map with streets, buildings and fences. Sprint maps use their own course rules and game modes.");
-        HoverTip.Add(edgeButton, "Shows where the game thinks the finished map ends. Parts outside it are left out. Move the edge if it is wrong.");
+        HoverTip.Add(edgeButton, "Draw where the finished map ends. Parts outside the edge are left out. Move the corners, draw a new edge, or use the whole map.");
         HoverTip.Add(terrainButton, "Set how quick each kind of ground is on this map: asphalt, roads, open land, forest, marsh and so on.");
         HoverTip.Add(lookButton, "Set what the terrain looks like in the 3D view at a TV control. Only changes how it looks, not the running.");
         HoverTip.Add(deleteButton, "Removes the map from the game for good.");
@@ -219,7 +219,7 @@ public class MapEditPanel : MonoBehaviour
             ? "Private: only you can use the map. Others can only race on it in a lobby you host."
             : "Public: the map is sent in and every player can use it.") + change;
         if (contactRow.gameObject.activeSelf == isPrivate) contactRow.gameObject.SetActive(!isPrivate);
-        edgeText.text = edge == null ? "Map edge: the whole map file is used."
+        edgeText.text = edge == null ? (edgeChanged ? "Map edge: removed. The map is built again when you save." : "Map edge: the whole map file is used.")
             : edgeChanged ? "Map edge: changed. The map is built again when you save."
             : "Map edge: only the part inside the edge is used.";
         bool sprint = mapType == "sprint" || mapType == "both";
@@ -373,7 +373,8 @@ public class MapEditPanel : MonoBehaviour
                 guessed = read.Item3;
             }
             SetStatus("", false);
-            MapEdgeEditor.Open(transform, preview, edge, guessed, chosen =>
+            // Only sprint maps get the game's guess: on forest maps it takes white forest for unfinished mapping
+            MapEdgeEditor.Open(transform, preview, edge, mapType != "forest" ? guessed : null, chosen =>
             {
                 if (!SameEdge(chosen, edge))
                 {
