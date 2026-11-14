@@ -3,20 +3,25 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
-// Tools > O-Manager > Build release (setup.exe)
+// Tools > O-Manager > Build release...
 //
 // One click to make a new version of the game for players:
 //   1. sets the version number (Player Settings > Version), which the game's updater compares with GitHub,
-//   2. builds the Windows game into Builds/Windows (the folder is emptied first),
-//   3. runs Inno Setup (free, https://jrsoftware.org/isdl.php) on installer/O-Manager.iss, which makes
-//      Builds/Release/O-Manager-Setup.exe,
-//   4. opens that folder and the "new release" page on GitHub with the version and notes filled in.
-// Then drag O-Manager-Setup.exe onto the GitHub page and press Publish release. Every installed game
-// updates itself the next time it starts, and the website's Download button gives the new setup.
+//   2. builds the game for each ticked computer type (the folders are emptied first):
+//        Windows -> Builds/Windows, then Inno Setup (free, https://jrsoftware.org/isdl.php) on installer/O-Manager.iss
+//                   makes Builds/Release/O-Manager-Setup.exe
+//        Mac     -> Builds/Mac/O-Manager.app (Intel + Apple silicon), packed as Builds/Release/O-Manager-Mac.zip
+//        Linux   -> Builds/Linux, packed as Builds/Release/O-Manager-Linux.tar.gz
+//      Mac and Linux need "Mac Build Support (Mono)" and "Linux Build Support (Mono)" added to this Unity version
+//      in Unity Hub (Installs > the gear > Add modules). Without them those boxes are greyed out.
+//   3. opens that folder and the "new release" page on GitHub with the version and notes filled in.
+// Then drag the files onto the GitHub page and press Publish release. Every installed game updates itself the
+// next time it starts, and the website's Download button gives the new version for the visitor's computer.
 public class ReleaseBuilder : EditorWindow
 {
     const string IsccPathKey = "OManager.Release.IsccPath";
@@ -29,15 +34,32 @@ public class ReleaseBuilder : EditorWindow
 
     static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
     static string BuildDir => Path.Combine(ProjectRoot, "Builds", "Windows");
+    static string MacBuildDir => Path.Combine(ProjectRoot, "Builds", "Mac");
+    static string LinuxBuildDir => Path.Combine(ProjectRoot, "Builds", "Linux");
     static string ReleaseDir => Path.Combine(ProjectRoot, "Builds", "Release");
     static string ScriptPath => Path.Combine(ProjectRoot, "installer", "O-Manager.iss");
     static string SetupPath => Path.Combine(ReleaseDir, GameUpdater.SetupAssetName);
+    static string MacZipPath => Path.Combine(ReleaseDir, GameUpdater.MacAssetName);
+    static string LinuxTarPath => Path.Combine(ReleaseDir, GameUpdater.LinuxAssetName);
 
-    [MenuItem("Tools/O-Manager/Build release (setup.exe)...", false, 40)]
+    const string WindowsKey = "OManager.Release.Windows";
+    const string MacKey = "OManager.Release.Mac";
+    const string LinuxKey = "OManager.Release.Linux";
+
+    bool buildWindows = true;
+    bool buildMac = true;
+    bool buildLinux = true;
+
+    static bool HasModule(BuildTarget target) => BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone, target);
+
+    [MenuItem("Tools/O-Manager/Build release...", false, 40)]
     static void Open()
     {
         ReleaseBuilder window = GetWindow<ReleaseBuilder>(true, "Build release", true);
-        window.minSize = new Vector2(480, 420);
+        window.minSize = new Vector2(480, 520);
+        window.buildWindows = EditorPrefs.GetBool(WindowsKey, true);
+        window.buildMac = EditorPrefs.GetBool(MacKey, true);
+        window.buildLinux = EditorPrefs.GetBool(LinuxKey, true);
         window.version = NextVersion(PlayerSettings.bundleVersion);
         window.notes = EditorPrefs.GetString(NotesKey, "");
         window.Show();
@@ -72,18 +94,50 @@ public class ReleaseBuilder : EditorWindow
             if (GUILayout.Button("Download Inno Setup")) Application.OpenURL("https://jrsoftware.org/isdl.php");
         }
 
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("Computers", EditorStyles.boldLabel);
+        buildWindows = EditorGUILayout.ToggleLeft("Windows (" + GameUpdater.SetupAssetName + ")", buildWindows);
+        bool macOk = HasModule(BuildTarget.StandaloneOSX);
+        bool linuxOk = HasModule(BuildTarget.StandaloneLinux64);
+        buildMac = PlatformToggle("Mac (" + GameUpdater.MacAssetName + ")", macOk, buildMac);
+        buildLinux = PlatformToggle("Linux (" + GameUpdater.LinuxAssetName + ")", linuxOk, buildLinux);
+        if (!macOk || !linuxOk)
+        {
+            EditorGUILayout.HelpBox("To build for Mac or Linux, open Unity Hub > Installs > the gear next to this Unity version > Add modules, " +
+                                    "tick \"Mac Build Support (Mono)\" and \"Linux Build Support (Mono)\", install, and restart Unity.", MessageType.Info);
+        }
+        if (!buildWindows)
+        {
+            EditorGUILayout.HelpBox("Windows is not ticked. Windows players will not get this version.", MessageType.Warning);
+        }
+
         openGitHub = EditorGUILayout.ToggleLeft("Open the GitHub release page when done", openGitHub);
 
+        bool any = buildWindows || (buildMac && macOk) || (buildLinux && linuxOk);
         EditorGUILayout.Space(10);
-        GUI.enabled = !string.IsNullOrWhiteSpace(version);
-        if (GUILayout.Button("Build game and setup.exe", GUILayout.Height(36)))
+        GUI.enabled = !string.IsNullOrWhiteSpace(version) && any;
+        if (GUILayout.Button("Build release", GUILayout.Height(36)))
         {
             EditorPrefs.SetString(NotesKey, notes ?? "");
+            EditorPrefs.SetBool(WindowsKey, buildWindows);
+            EditorPrefs.SetBool(MacKey, buildMac);
+            EditorPrefs.SetBool(LinuxKey, buildLinux);
             string v = version.Trim().TrimStart('v', 'V');
-            EditorApplication.delayCall += () => BuildRelease(v, notes ?? "", openGitHub);
+            bool win = buildWindows, mac = buildMac && macOk, linux = buildLinux && linuxOk;
+            EditorApplication.delayCall += () => BuildRelease(v, notes ?? "", openGitHub, win, mac, linux);
             Close();
         }
         GUI.enabled = true;
+    }
+
+    // A greyed-out box when the module is missing; the choice is remembered for when it is installed
+    static bool PlatformToggle(string label, bool moduleInstalled, bool value)
+    {
+        if (moduleInstalled) return EditorGUILayout.ToggleLeft(label, value);
+        GUI.enabled = false;
+        EditorGUILayout.ToggleLeft(label + "  (module not installed)", false);
+        GUI.enabled = true;
+        return value;
     }
 
     // 1.0 -> 1.0.1, 1.0.3 -> 1.0.4
@@ -121,49 +175,106 @@ public class ReleaseBuilder : EditorWindow
         return null;
     }
 
-    static void BuildRelease(string version, string notes, bool openGitHub)
+    static void BuildRelease(string version, string notes, bool openGitHub, bool windows, bool mac, bool linux)
     {
         // 1. Version
         PlayerSettings.bundleVersion = version;
         AssetDatabase.SaveAssets();
+        Directory.CreateDirectory(ReleaseDir);
 
-        // 2. Build the game into an empty folder, so nothing old ends up in the setup
+        BuildTarget activeBefore = EditorUserBuildSettings.activeBuildTarget;
+        var made = new List<string>();
+        var problems = new List<string>();
         try
         {
-            if (Directory.Exists(BuildDir)) Directory.Delete(BuildDir, true);
+            // 2. One computer type at a time. A failure on one does not stop the others.
+            if (windows) BuildWindows(version, made, problems);
+            if (mac) BuildMac(made, problems);
+            if (linux) BuildLinux(made, problems);
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+            // Building Mac or Linux switches the editor to that platform; go back to what it was
+            if (EditorUserBuildSettings.activeBuildTarget != activeBefore)
+            {
+                EditorUserBuildSettings.SwitchActiveBuildTarget(BuildPipeline.GetBuildTargetGroup(activeBefore), activeBefore);
+            }
+        }
+
+        if (made.Count == 0)
+        {
+            EditorUtility.DisplayDialog("Build release", "Nothing was made.\n\n" + string.Join("\n", problems), "OK");
+            return;
+        }
+
+        File.WriteAllText(Path.Combine(ReleaseDir, "notes-" + version + ".txt"), notes);
+
+        // 3. Show the files and the GitHub page
+        EditorUtility.RevealInFinder(Path.Combine(ReleaseDir, made[0]));
+        if (openGitHub)
+        {
+            string url = "https://github.com/" + GameUpdater.ReleasesRepo + "/releases/new"
+                         + "?tag=v" + Uri.EscapeDataString(version)
+                         + "&title=" + Uri.EscapeDataString("O-Manager " + version)
+                         + "&body=" + Uri.EscapeDataString(notes);
+            Application.OpenURL(url);
+        }
+        string message = "Version " + version + " is ready in Builds/Release:\n\n  " + string.Join("\n  ", made) +
+                         "\n\nDrag " + (made.Count == 1 ? "it" : "all of them") + " onto the GitHub page that opened and press Publish release. " +
+                         "Installed games update the next time they start.";
+        if (problems.Count > 0)
+        {
+            message += "\n\nNot made:\n" + string.Join("\n", problems);
+        }
+        EditorUtility.DisplayDialog("Build release", message, "OK");
+    }
+
+    // Empties folder and builds the game there. Returns false (and notes why) when it did not work.
+    static bool BuildGame(BuildTarget target, string folder, string fileName, string label, List<string> problems)
+    {
+        try
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, true);
+            Directory.CreateDirectory(folder);
         }
         catch (Exception e)
         {
-            EditorUtility.DisplayDialog("Build release", "Could not empty " + BuildDir + "\nIs the game still running?\n\n" + e.Message, "OK");
-            return;
+            problems.Add(label + ": could not empty " + folder + " (is the game still running?) " + e.Message);
+            return false;
         }
-        Directory.CreateDirectory(BuildDir);
 
         string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
         BuildPlayerOptions options = new BuildPlayerOptions
         {
             scenes = scenes,
-            locationPathName = Path.Combine(BuildDir, PlayerSettings.productName + ".exe"),
-            target = BuildTarget.StandaloneWindows64,
+            locationPathName = Path.Combine(folder, fileName),
+            target = target,
+            targetGroup = BuildTargetGroup.Standalone,
             options = BuildOptions.None,
         };
         BuildReport report = BuildPipeline.BuildPlayer(options);
         if (report.summary.result != BuildResult.Succeeded)
         {
-            EditorUtility.DisplayDialog("Build release", "The Unity build failed (" + report.summary.result + "). See the Console.", "OK");
-            return;
+            problems.Add(label + ": the Unity build failed (" + report.summary.result + "). See the Console.");
+            return false;
         }
-        UnityEngine.Debug.Log("Release " + version + ": game built in " + BuildDir);
+        UnityEngine.Debug.Log("Release: " + label + " game built in " + folder);
+        return true;
+    }
 
-        // 3. setup.exe
+    static string SizeText(string path) => (new FileInfo(path).Length / 1048576) + " MB";
+
+    static void BuildWindows(string version, List<string> made, List<string> problems)
+    {
+        if (!BuildGame(BuildTarget.StandaloneWindows64, BuildDir, PlayerSettings.productName + ".exe", "Windows", problems)) return;
+
         string iscc = FindIscc();
         if (iscc == null)
         {
-            EditorUtility.DisplayDialog("Build release", "The game is built in\n" + BuildDir + "\n\nbut Inno Setup was not found, so no setup.exe was made. Install Inno Setup 6 and try again.", "OK");
-            EditorUtility.RevealInFinder(BuildDir);
+            problems.Add("Windows: Inno Setup was not found, so no setup.exe was made (the game is in " + BuildDir + ").");
             return;
         }
-        Directory.CreateDirectory(ReleaseDir);
         if (File.Exists(SetupPath)) File.Delete(SetupPath);
 
         string args = "/Q \"/DAppVersion=" + version + "\" \"/DBuildDir=" + BuildDir + "\" \"/DOutputDir=" + ReleaseDir + "\" \"" + ScriptPath + "\"";
@@ -202,27 +313,81 @@ public class ReleaseBuilder : EditorWindow
         if (exitCode != 0 || !File.Exists(SetupPath))
         {
             UnityEngine.Debug.LogError("Inno Setup failed (" + exitCode + "):\n" + output);
-            EditorUtility.DisplayDialog("Build release", "Inno Setup could not make the setup. See the Console.", "OK");
+            problems.Add("Windows: Inno Setup could not make the setup. See the Console.");
             return;
         }
+        made.Add(GameUpdater.SetupAssetName + " (" + SizeText(SetupPath) + ")");
+        UnityEngine.Debug.Log("Release: " + SetupPath + " (" + SizeText(SetupPath) + ")");
+    }
 
-        File.WriteAllText(Path.Combine(ReleaseDir, "notes-" + version + ".txt"), notes);
-        long mb = new FileInfo(SetupPath).Length / 1048576;
-        UnityEngine.Debug.Log("Release " + version + ": " + SetupPath + " (" + mb + " MB)");
-
-        // 4. Show the file and the GitHub page
-        EditorUtility.RevealInFinder(SetupPath);
-        if (openGitHub)
+    static void BuildMac(List<string> made, List<string> problems)
+    {
+        SetMacUniversal();
+        string app = PlayerSettings.productName + ".app";
+        if (!BuildGame(BuildTarget.StandaloneOSX, MacBuildDir, app, "Mac", problems)) return;
+        try
         {
-            string url = "https://github.com/" + GameUpdater.ReleasesRepo + "/releases/new"
-                         + "?tag=v" + Uri.EscapeDataString(version)
-                         + "&title=" + Uri.EscapeDataString("O-Manager " + version)
-                         + "&body=" + Uri.EscapeDataString(notes);
-            Application.OpenURL(url);
+            EditorUtility.DisplayProgressBar("Build release", "Packing " + GameUpdater.MacAssetName + "…", 0.5f);
+            ReleaseArchives.ZipMacApp(Path.Combine(MacBuildDir, app), MacZipPath);
+            made.Add(GameUpdater.MacAssetName + " (" + SizeText(MacZipPath) + ")");
+            UnityEngine.Debug.Log("Release: " + MacZipPath + " (" + SizeText(MacZipPath) + ")");
         }
-        EditorUtility.DisplayDialog("Build release",
-            "O-Manager-Setup.exe for version " + version + " is ready (" + mb + " MB).\n\n" +
-            "Drag it onto the GitHub page that opened and press Publish release. " +
-            "Installed games update the next time they start.", "OK");
+        catch (Exception e)
+        {
+            UnityEngine.Debug.LogException(e);
+            problems.Add("Mac: could not pack the zip. " + e.Message);
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+    }
+
+    static void BuildLinux(List<string> made, List<string> problems)
+    {
+        if (!BuildGame(BuildTarget.StandaloneLinux64, LinuxBuildDir, PlayerSettings.productName + ".x86_64", "Linux", problems)) return;
+        try
+        {
+            EditorUtility.DisplayProgressBar("Build release", "Packing " + GameUpdater.LinuxAssetName + "…", 0.5f);
+            // Leave out Unity's debug symbol files, players do not need them
+            foreach (string debug in Directory.GetFiles(LinuxBuildDir, "*.debug", SearchOption.TopDirectoryOnly))
+            {
+                File.Delete(debug);
+            }
+            ReleaseArchives.TarGzFolder(LinuxBuildDir, PlayerSettings.productName, LinuxTarPath);
+            made.Add(GameUpdater.LinuxAssetName + " (" + SizeText(LinuxTarPath) + ")");
+            UnityEngine.Debug.Log("Release: " + LinuxTarPath + " (" + SizeText(LinuxTarPath) + ")");
+        }
+        catch (Exception e)
+        {
+            UnityEngine.Debug.LogException(e);
+            problems.Add("Linux: could not pack the tar.gz. " + e.Message);
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+    }
+
+    // One Mac game that runs on both Intel and Apple silicon Macs. The setting lives in the Mac build module,
+    // which is only there when the module is installed, so it is reached by name.
+    static void SetMacUniversal()
+    {
+        try
+        {
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type settings = assembly.GetType("UnityEditor.OSXStandalone.UserBuildSettings", false);
+                PropertyInfo architecture = settings?.GetProperty("architecture", BindingFlags.Public | BindingFlags.Static);
+                if (architecture == null || !architecture.CanWrite) continue;
+                architecture.SetValue(null, Enum.Parse(architecture.PropertyType, "x64ARM64"));
+                return;
+            }
+            UnityEngine.Debug.LogWarning("Build release: could not find the Mac architecture setting; the Mac game uses whatever is set in Build Profiles.");
+        }
+        catch (Exception e)
+        {
+            UnityEngine.Debug.LogWarning("Build release: could not set the Mac game to Intel + Apple silicon: " + e.Message);
+        }
     }
 }

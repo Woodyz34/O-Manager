@@ -1,5 +1,15 @@
 # Installationsprogram och automatiska uppdateringar
 
+Spelet finns för **Windows, Mac och Linux**. Varje release på GitHub har en fil per dator:
+
+| Dator | Fil | Vad spelaren gör |
+| --- | --- | --- |
+| Windows | `O-Manager-Setup.exe` | Kör setup-filen |
+| Mac (Intel och Apple silicon) | `O-Manager-Mac.zip` | Packar upp, drar O-Manager till Program |
+| Linux (64-bitars) | `O-Manager-Linux.tar.gz` | Packar upp, startar `O-Manager.x86_64` |
+
+Hemsidans *Ladda ner*-knapp väljer rätt fil själv efter besökarens dator. Alla tre uppdaterar sig själva.
+
 Spelarna laddar ner **en fil**, `O-Manager-Setup.exe`, från hemsidan. Den installerar spelet, gör en genväg i
 Start-menyn (och på skrivbordet om man vill) och lägger till O-Manager under *Inställningar > Appar*, så att
 det går att avinstallera som vanligt.
@@ -12,6 +22,9 @@ ligger kvar, de sparas inte i spelmappen.
 
 ## Engångsförberedelser (görs bara första gången)
 
+0. **Lägg till Mac och Linux i Unity** (bara om du vill bygga dem): öppna **Unity Hub > Installs**, klicka på
+   kugghjulet vid Unity 6000.3.25f1 > **Add modules**, kryssa i **Mac Build Support (Mono)** och
+   **Linux Build Support (Mono)**, tryck **Install** och starta om Unity. Utan dem är rutorna Mac och Linux grå.
 1. **Installera Inno Setup** (gratis): https://jrsoftware.org/isdl.php > `innosetup-6.x.x.exe` > installera
    med standardvalen. Unity hittar det själv.
 2. **Skapa det publika nedladdningsrepot** på https://github.com/new
@@ -22,27 +35,41 @@ ligger kvar, de sparas inte i spelmappen.
 
 ## Släppa en ny version (varje gång)
 
-1. Öppna projektet i Unity och välj **Tools > O-Manager > Build release (setup.exe)…**
+1. Öppna projektet i Unity och välj **Tools > O-Manager > Build release…**
 2. Kolla **New version**. Den föreslår nästa nummer själv (t.ex. `1.0.4`). Det måste vara högre än förra
    versionen, annars uppdaterar sig inte spelen.
 3. Skriv vad som är nytt under **What's new**, t.ex. `Ny karta: Ängaryd` och `Nya löparvärden`. En sak per rad.
    Texten syns i spelet medan det uppdaterar och på GitHub.
-4. Tryck **Build game and setup.exe**. Unity bygger spelet och Inno Setup packar det (några minuter).
+4. Kolla rutorna under **Computers** (Windows, Mac, Linux) och tryck **Build release**. Unity bygger spelet en
+   gång per dator och packar filerna (räkna med 5–15 minuter för alla tre). Unity växlar plattform under tiden
+   och tillbaka till Windows på slutet.
 5. När det är klart öppnas mappen `Builds\Release` och GitHub-sidan *New release* i webbläsaren, med
    versionsnummer, titel och text redan ifyllda.
-6. Dra `O-Manager-Setup.exe` från mappen till rutan *Attach binaries* på GitHub-sidan och vänta tills den laddat upp.
+6. Dra **alla** filerna (`O-Manager-Setup.exe`, `O-Manager-Mac.zip`, `O-Manager-Linux.tar.gz`) från mappen till
+   rutan *Attach binaries* på GitHub-sidan och vänta tills de laddat upp.
 7. Tryck **Publish release**.
 
 Klart. Hemsidans *Ladda ner*-knapp ger nu den nya versionen, och alla som redan har spelet får uppdateringen
 nästa gång de startar det. Vill du berätta om det på hemsidan också, lägg en rad i `website/news.json`.
 
-Kom ihåg: filen måste heta exakt `O-Manager-Setup.exe` och releasen får inte vara *pre-release* eller utkast.
+Kom ihåg: filerna måste heta exakt som ovan och releasen får inte vara *pre-release* eller utkast. Saknas en fil
+i en release får den datorn ingen uppdatering den gången (och hemsidan säger "kommer snart" för den).
 
 ## Bra att veta
 
 - **"Windows skyddade datorn"**: spelet är inte kodsignerat (det kostar pengar varje år), så Windows varnar
   första gången man kör setup-filen. Man klickar **Mer information** och **Kör ändå**. Uppdateringarna som spelet
   laddar ner själv visar inte varningen.
+- **Mac: "kan inte kontrolleras" / "är skadat"**: spelet är inte signerat och notariserat hos Apple (det kräver
+  Apple Developer Program, 99 USD om året). Första gången går spelaren till *Systeminställningar > Integritet och
+  säkerhet > Öppna ändå*. Säger Macen att appen är skadad hjälper `xattr -cr /Applications/O-Manager.app` i Terminal.
+  Båda står på hemsidan. Uppdateringar som spelet laddar ner själv får ingen varning.
+- **Mac: uppdatering kräver att spelet ligger i Program**: körs det direkt från Hämtade filer kör macOS en dold,
+  skrivskyddad kopia. Då visar spelet bara "Version X is out" med en knapp till hemsidan. Samma sak om mappen inte
+  går att skriva i, eller om en uppdatering misslyckats två gånger i rad.
+- **Mac byggs från Windows**: Unity bygger Mac-spelet med Mono. Zip-filen skrivs av Unity-skriptet självt
+  (`Assets/Editor/ReleaseArchives.cs`), eftersom Windows egna zip tappar "får köras"-flaggan som Macen behöver.
+- **Linux-introt**: Linux kan inte spela mp4, så introfilmen finns också som `Resources/Intro/intro_linux.webm`.
 - **Var spelet hamnar**: `%LOCALAPPDATA%\Programs\O-Manager` (samma sätt som Discord och VS Code installeras).
   Då behövs ingen administratörsruta, varken vid installation eller uppdatering.
 - **Testa själv innan**: kör `Builds\Windows\O-Manager.exe` direkt, eller installera `Builds\Release\O-Manager-Setup.exe`
@@ -58,6 +85,7 @@ Kom ihåg: filen måste heta exakt `O-Manager-Setup.exe` och releasen får inte 
 | --- | --- |
 | `installer/O-Manager.iss` | Inno Setup-skriptet (genvägar, avinstallation, väntar på att spelet stängs vid uppdatering) |
 | `installer/O-Manager.ico` | Ikonen på setup-filen (från `Assets/Art/Icon/OManagerIcon.png`) |
-| `Assets/Editor/ReleaseBuilder.cs` | Menyn *Build release*: version, bygge, Inno Setup, GitHub-sidan |
+| `Assets/Editor/ReleaseBuilder.cs` | Menyn *Build release*: version, bygge för varje dator, Inno Setup, GitHub-sidan |
+| `Assets/Editor/ReleaseArchives.cs` | Packar Mac-zip och Linux-tar.gz med rätt "får köras"-flaggor |
 | `Assets/Scripts/UI/GameUpdater.cs` | Uppdateringskollen i spelet och versionsnumret nere till höger på huvudmenyn |
-| `website/config.js` | Vilket repo och filnamn hemsidans *Ladda ner*-knapp använder |
+| `website/config.js` | Vilket repo och vilka filnamn hemsidans *Ladda ner*-knapp använder |

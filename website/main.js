@@ -173,30 +173,58 @@
     $("newsList").innerHTML = '<p class="sec-lead">' + (lang() === "sv" ? "Nyheterna kunde inte laddas just nu." : "News could not be loaded right now.") + "</p>";
   });
 
-  /* ---------- Download: always the newest GitHub release ---------- */
+  /* ---------- Download: always the newest GitHub release, for the visitor's computer ---------- */
   var cfg = window.OM_CONFIG || {}, release = null, releaseState = "loading";
   var repoUrl = "https://github.com/" + cfg.releasesRepo + "/releases";
-  $("dlBtn").href = repoUrl + "/latest";
+  var osNames = { win: "Windows", mac: "Mac", linux: "Linux" };
+  var osFiles = { win: cfg.assetName, mac: cfg.macAssetName, linux: cfg.linuxAssetName };
+  var osIcons = {
+    win: '<path d="M3 5.5 10 4.5v7H3Zm8-1.1L21 3v8.5H11ZM3 12.5h7v7L3 18.5Zm8 0h10V21l-10-1.4Z" class="f"/>',
+    other: '<path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16" />'
+  };
+  var ua = navigator.userAgent || "";
+  var os = /Android|iPhone|iPad|iPod/.test(ua) ? "win" : /Mac/.test(ua) ? "mac" : /Linux|X11|CrOS/.test(ua) ? "linux" : "win";
+  function assetFor(o) {
+    if (!release) return null;
+    return release.assets.filter(function (a) { return a.name === osFiles[o]; })[0] || null;
+  }
   function renderDownload() {
-    var meta = $("dlMeta"), l = lang();
-    if (releaseState === "ok") {
-      var d = new Date(release.published_at), mb = release.asset ? (release.asset.size / 1048576).toFixed(0) + " MB · " : "";
+    var meta = $("dlMeta"), l = lang(), btn = $("dlBtn"), asset = assetFor(os);
+    document.querySelectorAll(".dl-os").forEach(function (e) { e.textContent = osNames[os]; });
+    $("dlIcon").innerHTML = os === "win" ? osIcons.win : osIcons.other;
+    document.querySelectorAll(".dl-steps").forEach(function (e) { e.hidden = e.getAttribute("data-os") !== os; });
+    document.querySelectorAll("#dlOther button").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-os") === os); });
+    btn.href = asset ? asset.browser_download_url : os === "win" && releaseState !== "ok" ? repoUrl + "/latest" : "#download";
+    if (releaseState === "ok" && asset) {
+      var d = new Date(release.published_at), mb = (asset.size / 1048576).toFixed(0) + " MB · ";
       var date = d.getDate() + " " + months[l][d.getMonth()] + " " + d.getFullYear();
-      meta.textContent = (l === "sv" ? "Version " : "Version ") + release.tag_name + " · " + mb + (l === "sv" ? "släppt " : "released ") + date;
+      meta.textContent = "Version " + release.tag_name + " · " + mb + (l === "sv" ? "släppt " : "released ") + date;
+    } else if (releaseState === "ok") {
+      meta.textContent = l === "sv" ? osNames[os] + "-versionen kommer snart." : "The " + osNames[os] + " version is coming soon.";
     } else if (releaseState === "none") {
       meta.textContent = l === "sv" ? "Första versionen kommer snart." : "The first version is coming soon.";
     } else if (releaseState === "error") {
-      meta.textContent = l === "sv" ? "Senaste versionen för Windows 10 / 11." : "Latest version for Windows 10 / 11.";
+      meta.textContent = l === "sv" ? "Senaste versionen för " + osNames[os] + "." : "Latest version for " + osNames[os] + ".";
+    }
+    // Once there are Mac and Linux files, the hero says so too
+    if (release && assetFor("mac") && assetFor("linux")) {
+      $("heroMeta").innerHTML = '<span data-l="sv">Windows, Mac och Linux · Spela själv eller med dina vänner</span><span data-l="en">Windows, Mac and Linux · Play alone or with your friends</span>';
     }
   }
+  $("dlOther").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (b) { os = b.getAttribute("data-os"); renderDownload(); }
+  });
+  $("dlBtn").addEventListener("click", function (e) {
+    if ($("dlBtn").getAttribute("href") === "#download") e.preventDefault();
+  });
+  renderDownload();
   if (cfg.releasesRepo) {
     fetch("https://api.github.com/repos/" + cfg.releasesRepo + "/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
       .then(function (r) { if (r.status === 404) { releaseState = "none"; return null; } if (!r.ok) throw r; return r.json(); })
       .then(function (j) {
         if (!j) return renderDownload();
-        var asset = (j.assets || []).filter(function (a) { return a.name === cfg.assetName; })[0] || (j.assets || [])[0];
-        release = { tag_name: j.tag_name, published_at: j.published_at, asset: asset };
-        if (asset) $("dlBtn").href = asset.browser_download_url;
+        release = { tag_name: j.tag_name, published_at: j.published_at, assets: j.assets || [] };
         releaseState = "ok"; renderDownload();
       })
       .catch(function () { releaseState = "error"; renderDownload(); });

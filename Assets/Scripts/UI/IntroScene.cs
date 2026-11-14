@@ -60,7 +60,12 @@ public class IntroScene : MonoBehaviour
         sound.spatialBlend = 0f;
         sound.clip = Resources.Load<AudioClip>("Intro/intro_sound");
 
+#if UNITY_STANDALONE_LINUX && !UNITY_EDITOR
+        // Linux players cannot play H.264 (mp4), so they get the same film as VP8 (webm)
+        VideoClip clip = Resources.Load<VideoClip>("Intro/intro_linux");
+#else
         VideoClip clip = Resources.Load<VideoClip>("Intro/intro");
+#endif
         if (clip != null)
         {
             video = cam.gameObject.AddComponent<VideoPlayer>();
