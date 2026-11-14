@@ -8,8 +8,8 @@ using UnityEngine.SceneManagement;
 // the texts used on more than one page (lobby and single player) are kept here so they say the same thing.
 public class UIHints : MonoBehaviour
 {
-    public const string RunnerPool = "Which runners you race with. 'Your runners' means only the cards you own. 'Any runner' means you pick from all runners in the game.";
-    public const string GameMode = "Extra rules for the race, for example Imposter, Bears, Move a control or Route analysis. Several can be on at once. Click to read what each one does.";
+    public const string RunnerPool = "Choose which runners everyone races with.";
+    public const string GameMode = "Choose extra rules for the race. Click to see what each one does.";
     public const string Course = "The map and course the race is run on.";
     public const string ChangeColor = "Pick the colour of your runner. It is the colour you and the other players see on the map.";
     public const string ChangeCourse = "Choose which map and course to race on. You can pick a ready-made course, a community course or let the game make one.";
@@ -44,9 +44,6 @@ public class UIHints : MonoBehaviour
         new Hint("MultiPlayer", "Create Game Panel/Create session", "Create the lobby and wait for the others to join."),
         new Hint("MultiPlayer", "Create Game Panel/Return", "Go back without creating a lobby."),
 
-        new Hint("Lobby", "Game setup card/Game mode", RunnerPool + " The host decides."),
-        new Hint("Lobby", "Game setup card/Imposter", "The game modes the host has switched on for this race. Click 'See game modes' on the left to read what each one means."),
-        new Hint("Lobby", "Game setup card/Map", Course + " The host decides."),
         new Hint("Lobby", "Player setup panel/InnerPanel/Change player outfit", ChangeColor),
         new Hint("Lobby", "Player setup panel/InnerPanel/Change Map", "The host picks the map and course. The others can open this to see what has been picked."),
         new Hint("Lobby", "Player setup panel/InnerPanel/Change GameMode", "The host chooses whether everyone races with their own runners or any runner. The others can look at the choice."),

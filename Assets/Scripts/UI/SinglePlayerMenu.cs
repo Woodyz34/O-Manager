@@ -122,8 +122,8 @@ public class SinglePlayerMenu : MonoBehaviour
         poolValue = HeaderColumn(setup.transform, "RUNNER POOL", 300);
         modeValue = HeaderColumn(setup.transform, "GAME MODE", 300);
         courseValue = HeaderColumn(setup.transform, "COURSE", 460);
-        HoverTip.Add(poolValue.transform.parent, UIHints.RunnerPool);
-        HoverTip.Add(modeValue.transform.parent, UIHints.GameMode);
+        HoverTip.Add(poolValue.transform.parent, () => GameModes.ExplainPool(pool, (modes & ExtraModes.NoRunners) != 0));
+        HoverTip.Add(modeValue.transform.parent, () => ExtraModes.Explain(modes));
         HoverTip.Add(courseValue.transform.parent, UIHints.Course);
         HoverTip.Add(leave, "Back to the main menu.");
         HoverTip.Add(moneyPill, UIHints.Money);

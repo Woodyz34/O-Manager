@@ -68,6 +68,15 @@ public static class GameModes
         return cap > 0 ? name + ", avg max " + cap : name;
     }
 
+    // The hover text of the runner pool shown in the lobby: explains the pool that is picked now, nothing else
+    public static string ExplainPool(string mode, bool noRunners)
+    {
+        if (string.IsNullOrEmpty(mode) || mode == "...") return "";
+        if (noRunners) return "No runners: this game mode gives everyone a set runner, so the runner pool does not matter.";
+        int cap = Cap(mode);
+        return PoolName(mode) + ": " + PoolDescription(mode) + (cap > 0 ? " Average overall at most " + cap + "." : "");
+    }
+
     public static string PoolDescription(string mode)
     {
         if (IsSameStats(mode)) return "You set speed and technique (for each leg in a relay). Everyone picks any runner, and all run with your values.";
