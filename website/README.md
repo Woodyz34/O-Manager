@@ -54,3 +54,6 @@ utan att något i hemsidan ändras.
 ## Bilder och video
 `Docs/website_assets.py` gör om skärmdumparna till små AVIF/WebP-bilder och klipper introfilmen
 till bakgrundsvideon. `Docs/website_contours.py` gör höjdkurvorna i bakgrunden.
+
+Webbläsare sparar bilderna i 7 dagar. Byter du en bild men behåller filnamnet, öka siffran i `?v=2`
+efter bildadresserna i `index.html` (sök och ersätt `?v=2` med `?v=3`), annars ser besökare den gamla bilden.
