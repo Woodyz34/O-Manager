@@ -109,6 +109,50 @@ public class CourseBuilder : MonoBehaviour
     readonly List<Mark> shadows = new List<Mark>();
     Mark dragging;
 
+    // A click (without dragging) on the start or a control picks it: the next controls are put in after it, in the
+    // middle of the course (pick control 3 and the new one becomes 4). -1 = after the start; null = at the end.
+    int? insertAfter;
+
+    // The pick, when it still fits the course (else it is let go)
+    int? InsertAfter()
+    {
+        if (!insertAfter.HasValue) return null;
+        EditCourse course = Cur;
+        int after = insertAfter.Value;
+        if (tool != Tool.Control || after < -1 || after >= course.items.Count - 1 || (after == -1 && !course.start.HasValue))
+        {
+            insertAfter = null;
+            return null;
+        }
+        return after;
+    }
+
+    Mark InsertAfterMark()
+    {
+        int? after = InsertAfter();
+        if (!after.HasValue) return null;
+        return after.Value < 0 ? marks.Find(m => m.type == MarkType.Start) : marks.Find(m => m.type == MarkType.Control && m.item == after.Value);
+    }
+
+    void PickInsertAfter(Mark mark)
+    {
+        int after = mark.type == MarkType.Start ? -1 : mark.item;
+        EditCourse course = Cur;
+        if (insertAfter == after || after >= course.items.Count - 1)
+        {
+            // Clicked again, or the last control (new ones go after it anyway): back to adding at the end
+            bool was = insertAfter.HasValue;
+            insertAfter = null;
+            SetStatus(was ? "New controls go at the end of the course again." : "", false);
+        }
+        else
+        {
+            insertAfter = after;
+            SetStatus("New controls go in after " + MarkName(mark) + ". Click it again (or press Esc) to add at the end again.", false);
+        }
+        cursorKey = null;
+    }
+
     // The drag: where the mark was grabbed, where it came from, and the same control on other legs (moved with it)
     Vector3 dragGrab, dragFrom, dragMouse;
     bool dragMoved, dragUndo;
@@ -388,6 +432,14 @@ public class CourseBuilder : MonoBehaviour
         Vector3 mouseWorld = mapCamera.ScreenToWorldPoint(Input.mousePosition);
         mouseWorld.z = -1f;
 
+        // Esc lets go of a picked control: new controls go at the end again
+        if (insertAfter.HasValue && !typing && Input.GetKeyDown(KeyCode.Escape))
+        {
+            insertAfter = null;
+            cursorKey = null;
+            SetStatus("New controls go at the end of the course again.", false);
+        }
+
         // Zoom towards the mouse
         float wheel = Input.mouseScrollDelta.y;
         if (!overUI && Mathf.Abs(wheel) > 0.01f)
@@ -624,6 +676,18 @@ public class CourseBuilder : MonoBehaviour
                 from = branchTail;
                 to = branchExit;
             }
+            else if (InsertAfter().HasValue)
+            {
+                // Goes in after the picked control, before the one after it
+                int after = InsertAfter().Value;
+                label = (after + 2).ToString();
+                Vector3 before = after < 0 ? course.start.Value : course.items[after].point;
+                from = new List<(Vector3 point, CourseRenderer.MarkKind kind)> { (before, after < 0 ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control) };
+                EditItem next = course.items[after + 1];
+                if (next.fork < 0) to = (next.point, CourseRenderer.MarkKind.Control);
+                Mark picked = InsertAfterMark();
+                if (picked != null) drawn.Add(Ring(picked, CourseUI.Accent));
+            }
             else
             {
                 label = (course.items.Count + 1).ToString();
@@ -662,8 +726,16 @@ public class CourseBuilder : MonoBehaviour
             {
                 tip = "Click to add a control here, in between";
             }
+            else if (InsertAfter().HasValue && !moveType.HasValue && tool == Tool.Control)
+            {
+                tip = "Goes in after " + (InsertAfterMark() != null ? MarkName(InsertAfterMark()) : "the picked control");
+            }
         }
-        DrawCursor(drawn, lines, tip, tipIsError, hover.kind + " " + hover.point.x + " " + hover.point.y + " " + hover.fork + " " + tool + " " + moveType);
+        if (hover.kind == HoverKind.Mark && tool == Tool.Control && (hover.mark.type == MarkType.Start || (hover.mark.type == MarkType.Control && hover.mark.fork < 0)))
+        {
+            tip += "\nClick to put the next controls in after it";
+        }
+        DrawCursor(drawn, lines, tip, tipIsError, hover.kind + " " + hover.point.x + " " + hover.point.y + " " + hover.fork + " " + tool + " " + moveType + " " + insertAfter);
     }
 
     void DrawCursor(List<CourseRenderer.Mark> drawn, List<CourseRenderer.Line> lines, string tip, bool tipIsError, string what)
@@ -839,8 +911,11 @@ public class CourseBuilder : MonoBehaviour
         // Dropped: it must be somewhere a runner can stand, otherwise it goes back
         if (!dragMoved)
         {
+            Mark clicked = dragging;
             EndDrag(false);
             if (dragUndo) DropUndo();
+            if (tool == Tool.Control && (clicked.type == MarkType.Start || (clicked.type == MarkType.Control && clicked.fork < 0)))
+                PickInsertAfter(clicked);
             return;
         }
         string markName = MarkName(dragging);
@@ -957,6 +1032,7 @@ public class CourseBuilder : MonoBehaviour
     void Undo()
     {
         if (busy) return;
+        insertAfter = null;
         if (dragging != null)
         {
             // Ctrl+Z while dragging: the mark just goes back
@@ -1364,8 +1440,17 @@ public class CourseBuilder : MonoBehaviour
                 SetTool(Tool.Control);
                 break;
             case Tool.Control:
-                course.items.Add(new EditItem { point = world });
+            {
+                int? pickedAfter = InsertAfter();
+                if (pickedAfter.HasValue)
+                {
+                    // In the middle of the course, after the picked control; the next one goes after this one
+                    course.items.Insert(pickedAfter.Value + 1, new EditItem { point = world });
+                    insertAfter = pickedAfter.Value + 1;
+                }
+                else course.items.Add(new EditItem { point = world });
                 break;
+            }
             case Tool.Branch:
                 forks[branchFork].branches[branchIndex].Add(world);
                 break;
@@ -1405,6 +1490,7 @@ public class CourseBuilder : MonoBehaviour
     void RemoveMark(Mark mark)
     {
         PushUndo();
+        insertAfter = null;
         EditCourse course = Cur;
         switch (mark.type)
         {
@@ -1825,6 +1911,7 @@ public class CourseBuilder : MonoBehaviour
 
     void SelectLeg(int leg)
     {
+        insertAfter = null;
         selectedLeg = Mathf.Clamp(leg, 0, legs - 1);
         CopyStartAndFinishFromLegBefore();
         EditCourse course = Cur;
@@ -2373,6 +2460,7 @@ public class CourseBuilder : MonoBehaviour
 
     void SetTool(Tool chosen)
     {
+        if (chosen != Tool.Control) insertAfter = null;
         bool wasForbidden = tool == Tool.Forbidden;
         if (wasForbidden && chosen != Tool.Forbidden) CloseOpenArea();
         draggingCorner = false;
