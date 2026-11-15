@@ -79,7 +79,7 @@ public static class GameModes
 
     public static string PoolDescription(string mode)
     {
-        if (IsSameStats(mode)) return "You set speed and technique (for each leg in a relay). Everyone picks any runner, and all run with your values.";
+        if (IsSameStats(mode)) return "You set speed and technique (for each leg in a relay). Nobody picks a runner: everyone runs as themselves with your values.";
         if (IsOpenPacks(mode)) return "Everyone opens one free pack per leg and races with what comes out. The runners are only on loan.";
         return IsYourRunners(mode) ? "Everyone races with runners from their own collection." : "Everyone may pick any runner in the game.";
     }
@@ -243,6 +243,13 @@ public static class GameModes
             result.Add(copy);
         }
         return result;
+    }
+
+    // "Same stats": the runner a player runs as, named after the player, with the values of that leg
+    public static CardData SameStatsRunner(string playerName, int leg, bool man)
+    {
+        Vector2Int values = SameStatsForLeg(leg) ?? new Vector2Int(80, 80);
+        return new CardData(playerName, values.x, values.y, null, null, man ? "H21" : "D21", man, null);
     }
 
     public static bool IsYourRunners(string mode) => !string.IsNullOrEmpty(mode) && mode.Contains(YourRunners);

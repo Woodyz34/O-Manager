@@ -142,6 +142,20 @@ public class RelayRace : MonoBehaviour, IRaceStats
         return true;
     }
 
+    // "Same stats": no picking. The team runs every leg as the player, with that leg's values; a women's leg gets a
+    // woman (she runs at the women's pace, as any woman with the same values would).
+    public void PickSameStatsTeam(string playerName)
+    {
+        picks.Clear();
+        for (int legIndex = 0; legIndex < course.legs; legIndex++)
+        {
+            LegSex sex = LegSexes[Mathf.Clamp(legIndex, 0, LegSexes.Count - 1)];
+            picks.Add(GameModes.SameStatsRunner(playerName, legIndex, sex != LegSex.Women));
+        }
+        RunnerFilterBar.ClearRules();
+        if (pickHeader != null) pickHeader.transform.parent.gameObject.SetActive(false);
+    }
+
     // The runners the team picks from (without "Same stats" values): the player's own (and lent) runners in
     // "Your runners", the runners out of the packs in "Open packs", else every runner in the packs
     List<CardData> pool;
