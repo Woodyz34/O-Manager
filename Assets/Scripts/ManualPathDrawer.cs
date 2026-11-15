@@ -493,7 +493,7 @@ public class ManualPathDrawer : MonoBehaviour
         FlashLine(removed, new Color(0.85f, 0.15f, 0.1f), 1.2f);
         TrimTo(keepPoints);
         isDrawing = false;
-        UIToast.Show("You can't get past there. Carry on drawing from the end of your line, round it.", 3f);
+        UIToast.ShowSide("You can't get past there. Carry on drawing from the end of your line, round it.", 4f);
     }
 
     // Keeps the first count drawn points and the cells and detours that belong to them
