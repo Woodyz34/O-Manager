@@ -31,8 +31,11 @@ public class SinglePlayerMenu : MonoBehaviour
         ChosenGameMode = null;
         ChosenModes = ExtraMode.None;
         pool = GameModes.YourRunners;
+        poolLoaded = false;
         modes = ExtraMode.None;
     }
+
+    static bool poolLoaded;
 
     const string BackdropSprite = "Sprites/e2bf7ebc-02a1-4b78-b52f-e0211eeac746";   // the lobby's forest picture
 
@@ -57,6 +60,12 @@ public class SinglePlayerMenu : MonoBehaviour
     {
         ChosenGameMode = null;
         ChosenModes = ExtraMode.None;
+        // The first time this session: the runner pool picked last time (here or in a lobby)
+        if (!poolLoaded)
+        {
+            poolLoaded = true;
+            pool = GameModeHandler.LastPool ?? GameModes.YourRunners;
+        }
         if (GameManager.Instance == null)
         {
             GameManager manager = new GameObject("GameManager").AddComponent<GameManager>();
@@ -238,6 +247,7 @@ public class SinglePlayerMenu : MonoBehaviour
             id => GameModeSelect.Choose(id, pool, mode =>
             {
                 pool = mode;
+                GameModeHandler.LastPool = mode;
                 nextRefresh = 0f;
             }),
             "Who you can run with. The same runner pools as in a multiplayer lobby.");
