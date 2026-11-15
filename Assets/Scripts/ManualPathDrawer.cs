@@ -425,12 +425,14 @@ public class ManualPathDrawer : MonoBehaviour
     // with the smaller controls there), and a bit thinner in route analysis, so it does not cover what you want to see
     float normalLineWidth = -1f;
 
+    bool Sprint => CourseLoader.LoadedMap != null ? CourseLoader.LoadedMap.IsSprint
+        : manager != null && manager.cellSize / MapDefinition.WorldUnitsPerMeter < 5f;
+
     void FitLineWidth()
     {
         if (line == null) return;
         if (normalLineWidth < 0f) normalLineWidth = line.widthMultiplier;
-        bool sprint = CourseLoader.LoadedMap != null ? CourseLoader.LoadedMap.IsSprint
-            : manager != null && manager.cellSize / MapDefinition.WorldUnitsPerMeter < 5f;
+        bool sprint = Sprint;
         float share = sprint ? CourseRenderer.SprintSize : (RouteAnalysis.On && RelayRace.Active == null ? 0.6f : 1f);
         line.widthMultiplier = normalLineWidth * share;
     }
@@ -444,6 +446,7 @@ public class ManualPathDrawer : MonoBehaviour
         detours.Clear();
         detourFrom.Clear();
         blockedFrom = -1;
+        firstOpen = -1;
         if (line != null) line.positionCount = 0;
     }
 
@@ -472,6 +475,24 @@ public class ManualPathDrawer : MonoBehaviour
         return true;
     }
 
+    // Sprint maps are strict: the line may only touch closed ground (a corner of a house, the edge of a wall) for this
+    // many cells, and only when the way round is just as short; anything more (crossing a fence, a purple barrier, a
+    // house) stops the line. Forest maps take the way round within 100 m without a word.
+    const int SprintMaxClosedCells = 2;
+    const int SprintDetourMargin = 4;
+    const int SprintExtraDetourCells = 4;
+
+    int firstOpen = -1;   // gridPath index of the first cell the runner can run on (-1: the line is still on closed ground)
+
+    // Closed ground right at the control the line goes to: the control may stand by a wall, the line ends in it anyway
+    bool AtTarget(Vector2Int g)
+    {
+        if (targetControl == null) return false;
+        Vector2Int t = WorldToGrid(targetControl.position);
+        int reach = CourseValidator.PunchReachCells + 1;
+        return Mathf.Abs(g.x - t.x) <= reach && Mathf.Abs(g.y - t.y) <= reach;
+    }
+
     // Adds one cell of the drawn line and checks closed ground. Returns false when the line was stopped.
     bool AddCell(Vector2Int g, int pointIndex)
     {
@@ -480,19 +501,32 @@ public class ManualPathDrawer : MonoBehaviour
             cellPoint.Add(pointIndex);
             if (RouteAnalysis.On) return true;
             bool open = Passable(g);
+            // The line may start on closed ground (the control stands by a house or a fence): nothing is checked until
+            // it is out on ground the runner can run on. (Before, a start two cells inside a house stopped the line
+            // over and over, so it could not be drawn at all.)
+            if (firstOpen < 0)
+            {
+                if (open) firstOpen = gridPath.Count - 1;
+                return true;
+            }
+            bool strict = Sprint;
             if (!open && blockedFrom < 0)
             {
-                blockedFrom = gridPath.Count - 2;   // the last good cell (-1 when the line starts on closed ground)
+                blockedFrom = gridPath.Count - 2;   // the last good cell
             }
-            else if (!open && blockedFrom >= 0 && (gridPath.Count - 1 - blockedFrom) * manager.cellSize > 2f * CorrectionMeters * MapDefinition.WorldUnitsPerMeter)
+            else if (!open && blockedFrom >= 0 && !AtTarget(g) &&
+                     (strict ? gridPath.Count - 1 - blockedFrom > SprintMaxClosedCells
+                             : (gridPath.Count - 1 - blockedFrom) * manager.cellSize > 2f * CorrectionMeters * MapDefinition.WorldUnitsPerMeter))
             {
                 StopLine();
                 return false;
             }
             else if (open && blockedFrom >= 0)
             {
-                List<Vector2Int> way = blockedFrom < 0 ? null : SearchInBox(gridPath[blockedFrom], g, CorrectionCells, null);
-                if (way == null || way.Count == 0)
+                int closedCells = gridPath.Count - 2 - blockedFrom;
+                List<Vector2Int> way = SearchInBox(gridPath[blockedFrom], g, strict ? SprintDetourMargin : CorrectionCells, null);
+                bool tooLong = strict && way != null && way.Count > closedCells + 2 + SprintExtraDetourCells;
+                if (way == null || way.Count == 0 || tooLong)
                 {
                     StopLine();
                     return false;
@@ -533,7 +567,12 @@ public class ManualPathDrawer : MonoBehaviour
             detourFrom.RemoveAt(d);
         }
         blockedFrom = -1;
-        for (int i = cells - 1; i >= 0 && !RouteAnalysis.On; i--)
+        firstOpen = -1;
+        for (int i = 0; i < cells && !RouteAnalysis.On; i++)
+        {
+            if (Passable(gridPath[i])) { firstOpen = i; break; }
+        }
+        for (int i = cells - 1; i > firstOpen && firstOpen >= 0 && !RouteAnalysis.On; i--)
         {
             if (Passable(gridPath[i])) break;
             blockedFrom = i - 1;
