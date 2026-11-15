@@ -48,8 +48,6 @@ public class MultiSelectDropdown : MonoBehaviour
 
     void Build(RectTransform below, string heading, bool searchable)
     {
-        RectTransform root = (RectTransform)transform;
-
         Image outside = CourseUI.Panel("Outside", transform, new Color(0f, 0f, 0f, 0.001f), false);
         CourseUI.Stretch(outside.rectTransform);
         Button outsideButton = outside.gameObject.AddComponent<Button>();
@@ -71,9 +69,9 @@ public class MultiSelectDropdown : MonoBehaviour
         Canvas parentCanvas = below.GetComponentInParent<Canvas>();
         Camera cam = parentCanvas != null && parentCanvas.renderMode != RenderMode.ScreenSpaceOverlay ? parentCanvas.worldCamera : null;
         Vector2 screen = RectTransformUtility.WorldToScreenPoint(cam, corners[0]);
-        Vector2 local;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screen, null, out local);
-        Rect r = root.rect;
+        // Not from root's own size: this canvas was made this frame and is not scaled yet
+        Vector2 local = ScreenSettings.ScreenToFitted(screen);
+        Rect r = ScreenSettings.FittedRect();
         float x = Mathf.Clamp(local.x, r.xMin + 10f, r.xMax - PanelWidth - 10f);
         float top = Mathf.Max(local.y - 6f, r.yMin + height + 10f);
         panel.anchorMin = panel.anchorMax = new Vector2(0.5f, 0.5f);

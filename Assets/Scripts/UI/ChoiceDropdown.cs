@@ -28,8 +28,6 @@ public class ChoiceDropdown : MonoBehaviour
 
     void Build(RectTransform below, string[] labels, int selected, Action<int> chosen)
     {
-        RectTransform root = (RectTransform)transform;
-
         Image outside = CourseUI.Panel("Outside", transform, new Color(0f, 0f, 0f, 0.001f), false);
         CourseUI.Stretch(outside.rectTransform);
         Button outsideButton = outside.gameObject.AddComponent<Button>();
@@ -41,13 +39,13 @@ public class ChoiceDropdown : MonoBehaviour
         below.GetWorldCorners(corners);
         Canvas parentCanvas = below.GetComponentInParent<Canvas>();
         Camera cam = parentCanvas != null && parentCanvas.renderMode != RenderMode.ScreenSpaceOverlay ? parentCanvas.worldCamera : null;
-        Vector2 bottomLeft;
-        Vector2 bottomRight;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(root, RectTransformUtility.WorldToScreenPoint(cam, corners[0]), null, out bottomLeft);
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(root, RectTransformUtility.WorldToScreenPoint(cam, corners[3]), null, out bottomRight);
+        // Not from root's own size: this canvas was made this frame and is not scaled yet, so on a screen bigger
+        // than 1920x1080 the list landed outside the screen (the course builder's Type button, at the right edge)
+        Vector2 bottomLeft = ScreenSettings.ScreenToFitted(RectTransformUtility.WorldToScreenPoint(cam, corners[0]));
+        Vector2 bottomRight = ScreenSettings.ScreenToFitted(RectTransformUtility.WorldToScreenPoint(cam, corners[3]));
         float width = Mathf.Max(260f, bottomRight.x - bottomLeft.x);
         float height = 12f + labels.Length * (RowHeight + 4f) + 8f;
-        Rect r = root.rect;
+        Rect r = ScreenSettings.FittedRect();
 
         Image card = CourseUI.CardPanel("Panel", transform);
         RectTransform panel = card.rectTransform;

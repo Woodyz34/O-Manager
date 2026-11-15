@@ -524,6 +524,7 @@ public class CourseBuilder : MonoBehaviour
                 hover.point = onLine;
             }
         }
+        if (hover.kind == HoverKind.Free || hover.kind == HoverKind.Insert) hover.point = Nudge(hover.point);
         hover.point.z = -1f;
         hover.problem = CheckPlace(hover.point);
         return hover;
@@ -818,6 +819,7 @@ public class CourseBuilder : MonoBehaviour
                 snapped = true;
             }
         }
+        if (dragMoved && !snapped) target = Nudge(target);
 
         if (Input.GetMouseButton(0))
         {
@@ -1027,6 +1029,38 @@ public class CourseBuilder : MonoBehaviour
             }
         }
         return hit;
+    }
+
+    // A spot just on something a runner can't enter (a boulder, a fence, a building corner or one grid cell of
+    // thicket) moves to the nearest cell they can run on, at most two cells away. The grid is coarse (often 10 m a
+    // cell), so without this a control by a boulder or a fence crossing said "Nobody can get there".
+    Vector3 Nudge(Vector3 world)
+    {
+        if (map == null || grid == null) return world;
+        CoursePoint point = map.FromWorld(world);
+        if (!map.Contains(point)) return world;
+        Vector2Int cell = map.ToCell(point);
+        if (grid.IsPassable(cell)) return world;
+        float cs = map.CellSize;
+        Vector3 best = world;
+        float bestDistance = cs * 2.01f;
+        for (int dy = -2; dy <= 2; dy++)
+        {
+            for (int dx = -2; dx <= 2; dx++)
+            {
+                Vector2Int c = new Vector2Int(cell.x + dx, cell.y + dy);
+                if (!grid.IsPassable(c)) continue;
+                // The middle of that cell, the same layout as MapDefinition.ToCell
+                Vector3 centre = new Vector3((c.x + 0.5f) * cs - map.cols * cs / 2f, (c.y + 0.5f) * cs - map.rows * cs / 2f, world.z);
+                float distance = Vector2.Distance(centre, world);
+                if (distance >= bestDistance) continue;
+                if (areas.Exists(area => ForbiddenAreas.Contains(area, centre))) continue;
+                if (map.ToCell(map.FromWorld(centre)) != c) continue;
+                bestDistance = distance;
+                best = centre;
+            }
+        }
+        return best;
     }
 
     // Where a start, control or finish may go: on the map, on ground a runner can reach, not out of bounds
@@ -1306,6 +1340,7 @@ public class CourseBuilder : MonoBehaviour
 
     void FinishMove(Vector3 world)
     {
+        world = Nudge(world);
         string problem = CheckPlace(world);
         if (problem != null)
         {
