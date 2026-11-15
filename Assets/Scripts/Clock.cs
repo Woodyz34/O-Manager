@@ -66,7 +66,7 @@ public class Clock : MonoBehaviour
         else
         {
             // Klockan ska inte ticka vidare i lobbyn om tävlingen avbröts mitt i ett lopp
-            CancelInvoke("UpdateTimer");
+            StopTicking();
             endScreenRequested = false;
         }
     }
@@ -75,7 +75,7 @@ public class Clock : MonoBehaviour
     {
         endScreenRequested = false;
         HideFinishTexts = false;
-        CancelInvoke("UpdateTimer");
+        StopTicking();
         sekundercount = 0;
         minuterCount = 0;
         hourCount = 0;
@@ -111,7 +111,7 @@ public class Clock : MonoBehaviour
         {
             return;
         }
-        InvokeRepeating("UpdateTimer", 0f, 0.05f);
+        StartTicking();
         // Hitta alla nödvändiga komponenter i prefab
         if (instantiatedDashboard != null)
         {
@@ -191,25 +191,23 @@ public class Clock : MonoBehaviour
             if (agentMovement.manualPathDrawer.timeToDraw)
                 { adjustedSecondsPerUpdate = 0.05f; }
 
-            float oldSekunderCount = sekundercount;
             sekundercount += adjustedSecondsPerUpdate;
-            if((int)oldSekunderCount != (int)sekundercount)
-            {
-                player.secoundCount = (int)sekundercount;
-            }
-            if (sekundercount >= 60)
+            while (sekundercount >= 60)
             {
                 sekundercount -= 60;
                 minuterCount += 1;
-                player.minuterCount = minuterCount;
             }
-
-            if (minuterCount >= 60)
+            while (minuterCount >= 60)
             {
                 minuterCount -= 60;
                 hourCount += 1;
-                player.hourCount = hourCount;
             }
+            // The networked time is set after the minute and hour have rolled over. It used to be set before, so
+            // for a moment the others saw e.g. 12:60 (a minute too much) on the leaderboard.
+            int wholeSeconds = (int)sekundercount;
+            if (player.secoundCount != wholeSeconds) player.secoundCount = wholeSeconds;
+            if (player.minuterCount != minuterCount) player.minuterCount = minuterCount;
+            if (player.hourCount != hourCount) player.hourCount = hourCount;
 
             // Whole seconds only. While a route is being drawn the clock moves in small steps,
             // and the decimals used to show.
@@ -369,7 +367,7 @@ public class Clock : MonoBehaviour
     public void StopForResults()
     {
         isClockRunning = false;
-        CancelInvoke("UpdateTimer");
+        StopTicking();
         endScreenRequested = false;
         if (multiplayerEndScreen != null)
         {
@@ -391,8 +389,41 @@ public class Clock : MonoBehaviour
         return agentMovement != null && CompetitionFlow.IsHostRunner(agentMovement.Runner);
     }
 
+    // The clock moves in steps of 0.05 real seconds (20 game seconds per real second while running). It used to be
+    // driven by InvokeRepeating, which on a slow computer (under 20 frames per second) ran fewer steps than real time,
+    // so that player's clock ran slow and their time came out better than it was (2026-11-14 relay: first over the
+    // finish line but second on time). Now the steps follow the real time that has passed, whatever the frame rate.
+    const float TickSeconds = 0.05f;
+    bool ticking;
+    float tickTime;
+
+    void StartTicking()
+    {
+        ticking = true;
+        tickTime = 0f;
+    }
+
+    void StopTicking()
+    {
+        ticking = false;
+    }
+
     private void Update()
     {
+        if (ticking)
+        {
+            tickTime += Time.deltaTime;
+            int steps = 0;
+            // A long hitch (loading, a dragged window) is not made up for more than a few seconds at a time
+            while (tickTime >= TickSeconds && steps < 100)
+            {
+                tickTime -= TickSeconds;
+                steps++;
+                UpdateTimer();
+            }
+            if (steps >= 100) tickTime = 0f;
+        }
+
         UpdateTestEndButton();
 
         // Håller knappen rätt även om värdskapet går över till en annan spelare efter målgång
