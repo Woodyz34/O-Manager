@@ -14,11 +14,16 @@ using UnityEngine;
 //  - walls along its sides where it is under that closed ground, so a runner in the tunnel can not step out onto the
 //    road above (the other level) and the road can not be reached from the tunnel.
 // Outside the closed part (the open ground at each end) nothing changes.
+//
+// Bridges and footbridges (512.1 "Bro / Spång") get the same passage between their side lines, without walls (the
+// water or road under them is closed anyway): a narrow bridge drawn at a slant was, like the tunnels, only a thin
+// chain of cells touching at the corners, and nobody could get over it.
 public static class Tunnels
 {
     struct Tunnel
     {
         public Vector2 a1, a2, b1, b2;   // side line a from a1 to a2, side line b from b1 (near a1) to b2 (near a2)
+        public bool walls;               // tunnels: walls along the sides under the closed ground; bridges: none
     }
 
     static readonly Dictionary<string, List<Tunnel>> cache = new Dictionary<string, List<Tunnel>>();
@@ -36,8 +41,10 @@ public static class Tunnels
         List<Tunnel> tunnels = Load(map);
         if (tunnels.Count == 0) return;
         int opened = 0;
-        foreach (Tunnel tunnel in tunnels) opened += Open(map, speed, tunnel);
-        Debug.Log($"Tunnels: {tunnels.Count} on {map.displayName}, {opened} cells opened");
+        // Bridges first, so a tunnel's walls are not opened again by a bridge above it
+        foreach (Tunnel tunnel in tunnels) if (!tunnel.walls) opened += Open(map, speed, tunnel);
+        foreach (Tunnel tunnel in tunnels) if (tunnel.walls) opened += Open(map, speed, tunnel);
+        Debug.Log($"Tunnels and bridges: {tunnels.Count} on {map.displayName}, {opened} cells opened");
     }
 
     static List<Tunnel> Load(MapDefinition map)
@@ -48,19 +55,21 @@ public static class Tunnels
         byte[] bytes = MapPackages.LoadBytes(map.linesPath, ".json");
         if (bytes == null) return tunnels;
         List<(Vector2 from, Vector2 to)> sides = new List<(Vector2, Vector2)>();
+        List<(Vector2 from, Vector2 to)> bridgeSides = new List<(Vector2, Vector2)>();
         try
         {
             JObject root = JObject.Parse(System.Text.Encoding.UTF8.GetString(bytes));
             foreach (JToken feature in root["features"] ?? new JArray())
             {
                 string layer = (string)feature["properties"]?["Layer"] ?? "";
-                if (!IsTunnel(layer)) continue;
+                bool tunnel = IsTunnel(layer);
+                if (!tunnel && !IsBridge(layer)) continue;
                 JArray coords = feature["geometry"]?["coordinates"] as JArray;
                 if (coords == null || coords.Count < 2 || !(coords[0] is JArray)) continue;
                 Vector2 first = new Vector2((float)coords[0][0], (float)coords[0][1]);
                 Vector2 last = new Vector2((float)coords[coords.Count - 1][0], (float)coords[coords.Count - 1][1]);
                 if (Vector2.Distance(first, last) < 1f) continue;
-                sides.Add((first, last));
+                (tunnel ? sides : bridgeSides).Add((first, last));
             }
         }
         catch (Exception e)
@@ -69,7 +78,14 @@ public static class Tunnels
             return tunnels;
         }
 
-        // The two side lines of a tunnel run side by side, a few metres apart
+        Pair(sides, true, tunnels);
+        Pair(bridgeSides, false, tunnels);
+        return tunnels;
+    }
+
+    // The two side lines of a tunnel (or a bridge) run side by side, a few metres apart
+    static void Pair(List<(Vector2 from, Vector2 to)> sides, bool walls, List<Tunnel> tunnels)
+    {
         bool[] used = new bool[sides.Count];
         for (int i = 0; i < sides.Count; i++)
         {
@@ -86,7 +102,7 @@ public static class Tunnels
                 float d = Vector2.Distance(mid, (sides[j].from + sides[j].to) / 2f);
                 if (d < bestDistance) { bestDistance = d; best = j; }
             }
-            Tunnel tunnel = new Tunnel { a1 = a1, a2 = a2 };
+            Tunnel tunnel = new Tunnel { a1 = a1, a2 = a2, walls = walls };
             if (best >= 0)
             {
                 used[best] = true;
@@ -107,7 +123,6 @@ public static class Tunnels
             }
             tunnels.Add(tunnel);
         }
-        return tunnels;
     }
 
     static bool IsTunnel(string layer)
@@ -118,11 +133,25 @@ public static class Tunnels
         return named && (lower.StartsWith("512") || lower.StartsWith("518") || lower.StartsWith("531") || lower.StartsWith("532"));
     }
 
+    // 512.1 bridge / footbridge (not the tunnel, 512.2)
+    static bool IsBridge(string layer)
+    {
+        if (!layer.StartsWith("512") || IsTunnel(layer)) return false;
+        string lower = layer.ToLowerInvariant();
+        return !lower.Contains("tunnel") && !lower.Contains("genomgång");
+    }
+
     // Opens the passage and puts up the walls. Returns how many cells were opened.
     static int Open(MapDefinition map, float[,] speed, Tunnel t)
     {
         int rows = speed.GetLength(0), cols = speed.GetLength(1);
         float metresPerCell = Mathf.Max(0.5f, map.gridSize);
+        if (!t.walls)
+        {
+            // A bridge reaches one cell onto the shore at each end, past the shore line
+            Vector2 da = (t.a2 - t.a1).normalized * metresPerCell, db = (t.b2 - t.b1).normalized * metresPerCell;
+            t.a1 -= da; t.a2 += da; t.b1 -= db; t.b2 += db;
+        }
         float length = Mathf.Max(Vector2.Distance(t.a1, t.a2), Vector2.Distance(t.b1, t.b2));
         float width = Mathf.Max(Vector2.Distance(t.a1, t.b1), Vector2.Distance(t.a2, t.b2));
         int alongSteps = Mathf.Max(2, Mathf.CeilToInt(length / (metresPerCell * 0.4f)));
@@ -172,7 +201,7 @@ public static class Tunnels
         // The walls: just outside the side lines, where the tunnel is under closed ground
         float wallOut = 0.5f * metresPerCell / Mathf.Max(0.5f, width);
         HashSet<Vector2Int> walls = new HashSet<Vector2Int>();
-        for (int i = 0; i <= alongSteps; i++)
+        for (int i = 0; i <= alongSteps && t.walls; i++)
         {
             float along = i / (float)alongSteps;
             if (along < closedFrom || along > closedTo) continue;
