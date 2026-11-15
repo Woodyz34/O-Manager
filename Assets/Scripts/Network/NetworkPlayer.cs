@@ -669,11 +669,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             return;
         }
 
-        // "Same stats": everyone picks any runner, and all of them run with the host's speed and technique
+        // "Same stats": nobody picks a runner (2026-11-15). Everyone runs as themselves, a runner with the player's
+        // name and the host's speed and technique; on a women's relay leg a woman with the same values.
         if (Object.HasStateAuthority && sameStats)
         {
-            manager.ChooseWhomeverYouWantMode = true;
-            manager.ChooseRunnerPanel.SetActive(true);
+            manager.ChooseRunnerPanel.SetActive(false);
+            PickSameStatsRunner();
+            return;
         }
 
         if (Object.HasStateAuthority && effectiveGameMode.Contains("Choose a runner"))
@@ -980,6 +982,23 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         Debug.Log($"{name} har valt löpare");
     }
 
+
+    void PickSameStatsRunner()
+    {
+        string name = nickName.ToString();
+        if (string.IsNullOrWhiteSpace(name)) name = GameManager.Instance != null ? GameManager.Instance.playerNickName : "Runner";
+        if (RelayRace.Active != null)
+        {
+            RelayRace.Active.PickSameStatsTeam(name);
+        }
+        else
+        {
+            CardData card = GameModes.SameStatsRunner(name, 0, true);
+            agentMovement.SetRunner(card);
+            relayRunnerName = name;
+        }
+        SetHasChoosenRunner();
+    }
 
     // "Change runner" on the waiting page: back to picking, as long as the race has not started for us
     public bool UnchooseRunner()
