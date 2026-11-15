@@ -385,6 +385,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     public override async void Spawned()
     {
+        RunnerVisibility.Remember(this);
         DontDestroyOnLoad(gameObject);
         PackRegistry.Add(this);
         SenseTheMapOnlyIfOwn();

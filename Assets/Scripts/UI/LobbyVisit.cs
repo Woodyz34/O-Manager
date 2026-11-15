@@ -51,8 +51,9 @@ public static class LobbyVisit
         Active = false;
         loading = false;
         visitScene = null;
-        offBehaviours.Clear();
-        offRenderers.Clear();
+        // The players' runners were hidden for the visit and live on into the race: shown again. (Before, they were
+        // only forgotten, and a player who was in the shop when the host started never saw a runner again.)
+        ShowLobby();
         lobbyRoots.Clear();
     }
 

@@ -517,5 +517,7 @@ public class RelayReplayView : MonoBehaviour
     void OnDestroy()
     {
         if (cameraController != null) cameraController.enabled = true;
+        // The runners live on into the next race: they must not stay hidden
+        ShowRealRunners();
     }
 }
