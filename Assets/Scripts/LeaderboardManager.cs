@@ -42,11 +42,7 @@ public class LeaderboardManager : NetworkBehaviour
             return;
         }
 
-        // A player who has just left is still found for a moment, but its networked values can not be read any more
-        var players = FindObjectsOfType<NetworkPlayer>()
-            .Where(p => p.Object != null && p.Object.IsValid)
-            .OrderBy(p => p.hourCount * 3600 + p.minuterCount * 60 + p.secoundCount)
-            .ToList();
+        var players = Standings();
 
         // Rensa gamla entries
         foreach (Transform child in contentParent)
@@ -64,15 +60,7 @@ public class LeaderboardManager : NetworkBehaviour
             GameObject entryObj = Instantiate(leaderboardEntryPrefab, contentParent);
             LeaderboardEntryUI entry = entryObj.GetComponent<LeaderboardEntryUI>();
 
-            // Alternerande bakgrundsfärg
-            if (rank % 2 == 0)
-                entry.GetComponent<Image>().color = new Color(1, 1, 1, 0.55f);
-            else
-                entry.GetComponent<Image>().color = new Color(1, 1, 1, 0.8f);
-
-            // Markera egen rad
-            if (p.Object.HasInputAuthority)
-                entry.GetComponent<Image>().color = new Color(0.91f, 0.45f, 0.16f, 0.32f);
+            ColorRow(entry, rank, p);
 
             string timeString = $"{p.hourCount:00}:{p.minuterCount:00}:{p.secoundCount:00}";
             entry.SetData(rank, p.nickName.ToString(), timeString);
@@ -83,6 +71,72 @@ public class LeaderboardManager : NetworkBehaviour
         }
 
         ResizePanel(players.Count);
+        shownOrder.Clear();
+        foreach (var p in players) shownOrder.Add(p.Object.InputAuthority);
+    }
+
+    // Alternating rows, your own in orange
+    static void ColorRow(LeaderboardEntryUI entry, int rank, NetworkPlayer p)
+    {
+        Image image = entry.GetComponent<Image>();
+        if (image == null) return;
+        if (p.Object.HasInputAuthority) image.color = new Color(0.91f, 0.45f, 0.16f, 0.32f);
+        else image.color = rank % 2 == 0 ? new Color(1, 1, 1, 0.55f) : new Color(1, 1, 1, 0.8f);
+    }
+
+    // The standings as the race goes (2026-11-15): furthest on first (relay leg, then control), and at the same
+    // control the one with the least time. Before, the list was only put in order of time when someone punched (in
+    // relays only at the end of each leg). Everything it needs is already networked on the players, so each client
+    // works it out itself once a second; nothing is sent.
+    List<NetworkPlayer> Standings()
+    {
+        // A player who has just left is still found for a moment, but its networked values can not be read any more
+        return FindObjectsOfType<NetworkPlayer>()
+            .Where(p => p.Object != null && p.Object.IsValid)
+            .OrderByDescending(p => Mathf.Max(0, p.relayLeg))
+            .ThenByDescending(p => p.relayLeg < 0 ? 0 : p.relayControl)
+            .ThenBy(p => p.hourCount * 3600 + p.minuterCount * 60 + p.secoundCount)
+            .ToList();
+    }
+
+    private readonly List<PlayerRef> shownOrder = new List<PlayerRef>();
+    private const float orderRefreshInterval = 1f;
+    private float nextOrderRefresh;
+
+    // Puts the rows in the order of the standings, when it has changed; a new or departed player builds the list again
+    void RefreshOrder()
+    {
+        if (contentParent == null || entries.Count == 0) return;
+        var players = Standings();
+        bool same = players.Count == shownOrder.Count;
+        for (int i = 0; same && i < players.Count; i++) same = players[i].Object.InputAuthority == shownOrder[i];
+        if (same) return;
+        foreach (var p in players)
+        {
+            if (!entries.TryGetValue(p.Object.InputAuthority, out LeaderboardEntryUI e) || e == null)
+            {
+                BuildLeaderboardUI();
+                return;
+            }
+        }
+        if (players.Count != entries.Count)
+        {
+            BuildLeaderboardUI();
+            return;
+        }
+        shownOrder.Clear();
+        nicknameToRank.Clear();
+        for (int i = 0; i < players.Count; i++)
+        {
+            NetworkPlayer p = players[i];
+            LeaderboardEntryUI entry = entries[p.Object.InputAuthority];
+            entry.transform.SetSiblingIndex(i);
+            string timeString = $"{p.hourCount:00}:{p.minuterCount:00}:{p.secoundCount:00}";
+            entry.SetData(i + 1, p.nickName.ToString(), timeString);
+            ColorRow(entry, i + 1, p);
+            shownOrder.Add(p.Object.InputAuthority);
+            nicknameToRank[p.nickName.ToString()] = i + 1;
+        }
     }
 
     // Row and header sizes of the leaderboard card, used to let the card hug its rows
@@ -111,6 +165,11 @@ public class LeaderboardManager : NetworkBehaviour
 
     void Update()
     {
+        if (Time.unscaledTime >= nextOrderRefresh)
+        {
+            nextOrderRefresh = Time.unscaledTime + orderRefreshInterval;
+            RefreshOrder();
+        }
         if (Time.unscaledTime < nextTimeRefresh)
         {
             return;
