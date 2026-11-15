@@ -51,6 +51,7 @@ public class ManualPathDrawer : MonoBehaviour
     private void OnDestroy()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
+        if (eraserRing != null) Destroy(eraserRing.gameObject);
     }
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -109,6 +110,7 @@ public class ManualPathDrawer : MonoBehaviour
         {
             return;
         }
+        if (!timeToDraw && erasing) SetErasing(false);
         if (timeToDraw)
         {
             Vector3 worldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
@@ -118,6 +120,15 @@ public class ManualPathDrawer : MonoBehaviour
             // Placing a bear or moving a control takes the clicks on the map instead
             if (GameModeTools.TakesMouse)
             {
+                ShowEraserRing(worldPos, false);
+                return;
+            }
+            // The eraser: the left button rubs the line out from the first point under the circle to the end
+            if (erasing)
+            {
+                isDrawing = false;
+                ShowEraserRing(worldPos, !overUI && canDraw);
+                if (!overUI && canDraw && Input.GetMouseButton(0)) EraseAt(worldPos);
                 return;
             }
             if (!overUI && canDraw) // Endast rita om vi inte trycker på UI
@@ -134,6 +145,14 @@ public class ManualPathDrawer : MonoBehaviour
                     {
                         isDrawing = true;
                         ClearLine();
+                    }
+                    else if (Time.unscaledTime > nextStartHint)
+                    {
+                        // A click somewhere else did nothing before; now it says where the line can be started
+                        nextStartHint = Time.unscaledTime + 4f;
+                        UIToast.ShowSide(smoothPath.Count > 1
+                            ? "Carry on from the end of your line, or start again at the control."
+                            : "Start drawing at the control you are at.", 3f);
                     }
                 }
                 if (Input.GetMouseButtonUp(0)) isDrawing = false;
@@ -628,6 +647,85 @@ public class ManualPathDrawer : MonoBehaviour
         
         TrimTo(smoothPath.Count - Mathf.Min(count, smoothPath.Count));
     }
+    // ---- The eraser ----
+    // The eraser button switches the left mouse button between drawing and rubbing out. A circle follows the mouse;
+    // the line is cut back to the first point the circle touches, and the player carries on from the new end.
+
+    bool erasing;
+    float nextStartHint;
+    LineRenderer eraserRing;
+    static Material ringMaterial;
+    const int RingSegments = 40;
+    const float RingScreenRadius = 26f;   // pixels
+
+    public bool Erasing => erasing;
+
+    public void ToggleErasing() => SetErasing(!erasing);
+
+    public void SetErasing(bool on)
+    {
+        erasing = on && timeToDraw;
+        isDrawing = false;
+        if (!erasing && eraserRing != null) eraserRing.gameObject.SetActive(false);
+    }
+
+    float EraserRadius()
+    {
+        Camera cam = Camera.main;
+        if (cam == null || !cam.orthographic) return manager.cellSize * 4f;
+        return RingScreenRadius * 2f * cam.orthographicSize / Mathf.Max(1, Screen.height);
+    }
+
+    void EraseAt(Vector3 worldPos)
+    {
+        float r = EraserRadius();
+        worldPos.z = 0f;
+        for (int i = 0; i < smoothPath.Count; i++)
+        {
+            Vector3 p = smoothPath[i];
+            p.z = 0f;
+            if ((p - worldPos).sqrMagnitude > r * r) continue;
+            TrimTo(i);
+            // Nothing (or only the first point) left: the line starts again from the control
+            if (smoothPath.Count <= 1) ClearLine();
+            return;
+        }
+    }
+
+    void ShowEraserRing(Vector3 centre, bool show)
+    {
+        if (!show || !erasing)
+        {
+            if (eraserRing != null && eraserRing.gameObject.activeSelf) eraserRing.gameObject.SetActive(false);
+            return;
+        }
+        if (eraserRing == null)
+        {
+            if (ringMaterial == null) ringMaterial = new Material(Shader.Find("Sprites/Default"));
+            var go = new GameObject("Eraser circle");
+            eraserRing = go.AddComponent<LineRenderer>();
+            eraserRing.sharedMaterial = ringMaterial;
+            eraserRing.useWorldSpace = true;
+            eraserRing.loop = true;
+            eraserRing.positionCount = RingSegments;
+            eraserRing.startColor = eraserRing.endColor = new Color(0.12f, 0.24f, 0.17f, 0.9f);
+            if (line != null)
+            {
+                eraserRing.sortingLayerID = line.sortingLayerID;
+                eraserRing.sortingOrder = line.sortingOrder + 3;
+            }
+        }
+        if (!eraserRing.gameObject.activeSelf) eraserRing.gameObject.SetActive(true);
+        float r = EraserRadius();
+        eraserRing.widthMultiplier = r * 0.12f;
+        centre.z = -1.5f;
+        for (int i = 0; i < RingSegments; i++)
+        {
+            float a = i * Mathf.PI * 2f / RingSegments;
+            eraserRing.SetPosition(i, centre + new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, 0f));
+        }
+    }
+
     public void usingMoveTool()
     {
         canDraw = false;
