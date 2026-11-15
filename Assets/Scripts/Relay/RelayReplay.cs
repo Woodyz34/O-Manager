@@ -38,14 +38,80 @@ public class RelayReplayRecorder : MonoBehaviour
         {
             List<RelayTrack> list = new List<RelayTrack>(tracks.Values);
             list.Sort((a, b) => b.isLocal.CompareTo(a.isLocal));
+            if (useRunnerClocks)
+            {
+                for (int i = 0; i < list.Count; i++) list[i] = WithoutStops(list[i]);
+            }
             return list;
         }
+    }
+
+    // Individual races (2026-11-15): everyone waits at every control and draws the next stretch, so a replay on one
+    // shared clock started everyone again at each control. Now every sample is stamped with that runner's own race
+    // clock (which also counts the drawing), and the stops are spread over the stretch that follows: the runner
+    // moves without stopping, a little slower where they drew for long, and passes every control at its real split
+    // time. So the replay shows the real gaps and who catches up.
+    bool useRunnerClocks;
+    AgentMovement localAgent;
+
+    public void Begin(int legIndex, AgentMovement agent, bool runnerClocks)
+    {
+        Begin(legIndex, agent);
+        useRunnerClocks = runnerClocks;
+    }
+
+    // The runner's race clock in replay seconds (game seconds / GameSecondsPerSecond)
+    float ClockOf(IPackRunner runner)
+    {
+        float seconds;
+        if (runner is NetworkPlayer player && !player.IsLocalRunner)
+        {
+            seconds = RelayRace.TeamSeconds(player);
+        }
+        else
+        {
+            Clock clock = localAgent != null ? localAgent.GetComponent<Clock>() : null;
+            seconds = clock != null ? clock.hourCount * 3600 + clock.minuterCount * 60 + clock.sekundercount : 0f;
+        }
+        return seconds / PackRunning.GameSecondsPerSecond;
+    }
+
+    // A gap this long (in replay seconds, = 6 game seconds) between two samples is a stop at a control
+    const float StopGap = 6f / PackRunning.GameSecondsPerSecond;
+
+    static RelayTrack WithoutStops(RelayTrack track)
+    {
+        RelayTrack smooth = new RelayTrack { label = track.label, isLocal = track.isLocal, color = track.color, look = track.look };
+        smooth.positions.AddRange(track.positions);
+        int n = track.times.Count;
+        if (n == 0) return smooth;
+        float previousEnd = 0f;   // the race starts at 0 for everyone; the first stretch takes the first drawing too
+        int start = 0;
+        for (int i = 1; i <= n; i++)
+        {
+            bool end = i == n || track.times[i] - track.times[i - 1] > StopGap;
+            if (!end) continue;
+            int last = i - 1;
+            float from = track.times[start];
+            float to = track.times[last];
+            float begin = Mathf.Min(previousEnd, from);
+            for (int j = start; j <= last; j++)
+            {
+                float f = to > from ? (track.times[j] - from) / (to - from) : 1f;
+                smooth.times.Add(Mathf.Lerp(begin, to, f));
+            }
+            previousEnd = to;
+            start = i;
+        }
+        return smooth;
     }
 
     public void Begin(int legIndex, AgentMovement agent)
     {
         tracks.Clear();
         leg = legIndex;
+        useRunnerClocks = false;
+        localAgent = agent;
         recording = true;
         startedAt = Time.time;
         next = 0f;
@@ -107,7 +173,10 @@ public class RelayReplayRecorder : MonoBehaviour
                 track.positions.Clear();
                 track.times.Clear();
             }
-            track.times.Add(t);
+            float stamp = useRunnerClocks ? ClockOf(runner) : t;
+            // A remote clock arrives a moment after the position: never let a runner's time go backwards
+            if (track.times.Count > 0) stamp = Mathf.Max(stamp, track.times[track.times.Count - 1]);
+            track.times.Add(stamp);
             track.positions.Add(position);
         }
     }
@@ -185,7 +254,9 @@ public class RelayReplayView : MonoBehaviour
 
         if (material == null) material = new Material(Shader.Find("Sprites/Default"));
         // Sizes follow the zoom, so the lines and dots are as easy to see on a long leg as on a short one
+        fitSize = cam.orthographicSize;
         float lineWidth = cam.orthographicSize * 0.012f;
+        baseLineWidth = lineWidth;
         float dotSize = cam.orthographicSize * 0.045f;
         foreach (RelayTrack track in tracks)
         {
@@ -233,6 +304,7 @@ public class RelayReplayView : MonoBehaviour
             label.enableWordWrapping = false;
             label.sortingOrder = 42;
             markers.Add(marker.transform);
+            markerScales.Add(marker.transform.localScale);
         }
 
         HideRealRunners();
@@ -331,8 +403,57 @@ public class RelayReplayView : MonoBehaviour
         CourseUI.SetButtonText(speedButton, "Speed x" + speed);
     }
 
+    // Zoom and move the map while the replay plays (2026-11-15: on narrow screens the leaderboard hid the finish).
+    // Mouse wheel zooms towards the mouse, dragging with any mouse button moves the map. Lines and dots keep their
+    // size on the screen.
+    float fitSize;
+    float baseLineWidth;
+    readonly List<Vector3> markerScales = new List<Vector3>();
+    bool dragging;
+    Vector3 dragFrom;
+
+    void HandleMapInput()
+    {
+        if (cam == null) return;
+        bool overUI = UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+        float scroll = Input.mouseScrollDelta.y;
+        if (!overUI && Mathf.Abs(scroll) > 0.01f)
+        {
+            Vector3 before = cam.ScreenToWorldPoint(Input.mousePosition);
+            float size = cam.orthographicSize * Mathf.Pow(0.88f, scroll);
+            cam.orthographicSize = Mathf.Clamp(size, fitSize * 0.08f, fitSize * 1.6f);
+            Vector3 after = cam.ScreenToWorldPoint(Input.mousePosition);
+            cam.transform.position += new Vector3(before.x - after.x, before.y - after.y, 0f);
+            Rescale();
+        }
+        bool anyDown = Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
+        bool anyHeld = Input.GetMouseButton(0) || Input.GetMouseButton(1) || Input.GetMouseButton(2);
+        if (anyDown && !overUI)
+        {
+            dragging = true;
+            dragFrom = cam.ScreenToWorldPoint(Input.mousePosition);
+        }
+        if (!anyHeld) dragging = false;
+        if (dragging)
+        {
+            Vector3 now = cam.ScreenToWorldPoint(Input.mousePosition);
+            cam.transform.position += new Vector3(dragFrom.x - now.x, dragFrom.y - now.y, 0f);
+        }
+    }
+
+    void Rescale()
+    {
+        float ratio = fitSize > 0f ? cam.orthographicSize / fitSize : 1f;
+        foreach (LineRenderer line in lines) if (line != null) line.widthMultiplier = baseLineWidth * ratio;
+        for (int k = 0; k < markers.Count && k < markerScales.Count; k++)
+        {
+            if (markers[k] != null) markers[k].localScale = markerScales[k] * ratio;
+        }
+    }
+
     void Update()
     {
+        HandleMapInput();
         if (!playing) return;
         time += Time.deltaTime * speed;
         if (time >= endTime)
