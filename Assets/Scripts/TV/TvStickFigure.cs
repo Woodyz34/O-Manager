@@ -70,6 +70,7 @@ public class TvStickFigure
     // Going up to the flag to punch (TvWorldView.ToThePunch): 0 = on its route, 1 = to the flag, 2 = back to the route
     public int punch;
     public bool punched, tracked, finishing;
+    public bool mayPunch = true;   // false while it only passes the control on the way to another one
     public bool everPunched;    // has touched the punching unit on this pass (for the split time on TV)
     public float shownX, shownZ, realX, realZ, headX, headZ, punchedAt, swerveX, swerveZ;
     public float nearest = float.MaxValue;

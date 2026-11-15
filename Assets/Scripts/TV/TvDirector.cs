@@ -43,6 +43,7 @@ public class TvDirector : MonoBehaviour
         public float camE, camN;               // the side of the spot the TV camera should stand on (0, 0 = anywhere)
         public float legE, legN;               // at the start: the way the first leg goes
         public int ordinal = -1;               // its number among the leg's common points, for the split times
+        public int controlIndex = -1;          // its place in this team's route on the leg (0 = start), -1 = not on it
         // The producer's notes for the leg
         internal readonly Dictionary<IPackRunner, Pass> passes = new Dictionary<IPackRunner, Pass>();
         internal readonly HashSet<IPackRunner> punched = new HashSet<IPackRunner>();
@@ -102,7 +103,33 @@ public class TvDirector : MonoBehaviour
     public TvWorldView View => current != null ? current.view : null;
     public bool Failed => current != null && current.failed;
     public bool AtStart => current != null && current.start;
-    public string Title => current != null ? current.name : "TV";
+    // A runner who only passes the TV control on the way to another control (2026-11-15: "TV 2" read as if the
+    // runner was at TV 2). Then the title says where the runner is really going.
+    public string Title
+    {
+        get
+        {
+            if (current == null) return "TV";
+            IPackRunner p = passing;
+            if (p == null || !p.IsValidRunner || current.start) return current.name;
+            RelayRace race = RelayRace.Active;
+            int last = race != null && race.Route != null ? race.Route.course.AllPoints().Count - 1 : -1;
+            string to = p.RelayControl == last ? "the finish" : "control " + p.RelayControl;
+            string camera = current.name.Split('·')[0].Trim();
+            return p.RunnerLabel + " on the way to " + to + "  <size=80%><color=#C7D6DA>(" + camera + " camera)</color></size>";
+        }
+    }
+    IPackRunner passing;
+
+    // Is the runner on its way to this spot (or just past it)? Only then does it punch there. A runner who passes
+    // a TV control or the finish on the way to another control does not punch it (2026-11-15: a runner near the
+    // finish at the start of the leg punched the finish).
+    static bool HeadingTo(Spot spot, IPackRunner runner)
+    {
+        if (spot.start || spot.controlIndex < 0) return true;
+        int to = runner.RelayControl;
+        return to == spot.controlIndex || to == spot.controlIndex + 1;
+    }
     public Vector3? Subject { get; private set; }
     public bool RunnerInPicture { get; private set; }
     public float ShotSeconds => current != null ? Time.unscaledTime - shotStart : 0f;
@@ -217,6 +244,7 @@ public class TvDirector : MonoBehaviour
         startSpot.point = points[0];
         CameraSide(startSpot, points, 0);
         startSpot.name = "Start · Leg " + (race.Leg + 1);
+        startSpot.controlIndex = 0;
         // The finish, unless it is a TV control already
         CoursePoint finish = points[points.Count - 1];
         if (finishSpot.view != null && !Same(finishSpot.point, finish))
@@ -227,6 +255,7 @@ public class TvDirector : MonoBehaviour
         if (finishSpot.view == null) finishSpot.failed = false;
         finishSpot.point = finish;
         finishSpot.name = "Finish · Leg " + (race.Leg + 1);
+        finishSpot.controlIndex = points.Count - 1;
         finishSpot.off = points.Count < 2;
         if (points.Count - 1 < route.commonOrdinal.Count) finishSpot.ordinal = route.commonOrdinal[points.Count - 1];
         CameraSide(finishSpot, points, points.Count - 1);
@@ -235,10 +264,12 @@ public class TvDirector : MonoBehaviour
             Spot spot = spots[s];
             if (Same(spot.point, finish)) finishSpot.off = true;
             spot.name = "TV " + (s + 1);
+            spot.controlIndex = -1;
             for (int i = 1; i < points.Count && i < route.commonOrdinal.Count; i++)
             {
                 if (!Same(points[i], spot.point)) continue;
                 spot.ordinal = route.commonOrdinal[i];
+                spot.controlIndex = i;
                 CameraSide(spot, points, i);
                 spot.name += i == points.Count - 1 ? " · Finish" : " · Control " + i;
                 break;
@@ -345,7 +376,7 @@ public class TvDirector : MonoBehaviour
                 {
                     // Stopped running near the finish: it finished. Keep it for the finish camera.
                     if (!finishSpot.off && runner.IsValidRunner && runner.RelayLeg == race.Leg && Distance(last, finishSpot.point) < 45f
-                        && !finishing.ContainsKey(runner))
+                        && !finishing.ContainsKey(runner) && HeadingTo(finishSpot, runner))
                     {
                         finishing[runner] = new Finishing { runner = runner, track = last, label = runner.RunnerLabel, color = ColorOf(runner), since = now };
                         finishSpot.punched.Add(runner);
@@ -422,16 +453,25 @@ public class TvDirector : MonoBehaviour
         current.lastUsed = now;
         runners.Clear();
         float nearest = float.MaxValue;
+        float passingDistance = float.MaxValue;
+        passing = null;
         foreach (IPackRunner runner in running)
         {
             Track t = tracks[runner];
             float d = Distance(t, current.point);
             if (d > ShownWithin) continue;
             nearest = Mathf.Min(nearest, d);
+            bool heading = HeadingTo(current, runner);
+            if (d < passingDistance)
+            {
+                passingDistance = d;
+                passing = heading ? null : runner;
+            }
             runners.Add(new TvWorldView.RunnerAt
             {
                 key = runner, label = runner.RunnerLabel, color = ColorOf(runner),
-                x = (float)(t.e - current.point.e), z = (float)(t.n - current.point.n)
+                x = (float)(t.e - current.point.e), z = (float)(t.n - current.point.n),
+                mayPunch = heading
             });
         }
         if (current == finishSpot)
@@ -580,7 +620,7 @@ public class TvDirector : MonoBehaviour
                 // Punched: at the control, or on the way out again after passing it (the drawn route may cut the corner)
                 spot.closest.TryGetValue(runner, out float least);
                 if (d < least) spot.closest[runner] = least = d;
-                if (d < 3f || (least < 15f && d > least + 2f)) spot.punched.Add(runner);
+                if ((d < 3f || (least < 15f && d > least + 2f)) && HeadingTo(spot, runner)) spot.punched.Add(runner);
                 bool punched = spot.punched.Contains(runner);
                 if (InSight(spot, t, d, punched, least)) spot.seen[runner] = now;
                 spot.seen.TryGetValue(runner, out float seenAt);
