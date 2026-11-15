@@ -981,6 +981,16 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     }
 
 
+    // "Change runner" on the waiting page: back to picking, as long as the race has not started for us
+    public bool UnchooseRunner()
+    {
+        if (Object == null || !Object.HasStateAuthority || !HasChoosenRunner) return false;
+        AgentMovement agent = GetComponent<AgentMovement>();
+        if (agent == null || !agent.WaitingForAllPlayersToChooseRunner) return false;
+        HasChoosenRunner = false;
+        return true;
+    }
+
     private void CheckAllPlayersReady()
     {
         var players = FindObjectsOfType<NetworkPlayer>();
