@@ -47,6 +47,7 @@ public class PathfindingManager : MonoBehaviour
         LoadGridData();
         // The course's out-of-bounds areas are closed cells for every runner, the A* routes and the drawn routes
         ForbiddenAreas.ApplyToCompetition(this);
+        MoveControlsOntoRunnableGround();
 
 
     }
@@ -226,6 +227,24 @@ public class PathfindingManager : MonoBehaviour
         float y = i * cellSize + cellSize / 2f - totalHeight / 2f;   //  ändrat från *1.8f
 
         return new Vector3(x, y, -1f);
+    }
+
+    // A control on a cliff, a fence, a boulder or a lake shore is punched from the nearest cell a runner can run on
+    // (CourseValidator.RunCell). The circle on the map stays where the course setter put it; only the point the
+    // runners head for moves. Called once the grid is loaded, and by relays for each new leg.
+    public void MoveControlsOntoRunnableGround()
+    {
+        if (speedGrid2D == null || controlPoints == null) return;
+        foreach (Transform point in controlPoints)
+        {
+            if (point == null) continue;
+            Vector2Int cell = WorldToGridPosition(point.position);
+            Vector2Int run = CourseValidator.RunCell(speedGrid2D, cell);
+            if (run == cell || run.x < 0) continue;
+            Vector3 world = GridToWorldPosition(run.y, run.x);
+            point.position = new Vector3(world.x, world.y, point.position.z);
+        }
+        if (controlPoints.Count > 0 && controlPoints[0] != null) startPoint = controlPoints[0].position;
     }
 
     // The grid cell (x = column, y = row) a world position is in

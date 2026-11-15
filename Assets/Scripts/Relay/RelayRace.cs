@@ -104,6 +104,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
             points.Add(point);
         }
         pathfinding.controlPoints = points;
+        pathfinding.MoveControlsOntoRunnableGround();   // nothing until the grid is loaded; PathfindingManager.Awake does leg 1
         pathfinding.startPoint = points[0].position;
         courseRenderer.Draw(map, legCourse);
     }
