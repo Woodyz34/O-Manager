@@ -68,10 +68,11 @@ public static class BearMode
         NetworkPlayer ownerPlayer = CompetitionFlow.FindPlayer(owner);
         bool ownerIsMe = ownerPlayer != null && ownerPlayer.Object != null && ownerPlayer.Object.HasStateAuthority;
         bool scaredIsMe = scared != null && scared.Object != null && scared.Object.HasStateAuthority;
-        string ownerName = ownerIsMe ? "your" : (ownerPlayer != null ? Name(ownerPlayer) : "someone") + "'s";
+        bool hidden = ExtraModes.HideOwners;
+        string ownerName = ownerIsMe ? "your" : hidden ? "a" : (ownerPlayer != null ? Name(ownerPlayer) : "someone") + "'s";
         string runnerName = scaredIsMe ? "you" : scared != null ? Name(scared) : "a runner";
         bool ownBear = scared != null && scared == ownerPlayer;
-        if (ownBear) ownerName = scaredIsMe ? "your own" : "their own";
+        if (ownBear) ownerName = scaredIsMe ? "your own" : hidden ? "a" : "their own";
 
         if (BearWatcher.Instance != null)
         {
@@ -239,7 +240,7 @@ public class BearWatcher : MonoBehaviour
             Color color = Color.white;
             color.a = found ? 1f : 0.55f;
             if (!view.popped) view.sprite.color = color;
-            view.label.text = mine ? "Your bear" : BearMode.Name(player) + "'s bear";
+            view.label.text = mine ? "Your bear" : ExtraModes.HideOwners ? "A bear" : BearMode.Name(player) + "'s bear";
         }
     }
 

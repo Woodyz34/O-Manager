@@ -203,6 +203,13 @@ public static class MoveControlMode
         string who = names.Count == 1 ? names[0] : string.Join(", ", names.GetRange(0, names.Count - 1)) + " and " + names[names.Count - 1];
         float meters = Vector2.Distance(Original(index), to) / U;
         string detail = "Moved by " + who + (names.Count > 1 ? ", so it lands in the middle" : "") + ": " + Mathf.RoundToInt(meters) + " m from where it was laid.";
+        // Imposter and Secret task: who moved it is not told (only that you did, if you did)
+        if (ExtraModes.HideOwners)
+        {
+            bool mine = names.Contains("you");
+            detail = (mine ? (names.Count > 1 ? "Moved by you and someone else, so it lands in the middle" : "Moved by you") : names.Count > 1 ? "Moved by " + names.Count + " players, so it lands in the middle" : "Moved by someone")
+                     + ": " + Mathf.RoundToInt(meters) + " m from where it was laid.";
+        }
         ModeBanner.Show(null, "Control " + index + " is on the move!", detail, CourseRenderer.CoursePurple, 3.4f, false, ModeBanner.LoadSound("control_whoosh"));
 
         // Show the old place and the new one

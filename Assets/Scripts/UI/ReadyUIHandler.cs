@@ -104,6 +104,12 @@ public class ReadyUIHandler : NetworkBehaviour
         string chosenMode = gameModeHandler != null && !string.IsNullOrWhiteSpace(gameModeHandler.gameMode) ? gameModeHandler.gameMode : GameModes.YourRunners;
         LobbySettingsUI lobbySettings = FindObjectOfType<LobbySettingsUI>();
         ExtraMode extraModes = lobbySettings != null ? lobbySettings.modes : ExtraMode.None;
+        // Imposter and Secret task are always raced with Same stats
+        if ((extraModes & ExtraModes.ImposterKinds) != 0 && !GameModes.IsSameStats(chosenMode))
+        {
+            chosenMode = SameStatsPopup.LastValuesMode();
+            if (gameModeHandler != null) gameModeHandler.gameMode = chosenMode;
+        }
         // Route analysis and the route choice game give everyone the same runner, so nobody needs runners of their own
         string tooFew = (extraModes & ExtraModes.NoRunners) != 0 ? null : GameModes.RelayNeedsMoreRunners(CourseLibrary.Current, chosenMode);
         if (tooFew != null)

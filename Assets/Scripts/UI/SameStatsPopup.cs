@@ -57,6 +57,15 @@ public class SameStatsPopup : MonoBehaviour
 
     bool Relay => legs.Count > 1;
 
+    // "Same stats" with the values used last (or 85/85): what Imposter and Secret task fall back on when the host
+    // has not set any
+    public static string LastValuesMode()
+    {
+        if (GameModes.TryGetSameStatsLegs(PlayerPrefs.GetString(LegsKey, ""), out List<Vector2Int> saved) && saved.Count > 0)
+            return GameModes.MakeSameStats(saved);
+        return GameModes.MakeSameStats(PlayerPrefs.GetInt(SpeedKey, DefaultValue), PlayerPrefs.GetInt(TechniqueKey, DefaultValue));
+    }
+
     void Build(Action<string> chosen)
     {
         Image dim = CourseUI.Panel("Dim", transform, new Color(0f, 0f, 0f, 0.45f), false);

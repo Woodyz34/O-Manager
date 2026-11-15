@@ -192,6 +192,19 @@ public class LobbySettingsUI : MonoBehaviour
             if (local.lobbyMapOwner.ToString() != mapOwner) local.lobbyMapOwner = mapOwner;
             if (local.privateMapReady.Length > 0) local.privateMapReady = "";
 
+            // Imposter and Secret task are always raced with Same stats (everyone runs with the same values, so the
+            // runner gives nobody away): turning one of them on switches the pool and lets the host set the values
+            if ((modes & ExtraModes.ImposterKinds) != 0 && !GameModes.IsSameStats(gameModeHandler.gameMode))
+            {
+                gameModeHandler.gameMode = SameStatsPopup.LastValuesMode();
+                UIToast.Show("Imposter and Secret task are raced with Same stats: everyone runs with the values you set.", 5f);
+                SameStatsPopup.Open(gameModeHandler.gameMode, mode =>
+                {
+                    if (GameModes.IsSameStats(mode)) gameModeHandler.gameMode = mode;
+                    nextRefresh = 0f;
+                });
+            }
+
             if (local.lobbyGameMode.ToString() != gameModeHandler.gameMode) local.lobbyGameMode = gameModeHandler.gameMode;
             if (local.lobbyMap.ToString() != mapHandler.map) local.lobbyMap = mapHandler.map;
             string courseText = mapHandler.course != null ? mapHandler.course.ToLobbyString() : "";

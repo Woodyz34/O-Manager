@@ -208,6 +208,10 @@ public static class ExtraModes
 
     public static bool Is(ExtraMode mode) => (Active & mode) != 0;
 
+    // Imposter and Secret task: nobody may see who placed a bear or moved a control (it would give the imposter
+    // away); in the other modes the names are shown (2026-11-15)
+    public static bool HideOwners => (Active & ImposterKinds) != 0;
+
     static void Refresh()
     {
         if (known) return;
