@@ -49,7 +49,7 @@ public class ModeBanner : MonoBehaviour
         {
             AudioSource source = go.AddComponent<AudioSource>();
             source.spatialBlend = 0f;
-            source.PlayOneShot(sound, 0.9f);
+            source.PlayOneShot(sound, 0.65f);
         }
     }
 
