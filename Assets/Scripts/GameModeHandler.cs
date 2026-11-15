@@ -14,10 +14,46 @@ public class GameModeHandler : MonoBehaviour
         // "Your runners" first: it is the default
         gameModes.Sort((a, b) => (b.name == GameModes.YourRunners).CompareTo(a.name == GameModes.YourRunners));
         gameMode = gameModes.Count > 0 ? gameModes[0].name : GameModes.YourRunners;
+        // The runner pool picked last time (2026-11-15): a new lobby starts with it
+        string last = LastPool;
+        if (last != null) gameMode = last;
+        savedMode = gameMode;
     }
     public void SetGameMode(string GameMode)
     {
         gameMode = GameMode;
+    }
+
+    string savedMode;
+
+    // The pool is set from many places (the pop-ups, taking over as host ...): it is saved when it has changed
+    void Update()
+    {
+        if (gameMode == savedMode || string.IsNullOrWhiteSpace(gameMode)) return;
+        savedMode = gameMode;
+        LastPool = gameMode;
+    }
+
+    const string LastPoolKey = "RunnerPool.Last";
+
+    // The runner pool (with its values: max average, same stats) picked last, in the lobby or on the single player
+    // page; null when none was saved or it is not a pool the game has any more
+    public static string LastPool
+    {
+        get
+        {
+            string saved = PlayerPrefs.GetString(LastPoolKey, "");
+            if (string.IsNullOrWhiteSpace(saved)) return null;
+            string id = GameModes.PoolId(saved);
+            foreach (string pool in GameModes.LobbyPools) if (pool == id) return saved;
+            return null;
+        }
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            PlayerPrefs.SetString(LastPoolKey, value);
+            PlayerPrefs.Save();
+        }
     }
 }
 
