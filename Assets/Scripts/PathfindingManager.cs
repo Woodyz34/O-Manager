@@ -159,6 +159,7 @@ public class PathfindingManager : MonoBehaviour
                 speedGrid2D = packageSpeed;
                 slopeFactors = packageSlopes;
                 TerrainSpeedModel.Apply(speedGrid2D, slopeFactors);
+                Tunnels.Apply(gridName, speedGrid2D);
                 cellSize = gridData.grid_size * scaleFactor;
                 Debug.Log($"PathfindingManager: laddade kartpaketets grid {gridName} på {loadWatch.Elapsed.TotalSeconds:F2} s");
                 return;
