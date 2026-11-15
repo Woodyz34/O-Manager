@@ -286,6 +286,11 @@ public class ManualPathDrawer : MonoBehaviour
         {
             foreach (Vector2Int c in gridPath) if (Passable(c)) { first = c; break; }
             for (int i = gridPath.Count - 1; i >= 0; i--) if (Passable(gridPath[i])) { last = gridPath[i]; break; }
+            // The runner stands at the control it starts from and must get to the control it goes to: a line that
+            // starts or ends on the other side of a fence or a wall next to the control (a few metres from it) is
+            // joined to the control's own side the way round, so nobody punches through a fence.
+            first = JoinToControl(ThisControll, first, route, true);
+            last = JoinToControl(targetControl, last, route, false);
         }
         List<Vector2Int> corridorPath = CorridorPath(route, first, last, corridor);
         if ((corridorPath == null || corridorPath.Count == 0) && CrossesBlocked(gridPath) && !RouteAnalysis.On)
@@ -392,6 +397,20 @@ public class ManualPathDrawer : MonoBehaviour
             agent.Initialize(corridorPath);
         }
 
+    }
+
+    // The cell the runner stands on at a control (beside it when the control itself is on closed ground). When the
+    // line's end is not that cell, the way between them (round a fence if there is one) is added to the route cells and
+    // the control's cell is returned; otherwise the line's end stays.
+    Vector2Int JoinToControl(Transform control, Vector2Int lineEnd, List<Vector2Int> route, bool atStart)
+    {
+        if (control == null) return lineEnd;
+        Vector2Int at = CourseValidator.RunCell(manager.speedGrid2D, WorldToGrid(control.position));
+        if (at.x < 0 || at == lineEnd || !Passable(lineEnd)) return lineEnd;
+        List<Vector2Int> way = atStart ? SearchInBox(at, lineEnd, CorrectionCells, null) : SearchInBox(lineEnd, at, CorrectionCells, null);
+        if (way == null || way.Count == 0) return lineEnd;
+        route.AddRange(way);
+        return at;
     }
 
     // ---- Lines over ground nobody can run on ----
