@@ -58,6 +58,7 @@ public class TvDirector : MonoBehaviour
         public string name;
         public Color color;
         public int seconds;
+        public bool running;   // not at the control yet: seconds is the team's clock now, ticking until the punch
     }
 
     // A runner who finished the leg while on its way in to the finish camera: it is still shown running the
@@ -773,6 +774,9 @@ public class TvDirector : MonoBehaviour
 
     // ---- Split times at the TV control on air: the teams that have punched it on this leg, the first one first ----
 
+    // A TV control with split times is on air (not the start)
+    public bool ShowsSplits => current != null && !current.start && current.ordinal >= 0;
+
     public void Splits(List<Split> into)
     {
         into.Clear();
@@ -780,14 +784,22 @@ public class TvDirector : MonoBehaviour
         foreach (IPackRunner runner in PackRegistry.All)
         {
             if (!(runner is NetworkPlayer player) || !player.IsValidRunner) continue;
-            if (player.relaySplitLeg != producedLeg || player.relaySplitCount <= current.ordinal || current.ordinal >= player.relaySplits.Length) continue;
-            int seconds = player.relaySplits[current.ordinal];
-            if (seconds <= 0) continue;
+            bool punched = player.relaySplitLeg == producedLeg && player.relaySplitCount > current.ordinal
+                           && current.ordinal < player.relaySplits.Length && player.relaySplits[current.ordinal] > 0;
             // The time comes up when the runner is seen punching, not a moment before
-            if (current.view != null && current.view.PunchToCome(runner)) continue;
-            into.Add(new Split { name = player.RunnerLabel, color = ColorOf(runner), seconds = seconds });
+            if (punched && current.view != null && current.view.PunchToCome(runner)) punched = false;
+            if (punched)
+            {
+                into.Add(new Split { name = player.RunnerLabel, color = ColorOf(runner), seconds = player.relaySplits[current.ordinal] });
+                continue;
+            }
+            // Still on the way to the control on this leg: the clock ticks on beside the name until the punch
+            // (2026-11-15: the split times are always there, not only once someone has punched)
+            if (player.relayLeg != producedLeg || (current.controlIndex >= 0 && player.relayControl > current.controlIndex)) continue;
+            into.Add(new Split { name = player.RunnerLabel, color = ColorOf(runner), seconds = RelayRace.TeamSeconds(player), running = true });
         }
-        into.Sort((a, b) => a.seconds.CompareTo(b.seconds));
+        // The ones who have punched in order of time, then the ones on the way (the one furthest on first)
+        into.Sort((a, b) => a.running != b.running ? a.running.CompareTo(b.running) : a.running ? b.seconds.CompareTo(a.seconds) : a.seconds.CompareTo(b.seconds));
     }
 
     // ---- Mistakes, for the map: the runners making a mistake right now ----
