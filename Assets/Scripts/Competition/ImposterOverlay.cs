@@ -85,6 +85,16 @@ public class ImposterOverlay : MonoBehaviour
         }
     }
 
+    // The reminder sits at the right edge under the race clock (2026-11-15: at the top middle it could cover the
+    // control being drawn to). In a relay the relay box is under the clock, so it goes below that.
+    void PlaceRoleChipRight()
+    {
+        RectTransform chip = roleChip.GetComponent<RectTransform>();
+        chip.anchorMin = chip.anchorMax = new Vector2(1f, 1f);
+        chip.pivot = new Vector2(1f, 1f);
+        chip.anchoredPosition = new Vector2(-24f, RelayRace.Active != null ? -400f : -104f);
+    }
+
     public void HideRoleChip()
     {
         roleChip.SetActive(false);
@@ -187,6 +197,7 @@ public class ImposterOverlay : MonoBehaviour
             {
                 roleChipText.text = amImposter ? "You are the imposter: finish last" : "Imposter mode: who is trying to lose?";
             }
+            PlaceRoleChipRight();
             roleChip.SetActive(true);
         }
     }

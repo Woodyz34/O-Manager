@@ -154,7 +154,8 @@ public class GameModeTools : MonoBehaviour
         if (canvas == null) return;
         Image card = CourseUI.CardPanel("Game mode tools", canvas.transform);
         panel = card.gameObject;
-        CourseUI.Place(card.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(24, 40), new Vector2(360, 10));
+        // At the right edge: the leaderboard is on the left (2026-11-15: the card covered it)
+        CourseUI.Place(card.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24, 60), new Vector2(360, 10));
         VerticalLayoutGroup column = CourseUI.Column(panel, 10, new RectOffset(20, 20, 18, 20));
         column.childForceExpandHeight = false;
         ContentSizeFitter fit = panel.AddComponent<ContentSizeFitter>();
