@@ -90,6 +90,17 @@ public class GameModeSelect : MonoBehaviour
     // A small pop-up with the choices replaced the old panel of pictures (kept in the scene, unused).
     public void OpenPanel()
     {
+        // Imposter and Secret task are always raced with Same stats: only its values can be changed
+        LobbySettingsUI settings = FindObjectOfType<LobbySettingsUI>();
+        if (settings != null && (settings.modes & ExtraModes.ImposterKinds) != 0)
+        {
+            UIToast.Show("Imposter and Secret task are raced with Same stats. Turn them off to pick another runner pool.", 4f);
+            SameStatsPopup.Open(gameModeHandler.gameMode, mode =>
+            {
+                if (GameModes.IsSameStats(mode)) gameModeHandler.gameMode = mode;
+            });
+            return;
+        }
         // Your runners and Any runner can have a max average overall (CapPopup; lobby only)
         string current = gameModeHandler.gameMode;
         string extra = null;
