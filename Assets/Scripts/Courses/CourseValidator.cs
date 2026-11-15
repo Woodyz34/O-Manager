@@ -113,11 +113,45 @@ public static class CourseValidator
         {
             return "That is outside the map.";
         }
-        if (!grid.IsPassable(map.ToCell(point)))
+        if (RunCell(grid, map.ToCell(point)).x < 0)
         {
             return "Nobody can get there (lake, building or out-of-bounds area).";
         }
         return null;
+    }
+
+    // How many cells from a control the runner may punch it. A control may stand on a cliff, a fence, a boulder or
+    // a lake shore (user's wish 2026-11-15): the runner punches it from the nearest cell they can run on, as in a real
+    // race. The control stays where it was put; the cliff or fence is still not crossed.
+    public const int PunchReachCells = 2;
+
+    // The cell a runner punches a control from: the control's own cell, or the nearest cell that can be run on at
+    // most PunchReachCells away. (-1, -1) when there is none (the middle of a lake, a building).
+    public static Vector2Int RunCell(MapGrid grid, Vector2Int cell)
+    {
+        return RunCell(grid.speed, cell);
+    }
+
+    public static Vector2Int RunCell(float[,] speed, Vector2Int cell)
+    {
+        int rows = speed.GetLength(0);
+        int cols = speed.GetLength(1);
+        bool Open(int x, int y) => x >= 0 && x < cols && y >= 0 && y < rows && speed[y, x] > 0.01f;
+        if (Open(cell.x, cell.y)) return cell;
+        Vector2Int best = new Vector2Int(-1, -1);
+        int bestDistance = int.MaxValue;
+        for (int dy = -PunchReachCells; dy <= PunchReachCells; dy++)
+        {
+            for (int dx = -PunchReachCells; dx <= PunchReachCells; dx++)
+            {
+                int distance = dx * dx + dy * dy;
+                if (distance >= bestDistance || distance > PunchReachCells * PunchReachCells + 1) continue;
+                if (!Open(cell.x + dx, cell.y + dy)) continue;
+                bestDistance = distance;
+                best = new Vector2Int(cell.x + dx, cell.y + dy);
+            }
+        }
+        return best;
     }
 
     public static Result Check(MapDefinition map, MapGrid grid, CourseData course)
@@ -184,8 +218,8 @@ public static class CourseValidator
         AStarPathfinder pathfinder = new AStarPathfinder(grid.speed, grid.slopes);
         for (int i = 1; i < points.Count; i++)
         {
-            Vector2Int from = map.ToCell(points[i - 1]);
-            Vector2Int to = map.ToCell(points[i]);
+            Vector2Int from = RunCell(grid, map.ToCell(points[i - 1]));
+            Vector2Int to = RunCell(grid, map.ToCell(points[i]));
             if (from == to)
             {
                 return Fail(result, i, PointName(i, controls) + " is on top of " + PointName(i - 1, controls).ToLower() + ". Move it further away.");
@@ -264,8 +298,8 @@ public static class CourseValidator
         HashSet<long> done = new HashSet<long>();
         foreach (var way in ways)
         {
-            Vector2Int from = map.ToCell(way.from.point);
-            Vector2Int to = map.ToCell(way.to.point);
+            Vector2Int from = RunCell(grid, map.ToCell(way.from.point));
+            Vector2Int to = RunCell(grid, map.ToCell(way.to.point));
             if (from == to)
             {
                 return FailAt(result, way.to.point, Capital(way.to.name) + " is on top of " + way.from.name + ". Move it further away.");
