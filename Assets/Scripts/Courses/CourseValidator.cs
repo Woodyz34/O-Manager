@@ -37,6 +37,7 @@ public class MapGrid
             }
             grid = new MapGrid { speed = packageSpeed, slopes = packageSlopes };
             TerrainSpeedModel.Apply(grid.speed, grid.slopes);
+            Tunnels.Apply(gridName, grid.speed);
             cache[gridName] = grid;
             return grid;
         }
