@@ -731,7 +731,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             Debug.Log("Choose runner startades inte " + Object.HasStateAuthority + " " + effectiveGameMode);
         }
 
-        if (Object.HasStateAuthority && GameModes.IsYourRunners(effectiveGameMode))
+        if (Object.HasStateAuthority && GameModes.PicksFromCollection(effectiveGameMode))
         {
             manager.YourRunnersMode = true;
             manager.ChooseRunnerPanel.SetActive(true);

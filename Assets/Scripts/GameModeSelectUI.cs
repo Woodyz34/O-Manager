@@ -82,6 +82,12 @@ public class GameModeSelect : MonoBehaviour
             SameStatsPopup.Open(current, set);
             return;
         }
+        // "Random runners": how many each player gets
+        if (pool == GameModes.RandomMode)
+        {
+            RandomCountPopup.Open(current, set);
+            return;
+        }
         // Your runners and Any runner keep the max average overall the host has set
         set(GameModes.WithCap(pool, GameModes.Cap(current)));
     }

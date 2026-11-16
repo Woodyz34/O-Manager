@@ -77,6 +77,8 @@ public static class RunnerRules
     public static int Cap { get; private set; }
     // "Open packs": the runners that came out of the player's packs
     public static bool OpenPacksRound { get; private set; }
+    // "Random runners": how many random runners everyone gets on loan, or 0
+    public static int RandomCount { get; private set; }
     public static readonly List<CardData> Opened = new List<CardData>();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -84,6 +86,7 @@ public static class RunnerRules
     {
         Cap = 0;
         OpenPacksRound = false;
+        RandomCount = 0;
         Opened.Clear();
     }
 
@@ -91,6 +94,7 @@ public static class RunnerRules
     {
         Cap = GameModes.Cap(mode);
         OpenPacksRound = GameModes.IsOpenPacks(mode);
+        RandomCount = GameModes.RandomCount(mode);
         Opened.Clear();
     }
 
@@ -197,8 +201,9 @@ public static class RunnerRules
         return names.Count;
     }
 
-    // "Your runners": the player's own runners (plus the usual loans up to 10). When they can't fill the legs (too
-    // few women or men, or too strong for the max average), the cheapest runners that are missing are lent as well.
+    // "Your runners": the player's own runners (2026-11-16: no longer filled up to 10). When they can't fill the legs
+    // (too few runners, too few women or men, or too strong for the max average), only the missing runners are lent:
+    // random ones, or the cheapest with a max average. "Random runners" goes the same way from its random runners.
     public static List<CardData> YourRunnersPool(IList<LegSex> legs, int cap)
     {
         List<CardData> pool = RunnerCollection.CardsForRace();
@@ -206,13 +211,44 @@ public static class RunnerRules
         if (CanFill(pool, legs, budget)) return pool;
 
         List<CardData> spare = RunnerCards.InPacks().FindAll(c => !pool.Exists(p => p.RunnerName == c.RunnerName));
-        spare.Sort((a, b) => BudgetCost(a).CompareTo(BudgetCost(b)));
         List<CardData> lent = new List<CardData>();
-        // One cheap woman and one cheap man at a time until the legs can be filled
+        if (cap <= 0)
+        {
+            // Without a max average only the number counts: the missing women, the missing men, then anyone
+            System.Random random = new System.Random();
+            int women = 0, men = 0, womenLegs = 0, menLegs = 0;
+            HashSet<string> names = new HashSet<string>();
+            foreach (CardData card in pool)
+            {
+                if (card == null || !names.Add(card.RunnerName)) continue;
+                if (card.man) men++; else women++;
+            }
+            foreach (LegSex leg in legs)
+            {
+                if (leg == LegSex.Women) womenLegs++;
+                else if (leg == LegSex.Men) menLegs++;
+            }
+            void LendOne(bool? man)
+            {
+                List<CardData> fitting = man.HasValue ? spare.FindAll(c => c.man == man.Value) : spare;
+                if (fitting.Count == 0) return;
+                CardData next = fitting[random.Next(fitting.Count)];
+                spare.Remove(next);
+                pool.Add(next);
+                lent.Add(next);
+                if (next.man) men++; else women++;
+            }
+            while (women < womenLegs && spare.Exists(c => !c.man)) LendOne(false);
+            while (men < menLegs && spare.Exists(c => c.man)) LendOne(true);
+            while (women + men < legs.Count && spare.Count > 0) LendOne(null);
+        }
+        // With a max average (or if the count above was not enough): one cheap woman and one cheap man at a time
+        spare.Sort((a, b) => BudgetCost(a).CompareTo(BudgetCost(b)));
         for (int round = 0; round < GameModes.MaxLegs * 2 && !CanFill(pool, legs, budget); round++)
         {
             foreach (bool man in new[] { false, true })
             {
+                if (CanFill(pool, legs, budget)) break;
                 CardData next = spare.Find(c => c.man == man);
                 if (next == null) continue;
                 spare.Remove(next);

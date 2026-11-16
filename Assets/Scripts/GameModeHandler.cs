@@ -82,8 +82,29 @@ public static class GameModes
     public const char CapMark = '#';
     public const int MinCap = 40, MaxCap = 99, DefaultCap = 75;
 
+    // "Random runners" (2026-11-16): everyone gets this many random runners on loan for the round and picks from
+    // them. Sent as "Random runners|<count>". (Your runners no longer fills up to 10 with loans: only what the legs need.)
+    public const string RandomMode = "Random runners";
+    public const int MinRandom = 1, MaxRandom = 30, DefaultRandom = 10;
+
     // The runner pools offered in the lobby and, since 2026-11-13, in single player too
-    public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode, OpenPacksMode };
+    public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode, OpenPacksMode, RandomMode };
+
+    public static bool IsRandom(string mode) => !string.IsNullOrEmpty(mode) && mode.StartsWith(RandomMode);
+
+    // How many random runners everyone gets, or 0 when the pool is not "Random runners"
+    public static int RandomCount(string mode)
+    {
+        if (!IsRandom(mode)) return 0;
+        int bar = mode.IndexOf('|');
+        if (bar < 0 || !int.TryParse(mode.Substring(bar + 1), out int count)) return DefaultRandom;
+        return Mathf.Clamp(count, MinRandom, MaxRandom);
+    }
+
+    public static string MakeRandom(int count) => RandomMode + "|" + Mathf.Clamp(count, MinRandom, MaxRandom);
+
+    // Pools where the player picks among their own or lent runners (the "Your runners" picking)
+    public static bool PicksFromCollection(string mode) => IsYourRunners(mode) || IsRandom(mode);
 
     // The whole scale (2026-11-13, the user wanted every value). Speed 0 would never reach the finish, so it starts at 1.
     public const int MinSpeed = 1, MaxSpeed = 100, MinTechnique = 0, MaxTechnique = 100;
@@ -100,6 +121,7 @@ public static class GameModes
             if (!AllLegsAlike(legs) || !speedsAlike) return "Same stats per leg";   // kept short for the lobby bar
             return "Same stats " + legs[0].x + "/" + (speeds != null ? speeds[0] : legs[0].x) + "/" + legs[0].y;   // physics/speed/technique
         }
+        if (IsRandom(mode)) return mode.Contains("|") ? RandomCount(mode) + " random runners" : RandomMode;
         string id = PoolId(mode);
         string name = IsYourRunners(id) ? "Your runners" : id == ChooseAny ? "Any runner" : id;
         int cap = Cap(mode);
@@ -119,13 +141,15 @@ public static class GameModes
     {
         if (IsSameStats(mode)) return "You set physics, speed and technique (for each leg in a relay). Nobody picks a runner: everyone runs as themselves with your values.";
         if (IsOpenPacks(mode)) return "Everyone opens one free pack per leg and races with what comes out. The runners are only on loan.";
-        return IsYourRunners(mode) ? "Everyone races with runners from their own collection." : "Everyone may pick any runner in the game.";
+        if (IsRandom(mode)) return "Everyone gets " + (mode.Contains("|") ? RandomCount(mode) + " " : "a few ") + "random runners on loan for the race and picks from them.";
+        return IsYourRunners(mode) ? "Everyone races with runners from their own collection. Only runners that are missing for the legs are lent." : "Everyone may pick any runner in the game.";
     }
 
     // The option id of a mode ("Same stats|85|70" is the option "Same stats", "Your runners#75" is "Your runners")
     public static string PoolId(string mode)
     {
         if (IsSameStats(mode)) return SameStatsMode;
+        if (IsRandom(mode)) return RandomMode;
         if (string.IsNullOrEmpty(mode)) return mode;
         int mark = mode.IndexOf(CapMark);
         return mark >= 0 ? mode.Substring(0, mark) : mode;
@@ -361,20 +385,6 @@ public static class GameModes
 
     // In "Your runners" a relay can only be run when every player owns at least as many runners as it has legs.
     // Returns why not, or null when it is fine.
-    public static string RelayNeedsMoreRunners(CourseData course, string mode)
-    {
-        if (course == null || !course.IsRelay() || !IsYourRunners(mode)) return null;
-        foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
-        {
-            if (player.Object == null || !player.Object.IsValid) continue;
-            int owned = player.Object.HasStateAuthority ? RaceRunnerCount() : player.ownedRunners;
-            if (owned < course.legs)
-            {
-                string who = player.Object.HasStateAuthority ? "you only have" : player.nickName.ToString() + " only has";
-                return "\"" + course.name + "\" has " + course.legs + " legs, but " + who + " " + owned + (owned == 1 ? " runner" : " runners")
-                    + ". Choose a relay with fewer legs, or the runner pool \"Any runner\".";
-            }
-        }
-        return null;
-    }
+    // Since 2026-11-16 the missing runners are lent (RunnerRules.YourRunnersPool), so a relay can always be run.
+    public static string RelayNeedsMoreRunners(CourseData course, string mode) => null;
 }
