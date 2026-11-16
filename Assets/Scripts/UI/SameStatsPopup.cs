@@ -4,8 +4,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// The host's window for the runner pool "Same stats": two sliders for the speed and technique that every runner in
-// the competition gets. When the lobby's course is a relay, a row of leg buttons lets the host set other values for
+// The host's window for the runner pool "Same stats": sliders for the physics, speed (sprint, 2026-11-16) and
+// technique that every runner in the competition gets. When the lobby's course is a relay, a row of leg buttons lets the host set other values for
 // each leg (2026-11-11). The last values are remembered between games.
 public class SameStatsPopup : MonoBehaviour
 {
@@ -18,7 +18,10 @@ public class SameStatsPopup : MonoBehaviour
 
     // One speed/technique pair per leg (just one outside relays)
     readonly List<Vector2Int> legs = new List<Vector2Int>();
+    readonly List<int> speeds = new List<int>();   // sprint speed per leg
     int leg;
+    TextMeshProUGUI sprintLabel;
+    Slider sprintSlider;
     TextMeshProUGUI speedLabel;
     TextMeshProUGUI techniqueLabel;
     Slider speedSlider;
@@ -45,12 +48,16 @@ public class SameStatsPopup : MonoBehaviour
         }
 
         // A relay in the lobby: one pair per leg (legs without values of their own start with the last leg's)
+        List<int> savedSpeeds = GameModes.SameStatsSpeedsOf(current);
+        if (savedSpeeds == null && !GameModes.IsSameStats(current)) savedSpeeds = GameModes.SameStatsSpeedsOf(PlayerPrefs.GetString(LegsKey, ""));
         CourseData course = CourseLibrary.Current;
         int count = course != null && course.IsRelay() ? Mathf.Clamp(course.legs, 1, GameModes.MaxLegs) : 1;
         for (int i = 0; i < count; i++)
         {
             Vector2Int v = GameModes.LegValues(saved, i);
             open.legs.Add(new Vector2Int(Mathf.Clamp(v.x, GameModes.MinSpeed, GameModes.MaxSpeed), Mathf.Clamp(v.y, GameModes.MinTechnique, GameModes.MaxTechnique)));
+            // No speed saved yet: the same as physics
+            open.speeds.Add(savedSpeeds != null ? savedSpeeds[Mathf.Min(i, savedSpeeds.Count - 1)] : open.legs[i].x);
         }
         open.Build(chosen);
     }
@@ -61,8 +68,9 @@ public class SameStatsPopup : MonoBehaviour
     // has not set any
     public static string LastValuesMode()
     {
-        if (GameModes.TryGetSameStatsLegs(PlayerPrefs.GetString(LegsKey, ""), out List<Vector2Int> saved) && saved.Count > 0)
-            return GameModes.MakeSameStats(saved);
+        string last = PlayerPrefs.GetString(LegsKey, "");
+        if (GameModes.TryGetSameStatsLegs(last, out List<Vector2Int> saved) && saved.Count > 0)
+            return GameModes.MakeSameStats(saved, GameModes.SameStatsSpeedsOf(last));
         return GameModes.MakeSameStats(PlayerPrefs.GetInt(SpeedKey, DefaultValue), PlayerPrefs.GetInt(TechniqueKey, DefaultValue));
     }
 
@@ -76,7 +84,7 @@ public class SameStatsPopup : MonoBehaviour
 
         Image card = CourseUI.CardPanel("Card", transform);
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero,
-            new Vector2(Relay ? 900 : 760, Relay ? 680 : 520));
+            new Vector2(Relay ? 900 : 760, Relay ? 790 : 630));
         card.gameObject.AddComponent<ClickCatcher>();
         CourseUI.Column(card.gameObject, 14, new RectOffset(36, 36, 30, 30));
 
@@ -96,6 +104,7 @@ public class SameStatsPopup : MonoBehaviour
         }
 
         speedLabel = StatRow("Physics", GameModes.MinSpeed, GameModes.MaxSpeed, legs[0].x, v => { SetLeg(new Vector2Int(v, legs[leg].y)); }, card.transform, out speedSlider);
+        sprintLabel = StatRow("Speed", GameModes.MinSpeed, GameModes.MaxSpeed, speeds[0], v => { speeds[leg] = v; Refresh(); }, card.transform, out sprintSlider);
         techniqueLabel = StatRow("Technique", GameModes.MinTechnique, GameModes.MaxTechnique, legs[0].y, v => { SetLeg(new Vector2Int(legs[leg].x, v)); }, card.transform, out techniqueSlider);
 
         if (Relay)
@@ -103,7 +112,8 @@ public class SameStatsPopup : MonoBehaviour
             Button copy = CourseUI.Button("Copy to all legs", card.transform, "Use these values on every leg", CourseUI.ButtonKind.Secondary, () =>
             {
                 Vector2Int v = legs[leg];
-                for (int i = 0; i < legs.Count; i++) legs[i] = v;
+                int s = speeds[leg];
+                for (int i = 0; i < legs.Count; i++) { legs[i] = v; speeds[i] = s; }
                 ShowLeg(leg);
             }, 22);
             CourseUI.Size(copy, 52);
@@ -116,7 +126,7 @@ public class SameStatsPopup : MonoBehaviour
         CourseUI.Size(cancel, -1, -1, 1);
         Button use = CourseUI.Button("Use", buttons, "Use these values", CourseUI.ButtonKind.Primary, () =>
         {
-            string mode = GameModes.MakeSameStats(legs);
+            string mode = GameModes.MakeSameStats(legs, speeds);
             PlayerPrefs.SetInt(SpeedKey, legs[0].x);
             PlayerPrefs.SetInt(TechniqueKey, legs[0].y);
             PlayerPrefs.SetString(LegsKey, mode);
@@ -149,6 +159,7 @@ public class SameStatsPopup : MonoBehaviour
     {
         leg = Mathf.Clamp(index, 0, legs.Count - 1);
         speedSlider.SetValueWithoutNotify(legs[leg].x);
+        sprintSlider.SetValueWithoutNotify(speeds[leg]);
         techniqueSlider.SetValueWithoutNotify(legs[leg].y);
         BuildLegButtons();
         Refresh();
@@ -174,11 +185,12 @@ public class SameStatsPopup : MonoBehaviour
     {
         string which = Relay ? "Leg " + (leg + 1) + "  " : "";
         speedLabel.text = which + "Physics  <color=#E8742A>" + legs[leg].x + "</color>";
+        sprintLabel.text = which + "Speed (sprint)  <color=#E8742A>" + speeds[leg] + "</color>";
         techniqueLabel.text = which + "Technique  <color=#E8742A>" + legs[leg].y + "</color>";
         for (int i = 0; i < legTexts.Count && i < legs.Count; i++)
         {
             if (legTexts[i] == null) continue;
-            legTexts[i].text = (legs.Count > 6 ? "" : "Leg ") + (i + 1) + "\n<size=75%>" + legs[i].x + "/" + legs[i].y + "</size>";
+            legTexts[i].text = (legs.Count > 6 ? "" : "Leg ") + (i + 1) + "\n<size=75%>" + legs[i].x + "/" + speeds[i] + "/" + legs[i].y + "</size>";
             legTexts[i].enableWordWrapping = false;
         }
     }

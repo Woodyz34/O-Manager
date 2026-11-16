@@ -49,13 +49,13 @@ public class CardData
     // "87", or "-" when there is no sprint speed
     public string SprintSpeedText => HasSprintSpeed ? Mathf.RoundToInt(sprintSpeed).ToString() : "-";
 
-    // The same runner with other values ("Same stats" in the lobby). Everybody gets the same number on every
-    // kind of ground, so the sprint speed is left out and physics is used everywhere.
-    public CardData WithStats(float newPhysics, float newTechnique)
+    // The same runner with other values ("Same stats" in the lobby). Since 2026-11-16 the host sets the sprint speed
+    // too; without one (NoValue) physics is used on every kind of ground.
+    public CardData WithStats(float newPhysics, float newTechnique, float newSprintSpeed = NoValue)
     {
         CardData copy = (CardData)MemberwiseClone();
         copy.physics = newPhysics;
-        copy.sprintSpeed = NoValue;
+        copy.sprintSpeed = newSprintSpeed;
         copy.technique = newTechnique;
         return copy;
     }

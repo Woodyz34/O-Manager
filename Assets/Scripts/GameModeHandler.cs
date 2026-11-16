@@ -95,8 +95,10 @@ public static class GameModes
         if (IsSameStats(mode))
         {
             if (!TryGetSameStatsLegs(mode, out List<Vector2Int> legs)) return "Same stats";
-            if (!AllLegsAlike(legs)) return "Same stats per leg";   // kept short for the lobby bar
-            return "Same stats " + legs[0].x + "/" + legs[0].y;     // speed/technique
+            List<int> speeds = SameStatsSpeedsOf(mode);
+            bool speedsAlike = speeds == null || speeds.TrueForAll(s => s == speeds[0]);
+            if (!AllLegsAlike(legs) || !speedsAlike) return "Same stats per leg";   // kept short for the lobby bar
+            return "Same stats " + legs[0].x + "/" + (speeds != null ? speeds[0] : legs[0].x) + "/" + legs[0].y;   // physics/speed/technique
         }
         string id = PoolId(mode);
         string name = IsYourRunners(id) ? "Your runners" : id == ChooseAny ? "Any runner" : id;
@@ -115,7 +117,7 @@ public static class GameModes
 
     public static string PoolDescription(string mode)
     {
-        if (IsSameStats(mode)) return "You set speed and technique (for each leg in a relay). Nobody picks a runner: everyone runs as themselves with your values.";
+        if (IsSameStats(mode)) return "You set physics, speed and technique (for each leg in a relay). Nobody picks a runner: everyone runs as themselves with your values.";
         if (IsOpenPacks(mode)) return "Everyone opens one free pack per leg and races with what comes out. The runners are only on loan.";
         return IsYourRunners(mode) ? "Everyone races with runners from their own collection." : "Everyone may pick any runner in the game.";
     }
@@ -164,6 +166,46 @@ public static class GameModes
 
     // One speed/technique pair per leg (x = speed, y = technique). Legs at the end that only repeat the leg before
     // are left out, so a plain race or a relay with the same values everywhere gives the short "Same stats|85|70".
+    // With a sprint speed per leg too (2026-11-16): sent after the legs as "|S" and two hex digits per leg, so
+    // "Same stats|85|70||S5A" is physics 85, technique 70, speed 90. Without it, speed = physics (older lobbies).
+    public static string MakeSameStats(IList<Vector2Int> legs, IList<int> speeds)
+    {
+        if (speeds == null || speeds.Count == 0) return MakeSameStats(legs);
+        if (legs == null || legs.Count == 0) legs = new List<Vector2Int> { new Vector2Int(MaxSpeed, MaxTechnique) };
+        int count = Mathf.Min(MaxLegs, Mathf.Max(legs.Count, speeds.Count));
+        Vector2Int LegAt(int i) => Clamp(legs[Mathf.Min(i, legs.Count - 1)]);
+        int SpeedAt(int i) => Mathf.Clamp(speeds[Mathf.Min(i, speeds.Count - 1)], MinSpeed, MaxSpeed);
+        // Legs at the end that only repeat the leg before are left out
+        while (count > 1 && LegAt(count - 1) == LegAt(count - 2) && SpeedAt(count - 1) == SpeedAt(count - 2)) count--;
+        System.Text.StringBuilder more = new System.Text.StringBuilder();
+        System.Text.StringBuilder s = new System.Text.StringBuilder();
+        for (int i = 0; i < count; i++)
+        {
+            if (i > 0) more.Append(LegAt(i).x.ToString("X2")).Append(LegAt(i).y.ToString("X2"));
+            s.Append(SpeedAt(i).ToString("X2"));
+        }
+        return SameStatsMode + "|" + LegAt(0).x + "|" + LegAt(0).y + "|" + more + "|S" + s;
+    }
+
+    // The sprint speed of every leg in a "Same stats" mode, or null when it has none (then physics is used)
+    public static List<int> SameStatsSpeedsOf(string mode)
+    {
+        if (!IsSameStats(mode)) return null;
+        string[] parts = mode.Split('|');
+        foreach (string part in parts)
+        {
+            if (part.Length < 3 || part[0] != 'S' || part == SameStatsMode) continue;
+            List<int> speeds = new List<int>();
+            for (int i = 1; i + 2 <= part.Length && speeds.Count < MaxLegs; i += 2)
+            {
+                if (!int.TryParse(part.Substring(i, 2), System.Globalization.NumberStyles.HexNumber, null, out int v)) break;
+                speeds.Add(Mathf.Clamp(v, MinSpeed, MaxSpeed));
+            }
+            return speeds.Count > 0 ? speeds : null;
+        }
+        return null;
+    }
+
     public static string MakeSameStats(IList<Vector2Int> legs)
     {
         List<Vector2Int> clamped = new List<Vector2Int>();
@@ -243,7 +285,26 @@ public static class GameModes
         }
     }
     static List<Vector2Int> sameStatsLegs;
-    static readonly Dictionary<(CardData, Vector2Int), CardData> sameStatsCopies = new Dictionary<(CardData, Vector2Int), CardData>();
+
+    // The sprint speed per leg in the competition being played, or null (then physics is used on sprint too)
+    public static List<int> SameStatsSpeeds
+    {
+        get => sameStatsSpeeds;
+        set
+        {
+            sameStatsCopies.Clear();
+            sameStatsSpeeds = value != null && value.Count > 0 ? value : null;
+        }
+    }
+    static List<int> sameStatsSpeeds;
+
+    // The sprint speed of one leg, or CardData.NoValue
+    public static float SameStatsSpeedForLeg(int leg)
+    {
+        if (sameStatsLegs == null || sameStatsSpeeds == null) return CardData.NoValue;
+        return sameStatsSpeeds[Mathf.Clamp(leg, 0, sameStatsSpeeds.Count - 1)];
+    }
+    static readonly Dictionary<(CardData, Vector3Int), CardData> sameStatsCopies = new Dictionary<(CardData, Vector3Int), CardData>();
 
     public static bool SameStatsActive => sameStatsLegs != null;
 
@@ -257,6 +318,7 @@ public static class GameModes
     static void ResetSameStats()
     {
         sameStatsLegs = null;
+        sameStatsSpeeds = null;
         sameStatsCopies.Clear();
     }
 
@@ -266,14 +328,15 @@ public static class GameModes
     {
         Vector2Int? values = SameStatsForLeg(leg);
         if (values == null || cards == null) return cards;
+        float speed = SameStatsSpeedForLeg(leg);
         List<CardData> result = new List<CardData>(cards.Count);
         foreach (CardData card in cards)
         {
             if (card == null) continue;
-            var key = (card, values.Value);
+            var key = (card, new Vector3Int(values.Value.x, values.Value.y, Mathf.RoundToInt(speed)));
             if (!sameStatsCopies.TryGetValue(key, out CardData copy))
             {
-                copy = card.WithStats(values.Value.x, values.Value.y);
+                copy = card.WithStats(values.Value.x, values.Value.y, speed);
                 sameStatsCopies[key] = copy;
             }
             result.Add(copy);
@@ -285,7 +348,7 @@ public static class GameModes
     public static CardData SameStatsRunner(string playerName, int leg, bool man)
     {
         Vector2Int values = SameStatsForLeg(leg) ?? new Vector2Int(80, 80);
-        return new CardData(playerName, values.x, values.y, null, null, man ? "H21" : "D21", man, null);
+        return new CardData(playerName, values.x, values.y, null, null, man ? "H21" : "D21", man, null) { sprintSpeed = SameStatsSpeedForLeg(leg) };
     }
 
     public static bool IsYourRunners(string mode) => !string.IsNullOrEmpty(mode) && mode.Contains(YourRunners);
