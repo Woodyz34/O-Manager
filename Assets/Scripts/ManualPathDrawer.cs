@@ -502,8 +502,9 @@ public class ManualPathDrawer : MonoBehaviour
     const int SprintExtraDetourCells = 4;
 
     // Gardens (olive green) and houses are half as strict (2026-11-16: the line stopped at the corner of a tiny house or
-    // a bit of garden); fences, walls, cliffs and purple barriers stay as strict as before
-    const float SoftCellWeight = 0.5f;
+    // a bit of garden); fences, walls, cliffs and purple barriers stay as strict as before. Quarter weight since the
+    // user's test the same day (twice as far over gardens and houses again).
+    const float SoftCellWeight = 0.25f;
 
     bool SoftCell(Vector2Int c)
     {
@@ -590,8 +591,8 @@ public class ManualPathDrawer : MonoBehaviour
                 int closedCells = gridPath.Count - 2 - blockedFrom;
                 ClosedWeight(gridPath.Count - 2, out int softCells);
                 boxStartLevel = LevelAt(blockedFrom);
-                List<Vector2Int> way = SearchInBox(gridPath[blockedFrom], g, strict ? SprintDetourMargin + softCells : CorrectionCells, null);
-                bool tooLong = strict && way != null && way.Count > closedCells + 2 + SprintExtraDetourCells + softCells;
+                List<Vector2Int> way = SearchInBox(gridPath[blockedFrom], g, strict ? SprintDetourMargin + 2 * softCells : CorrectionCells, null);
+                bool tooLong = strict && way != null && way.Count > closedCells + 2 + SprintExtraDetourCells + 3 * softCells;
                 if (way == null || way.Count == 0 || tooLong)
                 {
                     StopLine();
