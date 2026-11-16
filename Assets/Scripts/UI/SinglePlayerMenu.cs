@@ -292,7 +292,7 @@ public class SinglePlayerMenu : MonoBehaviour
             poolInfo.text = ExtraModes.Describe(modes) + " gives you a set runner, so the runner pool does not matter.";
         else if (GameModes.IsYourRunners(pool))
             poolInfo.text = "You run with the runners you own: you have " + owned + (owned == 1 ? " runner." : " runners.")
-                            + (owned < RunnerCollection.RaceMinimum ? " You borrow random runners up to " + RunnerCollection.RaceMinimum + " for the race." : "");
+                            + " Runners you are missing for the legs are lent for the race.";
         else
             poolInfo.text = GameModes.PoolDescription(pool);
 
@@ -323,15 +323,7 @@ public class SinglePlayerMenu : MonoBehaviour
         if (courseProblem != null) return courseProblem;
         string modeProblem = ExtraModes.CourseProblem(modes, course);
         if (modeProblem != null) return modeProblem;
-        if ((modes & ExtraModes.NoRunners) == 0 && course.IsRelay() && GameModes.IsYourRunners(pool))
-        {
-            int owned = GameModes.RaceRunnerCount();
-            if (owned < course.legs)
-            {
-                return "This relay has " + course.legs + " legs, but you only have " + owned + (owned == 1 ? " runner" : " runners")
-                    + ". Pick a relay with fewer legs, or the runner pool \"Any runner\".";
-            }
-        }
+        // Too few runners for a relay's legs: the missing ones are lent (2026-11-16)
         return null;
     }
 
