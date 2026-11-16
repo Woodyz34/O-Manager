@@ -84,7 +84,7 @@ public class LeaderboardManager : NetworkBehaviour
         else image.color = rank % 2 == 0 ? new Color(1, 1, 1, 0.55f) : new Color(1, 1, 1, 0.8f);
     }
 
-    // The standings as the race goes (2026-11-15): furthest on first (relay leg, then control), and at the same
+    // The standings as the race goes (2026-11-15): furthest on first (relay leg, then control; on a fork by NetworkPlayer.relayProgress, 2026-11-16), and at the same
     // control the one with the least time. Before, the list was only put in order of time when someone punched (in
     // relays only at the end of each leg). Everything it needs is already networked on the players, so each client
     // works it out itself once a second; nothing is sent.
@@ -94,7 +94,7 @@ public class LeaderboardManager : NetworkBehaviour
         return FindObjectsOfType<NetworkPlayer>()
             .Where(p => p.Object != null && p.Object.IsValid)
             .OrderByDescending(p => Mathf.Max(0, p.relayLeg))
-            .ThenByDescending(p => p.relayLeg < 0 ? 0 : p.relayControl)
+            .ThenByDescending(p => p.relayLeg < 0 ? 0f : p.relayProgress)
             .ThenBy(p => p.hourCount * 3600 + p.minuterCount * 60 + p.secoundCount)
             .ToList();
     }
