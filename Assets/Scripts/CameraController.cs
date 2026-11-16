@@ -148,6 +148,8 @@ public class CameraController : MonoBehaviour
             InitializeCamera();
         }
 
+        FocusOnNewStretchToDraw();
+
         if (!following && !EscMenu.IsOpen && !TvViewer.BlocksMapInput && mapRenderer != null)
         {
             PanCamera();
@@ -241,6 +243,26 @@ public class CameraController : MonoBehaviour
             return;
         }
         FocusOnCurrentLeg();
+    }
+
+    // Every new stretch to draw starts with the whole of it on the screen (2026-11-16: some ways of getting to the next
+    // stretch did not turn and zoom the map, and the player had to drag it to see the control). Once per stretch, so
+    // the player can zoom and drag freely after that.
+    private Transform lastDrawTarget;
+
+    private void FocusOnNewStretchToDraw()
+    {
+        if (agent == null) agent = GetComponent<AgentMovement>();
+        ManualPathDrawer drawer = agent != null ? agent.manualPathDrawer : null;
+        if (drawer == null || !drawer.timeToDraw || RouteChoiceGame.On)
+        {
+            if (drawer != null && !drawer.timeToDraw) lastDrawTarget = null;
+            return;
+        }
+        if (drawer.targetControl == null || drawer.ThisControll == null || drawer.targetControl == lastDrawTarget) return;
+        lastDrawTarget = drawer.targetControl;
+        FocusOnSegment(agent.WorldToGridPositionCentered(drawer.ThisControll.position),
+            agent.WorldToGridPositionCentered(drawer.targetControl.position));
     }
 
     private void FocusOnCurrentLeg()
@@ -374,7 +396,8 @@ public class CameraController : MonoBehaviour
         // Zoom so both control circles are wholly on the screen with half a circle more beyond each of them.
         // The leg runs straight up the screen, so only the height matters (a landscape screen is wider than tall).
         float circle = 37f * MapDefinition.WorldUnitsPerMeter * CourseRenderer.SizeFor(CourseLoader.LoadedMap);   // the control circle's radius (CourseRenderer)
-        legCamSize = distance / 2f + 2f * circle;
+        // (2.6 circles since 2026-11-16: the clock and tool bars cover the top and the bottom of the screen)
+        legCamSize = distance / 2f + 2.6f * circle;
         cam.orthographicSize = Mathf.Max(minCamSize, legCamSize);
         cam.transform.position = camPos;
     }
