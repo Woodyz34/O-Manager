@@ -195,4 +195,25 @@ public class ScreenSettings : MonoBehaviour
         scaler.referenceResolution = ReferenceResolution;
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
     }
+
+    // The scale a fitted canvas gets on this screen. A canvas made this frame still has scale 1 (CanvasScaler only
+    // applies its scale in its next Update), so anything placed from its size right away needs this instead.
+    public static float FitScale()
+    {
+        Vector2 reference = ReferenceResolution;
+        return Mathf.Max(0.01f, Mathf.Min(Screen.width / reference.x, Screen.height / reference.y));
+    }
+
+    // A screen point (pixels) as a position on a fitted overlay canvas, measured from its middle, and the canvas's
+    // own rectangle in the same units. Correct even on the frame the canvas was made.
+    public static Vector2 ScreenToFitted(Vector2 screenPoint)
+    {
+        return (screenPoint - new Vector2(Screen.width, Screen.height) * 0.5f) / FitScale();
+    }
+
+    public static Rect FittedRect()
+    {
+        Vector2 size = new Vector2(Screen.width, Screen.height) / FitScale();
+        return new Rect(-size * 0.5f, size);
+    }
 }

@@ -362,25 +362,39 @@ public class TvViewer : MonoBehaviour
     }
 
     // The split times at the TV control: the leader's time and how far behind the others are
+    // Always there while a TV control is on air (2026-11-15); the runners still on their way are listed under the
+    // ones who have punched, with their clock ticking until they punch
     void ShowSplits()
     {
-        bool any = splits.Count > 0;
-        if (splitBox.gameObject.activeSelf != any) splitBox.gameObject.SetActive(any);
-        if (!any) return;
+        bool show = director.ShowsSplits;
+        if (splitBox.gameObject.activeSelf != show) splitBox.gameObject.SetActive(show);
+        if (!show) return;
         int rows = Mathf.Min(splits.Count, 8);
         var text = new System.Text.StringBuilder();
         text.Append("<b>Split times</b>");
+        bool leader = splits.Count > 0 && !splits[0].running;
+        int place = 0;
         for (int i = 0; i < rows; i++)
         {
             TvDirector.Split s = splits[i];
-            string time = i == 0 ? CompetitionFlow.FormatTime(s.seconds) : "+" + CompetitionFlow.FormatTime(s.seconds - splits[0].seconds);
             // The place in the team's colour, made lighter so it shows on the dark box
             string colour = ColorUtility.ToHtmlStringRGB(Color.Lerp(s.color, Color.white, 0.35f));
-            text.Append("\n<b><color=#").Append(colour).Append(">").Append(i + 1).Append("</color></b><pos=34>")
+            if (s.running)
+            {
+                int behind = leader ? s.seconds - splits[0].seconds : -1;
+                string clock = behind >= 0 ? "+" + CompetitionFlow.FormatTime(behind) : CompetitionFlow.FormatTime(s.seconds);
+                text.Append("\n<color=#").Append(colour).Append(">•</color><pos=34><color=#C7D6DA>")
+                    .Append(s.name).Append("<pos=300>").Append(clock).Append("</color>");
+                continue;
+            }
+            place++;
+            string time = place == 1 ? CompetitionFlow.FormatTime(s.seconds) : "+" + CompetitionFlow.FormatTime(s.seconds - splits[0].seconds);
+            text.Append("\n<b><color=#").Append(colour).Append(">").Append(place).Append("</color></b><pos=34>")
                 .Append(s.name).Append("<pos=300>").Append(time);
         }
+        if (rows == 0) text.Append("\n<color=#C7D6DA>Nobody on the way here yet</color>");
         splitText.text = text.ToString();
-        splitBox.sizeDelta = new Vector2(430f, 24f + 30f * (rows + 1));
+        splitBox.sizeDelta = new Vector2(430f, 24f + 30f * (Mathf.Max(rows, 1) + 1));
     }
 
     // ---- Mistakes on the map: a label at every runner who is making a mistake, kept a moment so it is seen ----

@@ -95,7 +95,45 @@ public static class MoveControlMode
         if (manager == null || manager.speedGrid2D == null) return "The map is not ready yet.";
         Vector2Int cell = agent.WorldToGridPositionCentered(world);
         if (manager.speedGrid2D[cell.y, cell.x] <= 0.01f) return "Nobody can get there. Put the control on ground you can run on.";
+        // Not onto your own bear (2026-11-15). Where the others hid theirs nobody knows, so that can still happen.
+        NetworkPlayer own = agent.GetComponent<NetworkPlayer>();
+        if (own != null && own.bearPlaced && Vector2.Distance(own.bearPosition, (Vector2)world) < BearMode.MinFromControlMeters * U)
+        {
+            return "Too close to your bear. Put the control at least " + Mathf.RoundToInt(BearMode.MinFromControlMeters) + " m from it.";
+        }
         return null;
+    }
+
+    // Several players moved the same control: it lands in the middle of their places. That middle can be on ground
+    // nobody may enter (two places either side of a garden, out of bounds) even when each place was fine
+    // (2026-11-15). Then it lands on the nearest cell that can be run on, still within 100 m of where it was laid.
+    // Every player works this out the same way from the same numbers, so it lands in the same place for all.
+    static Vector2 Landing(PathfindingManager manager, int index, Vector2 middle)
+    {
+        float[,] speed = manager.speedGrid2D;
+        if (speed == null) return middle;
+        int rows = speed.GetLength(0), cols = speed.GetLength(1);
+        Vector2Int cell = manager.WorldToGridPositionCentered(new Vector3(middle.x, middle.y, 0f));
+        if (speed[cell.y, cell.x] > 0.01f) return middle;
+        Vector2 original = Original(index);
+        float max = MaxMeters * U;
+        int reach = Mathf.CeilToInt(2f * max / Mathf.Max(0.0001f, manager.cellSize));
+        Vector2 best = middle;
+        float bestDistance = float.MaxValue;
+        for (int dy = -reach; dy <= reach; dy++)
+        {
+            for (int dx = -reach; dx <= reach; dx++)
+            {
+                int x = cell.x + dx, y = cell.y + dy;
+                if (x < 0 || y < 0 || x >= cols || y >= rows || speed[y, x] <= 0.01f) continue;
+                Vector3 centre = manager.GridToWorldPosition(y, x);
+                Vector2 at = new Vector2(centre.x, centre.y);
+                if (Vector2.Distance(at, original) > max) continue;
+                float distance = (at - middle).sqrMagnitude;
+                if (distance < bestDistance) { bestDistance = distance; best = at; }
+            }
+        }
+        return best;
     }
 
     // The local player moves the control they are drawing to. Only they see it until everyone has drawn.
@@ -136,7 +174,7 @@ public static class MoveControlMode
         if (movers.Count == 0) return false;
 
         movers.Sort((a, b) => a.Object.StateAuthority.PlayerId.CompareTo(b.Object.StateAuthority.PlayerId));
-        Vector2 middle = sum / movers.Count;
+        Vector2 middle = Landing(agent.pathfindingManager, index, sum / movers.Count);
         Capture(agent.pathfindingManager);
         revealing = true;
         GameModeRuntime.Host.StartCoroutine(Reveal(agent, index, middle, movers, proceed));
@@ -165,6 +203,13 @@ public static class MoveControlMode
         string who = names.Count == 1 ? names[0] : string.Join(", ", names.GetRange(0, names.Count - 1)) + " and " + names[names.Count - 1];
         float meters = Vector2.Distance(Original(index), to) / U;
         string detail = "Moved by " + who + (names.Count > 1 ? ", so it lands in the middle" : "") + ": " + Mathf.RoundToInt(meters) + " m from where it was laid.";
+        // Imposter and Secret task: who moved it is not told (only that you did, if you did)
+        if (ExtraModes.HideOwners)
+        {
+            bool mine = names.Contains("you");
+            detail = (mine ? (names.Count > 1 ? "Moved by you and someone else, so it lands in the middle" : "Moved by you") : names.Count > 1 ? "Moved by " + names.Count + " players, so it lands in the middle" : "Moved by someone")
+                     + ": " + Mathf.RoundToInt(meters) + " m from where it was laid.";
+        }
         ModeBanner.Show(null, "Control " + index + " is on the move!", detail, CourseRenderer.CoursePurple, 3.4f, false, ModeBanner.LoadSound("control_whoosh"));
 
         // Show the old place and the new one

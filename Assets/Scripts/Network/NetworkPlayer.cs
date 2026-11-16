@@ -47,7 +47,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int minuterCount { get; set; }
     [Networked] public int hourCount { get; set; }
     // 64 characters: "Same stats" with values for every relay leg is longer than the default 16
-    [Networked, Capacity(64)] public string gameMode { get; set; }
+    [Networked, Capacity(128)] public string gameMode { get; set; }   // 128: Same stats with physics, speed and technique on 10 legs
     [Networked, Capacity(32)]
     public NetworkDictionary<int, PlayerRef> CardOwner => default;
     
@@ -85,7 +85,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int secretTask { get; set; }
 
     // The host's lobby choices, published on the host's own player so everyone can see them
-    [Networked] public NetworkString<_64> lobbyGameMode { get; set; }
+    [Networked] public NetworkString<_128> lobbyGameMode { get; set; }
     [Networked] public NetworkString<_64> lobbyMap { get; set; }
     // This player's Unity player id (Unity Cloud), so a host can let the players in its lobby download its private map
     [Networked] public NetworkString<_64> cloudId { get; set; }
@@ -181,6 +181,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // Relays: where this team's runner is, so the other runners can run behind it or hang on to it (PackRunning)
     [Networked] public int relayLeg { get; set; }
     [Networked] public int relayControl { get; set; }
+    // How far along the leg the runner is, counted in common controls (the ones every team runs): 3.5 = half way from the
+    // third common control to the next. On a fork two short controls and one long one both count as one step, so the
+    // live standings are even again once the fork is done (2026-11-16)
+    [Networked] public float relayProgress { get; set; }
     [Networked] public NetworkBool relayRunning { get; set; }
     [Networked] public NetworkBool relayMistake { get; set; }   // the runner is making a mistake right now, shown on the map of a TV production
     // TV production of a relay with TV controls (TvDirector): what the host puts on TV. 0 = nothing (the race runs at
@@ -195,6 +199,21 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int relaySplitLeg { get; set; }
     [Networked] public int relaySplitCount { get; set; }
     [Networked] public NetworkString<_32> relayRunnerName { get; set; }
+    // The runner's physics, sprint speed and technique for the leaderboard: physics * 65536 + (speed + 1) * 256 +
+    // technique, 0 = no runner yet (2026-11-16)
+    [Networked] public int runnerStats { get; set; }
+
+    // "P85  S90  T70" (physics, sprint speed, technique), or "" before a runner is picked
+    public string RunnerStatsText
+    {
+        get
+        {
+            int packed = IsValidRunner ? runnerStats : 0;
+            if (packed == 0) return "";
+            int physics = packed >> 16, speed = ((packed >> 8) & 0xFF) - 1, technique = packed & 0xFF;
+            return "P" + physics + "  S" + (speed >= 0 ? speed.ToString() : "-") + "  T" + technique;
+        }
+    }
 
     // A new competition: forget the last relay's results
     void ClearRelayResults()
@@ -237,6 +256,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             return;
         }
+        Vector3Int stats = agentMovement.RunnerStats;
+        int packedStats = stats == Vector3Int.zero ? 0
+            : (Mathf.Clamp(stats.x, 0, 255) << 16) | (Mathf.Clamp(stats.y + 1, 0, 255) << 8) | Mathf.Clamp(stats.z, 0, 255);
+        if (runnerStats != packedStats) runnerStats = packedStats;
         RelayRace relay = RelayRace.Active;
         if ((relay == null && IndividualRace.Active == null) || ActiveScene.Name == "Lobby")
         {
@@ -248,12 +271,29 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         }
         relayLeg = relay != null ? relay.Leg : 0; // an individual competition is "leg 0" for the replay
         relayControl = agentMovement.currentKontroll;
+        relayProgress = Progress(relay != null ? relay.Route : null, relayControl - 1); // currentKontroll is the control it runs to
         ManualPathDrawer drawer = agentMovement.manualPathDrawer;
         relayRunning = agentMovement.canRunNextSegment && !agentMovement.hasFinished && !agentMovement.relayHold
             && !agentMovement.WaitingForAllPlayersToReachKontroll && !agentMovement.WaitingForAllPlayersToDraw
             && drawer != null && !drawer.timeToDraw;
         relayMistake = relayRunning && agentMovement.IsMissing;
         tvShot = TvDirector.Active != null ? TvDirector.Active.ShotToSend : 0;
+    }
+
+    // The point index in the team's route (0 = start) as common controls: the last common point passed plus the part of
+    // the way to the next common point, by the number of controls between them
+    public static float Progress(LegRoute route, int index)
+    {
+        if (route == null || route.commonOrdinal.Count == 0) return index;
+        int count = route.commonOrdinal.Count;
+        if (index >= count - 1) return route.commonOrdinal[count - 1] >= 0 ? route.commonOrdinal[count - 1] : index;
+        int before = Mathf.Clamp(index, 0, count - 1);
+        while (before > 0 && route.commonOrdinal[before] < 0) before--;
+        int after = Mathf.Clamp(index, 0, count - 1) + (index > before ? 0 : 1);
+        while (after < count - 1 && route.commonOrdinal[after] < 0) after++;
+        float from = Mathf.Max(0, route.commonOrdinal[before]);
+        if (after <= before || route.commonOrdinal[after] < 0) return from;
+        return from + (index - before) / (float)(after - before);
     }
 
     public override void Despawned(NetworkRunner runner, bool hasState)
@@ -385,6 +425,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     public override async void Spawned()
     {
+        RunnerVisibility.Remember(this);
         DontDestroyOnLoad(gameObject);
         PackRegistry.Add(this);
         SenseTheMapOnlyIfOwn();
@@ -627,6 +668,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         // A relay gets one pair of values per leg.)
         bool sameStats = GameModes.TryGetSameStatsLegs(effectiveGameMode, out List<Vector2Int> sameStatsLegs);
         GameModes.SameStatsLegs = sameStats ? sameStatsLegs : null;
+        GameModes.SameStatsSpeeds = sameStats ? GameModes.SameStatsSpeedsOf(effectiveGameMode) : null;
         // Max average overall and "Open packs" (RunnerRules)
         RunnerRules.BeginRound(effectiveGameMode);
         RunnerFilterBar.ClearRules();
@@ -669,11 +711,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             return;
         }
 
-        // "Same stats": everyone picks any runner, and all of them run with the host's speed and technique
+        // "Same stats": nobody picks a runner (2026-11-15). Everyone runs as themselves, a runner with the player's
+        // name and the host's speed and technique; on a women's relay leg a woman with the same values.
         if (Object.HasStateAuthority && sameStats)
         {
-            manager.ChooseWhomeverYouWantMode = true;
-            manager.ChooseRunnerPanel.SetActive(true);
+            manager.ChooseRunnerPanel.SetActive(false);
+            PickSameStatsRunner();
+            return;
         }
 
         if (Object.HasStateAuthority && effectiveGameMode.Contains("Choose a runner"))
@@ -687,7 +731,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             Debug.Log("Choose runner startades inte " + Object.HasStateAuthority + " " + effectiveGameMode);
         }
 
-        if (Object.HasStateAuthority && GameModes.IsYourRunners(effectiveGameMode))
+        if (Object.HasStateAuthority && GameModes.PicksFromCollection(effectiveGameMode))
         {
             manager.YourRunnersMode = true;
             manager.ChooseRunnerPanel.SetActive(true);
@@ -980,6 +1024,33 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         Debug.Log($"{name} har valt löpare");
     }
 
+
+    void PickSameStatsRunner()
+    {
+        string name = nickName.ToString();
+        if (string.IsNullOrWhiteSpace(name)) name = GameManager.Instance != null ? GameManager.Instance.playerNickName : "Runner";
+        if (RelayRace.Active != null)
+        {
+            RelayRace.Active.PickSameStatsTeam(name);
+        }
+        else
+        {
+            CardData card = GameModes.SameStatsRunner(name, 0, true);
+            agentMovement.SetRunner(card);
+            relayRunnerName = name;
+        }
+        SetHasChoosenRunner();
+    }
+
+    // "Change runner" on the waiting page: back to picking, as long as the race has not started for us
+    public bool UnchooseRunner()
+    {
+        if (Object == null || !Object.HasStateAuthority || !HasChoosenRunner) return false;
+        AgentMovement agent = GetComponent<AgentMovement>();
+        if (agent == null || !agent.WaitingForAllPlayersToChooseRunner) return false;
+        HasChoosenRunner = false;
+        return true;
+    }
 
     private void CheckAllPlayersReady()
     {

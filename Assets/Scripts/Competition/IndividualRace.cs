@@ -86,7 +86,7 @@ public class IndividualRace : MonoBehaviour, IRaceStats
     {
         if (started) return;
         started = true;
-        recorder.Begin(0, agent);
+        recorder.Begin(0, agent, true);
         OnPunch(agent, 0);
     }
 

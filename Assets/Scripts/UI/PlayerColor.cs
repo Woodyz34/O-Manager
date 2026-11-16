@@ -230,6 +230,29 @@ public static class UIToast
         current = go;
         UnityEngine.Object.Destroy(go, seconds);
     }
+
+    // A message at the right edge of the screen, with an X to close it. For messages while drawing a route
+    // (2026-11-15: the bottom-middle message covered the start triangle, where the line is drawn from). The left side
+    // has the leaderboard and the top the stretch being drawn.
+    public static void ShowSide(string message, float seconds = 4f, Color? color = null)
+    {
+        if (current != null) UnityEngine.Object.Destroy(current);
+        GameObject go = new GameObject("Toast", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        Canvas canvas = go.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 300;
+        ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
+        Image card = CourseUI.CardPanel("Message", go.transform);
+        card.raycastTarget = false;
+        // In the very bottom-right corner (2026-11-16, user wish)
+        CourseUI.Place(card.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-24, 24), new Vector2(440, 150));
+        TextMeshProUGUI text = CourseUI.Text("Text", card.transform, message, 22, color ?? CourseUI.Danger, FontStyles.Bold, TextAlignmentOptions.Center);
+        CourseUI.Stretch(text.rectTransform, 22, 46, 12, 12);
+        Button close = CourseUI.Button("Close", card.transform, "X", CourseUI.ButtonKind.Light, () => UnityEngine.Object.Destroy(go), 20);
+        CourseUI.Place((RectTransform)close.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-8, -8), new Vector2(36, 36));
+        current = go;
+        UnityEngine.Object.Destroy(go, seconds);
+    }
 }
 
 // A message at the bottom of the screen with a loading bar and the time left, for work that takes a while

@@ -14,10 +14,46 @@ public class GameModeHandler : MonoBehaviour
         // "Your runners" first: it is the default
         gameModes.Sort((a, b) => (b.name == GameModes.YourRunners).CompareTo(a.name == GameModes.YourRunners));
         gameMode = gameModes.Count > 0 ? gameModes[0].name : GameModes.YourRunners;
+        // The runner pool picked last time (2026-11-15): a new lobby starts with it
+        string last = LastPool;
+        if (last != null) gameMode = last;
+        savedMode = gameMode;
     }
     public void SetGameMode(string GameMode)
     {
         gameMode = GameMode;
+    }
+
+    string savedMode;
+
+    // The pool is set from many places (the pop-ups, taking over as host ...): it is saved when it has changed
+    void Update()
+    {
+        if (gameMode == savedMode || string.IsNullOrWhiteSpace(gameMode)) return;
+        savedMode = gameMode;
+        LastPool = gameMode;
+    }
+
+    const string LastPoolKey = "RunnerPool.Last";
+
+    // The runner pool (with its values: max average, same stats) picked last, in the lobby or on the single player
+    // page; null when none was saved or it is not a pool the game has any more
+    public static string LastPool
+    {
+        get
+        {
+            string saved = PlayerPrefs.GetString(LastPoolKey, "");
+            if (string.IsNullOrWhiteSpace(saved)) return null;
+            string id = GameModes.PoolId(saved);
+            foreach (string pool in GameModes.LobbyPools) if (pool == id) return saved;
+            return null;
+        }
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            PlayerPrefs.SetString(LastPoolKey, value);
+            PlayerPrefs.Save();
+        }
     }
 }
 
@@ -46,8 +82,29 @@ public static class GameModes
     public const char CapMark = '#';
     public const int MinCap = 40, MaxCap = 99, DefaultCap = 75;
 
+    // "Random runners" (2026-11-16): everyone gets this many random runners on loan for the round and picks from
+    // them. Sent as "Random runners|<count>". (Your runners no longer fills up to 10 with loans: only what the legs need.)
+    public const string RandomMode = "Random runners";
+    public const int MinRandom = 1, MaxRandom = 30, DefaultRandom = 10;
+
     // The runner pools offered in the lobby and, since 2026-11-13, in single player too
-    public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode, OpenPacksMode };
+    public static readonly string[] LobbyPools = { YourRunners, ChooseAny, SameStatsMode, OpenPacksMode, RandomMode };
+
+    public static bool IsRandom(string mode) => !string.IsNullOrEmpty(mode) && mode.StartsWith(RandomMode);
+
+    // How many random runners everyone gets, or 0 when the pool is not "Random runners"
+    public static int RandomCount(string mode)
+    {
+        if (!IsRandom(mode)) return 0;
+        int bar = mode.IndexOf('|');
+        if (bar < 0 || !int.TryParse(mode.Substring(bar + 1), out int count)) return DefaultRandom;
+        return Mathf.Clamp(count, MinRandom, MaxRandom);
+    }
+
+    public static string MakeRandom(int count) => RandomMode + "|" + Mathf.Clamp(count, MinRandom, MaxRandom);
+
+    // Pools where the player picks among their own or lent runners (the "Your runners" picking)
+    public static bool PicksFromCollection(string mode) => IsYourRunners(mode) || IsRandom(mode);
 
     // The whole scale (2026-11-13, the user wanted every value). Speed 0 would never reach the finish, so it starts at 1.
     public const int MinSpeed = 1, MaxSpeed = 100, MinTechnique = 0, MaxTechnique = 100;
@@ -59,9 +116,12 @@ public static class GameModes
         if (IsSameStats(mode))
         {
             if (!TryGetSameStatsLegs(mode, out List<Vector2Int> legs)) return "Same stats";
-            if (!AllLegsAlike(legs)) return "Same stats per leg";   // kept short for the lobby bar
-            return "Same stats " + legs[0].x + "/" + legs[0].y;     // speed/technique
+            List<int> speeds = SameStatsSpeedsOf(mode);
+            bool speedsAlike = speeds == null || speeds.TrueForAll(s => s == speeds[0]);
+            if (!AllLegsAlike(legs) || !speedsAlike) return "Same stats per leg";   // kept short for the lobby bar
+            return "Same stats " + legs[0].x + "/" + (speeds != null ? speeds[0] : legs[0].x) + "/" + legs[0].y;   // physics/speed/technique
         }
+        if (IsRandom(mode)) return mode.Contains("|") ? RandomCount(mode) + " random runners" : RandomMode;
         string id = PoolId(mode);
         string name = IsYourRunners(id) ? "Your runners" : id == ChooseAny ? "Any runner" : id;
         int cap = Cap(mode);
@@ -79,15 +139,17 @@ public static class GameModes
 
     public static string PoolDescription(string mode)
     {
-        if (IsSameStats(mode)) return "You set speed and technique (for each leg in a relay). Everyone picks any runner, and all run with your values.";
+        if (IsSameStats(mode)) return "You set physics, speed and technique (for each leg in a relay). Nobody picks a runner: everyone runs as themselves with your values.";
         if (IsOpenPacks(mode)) return "Everyone opens one free pack per leg and races with what comes out. The runners are only on loan.";
-        return IsYourRunners(mode) ? "Everyone races with runners from their own collection." : "Everyone may pick any runner in the game.";
+        if (IsRandom(mode)) return "Everyone gets " + (mode.Contains("|") ? RandomCount(mode) + " " : "a few ") + "random runners on loan for the race and picks from them.";
+        return IsYourRunners(mode) ? "Everyone races with runners from their own collection. Only runners that are missing for the legs are lent." : "Everyone may pick any runner in the game.";
     }
 
     // The option id of a mode ("Same stats|85|70" is the option "Same stats", "Your runners#75" is "Your runners")
     public static string PoolId(string mode)
     {
         if (IsSameStats(mode)) return SameStatsMode;
+        if (IsRandom(mode)) return RandomMode;
         if (string.IsNullOrEmpty(mode)) return mode;
         int mark = mode.IndexOf(CapMark);
         return mark >= 0 ? mode.Substring(0, mark) : mode;
@@ -128,6 +190,46 @@ public static class GameModes
 
     // One speed/technique pair per leg (x = speed, y = technique). Legs at the end that only repeat the leg before
     // are left out, so a plain race or a relay with the same values everywhere gives the short "Same stats|85|70".
+    // With a sprint speed per leg too (2026-11-16): sent after the legs as "|S" and two hex digits per leg, so
+    // "Same stats|85|70||S5A" is physics 85, technique 70, speed 90. Without it, speed = physics (older lobbies).
+    public static string MakeSameStats(IList<Vector2Int> legs, IList<int> speeds)
+    {
+        if (speeds == null || speeds.Count == 0) return MakeSameStats(legs);
+        if (legs == null || legs.Count == 0) legs = new List<Vector2Int> { new Vector2Int(MaxSpeed, MaxTechnique) };
+        int count = Mathf.Min(MaxLegs, Mathf.Max(legs.Count, speeds.Count));
+        Vector2Int LegAt(int i) => Clamp(legs[Mathf.Min(i, legs.Count - 1)]);
+        int SpeedAt(int i) => Mathf.Clamp(speeds[Mathf.Min(i, speeds.Count - 1)], MinSpeed, MaxSpeed);
+        // Legs at the end that only repeat the leg before are left out
+        while (count > 1 && LegAt(count - 1) == LegAt(count - 2) && SpeedAt(count - 1) == SpeedAt(count - 2)) count--;
+        System.Text.StringBuilder more = new System.Text.StringBuilder();
+        System.Text.StringBuilder s = new System.Text.StringBuilder();
+        for (int i = 0; i < count; i++)
+        {
+            if (i > 0) more.Append(LegAt(i).x.ToString("X2")).Append(LegAt(i).y.ToString("X2"));
+            s.Append(SpeedAt(i).ToString("X2"));
+        }
+        return SameStatsMode + "|" + LegAt(0).x + "|" + LegAt(0).y + "|" + more + "|S" + s;
+    }
+
+    // The sprint speed of every leg in a "Same stats" mode, or null when it has none (then physics is used)
+    public static List<int> SameStatsSpeedsOf(string mode)
+    {
+        if (!IsSameStats(mode)) return null;
+        string[] parts = mode.Split('|');
+        foreach (string part in parts)
+        {
+            if (part.Length < 3 || part[0] != 'S' || part == SameStatsMode) continue;
+            List<int> speeds = new List<int>();
+            for (int i = 1; i + 2 <= part.Length && speeds.Count < MaxLegs; i += 2)
+            {
+                if (!int.TryParse(part.Substring(i, 2), System.Globalization.NumberStyles.HexNumber, null, out int v)) break;
+                speeds.Add(Mathf.Clamp(v, MinSpeed, MaxSpeed));
+            }
+            return speeds.Count > 0 ? speeds : null;
+        }
+        return null;
+    }
+
     public static string MakeSameStats(IList<Vector2Int> legs)
     {
         List<Vector2Int> clamped = new List<Vector2Int>();
@@ -207,7 +309,26 @@ public static class GameModes
         }
     }
     static List<Vector2Int> sameStatsLegs;
-    static readonly Dictionary<(CardData, Vector2Int), CardData> sameStatsCopies = new Dictionary<(CardData, Vector2Int), CardData>();
+
+    // The sprint speed per leg in the competition being played, or null (then physics is used on sprint too)
+    public static List<int> SameStatsSpeeds
+    {
+        get => sameStatsSpeeds;
+        set
+        {
+            sameStatsCopies.Clear();
+            sameStatsSpeeds = value != null && value.Count > 0 ? value : null;
+        }
+    }
+    static List<int> sameStatsSpeeds;
+
+    // The sprint speed of one leg, or CardData.NoValue
+    public static float SameStatsSpeedForLeg(int leg)
+    {
+        if (sameStatsLegs == null || sameStatsSpeeds == null) return CardData.NoValue;
+        return sameStatsSpeeds[Mathf.Clamp(leg, 0, sameStatsSpeeds.Count - 1)];
+    }
+    static readonly Dictionary<(CardData, Vector3Int), CardData> sameStatsCopies = new Dictionary<(CardData, Vector3Int), CardData>();
 
     public static bool SameStatsActive => sameStatsLegs != null;
 
@@ -221,6 +342,7 @@ public static class GameModes
     static void ResetSameStats()
     {
         sameStatsLegs = null;
+        sameStatsSpeeds = null;
         sameStatsCopies.Clear();
     }
 
@@ -230,19 +352,27 @@ public static class GameModes
     {
         Vector2Int? values = SameStatsForLeg(leg);
         if (values == null || cards == null) return cards;
+        float speed = SameStatsSpeedForLeg(leg);
         List<CardData> result = new List<CardData>(cards.Count);
         foreach (CardData card in cards)
         {
             if (card == null) continue;
-            var key = (card, values.Value);
+            var key = (card, new Vector3Int(values.Value.x, values.Value.y, Mathf.RoundToInt(speed)));
             if (!sameStatsCopies.TryGetValue(key, out CardData copy))
             {
-                copy = card.WithStats(values.Value.x, values.Value.y);
+                copy = card.WithStats(values.Value.x, values.Value.y, speed);
                 sameStatsCopies[key] = copy;
             }
             result.Add(copy);
         }
         return result;
+    }
+
+    // "Same stats": the runner a player runs as, named after the player, with the values of that leg
+    public static CardData SameStatsRunner(string playerName, int leg, bool man)
+    {
+        Vector2Int values = SameStatsForLeg(leg) ?? new Vector2Int(80, 80);
+        return new CardData(playerName, values.x, values.y, null, null, man ? "H21" : "D21", man, null) { sprintSpeed = SameStatsSpeedForLeg(leg) };
     }
 
     public static bool IsYourRunners(string mode) => !string.IsNullOrEmpty(mode) && mode.Contains(YourRunners);
@@ -255,20 +385,6 @@ public static class GameModes
 
     // In "Your runners" a relay can only be run when every player owns at least as many runners as it has legs.
     // Returns why not, or null when it is fine.
-    public static string RelayNeedsMoreRunners(CourseData course, string mode)
-    {
-        if (course == null || !course.IsRelay() || !IsYourRunners(mode)) return null;
-        foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
-        {
-            if (player.Object == null || !player.Object.IsValid) continue;
-            int owned = player.Object.HasStateAuthority ? RaceRunnerCount() : player.ownedRunners;
-            if (owned < course.legs)
-            {
-                string who = player.Object.HasStateAuthority ? "you only have" : player.nickName.ToString() + " only has";
-                return "\"" + course.name + "\" has " + course.legs + " legs, but " + who + " " + owned + (owned == 1 ? " runner" : " runners")
-                    + ". Choose a relay with fewer legs, or the runner pool \"Any runner\".";
-            }
-        }
-        return null;
-    }
+    // Since 2026-11-16 the missing runners are lent (RunnerRules.YourRunnersPool), so a relay can always be run.
+    public static string RelayNeedsMoreRunners(CourseData course, string mode) => null;
 }

@@ -99,6 +99,10 @@ public class PackOpening : MonoBehaviour
     const float CardScale = 1.1f;
     const float CardY = -14f;
     const float DroneVolume = 0.45f;
+    // The pack opening was loud next to the rest of the game (2026-11-15: a bit lower). The prefab keeps its own
+    // volume, so the lowering is here.
+    const float Quieter = 0.6f;
+    float Level => volume * Quieter;
     static readonly Vector2 ChipLeft = new Vector2(-700f, 405f);
     static readonly Vector2 ChipRight = new Vector2(650f, 405f);
     static readonly Vector2 ChipClub = new Vector2(-545f, 405f);   // next to the flag in the corner
@@ -235,7 +239,7 @@ public class PackOpening : MonoBehaviour
         yield return UIAnim.Run(1.1f, t =>
         {
             stageGroup.alpha = Mathf.Clamp01(t * 3f);
-            loop.volume = t * DroneVolume * volume;
+            loop.volume = t * DroneVolume * Level;
             float e = UIAnim.OutCubic(t);
             Place(pack, new Vector2(0, Mathf.Lerp(-950f, PackY, e)), Mathf.Lerp(0.45f, 1f, e), Mathf.Lerp(540f, 0f, e), Mathf.Lerp(-25f, 0f, e));
         });
@@ -686,7 +690,7 @@ public class PackOpening : MonoBehaviour
         pillar.gameObject.SetActive(false);
         shaker.localScale = Vector3.one;
         stageGroup.alpha = 1f;
-        loop.volume = DroneVolume * volume * 0.6f;
+        loop.volume = DroneVolume * Level * 0.6f;
 
         phase = Phase.Done;
         Sound(reveal, 1f);
@@ -958,7 +962,7 @@ public class PackOpening : MonoBehaviour
         source.spatialBlend = 0f;
         source.clip = hit;
         source.pitch = pitch;
-        source.volume = 0.9f * volume;
+        source.volume = 0.9f * Level;
         source.Play();
         Destroy(source, hit.length / pitch + 0.2f);
     }
@@ -967,7 +971,7 @@ public class PackOpening : MonoBehaviour
     {
         if (clip != null && sfx != null)
         {
-            sfx.PlayOneShot(clip, level * volume);
+            sfx.PlayOneShot(clip, level * Level);
         }
     }
 }

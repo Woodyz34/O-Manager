@@ -69,7 +69,7 @@ public static class ExtraModes
     public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
     // Modes that only work on individual courses, not relays
-    public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.Bears | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+    public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
     // Modes that only work in the forest, not on sprint courses (Imposter works on both)
     public const ExtraMode ForestOnly = ExtraMode.Bears | ExtraMode.MoveControl;
@@ -207,6 +207,10 @@ public static class ExtraModes
     }
 
     public static bool Is(ExtraMode mode) => (Active & mode) != 0;
+
+    // Imposter and Secret task: nobody may see who placed a bear or moved a control (it would give the imposter
+    // away); in the other modes the names are shown (2026-11-15)
+    public static bool HideOwners => (Active & ImposterKinds) != 0;
 
     static void Refresh()
     {

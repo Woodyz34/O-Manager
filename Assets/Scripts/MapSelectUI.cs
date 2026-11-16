@@ -20,7 +20,7 @@ public class MapSelectUI : MonoBehaviour
     TextMeshProUGUI statusText;
     TMP_InputField searchField;
     Button kindButton;
-    CourseFilter.Kind kind = CourseFilter.Kind.All;
+    readonly HashSet<string> types = new HashSet<string>();   // ticked course types; none = all
     bool fetching;
     float lastFetch = -999f;
     string fetchError;
@@ -78,18 +78,17 @@ public class MapSelectUI : MonoBehaviour
         searchField = CourseUI.Input("Search", searchRow, "Search courses (name, author, relay...)", 40, _ => PopulateMapList());
         CourseUI.Size(searchField, 52, 600);
         HoverTip.Add(searchField, "Search for a course by its name, its maker or its map.");
-        kindButton = CourseUI.Button("Kind", searchRow, CourseFilter.KindLabel(kind), CourseUI.ButtonKind.Light, () =>
+        kindButton = CourseUI.Button("Kind", searchRow, CourseFilter.TypesLabel(types), CourseUI.ButtonKind.Light, () =>
         {
-            ChoiceDropdown.Open((RectTransform)kindButton.transform, CourseFilter.KindNames, (int)kind, index =>
+            MultiSelectDropdown.Open((RectTransform)kindButton.transform, "Course type", CourseFilter.TypeOptions, types, false, null, () =>
             {
-                kind = (CourseFilter.Kind)index;
-                CourseUI.SetButtonText(kindButton, CourseFilter.KindLabel(kind));
-                CourseUI.SetButtonColor(kindButton, kind == CourseFilter.Kind.All ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
+                CourseUI.SetButtonText(kindButton, CourseFilter.TypesLabel(types));
+                CourseUI.SetButtonColor(kindButton, types.Count == 0 ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
                 PopulateMapList();
             });
         }, 22);
         CourseUI.Size(kindButton, 52, 270);
-        HoverTip.Add(kindButton, "Pick what to list: all courses, only individual courses, relays, forest or sprint courses.");
+        HoverTip.Add(kindButton, "Tick the course types to list, as many as you like: Relay + Sprint lists sprint relays. Nothing ticked lists all.");
 
         statusText = CourseUI.Text("Course status", mapSelectPanel.transform, "", 24, CourseUI.InkMuted, FontStyles.Italic, TextAlignmentOptions.Center);
         CourseUI.Place(statusText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -288), new Vector2(1400, 34));
@@ -180,7 +179,7 @@ public class MapSelectUI : MonoBehaviour
                 if (course.authorId != myId && !mineIds.Contains(course.id)) list.Add((course, "Community"));
 
         string search = searchField != null ? searchField.text : "";
-        list.RemoveAll(entry => !CourseFilter.Matches(entry.course, search, kind));
+        list.RemoveAll(entry => !CourseFilter.Matches(entry.course, search, types));
         // Courses on a map this computer does not have (a map someone imported on their own computer)
         list.RemoveAll(entry => !MapDefinition.Exists(entry.course.mapId));
         foreach (var entry in list)
@@ -199,7 +198,7 @@ public class MapSelectUI : MonoBehaviour
             statusText.text = fetchError;
         else if (shown == 0 && filter == Filter.Mine)
             statusText.text = "You have not made any courses yet. Make one with the Course builder in the main menu.";
-        else if (shown == 0 && ((searchField != null && searchField.text.Trim().Length > 0) || kind != CourseFilter.Kind.All))
+        else if (shown == 0 && ((searchField != null && searchField.text.Trim().Length > 0) || types.Count > 0))
             statusText.text = "No courses match the search.";
         else if (shown == 0)
             statusText.text = "No courses here yet.";

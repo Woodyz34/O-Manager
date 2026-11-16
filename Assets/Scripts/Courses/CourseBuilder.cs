@@ -109,6 +109,50 @@ public class CourseBuilder : MonoBehaviour
     readonly List<Mark> shadows = new List<Mark>();
     Mark dragging;
 
+    // A click (without dragging) on the start or a control picks it: the next controls are put in after it, in the
+    // middle of the course (pick control 3 and the new one becomes 4). -1 = after the start; null = at the end.
+    int? insertAfter;
+
+    // The pick, when it still fits the course (else it is let go)
+    int? InsertAfter()
+    {
+        if (!insertAfter.HasValue) return null;
+        EditCourse course = Cur;
+        int after = insertAfter.Value;
+        if (tool != Tool.Control || after < -1 || after >= course.items.Count - 1 || (after == -1 && !course.start.HasValue))
+        {
+            insertAfter = null;
+            return null;
+        }
+        return after;
+    }
+
+    Mark InsertAfterMark()
+    {
+        int? after = InsertAfter();
+        if (!after.HasValue) return null;
+        return after.Value < 0 ? marks.Find(m => m.type == MarkType.Start) : marks.Find(m => m.type == MarkType.Control && m.item == after.Value);
+    }
+
+    void PickInsertAfter(Mark mark)
+    {
+        int after = mark.type == MarkType.Start ? -1 : mark.item;
+        EditCourse course = Cur;
+        if (insertAfter == after || after >= course.items.Count - 1)
+        {
+            // Clicked again, or the last control (new ones go after it anyway): back to adding at the end
+            bool was = insertAfter.HasValue;
+            insertAfter = null;
+            SetStatus(was ? "New controls go at the end of the course again." : "", false);
+        }
+        else
+        {
+            insertAfter = after;
+            SetStatus("New controls go in after " + MarkName(mark) + ". Click it again (or press Esc) to add at the end again.", false);
+        }
+        cursorKey = null;
+    }
+
     // The drag: where the mark was grabbed, where it came from, and the same control on other legs (moved with it)
     Vector3 dragGrab, dragFrom, dragMouse;
     bool dragMoved, dragUndo;
@@ -148,7 +192,8 @@ public class CourseBuilder : MonoBehaviour
     (Vector3 point, CourseRenderer.MarkKind kind)? branchExit;
     string branchNextLabel = "";
     bool showOtherLegs = true;
-    Button otherLegsButton;
+    Button relaySettingsButton;
+    Button scratchButton;
     Button undoButton;
     Vector3 lastPanMouse;
     bool panning;
@@ -173,8 +218,6 @@ public class CourseBuilder : MonoBehaviour
     Button legSexButton;
     RectTransform legButtonRow;
     Button sameCourseButton;
-    Button forkModeButton;
-    TextMeshProUGUI relayInfo;
     GameObject canvasObject;
 
     const float PanelWidth = 560f;
@@ -388,6 +431,14 @@ public class CourseBuilder : MonoBehaviour
         Vector3 mouseWorld = mapCamera.ScreenToWorldPoint(Input.mousePosition);
         mouseWorld.z = -1f;
 
+        // Esc lets go of a picked control: new controls go at the end again
+        if (insertAfter.HasValue && !typing && Input.GetKeyDown(KeyCode.Escape))
+        {
+            insertAfter = null;
+            cursorKey = null;
+            SetStatus("New controls go at the end of the course again.", false);
+        }
+
         // Zoom towards the mouse
         float wheel = Input.mouseScrollDelta.y;
         if (!overUI && Mathf.Abs(wheel) > 0.01f)
@@ -455,6 +506,13 @@ public class CourseBuilder : MonoBehaviour
         {
             if (Input.GetMouseButtonDown(0) && !overUI) FinishMove(hover.kind == HoverKind.None ? mouseWorld : hover.point);
             else if (Input.GetMouseButtonUp(1) && !panning && !overUI) CancelMove();
+            return;
+        }
+
+        // F over the last control: it becomes the finish
+        if (!typing && hover.kind == HoverKind.Mark && IsLastControl(hover.mark) && Input.GetKeyDown(KeyCode.F))
+        {
+            MakeFinish(hover.mark.item);
             return;
         }
 
@@ -582,7 +640,8 @@ public class CourseBuilder : MonoBehaviour
         {
             drawn.Add(Ring(hover.mark, accent));
             string also = relay && hover.mark.type != MarkType.BranchControl ? LegsText(LinksAt(hover.mark.position)) : "";
-            tip = MarkName(hover.mark) + ": drag to move, right-click to remove" + (also.Length > 0 ? "\nSame control on " + also + ": it moves there too (hold Alt for this leg only)" : "");
+            tip = MarkName(hover.mark) + ": drag to move, right-click to remove"
+                + (IsLastControl(hover.mark) ? "\nPress F to make it the finish" : "") + (also.Length > 0 ? "\nSame control on " + also + ": it moves there too (hold Alt for this leg only)" : "");
         }
         else if (hover.kind == HoverKind.Fork)
         {
@@ -624,6 +683,18 @@ public class CourseBuilder : MonoBehaviour
                 from = branchTail;
                 to = branchExit;
             }
+            else if (InsertAfter().HasValue)
+            {
+                // Goes in after the picked control, before the one after it
+                int after = InsertAfter().Value;
+                label = (after + 2).ToString();
+                Vector3 before = after < 0 ? course.start.Value : course.items[after].point;
+                from = new List<(Vector3 point, CourseRenderer.MarkKind kind)> { (before, after < 0 ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control) };
+                EditItem next = course.items[after + 1];
+                if (next.fork < 0) to = (next.point, CourseRenderer.MarkKind.Control);
+                Mark picked = InsertAfterMark();
+                if (picked != null) drawn.Add(Ring(picked, CourseUI.Accent));
+            }
             else
             {
                 label = (course.items.Count + 1).ToString();
@@ -662,8 +733,16 @@ public class CourseBuilder : MonoBehaviour
             {
                 tip = "Click to add a control here, in between";
             }
+            else if (InsertAfter().HasValue && !moveType.HasValue && tool == Tool.Control)
+            {
+                tip = "Goes in after " + (InsertAfterMark() != null ? MarkName(InsertAfterMark()) : "the picked control");
+            }
         }
-        DrawCursor(drawn, lines, tip, tipIsError, hover.kind + " " + hover.point.x + " " + hover.point.y + " " + hover.fork + " " + tool + " " + moveType);
+        if (hover.kind == HoverKind.Mark && tool == Tool.Control && (hover.mark.type == MarkType.Start || (hover.mark.type == MarkType.Control && hover.mark.fork < 0)))
+        {
+            tip += "\nClick to put the next controls in after it";
+        }
+        DrawCursor(drawn, lines, tip, tipIsError, hover.kind + " " + hover.point.x + " " + hover.point.y + " " + hover.fork + " " + tool + " " + moveType + " " + insertAfter);
     }
 
     void DrawCursor(List<CourseRenderer.Mark> drawn, List<CourseRenderer.Line> lines, string tip, bool tipIsError, string what)
@@ -839,8 +918,11 @@ public class CourseBuilder : MonoBehaviour
         // Dropped: it must be somewhere a runner can stand, otherwise it goes back
         if (!dragMoved)
         {
+            Mark clicked = dragging;
             EndDrag(false);
             if (dragUndo) DropUndo();
+            if (tool == Tool.Control && (clicked.type == MarkType.Start || (clicked.type == MarkType.Control && clicked.fork < 0)))
+                PickInsertAfter(clicked);
             return;
         }
         string markName = MarkName(dragging);
@@ -957,6 +1039,7 @@ public class CourseBuilder : MonoBehaviour
     void Undo()
     {
         if (busy) return;
+        insertAfter = null;
         if (dragging != null)
         {
             // Ctrl+Z while dragging: the mark just goes back
@@ -1364,8 +1447,17 @@ public class CourseBuilder : MonoBehaviour
                 SetTool(Tool.Control);
                 break;
             case Tool.Control:
-                course.items.Add(new EditItem { point = world });
+            {
+                int? pickedAfter = InsertAfter();
+                if (pickedAfter.HasValue)
+                {
+                    // In the middle of the course, after the picked control; the next one goes after this one
+                    course.items.Insert(pickedAfter.Value + 1, new EditItem { point = world });
+                    insertAfter = pickedAfter.Value + 1;
+                }
+                else course.items.Add(new EditItem { point = world });
                 break;
+            }
             case Tool.Branch:
                 forks[branchFork].branches[branchIndex].Add(world);
                 break;
@@ -1402,9 +1494,34 @@ public class CourseBuilder : MonoBehaviour
         }
     }
 
+    // The last control of the course (not on a fork): it can be turned into the finish (2026-11-16: before, it had to be
+    // removed and a finish put in its place)
+    bool IsLastControl(Mark mark)
+    {
+        EditCourse course = Cur;
+        return mark != null && mark.type == MarkType.Control && mark.item >= 0 && mark.item == course.items.Count - 1
+            && course.items[mark.item].fork < 0;
+    }
+
+    void MakeFinish(int item)
+    {
+        EditCourse course = Cur;
+        if (item < 0 || item >= course.items.Count || course.items[item].fork >= 0) return;
+        PushUndo();
+        insertAfter = null;
+        cursorKey = null;
+        bool hadFinish = course.finish.HasValue;
+        course.finish = course.items[item].point;
+        course.items.RemoveAt(item);
+        errorPoint = null;
+        SetStatus(hadFinish ? "The last control is the finish now (the old finish was removed)." : "The last control is the finish now.", false);
+        Redraw();
+    }
+
     void RemoveMark(Mark mark)
     {
         PushUndo();
+        insertAfter = null;
         EditCourse course = Cur;
         switch (mark.type)
         {
@@ -1825,13 +1942,15 @@ public class CourseBuilder : MonoBehaviour
 
     void SelectLeg(int leg)
     {
+        insertAfter = null;
         selectedLeg = Mathf.Clamp(leg, 0, legs - 1);
         CopyStartAndFinishFromLegBefore();
         EditCourse course = Cur;
         errorPoint = null;
         dragging = null;
         SetTool(!course.start.HasValue ? Tool.Start : Tool.Control);
-        SetStatus("", false);
+        SetStatus(statusAfterSelect ?? "", false);
+        statusAfterSelect = null;
         Redraw();
     }
 
@@ -1939,16 +2058,15 @@ public class CourseBuilder : MonoBehaviour
             button.GetComponentInChildren<TextMeshProUGUI>().enableWordWrapping = true;
         }
         sameCourseButton.gameObject.SetActive(selectedLeg > 0);
+        scratchButton.gameObject.SetActive(selectedLeg > 0 && Cur.items.Count > 0);
         bool same = selectedLeg > 0 && legCourse[selectedLeg] == legCourse[selectedLeg - 1];
         CourseUI.SetButtonText(sameCourseButton, same ? "Give leg " + (selectedLeg + 1) + " its own course" : "Same course as leg " + selectedLeg);
         LegSex selectedSex = SexOf(selectedLeg);
         CourseUI.SetButtonText(legSexButton, "Leg " + (selectedLeg + 1) + " runners: " + (selectedSex == LegSex.Any ? "Anyone" : selectedSex == LegSex.Women ? "Women" : "Men"));
         CourseUI.SetButtonColor(legSexButton, selectedSex == LegSex.Any ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
-        CourseUI.SetButtonText(forkModeButton, forkEveryVariant ? "Every team runs every branch" : "Branches are random");
-        CourseUI.SetButtonText(otherLegsButton, showOtherLegs ? "Other legs: shown faded" : "Other legs: only their forks");
-        relayInfo.text = "Each leg has its own course. Turn a control into a fork with \"Fork\" in the control list; a branch can have several controls, or none.\n"
-            + "Faded marks are the other legs. Bring a control to one and it clicks into place: on a plain control it becomes the same control, on a fork's control (F1A...) the whole fork goes on this leg. "
-            + (forkEveryVariant ? "Every team runs every branch of a fork once, so a fork needs as many legs as branches." : "Each team gets a random branch of every fork.");
+        bool usual = forkEveryVariant && showOtherLegs;
+        CourseUI.SetButtonText(relaySettingsButton, usual ? "Settings" : "Settings (changed)");
+        CourseUI.SetButtonColor(relaySettingsButton, usual ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
     }
 
     // ---- Clearing, checking and saving ----
@@ -2188,11 +2306,13 @@ public class CourseBuilder : MonoBehaviour
         if (leg == selectedLeg) return;
         selectedLeg = leg;
         CopyStartAndFinishFromLegBefore();
+        statusAfterSelect = null;
         dragging = null;
         SetTool(Cur.start.HasValue ? Tool.Control : Tool.Start);
     }
 
-    // A new leg starts with the same start and finish as the leg before, since relays usually share them
+    // A new leg starts as a copy of the leg before (2026-11-16: whole course, before only start and finish);
+    // "Start from scratch" clears the controls again
     void CopyStartAndFinishFromLegBefore()
     {
         EditCourse course = Cur;
@@ -2201,7 +2321,30 @@ public class CourseBuilder : MonoBehaviour
             EditCourse before = courses[legCourse[selectedLeg - 1]];
             course.start = before.start;
             course.finish = before.finish;
+            course.finishTv = before.finishTv;
+            foreach (EditItem item in before.items) course.items.Add(new EditItem { fork = item.fork, point = item.point, tv = item.tv });
+            if (before.items.Count > 0)
+                statusAfterSelect = "Leg " + (selectedLeg + 1) + " starts as a copy of leg " + selectedLeg + ". Change what you like, or press \"Start from scratch\".";
         }
+    }
+
+    string statusAfterSelect;
+
+    // Clears the selected leg's controls; start and finish stay
+    void StartLegFromScratch()
+    {
+        EditCourse course = Cur;
+        if (selectedLeg == 0 || course.items.Count == 0) return;
+        PushUndo();
+        if (legCourse[selectedLeg] == legCourse[selectedLeg - 1])
+        {
+            EditCourse own = new EditCourse { start = course.start, finish = course.finish, finishTv = course.finishTv };
+            courses.Add(own);
+            legCourse[selectedLeg] = courses.Count - 1;
+        }
+        else course.items.Clear();
+        SelectLeg(selectedLeg);
+        SetStatus("Leg " + (selectedLeg + 1) + " has no controls now. Start and finish are kept.", false);
     }
 
     async void OnSave()
@@ -2373,6 +2516,7 @@ public class CourseBuilder : MonoBehaviour
 
     void SetTool(Tool chosen)
     {
+        if (chosen != Tool.Control) insertAfter = null;
         bool wasForbidden = tool == Tool.Forbidden;
         if (wasForbidden && chosen != Tool.Forbidden) CloseOpenArea();
         draggingCorner = false;
@@ -2598,14 +2742,13 @@ public class CourseBuilder : MonoBehaviour
         HoverTip.Add(newCourse, "Clear everything and start a new course. You can undo it.");
         HoverTip.Add(sameCourseButton, "Use the same course on this leg as on the leg before it, or give this leg its own course.");
         HoverTip.Add(legSexButton, "Who may run this leg: anyone, only women or only men. Click to change.");
-        HoverTip.Add(forkModeButton, "Click to switch. Random: each team gets a random branch of every fork. Every branch: each team runs every branch once, so a fork needs as many legs as it has branches.");
-        HoverTip.Add(otherLegsButton, "Show the other legs' controls faded on the map, so you can line the legs up, or hide them.");
+        HoverTip.Add(relaySettingsButton, "Fork mode (every team runs every branch, or random branches) and how the other legs show on the map.");
     }
 
     void BuildRelayPanel(Transform canvas)
     {
         relayPanel = CourseUI.CardPanel("Relay panel", canvas);
-        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 708));
+        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 534));
         CourseUI.Column(relayPanel.gameObject, 10, new RectOffset(22, 22, 20, 20));
 
         TextMeshProUGUI title = CourseUI.Text("Title", relayPanel.transform, "Relay", 32, CourseUI.Ink, FontStyles.Bold);
@@ -2637,18 +2780,18 @@ public class CourseBuilder : MonoBehaviour
         sameCourseButton = CourseUI.Button("Same course", relayPanel.transform, "", CourseUI.ButtonKind.Light, ToggleSameCourse, 19);
         CourseUI.Size(sameCourseButton, 44);
 
+        scratchButton = CourseUI.Button("Start from scratch", relayPanel.transform, "Start this leg from scratch", CourseUI.ButtonKind.Light, StartLegFromScratch, 19);
+        CourseUI.Size(scratchButton, 44);
+        HoverTip.Add(scratchButton, "A new leg starts as a copy of the leg before. This removes its controls so you can lay it from the start; start and finish stay.");
+
         // Women's, men's or open leg (2026-11-13); W/M on the leg buttons
         legSexButton = CourseUI.Button("Leg runners", relayPanel.transform, "", CourseUI.ButtonKind.Light, CycleLegSex, 19);
         CourseUI.Size(legSexButton, 44);
 
-        forkModeButton = CourseUI.Button("Fork mode", relayPanel.transform, "", CourseUI.ButtonKind.Secondary, ToggleForkMode, 20);
-        CourseUI.Size(forkModeButton, 44);
-
-        otherLegsButton = CourseUI.Button("Other legs", relayPanel.transform, "", CourseUI.ButtonKind.Light, () => { showOtherLegs = !showOtherLegs; Redraw(); }, 19);
-        CourseUI.Size(otherLegsButton, 44);
-
-        relayInfo = CourseUI.Text("Info", relayPanel.transform, "", 17, CourseUI.InkMuted);
-        CourseUI.Size(relayInfo, 150);
+        // Fork mode and other legs moved into a popup (2026-11-16): the defaults fit almost every relay
+        relaySettingsButton = CourseUI.Button("Relay settings", relayPanel.transform, "Settings", CourseUI.ButtonKind.Light,
+            () => RelaySettingsPopup.Open(() => forkEveryVariant, ToggleForkMode, () => showOtherLegs, () => { showOtherLegs = !showOtherLegs; Redraw(); }), 19);
+        CourseUI.Size(relaySettingsButton, 44);
 
         relayPanel.gameObject.SetActive(relay);
     }
@@ -2684,13 +2827,21 @@ public class CourseBuilder : MonoBehaviour
                         ("Fork", CourseUI.ButtonKind.Secondary, () => MakeFork(index)),
                         ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
                         ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
+                    if (index == course.items.Count - 1) AddRow("", 30, CourseUI.Ink, FontStyles.Normal, 34,
+                        ("Make finish", CourseUI.ButtonKind.Light, () => MakeFinish(index)));
                     if (item.tv) AddTvRow(item.point);
                 }
                 else
                 {
-                    AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
-                        ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
-                        ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
+                    if (index == course.items.Count - 1)
+                        AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
+                            ("Finish", CourseUI.ButtonKind.Light, () => MakeFinish(index)),
+                            ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
+                            ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
+                    else
+                        AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
+                            ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
+                            ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
                 }
                 previous = item.point;
                 continue;

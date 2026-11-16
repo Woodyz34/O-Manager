@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -202,9 +203,12 @@ public class MainMenuUI : MonoBehaviour
         }
     }
 
+    // The shown percentages always add up to 100: each tier is rounded, and the most common tier shown last
+    // (usually Bronze) takes what is left (a friend saw 101% after the odds changed with the runners he owned).
     static string OddsText()
     {
-        StringBuilder text = new StringBuilder();
+        List<RunnerTier> tiers = new List<RunnerTier>();
+        List<int> percents = new List<int>();
         for (int i = (int)RunnerTier.Elite; i >= 0; i--)
         {
             RunnerTier tier = (RunnerTier)i;
@@ -213,10 +217,22 @@ public class MainMenuUI : MonoBehaviour
             {
                 continue;
             }
+            tiers.Add(tier);
+            percents.Add(Mathf.Max(1, Mathf.RoundToInt(chance * 100f)));
+        }
+        if (percents.Count > 0)
+        {
+            int others = 0;
+            for (int i = 0; i < percents.Count - 1; i++) others += percents[i];
+            percents[percents.Count - 1] = Mathf.Max(1, 100 - others);
+        }
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < tiers.Count; i++)
+        {
             if (text.Length > 0) text.Append("   ");
-            string name = RunnerCards.TierName(tier);
+            string name = RunnerCards.TierName(tiers[i]);
             text.Append("<b>").Append(name[0]).Append(name.Substring(1).ToLowerInvariant()).Append("</b> ");
-            text.Append(Mathf.RoundToInt(chance * 100f)).Append("%");
+            text.Append(percents[i]).Append("%");
         }
         return text.ToString();
     }

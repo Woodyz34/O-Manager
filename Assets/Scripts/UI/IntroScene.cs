@@ -58,6 +58,7 @@ public class IntroScene : MonoBehaviour
         sound = gameObject.AddComponent<AudioSource>();
         sound.playOnAwake = false;
         sound.spatialBlend = 0f;
+        sound.volume = 0.75f;
         sound.clip = Resources.Load<AudioClip>("Intro/intro_sound");
 
 #if UNITY_STANDALONE_LINUX && !UNITY_EDITOR

@@ -104,6 +104,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
             points.Add(point);
         }
         pathfinding.controlPoints = points;
+        pathfinding.MoveControlsOntoRunnableGround();   // nothing until the grid is loaded; PathfindingManager.Awake does leg 1
         pathfinding.startPoint = points[0].position;
         courseRenderer.Draw(map, legCourse);
     }
@@ -139,6 +140,20 @@ public class RelayRace : MonoBehaviour, IRaceStats
         RunnerFilterBar.ClearRules();
         if (pickHeader != null) pickHeader.transform.parent.gameObject.SetActive(false);
         return true;
+    }
+
+    // "Same stats": no picking. The team runs every leg as the player, with that leg's values; a women's leg gets a
+    // woman (she runs at the women's pace, as any woman with the same values would).
+    public void PickSameStatsTeam(string playerName)
+    {
+        picks.Clear();
+        for (int legIndex = 0; legIndex < course.legs; legIndex++)
+        {
+            LegSex sex = LegSexes[Mathf.Clamp(legIndex, 0, LegSexes.Count - 1)];
+            picks.Add(GameModes.SameStatsRunner(playerName, legIndex, sex != LegSex.Women));
+        }
+        RunnerFilterBar.ClearRules();
+        if (pickHeader != null) pickHeader.transform.parent.gameObject.SetActive(false);
     }
 
     // The runners the team picks from (without "Same stats" values): the player's own (and lent) runners in
@@ -233,7 +248,9 @@ public class RelayRace : MonoBehaviour, IRaceStats
         if (cap.Length > 0) rules += "   <color=#E8742A>" + cap + "</color>";
         // "Same stats": the values every runner gets on this leg
         Vector2Int? values = GameModes.SameStatsForLeg(picks.Count);
-        string stats = values != null ? "   <color=#E8742A>Speed " + values.Value.x + ", technique " + values.Value.y + "</color>" : "";
+        float sprint = GameModes.SameStatsSpeedForLeg(picks.Count);
+        string stats = values != null ? "   <color=#E8742A>Physics " + values.Value.x + ", speed " + (sprint >= 0f ? Mathf.RoundToInt(sprint) : values.Value.x)
+            + ", technique " + values.Value.y + "</color>" : "";
         pickHeader.text = "<b><size=120%>" + LegDescription(picks.Count) + "</size></b>" + stats + rules + team;
     }
 
@@ -283,6 +300,8 @@ public class RelayRace : MonoBehaviour, IRaceStats
             np.relayRunnerName = runner != null ? runner.RunnerName : "";
             np.relaySplitLeg = leg;
             np.relaySplitCount = 0;
+            // Bears: the last leg's bear goes back, a new one can be hidden on this leg (2026-11-16)
+            np.bearPlaced = false;
         }
 
         agent.manualPathDrawer.BeginRelayLeg();
@@ -456,7 +475,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     int statsDueForLeg = -1;
     bool statsDueFinal;
     float statsDueSince;
-    const float StatsLongestWait = 10f;
+    const float StatsLongestWait = 18f;   // the whole finish shot (TvDirector.FinishLongest + FinishHold) fits
 
     void AskForStats(bool final)
     {
@@ -521,30 +540,26 @@ public class RelayRace : MonoBehaviour, IRaceStats
         if (hud != null) return;
         GameObject canvas = GameObject.FindGameObjectWithTag("Canvas");
         if (canvas == null) return;
-        // A compact box under the timer (top right), so the map and the control are never covered
+        // A compact box under the timer (top right), so the map and the control are never covered.
+        // 2026-11-16: only the leg facts and what to draw; the runner and stats are on the leaderboard.
+        // It grows with its text and is hidden while the leg is run.
         Image panel = CourseUI.CardPanel("Relay HUD", canvas.transform);
         hud = panel.gameObject;
-        CourseUI.Place(panel.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32, -112), new Vector2(330, 270));
+        CourseUI.Place(panel.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32, -112), new Vector2(300, 100));
+        CourseUI.Column(hud, 6, new RectOffset(14, 14, 10, 10));
+        ContentSizeFitter fit = hud.AddComponent<ContentSizeFitter>();
+        fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        legText = CourseUI.Text("Leg", panel.transform, "", 20, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Place(legText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0, -12), new Vector2(-32, 118));
-        legText.rectTransform.anchorMin = new Vector2(0f, 1f);
-        legText.rectTransform.anchorMax = new Vector2(1f, 1f);
-        legText.rectTransform.offsetMin = new Vector2(16, -134);
-        legText.rectTransform.offsetMax = new Vector2(-16, -12);
+        legText = CourseUI.Text("Leg", panel.transform, "", 18, CourseUI.Ink, FontStyles.Bold);
         legText.alignment = TextAlignmentOptions.TopLeft;
         legText.enableWordWrapping = true;
 
-        hangButton = CourseUI.Button("Hang", panel.transform, "", CourseUI.ButtonKind.Secondary, ToggleHang, 18);
-        CourseUI.Place((RectTransform)hangButton.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -140), new Vector2(298, 44));
+        hangButton = CourseUI.Button("Hang", panel.transform, "", CourseUI.ButtonKind.Secondary, ToggleHang, 17);
+        CourseUI.Size(hangButton, 38);
 
-        statusText = CourseUI.Text("Status", panel.transform, "", 17, CourseUI.InkMuted);
-        statusText.rectTransform.anchorMin = new Vector2(0f, 0f);
-        statusText.rectTransform.anchorMax = new Vector2(1f, 0f);
-        statusText.rectTransform.pivot = new Vector2(0.5f, 0f);
-        statusText.rectTransform.offsetMin = new Vector2(16, 10);
-        statusText.rectTransform.offsetMax = new Vector2(-16, 80);
+        statusText = CourseUI.Text("Status", panel.transform, "", 16, CourseUI.InkMuted);
         statusText.alignment = TextAlignmentOptions.TopLeft;
+        statusText.enableWordWrapping = true;
     }
 
     // The choice is made while drawing, never during the race
@@ -561,15 +576,8 @@ public class RelayRace : MonoBehaviour, IRaceStats
     void RefreshHud()
     {
         if (hud == null || leg < 0) return;
-        CardData runner = picks.Count > 0 ? picks[Mathf.Min(leg, picks.Count - 1)] : null;
-        string text = runner != null ? runner.RunnerName + "\n" : "";
-        text += "<size=85%><color=#5B7563>Leg " + (leg + 1) + " of " + course.legs + "  ·  " + (LegIsStraight ? "straight" : "forked") + "\n"
-            + CourseData.KmText(route.course.LengthMeters()) + "  ·  " + route.course.controls.Count + " controls</color></size>";
-        if (runner != null)
-        {
-            text += "\n<size=85%><color=#5B7563>Physics " + Mathf.RoundToInt(runner.physics) + "  ·  Speed " + runner.SprintSpeedText + "  ·  Technique " + Mathf.RoundToInt(runner.technique) + "</color></size>";
-        }
-        legText.text = text;
+        legText.text = "Leg " + (leg + 1) + " of " + course.legs + "  ·  " + (LegIsStraight ? "straight" : "forked") + "\n"
+            + "<size=88%><color=#5B7563>" + CourseData.KmText(route.course.LengthMeters()) + "  ·  " + route.course.controls.Count + " controls</color></size>";
         bool showHang = LegIsStraight && !raceStarted;
         hangButton.gameObject.SetActive(showHang);
         CourseUI.SetButtonText(hangButton, hangEnabled ? "Hang on: follow faster runners" : "Hang on: own route");
@@ -602,6 +610,11 @@ public class RelayRace : MonoBehaviour, IRaceStats
             text = hangEnabled ? "Running alone. You hang on to anyone who passes you." : "Running alone.";
         }
         statusText.text = text;
+        statusText.gameObject.SetActive(text != "");
+        // Hidden while running the leg: the leaderboard shows the rest (2026-11-16)
+        bool running = raceStarted && waitMessage == "" && legMessage == "";
+        bool show = !running && statsShownForLeg < leg && !CompetitionFlow.ResultsShown;
+        if (hud.activeSelf != show) hud.SetActive(show);
     }
 
     static bool AllTeamsFinished(int legIndex)

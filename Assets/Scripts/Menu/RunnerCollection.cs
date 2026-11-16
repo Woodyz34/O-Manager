@@ -153,15 +153,19 @@ public static class RunnerCollection
     }
 
     // ---- Runners on loan ----
-    // "Your runners" with fewer than 10 runners of your own: the game lends random runners up to 10 for this round
-    // (none if you have 10 or more). They are not added to the collection and are gone after the round.
-    public const int RaceMinimum = 10;
+    // Runners the player only has for this round; never added to the collection, gone after the round.
+    // Since 2026-11-16 "Your runners" lends only what is missing: one runner when the player owns none, and in a
+    // relay the runners (and women or men) the legs need (RunnerRules.YourRunnersPool). It used to fill up to 10.
+    // "Random runners" lends the host's number of random runners and the player picks only among those.
+    public const int RaceMinimum = 1;
     static List<CardData> loans;
+    static bool randomLent;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void InitLoans()
     {
         loans = null;
+        randomLent = false;
         UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
         UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
     }
@@ -171,36 +175,47 @@ public static class RunnerCollection
     {
         if (mode == UnityEngine.SceneManagement.LoadSceneMode.Additive) return;
         string n = scene.name;
-        if (n == "Lobby" || n == "MainMenu" || n == "SingelPlayer" || n == "NewCompetition" || n == "MultiPlayer") loans = null;
+        if (n == "Lobby" || n == "MainMenu" || n == "SingelPlayer" || n == "NewCompetition" || n == "MultiPlayer")
+        {
+            loans = null;
+            randomLent = false;
+        }
     }
 
     public static bool IsOnLoan(string runnerName) => loans != null && loans.Exists(c => c.RunnerName == runnerName);
 
-    // The runners the player can race with in "Your runners": their own, plus random ones on loan up to 10
+    // The runners the player can race with in "Your runners": their own, plus the ones lent for this round.
+    // In "Random runners" (RunnerRules.RandomCount) only the random runners lent for the round.
     public static List<CardData> CardsForRace()
     {
-        List<CardData> owned = OwnedCards();
-        if (owned.Count >= RaceMinimum)
+        if (loans == null) loans = new List<CardData>();
+        System.Random random = new System.Random();
+        int randomCount = RunnerRules.RandomCount;
+        if (randomCount > 0)
         {
-            // Runners lent for the relay's rules (RunnerRules.YourRunnersPool) come on top
-            if (loans != null && loans.Count > 0) owned.AddRange(loans.FindAll(c => !owned.Exists(o => o.RunnerName == c.RunnerName)));
-            return owned;
-        }
-        if (loans == null)
-        {
-            List<CardData> free = RunnerCards.InPacks().FindAll(c => !Owns(c.RunnerName));
-            System.Random random = new System.Random();
-            loans = new List<CardData>();
-            while (loans.Count < RaceMinimum - owned.Count && free.Count > 0)
+            if (!randomLent)
             {
-                int i = random.Next(free.Count);
-                loans.Add(free[i]);
-                free.RemoveAt(i);
+                randomLent = true;
+                List<CardData> every = RunnerCards.InPacks();
+                while (loans.Count < randomCount && every.Count > 0)
+                {
+                    int i = random.Next(every.Count);
+                    if (!loans.Exists(c => c.RunnerName == every[i].RunnerName)) loans.Add(every[i]);
+                    every.RemoveAt(i);
+                }
             }
+            return new List<CardData>(loans);
         }
-        List<CardData> all = new List<CardData>(owned);
-        all.AddRange(loans);
-        return all;
+
+        List<CardData> owned = OwnedCards();
+        // Owns no runner at all: one random runner on loan (woman or man)
+        if (owned.Count == 0 && loans.Count == 0)
+        {
+            List<CardData> free = RunnerCards.InPacks();
+            if (free.Count > 0) loans.Add(free[random.Next(free.Count)]);
+        }
+        owned.AddRange(loans.FindAll(c => !owned.Exists(o => o.RunnerName == c.RunnerName)));
+        return owned;
     }
 
     // Lends these runners too for this round (a relay with women's or men's legs, or a max average overall, that
@@ -211,7 +226,7 @@ public static class RunnerCollection
         if (loans == null) loans = new List<CardData>();
         foreach (CardData card in cards)
         {
-            if (card != null && !Owns(card.RunnerName) && !loans.Exists(c => c.RunnerName == card.RunnerName)) loans.Add(card);
+            if (card != null && (RunnerRules.RandomCount > 0 || !Owns(card.RunnerName)) && !loans.Exists(c => c.RunnerName == card.RunnerName)) loans.Add(card);
         }
     }
 

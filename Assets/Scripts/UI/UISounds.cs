@@ -18,8 +18,8 @@ using UnityEngine.UI;
 [DefaultExecutionOrder(-32000)]
 public class UISounds : MonoBehaviour
 {
-    const float ClickVolume = 0.55f;
-    const float StartVolume = 0.7f;
+    const float ClickVolume = 0.4f;   // 2026-11-15: all a bit lower
+    const float StartVolume = 0.5f;
     const float DragLimit = 25f;     // a press that moves further than this is a drag (scrolling), not a click
 
     static UISounds instance;

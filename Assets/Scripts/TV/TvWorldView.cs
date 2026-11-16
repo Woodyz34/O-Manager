@@ -347,6 +347,7 @@ public class TvWorldView : MonoBehaviour
         public Color color;
         public float x, z;      // metres from the control, east and north
         public bool finishing;  // finished in the race already: runs the last metres to the finish unit on its own
+        public bool mayPunch;   // on its way to this control; a runner only passing by does not go up to the flag
     }
 
     readonly Dictionary<object, TvStickFigure> figures = new Dictionary<object, TvStickFigure>();
@@ -385,6 +386,7 @@ public class TvWorldView : MonoBehaviour
                 figures[r.key] = figure;
             }
             figure.finishing = r.finishing;
+            figure.mayPunch = r.mayPunch || r.finishing;
             ToThePunch(figure, r.x, r.z);
             // Round the trees and stones with room to spare, and smoothly: the runner swerves, it does not bump
             float px = figure.shownX, pz = figure.shownZ;
@@ -495,7 +497,7 @@ public class TvWorldView : MonoBehaviour
                 // Every runner that comes near punches: within 16 m whatever way it is heading, or when it has
                 // passed its nearest point a little further off
                 if (toUnit < f.nearest) f.nearest = toUnit;
-                if (toUnit < 16f || (f.nearest < 32f && toUnit > f.nearest + 1.5f) || f.finishing) f.punch = 1;
+                if (f.mayPunch && (toUnit < 16f || (f.nearest < 32f && toUnit > f.nearest + 1.5f) || f.finishing)) f.punch = 1;
             }
             if (toUnit > 45f && !f.punched) f.nearest = float.MaxValue;
         }
