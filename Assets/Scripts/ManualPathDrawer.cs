@@ -167,7 +167,7 @@ public class ManualPathDrawer : MonoBehaviour
                     }
 
                     // Check reach target
-                    if (Vector3.Distance(worldPos, targetControl.position) < manager.cellSize)
+                    if (ReachedTarget(worldPos))
                     {
                         Debug.Log("har ritat färdigt");
                         // A tick at the control, so it is clear the stretch is drawn
@@ -532,12 +532,23 @@ public class ManualPathDrawer : MonoBehaviour
     int firstOpen = -1;   // gridPath index of the first cell the runner can run on (-1: the line is still on closed ground)
 
     // Closed ground right at the control the line goes to: the control may stand by a wall, the line ends in it anyway
+    // (2026-11-16: anywhere inside the control's circle. On a sprint map the circle is 11 m round, and a line drawn into
+    // it past the corner of a house was stopped 4-5 cells from the middle, so the control could not be taken.)
     bool AtTarget(Vector2Int g)
     {
         if (targetControl == null) return false;
         Vector2Int t = WorldToGrid(targetControl.position);
-        int reach = CourseValidator.PunchReachCells + 1;
-        return Mathf.Abs(g.x - t.x) <= reach && Mathf.Abs(g.y - t.y) <= reach;
+        float reach = Mathf.Max(CourseValidator.PunchReachCells + 1, CircleRadiusWorld / manager.cellSize);
+        return (g - t).sqrMagnitude <= reach * reach;
+    }
+
+    // The radius of the control circles as drawn on this map
+    float CircleRadiusWorld => CourseRenderer.DefaultControlRadiusMeters * MapDefinition.WorldUnitsPerMeter * CourseRenderer.SizeFor(CourseLoader.LoadedMap);
+
+    // The line has got to the control: within half the circle (at least a cell) of its middle
+    bool ReachedTarget(Vector3 worldPos)
+    {
+        return Vector3.Distance(worldPos, targetControl.position) < Mathf.Max(manager.cellSize, CircleRadiusWorld * 0.5f);
     }
 
     // Adds one cell of the drawn line and checks closed ground. Returns false when the line was stopped.
