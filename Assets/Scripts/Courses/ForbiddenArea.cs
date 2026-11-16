@@ -35,7 +35,7 @@ public static class ForbiddenAreas
 
     // Closes every cell an area covers: cells whose centre is inside, and every cell the border runs through, so
     // even a narrow area is a wall the runners can not slip through. Returns how many cells were closed.
-    public static int Block(float[,] speed, MapDefinition map, List<ForbiddenArea> areas)
+    public static int Block(float[,] speed, MapDefinition map, List<ForbiddenArea> areas, HashSet<int> purpleCells = null)
     {
         if (speed == null || map == null || areas == null) return 0;
         int rows = speed.GetLength(0), cols = speed.GetLength(1);
@@ -58,6 +58,7 @@ public static class ForbiddenAreas
             shapes.Add((poly, area.line));
         }
         closed -= OpenGaps(speed, map, shapes, changed);
+        if (purpleCells != null) foreach (var c in changed) purpleCells.Add(c.Key);
         return closed;
     }
 
@@ -197,6 +198,10 @@ public static class ForbiddenAreas
         return copy;
     }
 
+    // The cells (row * cols + column) the competition's purple areas and lines closed: the drawing is as strict there
+    // as at a fence, whatever ground is under them (ManualPathDrawer)
+    public static readonly HashSet<int> CompetitionCells = new HashSet<int>();
+
     // In the competition: close the areas of the course being run in the grid every runner uses
     public static void ApplyToCompetition(PathfindingManager manager)
     {
@@ -206,7 +211,8 @@ public static class ForbiddenAreas
         string gridName = manager.jsonFileName ?? "";
         if (gridName.EndsWith(".json")) gridName = gridName.Substring(0, gridName.Length - 5);
         if (gridName != map.gridName) return;   // a scene that runs another map
-        int closed = Block(manager.speedGrid2D, map, course.forbidden);
+        CompetitionCells.Clear();
+        int closed = Block(manager.speedGrid2D, map, course.forbidden, CompetitionCells);
         Debug.Log("ForbiddenAreas: closed " + closed + " grid cells for " + course.forbidden.Count + " out-of-bounds areas and uncrossable boundaries");
     }
 

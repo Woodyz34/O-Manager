@@ -501,6 +501,34 @@ public class ManualPathDrawer : MonoBehaviour
     const int SprintDetourMargin = 4;
     const int SprintExtraDetourCells = 4;
 
+    // Gardens (olive green) and houses are half as strict (2026-11-16: the line stopped at the corner of a tiny house or
+    // a bit of garden); fences, walls, cliffs and purple barriers stay as strict as before
+    const float SoftCellWeight = 0.5f;
+
+    bool SoftCell(Vector2Int c)
+    {
+        MapDefinition map = CourseLoader.LoadedMap;
+        if (map == null || manager == null || manager.speedGrid2D == null) return false;
+        string gridName = manager.jsonFileName ?? "";
+        if (gridName.EndsWith(".json")) gridName = gridName.Substring(0, gridName.Length - 5);
+        if (gridName != map.gridName) return false;
+        return SoftGround.IsSoft(map, c, manager.speedGrid2D.GetLength(0), manager.speedGrid2D.GetLength(1), ForbiddenAreas.CompetitionCells);
+    }
+
+    // How much closed ground the line has crossed since blockedFrom: soft cells count half
+    float ClosedWeight(int upTo, out int softCells)
+    {
+        float weight = 0f;
+        softCells = 0;
+        for (int i = blockedFrom + 1; i <= upTo && i < gridPath.Count; i++)
+        {
+            if (Passable(gridPath[i])) continue;
+            if (SoftCell(gridPath[i])) { weight += SoftCellWeight; softCells++; }
+            else weight += 1f;
+        }
+        return weight;
+    }
+
     int firstOpen = -1;   // gridPath index of the first cell the runner can run on (-1: the line is still on closed ground)
 
     // Closed ground right at the control the line goes to: the control may stand by a wall, the line ends in it anyway
@@ -534,8 +562,8 @@ public class ManualPathDrawer : MonoBehaviour
                 blockedFrom = gridPath.Count - 2;   // the last good cell
             }
             else if (!open && blockedFrom >= 0 && !AtTarget(g) &&
-                     (strict ? gridPath.Count - 1 - blockedFrom > SprintMaxClosedCells
-                             : (gridPath.Count - 1 - blockedFrom) * manager.cellSize > 2f * CorrectionMeters * MapDefinition.WorldUnitsPerMeter))
+                     (strict ? ClosedWeight(gridPath.Count - 1, out _) > SprintMaxClosedCells
+                             : ClosedWeight(gridPath.Count - 1, out _) * manager.cellSize > 2f * CorrectionMeters * MapDefinition.WorldUnitsPerMeter))
             {
                 StopLine();
                 return false;
@@ -543,8 +571,9 @@ public class ManualPathDrawer : MonoBehaviour
             else if (open && blockedFrom >= 0)
             {
                 int closedCells = gridPath.Count - 2 - blockedFrom;
-                List<Vector2Int> way = SearchInBox(gridPath[blockedFrom], g, strict ? SprintDetourMargin : CorrectionCells, null);
-                bool tooLong = strict && way != null && way.Count > closedCells + 2 + SprintExtraDetourCells;
+                ClosedWeight(gridPath.Count - 2, out int softCells);
+                List<Vector2Int> way = SearchInBox(gridPath[blockedFrom], g, strict ? SprintDetourMargin + softCells : CorrectionCells, null);
+                bool tooLong = strict && way != null && way.Count > closedCells + 2 + SprintExtraDetourCells + softCells;
                 if (way == null || way.Count == 0 || tooLong)
                 {
                     StopLine();
