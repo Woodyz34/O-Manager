@@ -27,6 +27,7 @@ public class DrawnMark : MonoBehaviour
         mark.tick.SetPosition(0, new Vector3(-r * 0.55f, 0f, 0f));
         mark.tick.SetPosition(1, new Vector3(-r * 0.1f, -r * 0.45f, 0f));
         mark.tick.SetPosition(2, new Vector3(r * 0.65f, r * 0.55f, 0f));
+        mark.FaceCamera();
         mark.Animate(0f);
         Destroy(mark.gameObject, Seconds + 0.1f);
     }
@@ -49,8 +50,16 @@ public class DrawnMark : MonoBehaviour
         return line;
     }
 
+    // The map can be turned: the tick turns with the camera so it always stands the right way up (2026-11-16)
+    void FaceCamera()
+    {
+        Camera cam = Camera.main;
+        if (cam != null) transform.rotation = Quaternion.Euler(0f, 0f, cam.transform.eulerAngles.z);
+    }
+
     void Update()
     {
+        FaceCamera();
         Animate((Time.unscaledTime - born) / Seconds);
     }
 
