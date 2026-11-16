@@ -193,6 +193,7 @@ public class CourseBuilder : MonoBehaviour
     string branchNextLabel = "";
     bool showOtherLegs = true;
     Button relaySettingsButton;
+    Button scratchButton;
     Button undoButton;
     Vector3 lastPanMouse;
     bool panning;
@@ -1948,7 +1949,8 @@ public class CourseBuilder : MonoBehaviour
         errorPoint = null;
         dragging = null;
         SetTool(!course.start.HasValue ? Tool.Start : Tool.Control);
-        SetStatus("", false);
+        SetStatus(statusAfterSelect ?? "", false);
+        statusAfterSelect = null;
         Redraw();
     }
 
@@ -2056,6 +2058,7 @@ public class CourseBuilder : MonoBehaviour
             button.GetComponentInChildren<TextMeshProUGUI>().enableWordWrapping = true;
         }
         sameCourseButton.gameObject.SetActive(selectedLeg > 0);
+        scratchButton.gameObject.SetActive(selectedLeg > 0 && Cur.items.Count > 0);
         bool same = selectedLeg > 0 && legCourse[selectedLeg] == legCourse[selectedLeg - 1];
         CourseUI.SetButtonText(sameCourseButton, same ? "Give leg " + (selectedLeg + 1) + " its own course" : "Same course as leg " + selectedLeg);
         LegSex selectedSex = SexOf(selectedLeg);
@@ -2303,11 +2306,13 @@ public class CourseBuilder : MonoBehaviour
         if (leg == selectedLeg) return;
         selectedLeg = leg;
         CopyStartAndFinishFromLegBefore();
+        statusAfterSelect = null;
         dragging = null;
         SetTool(Cur.start.HasValue ? Tool.Control : Tool.Start);
     }
 
-    // A new leg starts with the same start and finish as the leg before, since relays usually share them
+    // A new leg starts as a copy of the leg before (2026-11-16: whole course, before only start and finish);
+    // "Start from scratch" clears the controls again
     void CopyStartAndFinishFromLegBefore()
     {
         EditCourse course = Cur;
@@ -2316,7 +2321,30 @@ public class CourseBuilder : MonoBehaviour
             EditCourse before = courses[legCourse[selectedLeg - 1]];
             course.start = before.start;
             course.finish = before.finish;
+            course.finishTv = before.finishTv;
+            foreach (EditItem item in before.items) course.items.Add(new EditItem { fork = item.fork, point = item.point, tv = item.tv });
+            if (before.items.Count > 0)
+                statusAfterSelect = "Leg " + (selectedLeg + 1) + " starts as a copy of leg " + selectedLeg + ". Change what you like, or press \"Start from scratch\".";
         }
+    }
+
+    string statusAfterSelect;
+
+    // Clears the selected leg's controls; start and finish stay
+    void StartLegFromScratch()
+    {
+        EditCourse course = Cur;
+        if (selectedLeg == 0 || course.items.Count == 0) return;
+        PushUndo();
+        if (legCourse[selectedLeg] == legCourse[selectedLeg - 1])
+        {
+            EditCourse own = new EditCourse { start = course.start, finish = course.finish, finishTv = course.finishTv };
+            courses.Add(own);
+            legCourse[selectedLeg] = courses.Count - 1;
+        }
+        else course.items.Clear();
+        SelectLeg(selectedLeg);
+        SetStatus("Leg " + (selectedLeg + 1) + " has no controls now. Start and finish are kept.", false);
     }
 
     async void OnSave()
@@ -2720,7 +2748,7 @@ public class CourseBuilder : MonoBehaviour
     void BuildRelayPanel(Transform canvas)
     {
         relayPanel = CourseUI.CardPanel("Relay panel", canvas);
-        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 480));
+        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 534));
         CourseUI.Column(relayPanel.gameObject, 10, new RectOffset(22, 22, 20, 20));
 
         TextMeshProUGUI title = CourseUI.Text("Title", relayPanel.transform, "Relay", 32, CourseUI.Ink, FontStyles.Bold);
@@ -2751,6 +2779,10 @@ public class CourseBuilder : MonoBehaviour
 
         sameCourseButton = CourseUI.Button("Same course", relayPanel.transform, "", CourseUI.ButtonKind.Light, ToggleSameCourse, 19);
         CourseUI.Size(sameCourseButton, 44);
+
+        scratchButton = CourseUI.Button("Start from scratch", relayPanel.transform, "Start this leg from scratch", CourseUI.ButtonKind.Light, StartLegFromScratch, 19);
+        CourseUI.Size(scratchButton, 44);
+        HoverTip.Add(scratchButton, "A new leg starts as a copy of the leg before. This removes its controls so you can lay it from the start; start and finish stay.");
 
         // Women's, men's or open leg (2026-11-13); W/M on the leg buttons
         legSexButton = CourseUI.Button("Leg runners", relayPanel.transform, "", CourseUI.ButtonKind.Light, CycleLegSex, 19);
