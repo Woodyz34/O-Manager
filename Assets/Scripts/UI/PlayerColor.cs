@@ -244,7 +244,8 @@ public static class UIToast
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
         Image card = CourseUI.CardPanel("Message", go.transform);
         card.raycastTarget = false;
-        CourseUI.Place(card.rectTransform, new Vector2(1f, 0.3f), new Vector2(1f, 0.5f), new Vector2(-24, 0), new Vector2(440, 150));
+        // In the very bottom-right corner (2026-11-16, user wish)
+        CourseUI.Place(card.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-24, 24), new Vector2(440, 150));
         TextMeshProUGUI text = CourseUI.Text("Text", card.transform, message, 22, color ?? CourseUI.Danger, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Stretch(text.rectTransform, 22, 46, 12, 12);
         Button close = CourseUI.Button("Close", card.transform, "X", CourseUI.ButtonKind.Light, () => UnityEngine.Object.Destroy(go), 20);
