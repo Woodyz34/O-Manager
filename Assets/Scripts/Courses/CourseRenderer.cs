@@ -11,7 +11,8 @@ public class CourseRenderer : MonoBehaviour
     public static readonly Color ErrorRed = new Color(0.86f, 0.12f, 0.12f, 1f);
 
     // Sizes in metres on the ground, matched to the courses printed on the old Illern map pictures
-    public float controlRadiusMeters = 37f;
+    public const float DefaultControlRadiusMeters = 37f;
+    public float controlRadiusMeters = DefaultControlRadiusMeters;
     public float startSideMeters = 90f;
     public float finishInnerRadiusMeters = 28f;
     public float finishOuterRadiusMeters = 40f;
