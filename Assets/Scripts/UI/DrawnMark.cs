@@ -23,8 +23,8 @@ public class DrawnMark : MonoBehaviour
         mark.born = Time.unscaledTime;
         mark.ring = Line(mark.transform, "Ring", material, sortingOrder, circleRadius * 0.14f, 41, true);
         mark.tick = Line(mark.transform, "Tick", material, sortingOrder + 1, circleRadius * 0.24f, 3, false);
-        // About as wide as the circle
-        float r = mark.radius * 0.95f;
+        // About as wide as the circle (the tick spans 1.2 r)
+        float r = mark.radius * 1.7f;
         mark.tick.SetPosition(0, new Vector3(-r * 0.55f, 0f, 0f));
         mark.tick.SetPosition(1, new Vector3(-r * 0.1f, -r * 0.45f, 0f));
         mark.tick.SetPosition(2, new Vector3(r * 0.65f, r * 0.55f, 0f));
