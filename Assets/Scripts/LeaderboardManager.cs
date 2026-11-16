@@ -63,7 +63,7 @@ public class LeaderboardManager : NetworkBehaviour
             ColorRow(entry, rank, p);
 
             string timeString = $"{p.hourCount:00}:{p.minuterCount:00}:{p.secoundCount:00}";
-            entry.SetData(rank, p.nickName.ToString(), timeString);
+            entry.SetData(rank, p.nickName.ToString(), p.relayRunnerName.ToString(), p.RunnerStatsText, timeString);
 
             entries[p.Object.InputAuthority] = entry;
             nicknameToRank[p.nickName.ToString()] = rank;
@@ -132,7 +132,7 @@ public class LeaderboardManager : NetworkBehaviour
             LeaderboardEntryUI entry = entries[p.Object.InputAuthority];
             entry.transform.SetSiblingIndex(i);
             string timeString = $"{p.hourCount:00}:{p.minuterCount:00}:{p.secoundCount:00}";
-            entry.SetData(i + 1, p.nickName.ToString(), timeString);
+            entry.SetData(i + 1, p.nickName.ToString(), p.relayRunnerName.ToString(), p.RunnerStatsText, timeString);
             ColorRow(entry, i + 1, p);
             shownOrder.Add(p.Object.InputAuthority);
             nicknameToRank[p.nickName.ToString()] = i + 1;
@@ -141,7 +141,7 @@ public class LeaderboardManager : NetworkBehaviour
 
     // Row and header sizes of the leaderboard card, used to let the card hug its rows
     private const float panelHeaderHeight = 62f;
-    private const float panelRowHeight = 44f;
+    private const float panelRowHeight = LeaderboardEntryUI.RowHeight;
     private const float panelRowSpacing = 6f;
     private const float panelBottomPadding = 14f;
     private const float panelMaxHeight = 560f;
@@ -195,6 +195,9 @@ public class LeaderboardManager : NetworkBehaviour
             {
                 continue;
             }
+
+            // The runner is picked (or changed on a new relay leg) after the list was built
+            entry.SetNames(p.nickName.ToString(), p.relayRunnerName.ToString(), p.RunnerStatsText);
 
             int seconds = p.hourCount * 3600 + p.minuterCount * 60 + p.secoundCount;
             if (shownSeconds.TryGetValue(p.Object.InputAuthority, out int shown) && shown == seconds)

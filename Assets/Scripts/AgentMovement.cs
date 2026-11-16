@@ -1655,6 +1655,11 @@ public class AgentMovement : NetworkBehaviour
     float cardPhysics;
     float cardSprintSpeed = CardData.NoValue;
 
+    // The runner's physics, sprint speed (-1 = none) and technique, for the leaderboard (0 before a runner is set)
+    public Vector3Int RunnerStats => string.IsNullOrEmpty(runnerName) ? Vector3Int.zero
+        : new Vector3Int(Mathf.RoundToInt(cardPhysics), cardSprintSpeed >= 0f ? Mathf.RoundToInt(cardSprintSpeed) : -1,
+            Mathf.RoundToInt(100f - runnerStatTec * 100f));
+
     public void SetRunner(CardDisplay card)
     {
         Debug.Log("SetRunner starts");

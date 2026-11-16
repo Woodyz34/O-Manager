@@ -199,6 +199,21 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int relaySplitLeg { get; set; }
     [Networked] public int relaySplitCount { get; set; }
     [Networked] public NetworkString<_32> relayRunnerName { get; set; }
+    // The runner's physics, sprint speed and technique for the leaderboard: physics * 65536 + (speed + 1) * 256 +
+    // technique, 0 = no runner yet (2026-11-16)
+    [Networked] public int runnerStats { get; set; }
+
+    // "P85  S90  T70" (physics, sprint speed, technique), or "" before a runner is picked
+    public string RunnerStatsText
+    {
+        get
+        {
+            int packed = IsValidRunner ? runnerStats : 0;
+            if (packed == 0) return "";
+            int physics = packed >> 16, speed = ((packed >> 8) & 0xFF) - 1, technique = packed & 0xFF;
+            return "P" + physics + "  S" + (speed >= 0 ? speed.ToString() : "-") + "  T" + technique;
+        }
+    }
 
     // A new competition: forget the last relay's results
     void ClearRelayResults()
@@ -241,6 +256,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             return;
         }
+        Vector3Int stats = agentMovement.RunnerStats;
+        int packedStats = stats == Vector3Int.zero ? 0
+            : (Mathf.Clamp(stats.x, 0, 255) << 16) | (Mathf.Clamp(stats.y + 1, 0, 255) << 8) | Mathf.Clamp(stats.z, 0, 255);
+        if (runnerStats != packedStats) runnerStats = packedStats;
         RelayRace relay = RelayRace.Active;
         if ((relay == null && IndividualRace.Active == null) || ActiveScene.Name == "Lobby")
         {
