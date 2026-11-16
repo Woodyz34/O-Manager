@@ -69,7 +69,7 @@ public static class ExtraModes
     public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
     // Modes that only work on individual courses, not relays
-    public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.Bears | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+    public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
     // Modes that only work in the forest, not on sprint courses (Imposter works on both)
     public const ExtraMode ForestOnly = ExtraMode.Bears | ExtraMode.MoveControl;

@@ -83,7 +83,7 @@ public class GameModeTools : MonoBehaviour
         NetworkPlayer local = NetworkPlayer.Local;
         AgentMovement agent = local != null ? local.agentMovement : null;
         bool drawing = agent != null && local.Object != null && local.Object.IsValid && agent.manualPathDrawer != null
-            && agent.manualPathDrawer.timeToDraw && !agent.manualPathDrawer.relayMode && !agent.WaitingForAllPlayersToDraw
+            && agent.manualPathDrawer.timeToDraw && (!agent.manualPathDrawer.relayMode || BearMode.On) && !agent.WaitingForAllPlayersToDraw
             && !CompetitionFlow.ResultsShown && agent.pathfindingManager != null;
 
         if (!drawing)
@@ -206,7 +206,7 @@ public class GameModeTools : MonoBehaviour
         if (text == null)
         {
             text = !string.IsNullOrEmpty(hintOverride) && Time.unscaledTime < hintUntil ? hintOverride
-                : (bearButton != null && !local.bearPlaced ? "One bear each, for the whole race. " : "")
+                : (bearButton != null && !local.bearPlaced ? (RelayRace.Active != null ? "One bear each per leg: it stays on this leg. " : "One bear each, for the whole race. ") : "")
                   + (moveButton != null && !local.moveUsed ? "One control move each: the control you are drawing to." : "");
         }
         hint.text = text;

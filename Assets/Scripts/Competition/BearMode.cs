@@ -22,7 +22,8 @@ public static class BearMode
 
     static float U => MapDefinition.WorldUnitsPerMeter;
 
-    public static bool On => ExtraModes.Is(ExtraMode.Bears) && RelayRace.Active == null;
+    // Relays too since 2026-11-16: one bear per player and leg; it stays on that leg only (RelayRace.StartLeg takes it away)
+    public static bool On => ExtraModes.Is(ExtraMode.Bears);
 
     static readonly HashSet<PlayerRef> found = new HashSet<PlayerRef>();
 
@@ -32,6 +33,9 @@ public static class BearMode
     }
 
     public static bool IsFound(PlayerRef owner) => found.Contains(owner);
+
+    // A bear taken away or hidden somewhere new (next relay leg): it has to be found again
+    public static void Forget(PlayerRef owner) => found.Remove(owner);
 
     // Why a bear cannot be hidden here, or null when it can
     public static string PlaceProblem(Vector3 world, PathfindingManager manager)
@@ -223,13 +227,26 @@ public class BearWatcher : MonoBehaviour
         }
     }
 
-    // Your own bear is shown faded; someone else's only once it has been found
+    readonly Dictionary<PlayerRef, Vector2> lastPlace = new Dictionary<PlayerRef, Vector2>();
+
+    // Your own bear is shown faded; someone else's only once it has been found.
+    // Relays: a bear taken away at a new leg is hidden, and a bear hidden somewhere new is unfound and can scare again.
     void SyncViews()
     {
         foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player.Object == null || !player.Object.IsValid || !player.bearPlaced) continue;
+            if (player.Object == null || !player.Object.IsValid) continue;
             PlayerRef owner = player.Object.StateAuthority;
+            bool moved = !player.bearPlaced || !lastPlace.TryGetValue(owner, out Vector2 was) || was != player.bearPosition;
+            if (moved && lastPlace.ContainsKey(owner))
+            {
+                lastPlace.Remove(owner);
+                BearMode.Forget(owner);
+                scaredBy.Remove(owner);
+                if (views.TryGetValue(owner, out View old) && old.root != null) old.root.SetActive(false);
+            }
+            if (!player.bearPlaced) continue;
+            lastPlace[owner] = player.bearPosition;
             bool mine = player.Object.HasStateAuthority;
             bool found = BearMode.IsFound(owner);
             if (!mine && !found) continue;

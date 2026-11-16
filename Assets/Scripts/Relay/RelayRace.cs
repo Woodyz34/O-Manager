@@ -300,6 +300,8 @@ public class RelayRace : MonoBehaviour, IRaceStats
             np.relayRunnerName = runner != null ? runner.RunnerName : "";
             np.relaySplitLeg = leg;
             np.relaySplitCount = 0;
+            // Bears: the last leg's bear goes back, a new one can be hidden on this leg (2026-11-16)
+            np.bearPlaced = false;
         }
 
         agent.manualPathDrawer.BeginRelayLeg();
