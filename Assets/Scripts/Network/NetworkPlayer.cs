@@ -181,6 +181,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // Relays: where this team's runner is, so the other runners can run behind it or hang on to it (PackRunning)
     [Networked] public int relayLeg { get; set; }
     [Networked] public int relayControl { get; set; }
+    // How far along the leg the runner is, counted in common controls (the ones every team runs): 3.5 = half way from the
+    // third common control to the next. On a fork two short controls and one long one both count as one step, so the
+    // live standings are even again once the fork is done (2026-11-16)
+    [Networked] public float relayProgress { get; set; }
     [Networked] public NetworkBool relayRunning { get; set; }
     [Networked] public NetworkBool relayMistake { get; set; }   // the runner is making a mistake right now, shown on the map of a TV production
     // TV production of a relay with TV controls (TvDirector): what the host puts on TV. 0 = nothing (the race runs at
@@ -248,12 +252,29 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         }
         relayLeg = relay != null ? relay.Leg : 0; // an individual competition is "leg 0" for the replay
         relayControl = agentMovement.currentKontroll;
+        relayProgress = Progress(relay != null ? relay.Route : null, relayControl - 1); // currentKontroll is the control it runs to
         ManualPathDrawer drawer = agentMovement.manualPathDrawer;
         relayRunning = agentMovement.canRunNextSegment && !agentMovement.hasFinished && !agentMovement.relayHold
             && !agentMovement.WaitingForAllPlayersToReachKontroll && !agentMovement.WaitingForAllPlayersToDraw
             && drawer != null && !drawer.timeToDraw;
         relayMistake = relayRunning && agentMovement.IsMissing;
         tvShot = TvDirector.Active != null ? TvDirector.Active.ShotToSend : 0;
+    }
+
+    // The point index in the team's route (0 = start) as common controls: the last common point passed plus the part of
+    // the way to the next common point, by the number of controls between them
+    public static float Progress(LegRoute route, int index)
+    {
+        if (route == null || route.commonOrdinal.Count == 0) return index;
+        int count = route.commonOrdinal.Count;
+        if (index >= count - 1) return route.commonOrdinal[count - 1] >= 0 ? route.commonOrdinal[count - 1] : index;
+        int before = Mathf.Clamp(index, 0, count - 1);
+        while (before > 0 && route.commonOrdinal[before] < 0) before--;
+        int after = Mathf.Clamp(index, 0, count - 1) + (index > before ? 0 : 1);
+        while (after < count - 1 && route.commonOrdinal[after] < 0) after++;
+        float from = Mathf.Max(0, route.commonOrdinal[before]);
+        if (after <= before || route.commonOrdinal[after] < 0) return from;
+        return from + (index - before) / (float)(after - before);
     }
 
     public override void Despawned(NetworkRunner runner, bool hasState)
