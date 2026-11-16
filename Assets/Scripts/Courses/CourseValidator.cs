@@ -115,11 +115,93 @@ public static class CourseValidator
         {
             return "That is outside the map.";
         }
-        if (RunCell(grid, map.ToCell(point)).x < 0)
+        Vector2Int cell = map.ToCell(point);
+        // Not in a garden (olive green) or on a house (2026-11-16): the runner could punch it from the street beside
+        // it, but nobody may go there. By a fence or a wall round a garden is fine.
+        if (grid.IsPassable(cell) == false && SoftGround.IsSoft(map, cell, grid.Rows, grid.Cols))
+        {
+            byte kind = SoftGround.KindAt(map, cell.x, cell.y, grid.Rows, grid.Cols);
+            return kind == MapImport.GroundKind.Plot ? "That is in a private garden (olive green). Nobody may go there."
+                : "That is on a building. Put it beside it.";
+        }
+        Vector2Int run = RunCell(grid, cell);
+        if (run.x < 0)
         {
             return "Nobody can get there (lake, building or out-of-bounds area).";
         }
+        // Not inside a fenced-off bit of the map (a pen, a closed yard) that nobody can get into or out of
+        if (ShutIn(grid, run))
+        {
+            return "That is shut in (fences, walls or water all round), so nobody can get in or out.";
+        }
         return null;
+    }
+
+    // ---- Shut-in pieces of ground (2026-11-16) ----
+    // The open cells of a grid in connected pieces (as the runners move: 8 ways, no corner-cutting). A piece much
+    // smaller than the biggest one is a pen, a closed yard or an island.
+    const float ShutInShare = 0.1f;
+
+    class Pieces
+    {
+        public int[] piece;      // per cell (row * cols + column): the number of its piece, -1 closed
+        public List<int> size = new List<int>();
+        public int biggest;
+    }
+
+    static float[,] piecesOf;
+    static Pieces pieces;
+
+    static bool ShutIn(MapGrid grid, Vector2Int cell)
+    {
+        Pieces p = PiecesOf(grid.speed);
+        int id = p.piece[cell.y * grid.Cols + cell.x];
+        return id >= 0 && p.size[id] < p.biggest * ShutInShare;
+    }
+
+    static Pieces PiecesOf(float[,] speed)
+    {
+        if (ReferenceEquals(speed, piecesOf) && pieces != null) return pieces;
+        int rows = speed.GetLength(0), cols = speed.GetLength(1);
+        Pieces p = new Pieces { piece = new int[rows * cols] };
+        for (int i = 0; i < p.piece.Length; i++) p.piece[i] = -1;
+        bool Open(int x, int y) => x >= 0 && y >= 0 && x < cols && y < rows && speed[y, x] > 0.01f;
+        var queue = new Queue<int>();
+        for (int y0 = 0; y0 < rows; y0++)
+        {
+            for (int x0 = 0; x0 < cols; x0++)
+            {
+                if (p.piece[y0 * cols + x0] >= 0 || !Open(x0, y0)) continue;
+                int id = p.size.Count;
+                int count = 0;
+                p.piece[y0 * cols + x0] = id;
+                queue.Enqueue(y0 * cols + x0);
+                while (queue.Count > 0)
+                {
+                    int at = queue.Dequeue();
+                    count++;
+                    int x = at % cols, y = at / cols;
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+                            int nx = x + dx, ny = y + dy;
+                            if (!Open(nx, ny) || p.piece[ny * cols + nx] >= 0) continue;
+                            // A diagonal step needs both cells beside it open
+                            if (dx != 0 && dy != 0 && (!Open(x + dx, y) || !Open(x, y + dy))) continue;
+                            p.piece[ny * cols + nx] = id;
+                            queue.Enqueue(ny * cols + nx);
+                        }
+                    }
+                }
+                p.size.Add(count);
+                p.biggest = Mathf.Max(p.biggest, count);
+            }
+        }
+        piecesOf = speed;
+        pieces = p;
+        return p;
     }
 
     // How many cells from a control the runner may punch it. A control may stand on a cliff, a fence, a boulder or
