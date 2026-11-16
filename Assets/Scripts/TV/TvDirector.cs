@@ -138,7 +138,7 @@ public class TvDirector : MonoBehaviour
     public int ShotToSend => IsProducer ? produced : 0;
 
     // True while the finish is on TV and a runner who has just finished is still on the way to the finish unit, or
-    // punched it less than a second ago. The relay's statistics wait for it (RelayRace), so they do not cover the
+    // the finish shot is still on after the punch (FinishHold). The relay's statistics wait for it (RelayRace), so they do not cover the
     // runner before it has punched.
     public bool FinishStillOnTheWay()
     {
@@ -151,11 +151,12 @@ public class TvDirector : MonoBehaviour
             {
                 if (now - f.since < FinishLongest) return true;
             }
-            else if (now - at < AfterFinishPunch) return true;
+            else if (now - at < FinishHold) return true;
         }
         return false;
     }
-    const float AfterFinishPunch = 1f;
+    // (2026-11-16: the statistics wait for the whole finish shot, the punch and the walk off, not just a second after
+    // the punch; they came up over half the screen while the finish camera was still on)
 
     static bool IsProducer => NetworkPlayer.Local == null || CompetitionFlow.LocalIsHost();
 
