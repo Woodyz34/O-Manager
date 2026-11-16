@@ -248,7 +248,9 @@ public class RelayRace : MonoBehaviour, IRaceStats
         if (cap.Length > 0) rules += "   <color=#E8742A>" + cap + "</color>";
         // "Same stats": the values every runner gets on this leg
         Vector2Int? values = GameModes.SameStatsForLeg(picks.Count);
-        string stats = values != null ? "   <color=#E8742A>Speed " + values.Value.x + ", technique " + values.Value.y + "</color>" : "";
+        float sprint = GameModes.SameStatsSpeedForLeg(picks.Count);
+        string stats = values != null ? "   <color=#E8742A>Physics " + values.Value.x + ", speed " + (sprint >= 0f ? Mathf.RoundToInt(sprint) : values.Value.x)
+            + ", technique " + values.Value.y + "</color>" : "";
         pickHeader.text = "<b><size=120%>" + LegDescription(picks.Count) + "</size></b>" + stats + rules + team;
     }
 

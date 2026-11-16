@@ -47,7 +47,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int minuterCount { get; set; }
     [Networked] public int hourCount { get; set; }
     // 64 characters: "Same stats" with values for every relay leg is longer than the default 16
-    [Networked, Capacity(64)] public string gameMode { get; set; }
+    [Networked, Capacity(128)] public string gameMode { get; set; }   // 128: Same stats with physics, speed and technique on 10 legs
     [Networked, Capacity(32)]
     public NetworkDictionary<int, PlayerRef> CardOwner => default;
     
@@ -85,7 +85,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int secretTask { get; set; }
 
     // The host's lobby choices, published on the host's own player so everyone can see them
-    [Networked] public NetworkString<_64> lobbyGameMode { get; set; }
+    [Networked] public NetworkString<_128> lobbyGameMode { get; set; }
     [Networked] public NetworkString<_64> lobbyMap { get; set; }
     // This player's Unity player id (Unity Cloud), so a host can let the players in its lobby download its private map
     [Networked] public NetworkString<_64> cloudId { get; set; }
@@ -668,6 +668,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         // A relay gets one pair of values per leg.)
         bool sameStats = GameModes.TryGetSameStatsLegs(effectiveGameMode, out List<Vector2Int> sameStatsLegs);
         GameModes.SameStatsLegs = sameStats ? sameStatsLegs : null;
+        GameModes.SameStatsSpeeds = sameStats ? GameModes.SameStatsSpeedsOf(effectiveGameMode) : null;
         // Max average overall and "Open packs" (RunnerRules)
         RunnerRules.BeginRound(effectiveGameMode);
         RunnerFilterBar.ClearRules();
