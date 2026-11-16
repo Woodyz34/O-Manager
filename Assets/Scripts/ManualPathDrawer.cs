@@ -171,7 +171,7 @@ public class ManualPathDrawer : MonoBehaviour
                     {
                         Debug.Log("har ritat färdigt");
                         // A tick at the control, so it is clear the stretch is drawn
-                        if (line != null) DrawnMark.Show(targetControl.position, line.sharedMaterial, line.sortingOrder + 2);
+                        if (line != null) DrawnMark.Show(targetControl.position, line.sharedMaterial, line.sortingOrder + 2, CircleRadiusWorld);
                         isDrawing = false;
                         timeToDraw = false;
                         OnPathFinished();

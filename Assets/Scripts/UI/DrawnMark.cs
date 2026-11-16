@@ -13,17 +13,18 @@ public class DrawnMark : MonoBehaviour
     float radius;
     float born;
 
-    public static void Show(Vector3 at, Material material, int sortingOrder)
+    // circleRadius: the control circle's radius in world units. The mark is sized by the circle, not by the zoom
+    // (2026-11-16: in a relay the camera jumps to the next stretch at another zoom, and the tick came out tiny or huge).
+    public static void Show(Vector3 at, Material material, int sortingOrder, float circleRadius)
     {
-        Camera cam = Camera.main;
-        float size = cam != null && cam.orthographic ? cam.orthographicSize : 3f;
         DrawnMark mark = new GameObject("Drawn mark").AddComponent<DrawnMark>();
         mark.transform.position = new Vector3(at.x, at.y, -1.6f);
-        mark.radius = size * 0.05f;
+        mark.radius = circleRadius;
         mark.born = Time.unscaledTime;
-        mark.ring = Line(mark.transform, "Ring", material, sortingOrder, size * 0.008f, 41, true);
-        mark.tick = Line(mark.transform, "Tick", material, sortingOrder + 1, size * 0.012f, 3, false);
-        float r = mark.radius * 0.6f;
+        mark.ring = Line(mark.transform, "Ring", material, sortingOrder, circleRadius * 0.14f, 41, true);
+        mark.tick = Line(mark.transform, "Tick", material, sortingOrder + 1, circleRadius * 0.24f, 3, false);
+        // About as wide as the circle (the tick spans 1.2 r)
+        float r = mark.radius * 1.7f;
         mark.tick.SetPosition(0, new Vector3(-r * 0.55f, 0f, 0f));
         mark.tick.SetPosition(1, new Vector3(-r * 0.1f, -r * 0.45f, 0f));
         mark.tick.SetPosition(2, new Vector3(r * 0.65f, r * 0.55f, 0f));
