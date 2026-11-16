@@ -12,10 +12,19 @@ using UnityEngine.UI;
 //
 // When the game starts it asks GitHub for the newest release in the public download repository
 // (the same place the website's Download button points to). If that release is newer than this game
-// (Application.version, set by Tools > O-Manager > Build release), it downloads O-Manager-Setup.exe in the
-// background while the intro plays. On the main menu a card shows the progress; when the download is done
-// the setup runs silently, replaces the game files and starts the game again. Saved runners and money are
-// in PlayerPrefs (the registry), so an update never touches them.
+// (Application.version, set by Tools > O-Manager > Build release), it downloads the file for this computer in the
+// background while the intro plays. On the main menu a card shows the progress; when the download is done:
+//   Windows: O-Manager-Setup.exe runs silently, replaces the game files and starts the game again.
+//   Mac:     O-Manager-Mac.zip is unpacked, and when the game has closed a small script swaps in the new
+//            O-Manager.app and opens it.
+//   Linux:   O-Manager-Linux.tar.gz is unpacked, and when the game has closed a small script copies the new files
+//            over the game's folder and starts it again.
+// Saved runners and money are in PlayerPrefs (registry / Library/Preferences / ~/.config), never in the game's
+// folder, so an update never touches them.
+//
+// On a Mac that runs the game straight from Downloads (not moved to Applications), macOS runs it from a hidden,
+// read-only copy, and on Mac/Linux the game's folder may not be writable. Then the card only says that a new
+// version is out and offers the website instead.
 //
 // "Later" stops it for this time; the next start tries again. Nothing happens in the Unity Editor, without
 // internet, or when GitHub cannot be reached: the game just starts as usual.
@@ -24,12 +33,15 @@ using UnityEngine.UI;
 public class GameUpdater : MonoBehaviour
 {
     public const string ReleasesRepo = "Woodyz34/O-Manager-Download"; // same as website/config.js
-    public const string SetupAssetName = "O-Manager-Setup.exe";      // file attached to every release
+    public const string SetupAssetName = "O-Manager-Setup.exe";      // Windows file attached to every release
+    public const string MacAssetName = "O-Manager-Mac.zip";          // Mac file (O-Manager.app inside)
+    public const string LinuxAssetName = "O-Manager-Linux.tar.gz";   // Linux file (O-Manager folder inside)
+    public const string WebsiteUrl = "https://o-manager.se/#download";
     const string MainMenuScene = "MainMenu";
 
     static GameUpdater instance;
 
-    enum State { Checking, UpToDate, Downloading, Ready, Installing, Failed, Cancelled }
+    enum State { Checking, UpToDate, Downloading, Ready, Installing, Failed, Cancelled, Manual }
     State state = State.Checking;
 
     string newVersion;
@@ -38,6 +50,8 @@ public class GameUpdater : MonoBehaviour
     long downloadSize;
     string setupPath;
     UnityWebRequest download;
+    string manualReason;   // why the game cannot update itself here (State.Manual)
+    string failReason;     // shown on the card when State.Failed
 
     // The card on the main menu
     GameObject root;
@@ -71,7 +85,7 @@ public class GameUpdater : MonoBehaviour
         Build();
         OnSceneLoaded(SceneManager.GetActiveScene(), LoadSceneMode.Single);
 
-        bool canUpdate = !Application.isEditor && Application.platform == RuntimePlatform.WindowsPlayer;
+        bool canUpdate = !Application.isEditor && AssetName != null;
         if (canUpdate)
         {
             StartCoroutine(CheckAndDownload());
@@ -131,7 +145,7 @@ public class GameUpdater : MonoBehaviour
             {
                 foreach (AssetInfo asset in release.assets)
                 {
-                    if (asset != null && string.Equals(asset.name, SetupAssetName, StringComparison.OrdinalIgnoreCase))
+                    if (asset != null && string.Equals(asset.name, AssetName, StringComparison.OrdinalIgnoreCase))
                     {
                         setup = asset;
                     }
@@ -139,7 +153,7 @@ public class GameUpdater : MonoBehaviour
             }
             if (setup == null || string.IsNullOrEmpty(setup.browser_download_url))
             {
-                UnityEngine.Debug.LogWarning("Update " + release.tag_name + " has no " + SetupAssetName + ".");
+                UnityEngine.Debug.LogWarning("Update " + release.tag_name + " has no " + AssetName + ".");
                 state = State.UpToDate;
                 yield break;
             }
@@ -150,14 +164,123 @@ public class GameUpdater : MonoBehaviour
             downloadSize = setup.size;
         }
 
+        manualReason = CannotSelfUpdateReason() ?? TriedBeforeReason();
+        if (manualReason != null)
+        {
+            UnityEngine.Debug.Log("Update " + newVersion + " found, but this game cannot replace itself: " + manualReason);
+            state = State.Manual;
+            Refresh();
+            yield break;
+        }
+
         yield return Download();
+    }
+
+    // ---------- Computer types ----------
+
+    // The release file for this computer, or null when this kind of computer has none
+    static string AssetName
+    {
+        get
+        {
+            switch (Application.platform)
+            {
+                case RuntimePlatform.WindowsPlayer: return SetupAssetName;
+                case RuntimePlatform.OSXPlayer: return MacAssetName;
+                case RuntimePlatform.LinuxPlayer: return LinuxAssetName;
+                default: return null;
+            }
+        }
+    }
+
+    static bool IsMac => Application.platform == RuntimePlatform.OSXPlayer;
+    static bool IsLinux => Application.platform == RuntimePlatform.LinuxPlayer;
+
+    // Mac: Application.dataPath is ".../O-Manager.app/Contents"
+    static string MacAppPath => Path.GetDirectoryName(Application.dataPath.TrimEnd('/'));
+
+    // Linux: Application.dataPath is ".../O-Manager_Data", next to the program "O-Manager.x86_64"
+    static string LinuxFolder => Path.GetDirectoryName(Application.dataPath.TrimEnd('/'));
+    static string LinuxDataName => Path.GetFileName(Application.dataPath.TrimEnd('/'));
+    static string LinuxProgram
+    {
+        get
+        {
+            string name = LinuxDataName;
+            if (name.EndsWith("_Data")) name = name.Substring(0, name.Length - 5);
+            return Path.Combine(LinuxFolder, name + ".x86_64");
+        }
+    }
+
+    // null when the game can update itself, otherwise a sentence for the card
+    static string CannotSelfUpdateReason()
+    {
+        if (IsMac)
+        {
+            string app = MacAppPath;
+            if (app.Contains("/AppTranslocation/") || !app.EndsWith(".app"))
+            {
+                return "Move O-Manager to the Applications folder and start it from there, and it will update by itself.";
+            }
+            if (!CanWriteIn(Path.GetDirectoryName(app)))
+            {
+                return "This computer does not let the game replace itself. Download the new version from o-manager.se.";
+            }
+        }
+        else if (IsLinux)
+        {
+            if (!CanWriteIn(LinuxFolder) || !File.Exists(LinuxProgram))
+            {
+                return "The game's folder cannot be changed by the game. Download the new version from o-manager.se.";
+            }
+        }
+        return null;
+    }
+
+    // Each install attempt is counted. If the game still starts as the old version after two tries (the swap was
+    // stopped by the computer), it stops trying, so it does not close and reopen at every start.
+    const string TriedKey = "OManager.Update.Tried";
+
+    string TriedBeforeReason()
+    {
+        string[] tried = PlayerPrefs.GetString(TriedKey, "").Split('|');
+        if (tried.Length == 2 && tried[0] == newVersion && int.TryParse(tried[1], out int count) && count >= 2)
+        {
+            return "The update did not finish on this computer. Download the new version from o-manager.se.";
+        }
+        return null;
+    }
+
+    void CountAttempt()
+    {
+        string[] tried = PlayerPrefs.GetString(TriedKey, "").Split('|');
+        int count = tried.Length == 2 && tried[0] == newVersion && int.TryParse(tried[1], out int n) ? n : 0;
+        PlayerPrefs.SetString(TriedKey, newVersion + "|" + (count + 1));
+        PlayerPrefs.Save();
+    }
+
+    static bool CanWriteIn(string folder)
+    {
+        try
+        {
+            string test = Path.Combine(folder, ".o-manager-write-test");
+            File.WriteAllText(test, "");
+            File.Delete(test);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     IEnumerator Download()
     {
         state = State.Downloading;
+        failReason = null;
         Refresh();
-        setupPath = Path.Combine(Path.GetTempPath(), "O-Manager-Setup-" + newVersion + ".exe");
+        string extension = IsMac ? ".zip" : IsLinux ? ".tar.gz" : ".exe";
+        setupPath = Path.Combine(Path.GetTempPath(), "O-Manager-Update-" + newVersion + extension);
 
         // Already downloaded on an earlier start?
         if (File.Exists(setupPath) && downloadSize > 0 && new FileInfo(setupPath).Length == downloadSize)
@@ -184,6 +307,7 @@ public class GameUpdater : MonoBehaviour
         if (!ok)
         {
             UnityEngine.Debug.LogWarning("Update download failed: " + download.error);
+            failReason = "The update could not be downloaded. Check your internet connection.";
         }
         download.Dispose();
         download = null;
@@ -213,6 +337,13 @@ public class GameUpdater : MonoBehaviour
         state = State.Installing;
         Refresh();
         yield return new WaitForSecondsRealtime(1.2f); // let the player read "Installing"
+
+        if (IsMac || IsLinux)
+        {
+            yield return InstallUnix();
+            yield break;
+        }
+
         try
         {
             ProcessStartInfo start = new ProcessStartInfo(setupPath, "/SILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE=1")
@@ -224,12 +355,148 @@ public class GameUpdater : MonoBehaviour
         catch (Exception e)
         {
             UnityEngine.Debug.LogWarning("Could not start the update: " + e.Message);
-            state = State.Failed;
-            Refresh();
+            InstallFailed();
             yield break;
         }
-        PlayerPrefs.Save();
+        CountAttempt();
         Application.Quit();
+    }
+
+    // Mac and Linux: unpack now (so a bad file is found while the game still runs), then leave the swap to a
+    // small script that waits for the game to close. A running program cannot replace its own files safely.
+    IEnumerator InstallUnix()
+    {
+        string work = Path.Combine(Path.GetTempPath(), "O-Manager-Update-" + newVersion);
+        string unpackError = null;
+        bool done = false;
+        bool mac = IsMac;
+        string archive = setupPath;
+        System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+        {
+            try
+            {
+                if (Directory.Exists(work)) Directory.Delete(work, true);
+                Directory.CreateDirectory(work);
+                // ditto (Mac) and tar keep the "may run" flags on the game's programs
+                if (mac) RunAndWait("/usr/bin/ditto", "-x -k \"" + archive + "\" \"" + work + "\"");
+                else RunAndWait("tar", "-xzf \"" + archive + "\" -C \"" + work + "\"");
+            }
+            catch (Exception e)
+            {
+                unpackError = e.Message;
+            }
+            done = true;
+        });
+        while (!done)
+        {
+            yield return null;
+        }
+
+        string newCopy = null;
+        if (unpackError == null)
+        {
+            newCopy = IsMac
+                ? FirstOrNull(Directory.GetDirectories(work, "*.app"))
+                : FirstOrNull(Directory.GetDirectories(work));
+            if (newCopy == null) unpackError = "the downloaded file has no game in it";
+        }
+        if (unpackError != null)
+        {
+            UnityEngine.Debug.LogWarning("Could not unpack the update: " + unpackError);
+            TryDelete(setupPath); // probably broken: download it again next time
+            InstallFailed();
+            yield break;
+        }
+
+        try
+        {
+            string script = Path.Combine(Path.GetTempPath(), "o-manager-update.sh");
+            File.WriteAllText(script, IsMac ? MacScript(newCopy, work) : LinuxScript(newCopy, work));
+            ProcessStartInfo start = new ProcessStartInfo("/usr/bin/nohup", "/bin/sh \"" + script + "\"")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            Process.Start(start);
+        }
+        catch (Exception e)
+        {
+            UnityEngine.Debug.LogWarning("Could not start the update: " + e.Message);
+            InstallFailed();
+            yield break;
+        }
+        CountAttempt();
+        Application.Quit();
+    }
+
+    string MacScript(string newApp, string work)
+    {
+        string app = MacAppPath;
+        return "#!/bin/sh\n" +
+               "PID=" + Process.GetCurrentProcess().Id + "\n" +
+               "APP=" + Quote(app) + "\n" +
+               "NEW=" + Quote(newApp) + "\n" +
+               "while kill -0 \"$PID\" 2>/dev/null; do sleep 0.5; done\n" +
+               "xattr -dr com.apple.quarantine \"$NEW\" 2>/dev/null\n" +
+               "rm -rf \"$APP.old\"\n" +
+               "if mv \"$APP\" \"$APP.old\"; then\n" +
+               "  if mv \"$NEW\" \"$APP\"; then rm -rf \"$APP.old\"; else mv \"$APP.old\" \"$APP\"; fi\n" +
+               "fi\n" +
+               "rm -rf " + Quote(work) + " " + Quote(setupPath) + "\n" +
+               "open \"$APP\"\n";
+    }
+
+    string LinuxScript(string newFolder, string work)
+    {
+        return "#!/bin/sh\n" +
+               "PID=" + Process.GetCurrentProcess().Id + "\n" +
+               "DIR=" + Quote(LinuxFolder) + "\n" +
+               "NEW=" + Quote(newFolder) + "\n" +
+               "while kill -0 \"$PID\" 2>/dev/null; do sleep 0.5; done\n" +
+               "cp -a \"$NEW/.\" \"$DIR/\"\n" +
+               "chmod +x " + Quote(LinuxProgram) + "\n" +
+               "rm -rf " + Quote(work) + " " + Quote(setupPath) + "\n" +
+               "cd \"$DIR\" && nohup " + Quote(LinuxProgram) + " >/dev/null 2>&1 &\n";
+    }
+
+    // A path in single quotes for the shell
+    static string Quote(string path)
+    {
+        return "'" + path.Replace("'", "'\\''") + "'";
+    }
+
+    static void RunAndWait(string program, string arguments)
+    {
+        ProcessStartInfo start = new ProcessStartInfo(program, arguments)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+        };
+        using (Process process = Process.Start(start))
+        {
+            string errors = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+            {
+                throw new Exception(program + " stopped with code " + process.ExitCode + ": " + errors);
+            }
+        }
+    }
+
+    static string FirstOrNull(string[] items) => items != null && items.Length > 0 ? items[0] : null;
+
+    static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); }
+        catch (Exception) { }
+    }
+
+    void InstallFailed()
+    {
+        failReason = "The update could not be installed. You can download it from o-manager.se.";
+        state = State.Failed;
+        Refresh();
     }
 
     void OnLater()
@@ -244,6 +511,11 @@ public class GameUpdater : MonoBehaviour
 
     void OnRetry()
     {
+        if (state == State.Manual)
+        {
+            Application.OpenURL(WebsiteUrl);
+            return;
+        }
         if (string.IsNullOrEmpty(downloadUrl))
         {
             return;
@@ -371,18 +643,21 @@ public class GameUpdater : MonoBehaviour
         bool menu = OnMainMenu;
         versionLabel.gameObject.SetActive(menu);
 
-        bool show = menu && (state == State.Downloading || state == State.Ready || state == State.Installing || state == State.Failed);
+        bool show = menu && (state == State.Downloading || state == State.Ready || state == State.Installing || state == State.Failed
+                             || state == State.Manual);
         card.SetActive(show);
         // Off everywhere but the main menu, so no other page takes it for an open pop-up
         root.SetActive(menu);
         if (!show) return;
 
-        titleText.text = "Updating to version " + newVersion;
+        titleText.text = state == State.Manual ? "Version " + newVersion + " is out" : "Updating to version " + newVersion;
         notesText.text = string.IsNullOrEmpty(notes) ? "" : notes;
         notesText.gameObject.SetActive(!string.IsNullOrEmpty(notes));
-        retryButton.gameObject.SetActive(state == State.Failed);
+        barFill.transform.parent.gameObject.SetActive(state != State.Manual);
+        retryButton.gameObject.SetActive(state == State.Failed || state == State.Manual);
+        CourseUI.SetButtonText(retryButton, state == State.Manual ? "Open o-manager.se" : "Try again");
         laterButton.gameObject.SetActive(state != State.Installing);
-        CourseUI.SetButtonText(laterButton, state == State.Failed ? "Play anyway" : "Later");
+        CourseUI.SetButtonText(laterButton, state == State.Failed || state == State.Manual ? "Play anyway" : "Later");
 
         switch (state)
         {
@@ -395,7 +670,10 @@ public class GameUpdater : MonoBehaviour
                 statusText.text = "Installing. The game starts again by itself.";
                 break;
             case State.Failed:
-                statusText.text = "The update could not be downloaded. Check your internet connection.";
+                statusText.text = failReason ?? "The update could not be downloaded. Check your internet connection.";
+                break;
+            case State.Manual:
+                statusText.text = manualReason;
                 break;
         }
     }

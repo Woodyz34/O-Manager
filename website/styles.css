@@ -313,6 +313,10 @@ section { position: relative; }
 .dl-card h2 { margin-bottom: 10px; }
 .dl-sub { color: var(--ink-soft); font-size: 1.1rem; margin-bottom: 28px; }
 .dl-meta { margin: 16px 0 0; font-size: .92rem; color: var(--ink-soft); min-height: 1.6em; }
+.dl-other { margin: 6px 0 0; font-size: .92rem; color: var(--ink-soft); }
+.dl-other button { font: inherit; color: var(--ink); background: none; border: 0; padding: 2px 4px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.dl-other button.on { font-weight: 700; text-decoration: none; cursor: default; }
+.dl-steps[hidden] { display: none; }
 .dl-steps { list-style: none; padding: 0; margin: 34px 0 0; display: grid; gap: 12px; text-align: left; }
 .dl-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; background: var(--cream-100); }
 .dl-steps li > b { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--cream-50); font-size: .85rem; }

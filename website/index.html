@@ -329,13 +329,25 @@
       <h2><span data-l="sv">Ladda ner O-Manager</span><span data-l="en">Download O-Manager</span></h2>
       <p class="dl-sub"><span data-l="sv">Gratis. Inget konto behövs.</span><span data-l="en">Free. No account needed.</span></p>
       <a class="btn btn-orange btn-xl" id="dlBtn" href="#">
-        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10 4.5v7H3Zm8-1.1L21 3v8.5H11ZM3 12.5h7v7L3 18.5Zm8 0h10V21l-10-1.4Z" class="f"/></svg>
-        <span data-l="sv">Ladda ner för Windows</span><span data-l="en">Download for Windows</span>
+        <svg class="ico" id="dlIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10 4.5v7H3Zm8-1.1L21 3v8.5H11ZM3 12.5h7v7L3 18.5Zm8 0h10V21l-10-1.4Z" class="f"/></svg>
+        <span data-l="sv">Ladda ner för <span class="dl-os">Windows</span></span><span data-l="en">Download for <span class="dl-os">Windows</span></span>
       </a>
       <p class="dl-meta" id="dlMeta"><span data-l="sv">Hämtar senaste versionen…</span><span data-l="en">Checking the latest version…</span></p>
-      <ol class="dl-steps">
+      <p class="dl-other" id="dlOther"><span data-l="sv">Annan dator?</span><span data-l="en">Another computer?</span>
+        <button type="button" data-os="win">Windows</button> · <button type="button" data-os="mac">Mac</button> · <button type="button" data-os="linux">Linux</button></p>
+      <ol class="dl-steps" data-os="win">
         <li><b>1</b><span data-l="sv">Kör <code>O-Manager-Setup.exe</code>. Säger Windows "Windows skyddade datorn", klicka <b>Mer information</b> och <b>Kör ändå</b>.</span><span data-l="en">Run <code>O-Manager-Setup.exe</code>. If Windows says "Windows protected your PC", click <b>More info</b> and <b>Run anyway</b>.</span></li>
         <li><b>2</b><span data-l="sv">Starta O-Manager från Start-menyn eller skrivbordet.</span><span data-l="en">Start O-Manager from the Start menu or the desktop.</span></li>
+        <li><b>3</b><span data-l="sv">Nya versioner installeras av sig själva när du startar spelet. Dina löpare och pengar finns kvar.</span><span data-l="en">New versions install themselves when you start the game. Your runners and money stay.</span></li>
+      </ol>
+      <ol class="dl-steps" data-os="mac" hidden>
+        <li><b>1</b><span data-l="sv">Öppna <code>O-Manager-Mac.zip</code> och dra <b>O-Manager</b> till mappen <b>Program</b>. Fungerar på både Intel-Mac och Apple silicon (M1 och nyare).</span><span data-l="en">Open <code>O-Manager-Mac.zip</code> and drag <b>O-Manager</b> into the <b>Applications</b> folder. Works on both Intel Macs and Apple silicon (M1 and later).</span></li>
+        <li><b>2</b><span data-l="sv">Första gången säger macOS att appen inte kan kontrolleras. Öppna <b>Systeminställningar &gt; Integritet och säkerhet</b>, scrolla ner och klicka <b>Öppna ändå</b>.</span><span data-l="en">The first time, macOS says the app cannot be checked. Open <b>System Settings &gt; Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</span></li>
+        <li><b>3</b><span data-l="sv">Nya versioner installeras av sig själva när du startar spelet från Program. Dina löpare och pengar finns kvar.</span><span data-l="en">New versions install themselves when you start the game from Applications. Your runners and money stay.</span></li>
+      </ol>
+      <ol class="dl-steps" data-os="linux" hidden>
+        <li><b>1</b><span data-l="sv">Packa upp <code>O-Manager-Linux.tar.gz</code>, till exempel med <code>tar -xzf O-Manager-Linux.tar.gz</code>. Du får mappen <code>O-Manager</code>.</span><span data-l="en">Unpack <code>O-Manager-Linux.tar.gz</code>, for example with <code>tar -xzf O-Manager-Linux.tar.gz</code>. You get the folder <code>O-Manager</code>.</span></li>
+        <li><b>2</b><span data-l="sv">Starta <code>O-Manager.x86_64</code> i mappen. Spelet är för 64-bitars Linux (x86-64).</span><span data-l="en">Start <code>O-Manager.x86_64</code> in the folder. The game is for 64-bit Linux (x86-64).</span></li>
         <li><b>3</b><span data-l="sv">Nya versioner installeras av sig själva när du startar spelet. Dina löpare och pengar finns kvar.</span><span data-l="en">New versions install themselves when you start the game. Your runners and money stay.</span></li>
       </ol>
     </div>
@@ -358,8 +370,10 @@
         <p><span data-l="sv">Det sker av sig självt. När du startar spelet kollar det om det finns en ny version, laddar ner den och startar om. Vill du spela direkt trycker du <b>Later</b>. Dina sparade löpare och pengar ligger kvar på datorn.</span><span data-l="en">It happens by itself. When you start the game it checks for a new version, downloads it and restarts. To play right away, press <b>Later</b>. Your saved runners and money stay on your computer.</span></p></details>
       <details class="reveal"><summary><span data-l="sv">Är löparna riktiga?</span><span data-l="en">Are the runners real?</span></summary>
         <p><span data-l="sv">Ja. Korten bygger på riktiga resultat från elittävlingar, och betygen räknas om när nya tävlingar läggs in. Korten här på sidan är bara exempel.</span><span data-l="en">Yes. The cards are based on real results from elite races, and ratings are recalculated as new races are added. The cards on this page are just examples.</span></p></details>
-      <details class="reveal"><summary><span data-l="sv">Kan jag spela på Mac?</span><span data-l="en">Can I play on a Mac?</span></summary>
-        <p><span data-l="sv">Inte än. Just nu finns spelet för Windows.</span><span data-l="en">Not yet. The game is available for Windows right now.</span></p></details>
+      <details class="reveal"><summary><span data-l="sv">Kan jag spela på Mac eller Linux?</span><span data-l="en">Can I play on a Mac or on Linux?</span></summary>
+        <p><span data-l="sv">Ja. Välj <b>Mac</b> eller <b>Linux</b> under Ladda ner. Du kan spela mot vänner på Windows som vanligt.</span><span data-l="en">Yes. Pick <b>Mac</b> or <b>Linux</b> under Download. You can play against friends on Windows as usual.</span></p></details>
+      <details class="reveal"><summary><span data-l="sv">Macen säger att O-Manager "är skadat" eller inte kan öppnas. Vad gör jag?</span><span data-l="en">My Mac says O-Manager "is damaged" or cannot be opened. What now?</span></summary>
+        <p><span data-l="sv">Spelet är inte registrerat hos Apple, så macOS varnar första gången. Öppna <b>Systeminställningar &gt; Integritet och säkerhet</b> och klicka <b>Öppna ändå</b>. Står det att appen är skadad: öppna appen Terminal, skriv <code>xattr -cr /Applications/O-Manager.app</code> och tryck Enter. Starta sedan spelet igen.</span><span data-l="en">The game is not registered with Apple, so macOS warns the first time. Open <b>System Settings &gt; Privacy &amp; Security</b> and click <b>Open Anyway</b>. If it says the app is damaged: open the Terminal app, type <code>xattr -cr /Applications/O-Manager.app</code> and press Enter. Then start the game again.</span></p></details>
       <details class="reveal"><summary><span data-l="sv">Hur kontaktar jag er?</span><span data-l="en">How do I get in touch?</span></summary>
         <p><span data-l="sv">Skicka ett mail till <a href="mailto:anders.skoglund.tranas@gmail.com">anders.skoglund.tranas@gmail.com</a>. Frågor, buggar och idéer är alltid välkomna.</span><span data-l="en">Send an email to <a href="mailto:anders.skoglund.tranas@gmail.com">anders.skoglund.tranas@gmail.com</a>. Questions, bugs and ideas are always welcome.</span></p></details>
     </div>
