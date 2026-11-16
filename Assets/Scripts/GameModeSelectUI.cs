@@ -105,7 +105,9 @@ public class GameModeSelect : MonoBehaviour
         string current = gameModeHandler.gameMode;
         string extra = null;
         System.Action openCap = null;
-        if (GameModes.CanHaveCap(current))
+        // Only for relays (2026-11-16): in an individual race it only shut out the good runners
+        CourseData lobbyCourse = CourseLibrary.Current;
+        if (GameModes.CanHaveCap(current) && lobbyCourse != null && lobbyCourse.IsRelay())
         {
             int cap = GameModes.Cap(current);
             extra = "Max average overall: " + (cap > 0 ? cap.ToString() : "off");
