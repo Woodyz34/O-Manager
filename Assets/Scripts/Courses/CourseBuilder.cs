@@ -192,7 +192,7 @@ public class CourseBuilder : MonoBehaviour
     (Vector3 point, CourseRenderer.MarkKind kind)? branchExit;
     string branchNextLabel = "";
     bool showOtherLegs = true;
-    Button otherLegsButton;
+    Button relaySettingsButton;
     Button undoButton;
     Vector3 lastPanMouse;
     bool panning;
@@ -217,8 +217,6 @@ public class CourseBuilder : MonoBehaviour
     Button legSexButton;
     RectTransform legButtonRow;
     Button sameCourseButton;
-    Button forkModeButton;
-    TextMeshProUGUI relayInfo;
     GameObject canvasObject;
 
     const float PanelWidth = 560f;
@@ -2063,11 +2061,9 @@ public class CourseBuilder : MonoBehaviour
         LegSex selectedSex = SexOf(selectedLeg);
         CourseUI.SetButtonText(legSexButton, "Leg " + (selectedLeg + 1) + " runners: " + (selectedSex == LegSex.Any ? "Anyone" : selectedSex == LegSex.Women ? "Women" : "Men"));
         CourseUI.SetButtonColor(legSexButton, selectedSex == LegSex.Any ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
-        CourseUI.SetButtonText(forkModeButton, forkEveryVariant ? "Every team runs every branch" : "Branches are random");
-        CourseUI.SetButtonText(otherLegsButton, showOtherLegs ? "Other legs: shown faded" : "Other legs: only their forks");
-        relayInfo.text = "Each leg has its own course. Turn a control into a fork with \"Fork\" in the control list; a branch can have several controls, or none.\n"
-            + "Faded marks are the other legs. Bring a control to one and it clicks into place: on a plain control it becomes the same control, on a fork's control (F1A...) the whole fork goes on this leg. "
-            + (forkEveryVariant ? "Every team runs every branch of a fork once, so a fork needs as many legs as branches." : "Each team gets a random branch of every fork.");
+        bool usual = forkEveryVariant && showOtherLegs;
+        CourseUI.SetButtonText(relaySettingsButton, usual ? "Settings" : "Settings (changed)");
+        CourseUI.SetButtonColor(relaySettingsButton, usual ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
     }
 
     // ---- Clearing, checking and saving ----
@@ -2718,14 +2714,13 @@ public class CourseBuilder : MonoBehaviour
         HoverTip.Add(newCourse, "Clear everything and start a new course. You can undo it.");
         HoverTip.Add(sameCourseButton, "Use the same course on this leg as on the leg before it, or give this leg its own course.");
         HoverTip.Add(legSexButton, "Who may run this leg: anyone, only women or only men. Click to change.");
-        HoverTip.Add(forkModeButton, "Click to switch. Random: each team gets a random branch of every fork. Every branch: each team runs every branch once, so a fork needs as many legs as it has branches.");
-        HoverTip.Add(otherLegsButton, "Show the other legs' controls faded on the map, so you can line the legs up, or hide them.");
+        HoverTip.Add(relaySettingsButton, "Fork mode (every team runs every branch, or random branches) and how the other legs show on the map.");
     }
 
     void BuildRelayPanel(Transform canvas)
     {
         relayPanel = CourseUI.CardPanel("Relay panel", canvas);
-        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 708));
+        CourseUI.Place(relayPanel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(440, 480));
         CourseUI.Column(relayPanel.gameObject, 10, new RectOffset(22, 22, 20, 20));
 
         TextMeshProUGUI title = CourseUI.Text("Title", relayPanel.transform, "Relay", 32, CourseUI.Ink, FontStyles.Bold);
@@ -2761,14 +2756,10 @@ public class CourseBuilder : MonoBehaviour
         legSexButton = CourseUI.Button("Leg runners", relayPanel.transform, "", CourseUI.ButtonKind.Light, CycleLegSex, 19);
         CourseUI.Size(legSexButton, 44);
 
-        forkModeButton = CourseUI.Button("Fork mode", relayPanel.transform, "", CourseUI.ButtonKind.Secondary, ToggleForkMode, 20);
-        CourseUI.Size(forkModeButton, 44);
-
-        otherLegsButton = CourseUI.Button("Other legs", relayPanel.transform, "", CourseUI.ButtonKind.Light, () => { showOtherLegs = !showOtherLegs; Redraw(); }, 19);
-        CourseUI.Size(otherLegsButton, 44);
-
-        relayInfo = CourseUI.Text("Info", relayPanel.transform, "", 17, CourseUI.InkMuted);
-        CourseUI.Size(relayInfo, 150);
+        // Fork mode and other legs moved into a popup (2026-11-16): the defaults fit almost every relay
+        relaySettingsButton = CourseUI.Button("Relay settings", relayPanel.transform, "Settings", CourseUI.ButtonKind.Light,
+            () => RelaySettingsPopup.Open(() => forkEveryVariant, ToggleForkMode, () => showOtherLegs, () => { showOtherLegs = !showOtherLegs; Redraw(); }), 19);
+        CourseUI.Size(relaySettingsButton, 44);
 
         relayPanel.gameObject.SetActive(relay);
     }
