@@ -547,6 +547,12 @@ public class ManualPathDrawer : MonoBehaviour
             gridPath.Add(g);
             cellPoint.Add(pointIndex);
             if (RouteAnalysis.On) return true;
+            if (!LevelStep())
+            {
+                blockedFrom = gridPath.Count - 2;
+                StopLine("You can't turn between the tunnel and the road above it (or a bridge and what is under it). Go straight through, or round.");
+                return false;
+            }
             bool open = Passable(g);
             // The line may start on closed ground (the control stands by a house or a fence): nothing is checked until
             // it is out on ground the runner can run on. (Before, a start two cells inside a house stopped the line
@@ -572,6 +578,7 @@ public class ManualPathDrawer : MonoBehaviour
             {
                 int closedCells = gridPath.Count - 2 - blockedFrom;
                 ClosedWeight(gridPath.Count - 2, out int softCells);
+                boxStartLevel = LevelAt(blockedFrom);
                 List<Vector2Int> way = SearchInBox(gridPath[blockedFrom], g, strict ? SprintDetourMargin + softCells : CorrectionCells, null);
                 bool tooLong = strict && way != null && way.Count > closedCells + 2 + SprintExtraDetourCells + softCells;
                 if (way == null || way.Count == 0 || tooLong)
@@ -587,8 +594,50 @@ public class ManualPathDrawer : MonoBehaviour
         return true;
     }
 
+    // Tunnels and bridges (TwoLevels): the level of each drawn cell, 0 on the ground, 1 in a tunnel or on a bridge
+    readonly List<int> cellLevel = new List<int>();
+
+    TwoLevels Levels => manager != null && manager.speedGrid2D != null
+        ? TwoLevels.For(manager.speedGrid2D.GetLength(0), manager.speedGrid2D.GetLength(1)) : null;
+
+    // The level of the cell just added; false when the step to it changes level where nobody can (a turn from the
+    // tunnel up onto the road)
+    bool LevelStep()
+    {
+        int index = gridPath.Count - 1;
+        if (cellLevel.Count > index) cellLevel.RemoveRange(index, cellLevel.Count - index);
+        TwoLevels levels = Levels;
+        if (levels == null)
+        {
+            while (cellLevel.Count <= index) cellLevel.Add(0);
+            return true;
+        }
+        while (cellLevel.Count < index)
+        {
+            int i = cellLevel.Count;
+            if (i == 0) cellLevel.Add(levels.StartLevel(gridPath[0].x, gridPath[0].y));
+            else
+            {
+                levels.Step(gridPath[i - 1].x, gridPath[i - 1].y, cellLevel[i - 1], gridPath[i].x, gridPath[i].y, out int l);
+                cellLevel.Add(l);
+            }
+        }
+        Vector2Int g = gridPath[index];
+        if (index == 0)
+        {
+            cellLevel.Add(levels.StartLevel(g.x, g.y));
+            return true;
+        }
+        Vector2Int p = gridPath[index - 1];
+        bool ok = levels.Step(p.x, p.y, cellLevel[index - 1], g.x, g.y, out int level);
+        cellLevel.Add(ok ? level : cellLevel[index - 1]);
+        return ok;
+    }
+
+    int LevelAt(int index) => index >= 0 && index < cellLevel.Count ? cellLevel[index] : -1;
+
     // Cuts the line back to just before the closed piece and stops drawing; the player carries on from there
-    void StopLine()
+    void StopLine(string message = null)
     {
         int keepCells = Mathf.Max(1, blockedFrom + 1);
         int keepPoints = Mathf.Max(1, cellPoint[keepCells - 1]);
@@ -596,7 +645,7 @@ public class ManualPathDrawer : MonoBehaviour
         FlashLine(removed, new Color(0.85f, 0.15f, 0.1f), 1.2f);
         TrimTo(keepPoints);
         isDrawing = false;
-        UIToast.ShowSide("You can't get past there. Carry on drawing from the end of your line, round it.", 4f);
+        UIToast.ShowSide(message ?? "You can't get past there. Carry on drawing from the end of your line, round it.", 4f);
     }
 
     // Keeps the first count drawn points and the cells and detours that belong to them
@@ -647,6 +696,8 @@ public class ManualPathDrawer : MonoBehaviour
         return SearchInBox(new List<Vector2Int> { a, b }, a, b, margin, allowed);
     }
 
+    int boxStartLevel = -1;   // the level at a for the next SearchInBox (-1: from the cell)
+
     List<Vector2Int> SearchInBox(List<Vector2Int> around, Vector2Int a, Vector2Int b, int margin, HashSet<Vector2Int> allowed)
     {
         int rows = manager.speedGrid2D.GetLength(0), cols = manager.speedGrid2D.GetLength(1);
@@ -677,7 +728,11 @@ public class ManualPathDrawer : MonoBehaviour
             }
         }
         var offset = new Vector2Int(x0, y0);
-        List<Vector2Int> path = new AStarPathfinder(speed, slopes).FindPath(a - offset, b - offset, 1);
+        AStarPathfinder search = new AStarPathfinder(speed, slopes);
+        search.UseLevels(TwoLevels.For(rows, cols), offset);
+        search.startLevel = boxStartLevel;
+        boxStartLevel = -1;
+        List<Vector2Int> path = search.FindPath(a - offset, b - offset, 1);
         if (path == null) return null;
         for (int i = 0; i < path.Count; i++) path[i] += offset;
         return path;

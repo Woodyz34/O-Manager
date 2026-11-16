@@ -20,6 +20,7 @@ public class AStarPathfinder
         this.height = speedGrid.GetLength(0);
         this.width = speedGrid.GetLength(1);
         this.slopeFactors = slopeFactors;
+        levels = TwoLevels.For(height, width);
 
         // The estimate of the cost left must never be higher than the real cost, or A* reopens cells over and over
         // (one search on the 2 m sprint grid took 10 s). The cheapest step is the fastest cell on the best slope.
@@ -54,6 +55,18 @@ public class AStarPathfinder
     }
 
     private float heuristicScale;
+
+    // Tunnels and bridges (TwoLevels): searched with the level the runner is on. A search on a piece of a bigger grid
+    // (ManualPathDrawer.SearchInBox) gives the whole grid's levels and where the piece starts.
+    private TwoLevels levels;
+    private Vector2Int levelOffset;
+    public int startLevel = -1;   // the level at the start, -1 = from the start cell
+
+    public void UseLevels(TwoLevels twoLevels, Vector2Int offset)
+    {
+        levels = twoLevels != null && twoLevels.Any ? twoLevels : null;
+        levelOffset = offset;
+    }
 
     // Octile distance (diagonal steps cost 1.414) at the fastest possible speed
     private float Estimate(int x, int y, Vector2Int goal)
@@ -203,6 +216,7 @@ public class AStarPathfinder
     {
         float[,] grid = customGrid ?? speedGrid;
         if (!IsInsideGrid(start) || !IsInsideGrid(goal)) return null;
+        if (levels != null) return InternalFindPathOnLevels(start, goal, grid, blockedEdges);
 
         int cellCount = width * height;
         if (gScore == null)
@@ -278,6 +292,95 @@ public class AStarPathfinder
             }
         }
 
+        return null;
+    }
+
+    // The same search with the level (ground or on a tunnel/bridge) as part of where the runner is: state = cell, or
+    // cell + cellCount on the way
+    private float[] levelG;
+    private int[] levelFrom;
+
+    private List<Vector2Int> InternalFindPathOnLevels(Vector2Int start, Vector2Int goal, float[,] grid, List<(Vector2Int, Vector2Int)> blockedEdges)
+    {
+        int cellCount = width * height;
+        if (levelG == null || levelG.Length != 2 * cellCount)
+        {
+            levelG = new float[2 * cellCount];
+            levelFrom = new int[2 * cellCount];
+        }
+        for (int i = 0; i < levelG.Length; i++)
+        {
+            levelG[i] = float.PositiveInfinity;
+            levelFrom[i] = -1;
+        }
+        heapCount = 0;
+
+        float[][,] slopes = new float[8][,];
+        if (slopeFactors != null)
+        {
+            for (int d = 0; d < 8; d++)
+                slopeFactors.TryGetValue(dirNames[d], out slopes[d]);
+        }
+
+        int ox = levelOffset.x, oy = levelOffset.y;
+        int firstLevel = startLevel >= 0 ? startLevel : levels.StartLevel(start.x + ox, start.y + oy);
+        int startState = start.y * width + start.x + (firstLevel > 0 ? cellCount : 0);
+        int goalIndex = goal.y * width + goal.x;
+        levelG[startState] = 0;
+        HeapPush(startState, 0);
+
+        while (heapCount > 0)
+        {
+            float currentF = heapKeys[0];
+            int state = HeapPop();
+            int level = state >= cellCount ? 1 : 0;
+            int current = state - level * cellCount;
+            int cx = current % width;
+            int cy = current / width;
+            float currentG = levelG[state];
+            if (currentF > currentG + Estimate(cx, cy, goal) + 0.0001f && state != startState)
+                continue;
+            if (current == goalIndex)
+            {
+                var path = new List<Vector2Int>();
+                while (state >= 0)
+                {
+                    int cell = state % cellCount;
+                    path.Add(new Vector2Int(cell % width, cell / width));
+                    state = levelFrom[state];
+                }
+                path.Reverse();
+                return path;
+            }
+
+            for (int d = 0; d < 8; d++)
+            {
+                int nx = cx + dirX[d];
+                int ny = cy + dirY[d];
+                if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                float cellSpeed = grid[ny, nx];
+                if (cellSpeed <= 0.01f) continue;
+                if (dirX[d] != 0 && dirY[d] != 0 && (grid[cy, nx] <= 0.01f || grid[ny, cx] <= 0.01f)) continue;
+                if (blockedEdges != null && blockedEdges.Contains((new Vector2Int(cx, cy), new Vector2Int(nx, ny))))
+                    continue;
+                if (!levels.Step(cx + ox, cy + oy, level, nx + ox, ny + oy, out int nextLevel)) continue;
+                // A diagonal step goes past the two cells beside it: no slipping between the levels at a corner
+                if (dirX[d] != 0 && dirY[d] != 0
+                    && (!levels.Step(cx + ox, cy + oy, level, nx + ox, cy + oy, out _) || !levels.Step(cx + ox, cy + oy, level, cx + ox, ny + oy, out _)))
+                    continue;
+
+                float distance = (dirX[d] != 0 && dirY[d] != 0) ? 1.414f : 1f;
+                float slopeFactor = slopes[d] != null ? slopes[d][cy, cx] : 1f;
+                float tentativeGScore = currentG + (distance / cellSpeed) / slopeFactor;
+                int next = ny * width + nx + (nextLevel > 0 ? cellCount : 0);
+                if (tentativeGScore < levelG[next])
+                {
+                    levelFrom[next] = state;
+                    levelG[next] = tentativeGScore;
+                    HeapPush(next, tentativeGScore + Estimate(nx, ny, goal));
+                }
+            }
+        }
         return null;
     }
 
