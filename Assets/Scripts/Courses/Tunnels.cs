@@ -9,11 +9,11 @@ using UnityEngine;
 // import only opened the cells under the two side lines (the bridge rule). On a sprint map those are thin diagonal
 // lines of 2 m cells, and the runners and the drawn line could not get through (no corner-cutting past fences).
 //
-// Here, when a map's grid is loaded, every tunnel gets:
-//  - a solid passage between its side lines through the fences and walls it goes under, and
-//  - walls along its sides where it is under that closed ground, so a runner in the tunnel can not step out onto the
-//    road above (the other level) and the road can not be reached from the tunnel.
-// Outside the closed part (the open ground at each end) nothing changes.
+// Here, when a map's grid is loaded, every tunnel gets a solid passage between its side lines through the fences and
+// walls it goes under. Two levels (2026-11-16, TwoLevels): the road above a tunnel stays open to walk along, and the
+// way through the tunnel goes straight on under it. Who goes into the tunnel stays in it to its other end, and who is
+// on the road can not drop down into it (no 90 degree turn from the tunnel up onto the road). Before, walls along the
+// tunnel's sides cut the road above in two.
 //
 // Bridges and footbridges (512.1 "Bro / Spång") get the same passage between their side lines, without walls (the
 // water or road under them is closed anyway): a narrow bridge drawn at a slant was, like the tunnels, only a thin
@@ -23,7 +23,7 @@ public static class Tunnels
     struct Tunnel
     {
         public Vector2 a1, a2, b1, b2;   // side line a from a1 to a2, side line b from b1 (near a1) to b2 (near a2)
-        public bool walls;               // tunnels: walls along the sides under the closed ground; bridges: none
+        public bool walls;               // a tunnel (true) or a bridge
     }
 
     static readonly Dictionary<string, List<Tunnel>> cache = new Dictionary<string, List<Tunnel>>();
@@ -31,7 +31,10 @@ public static class Tunnels
     // gridName is "<package root>grid"; the map objects are in "<package root>lines"
     public static void Apply(string gridName, float[,] speed)
     {
-        if (speed == null || string.IsNullOrEmpty(gridName) || !gridName.EndsWith("grid")) return;
+        if (speed == null) return;
+        // A grid without tunnels forgets the levels of an earlier grid of the same size
+        TwoLevels.Register(new TwoLevels(speed.GetLength(0), speed.GetLength(1)));
+        if (string.IsNullOrEmpty(gridName) || !gridName.EndsWith("grid")) return;
         MapDefinition map = null;
         foreach (MapDefinition m in MapDefinition.All)
         {
@@ -41,9 +44,10 @@ public static class Tunnels
         List<Tunnel> tunnels = Load(map);
         if (tunnels.Count == 0) return;
         int opened = 0;
-        // Bridges first, so a tunnel's walls are not opened again by a bridge above it
-        foreach (Tunnel tunnel in tunnels) if (!tunnel.walls) opened += Open(map, speed, tunnel);
-        foreach (Tunnel tunnel in tunnels) if (tunnel.walls) opened += Open(map, speed, tunnel);
+        TwoLevels levels = new TwoLevels(speed.GetLength(0), speed.GetLength(1));
+        foreach (Tunnel tunnel in tunnels) if (!tunnel.walls) opened += Open(map, speed, tunnel, levels);
+        foreach (Tunnel tunnel in tunnels) if (tunnel.walls) opened += Open(map, speed, tunnel, levels);
+        TwoLevels.Register(levels);
         Debug.Log($"Tunnels and bridges: {tunnels.Count} on {map.displayName}, {opened} cells opened");
     }
 
@@ -142,7 +146,7 @@ public static class Tunnels
     }
 
     // Opens the passage and puts up the walls. Returns how many cells were opened.
-    static int Open(MapDefinition map, float[,] speed, Tunnel t)
+    static int Open(MapDefinition map, float[,] speed, Tunnel t, TwoLevels levels)
     {
         int rows = speed.GetLength(0), cols = speed.GetLength(1);
         float metresPerCell = Mathf.Max(0.5f, map.gridSize);
@@ -198,28 +202,28 @@ public static class Tunnels
             }
         }
 
-        // The walls: just outside the side lines, where the tunnel is under closed ground
-        float wallOut = 0.5f * metresPerCell / Mathf.Max(0.5f, width);
-        HashSet<Vector2Int> walls = new HashSet<Vector2Int>();
-        for (int i = 0; i <= alongSteps && t.walls; i++)
+        // The way's own cells (closed before: under the fence, the wall, over the water) and the cells it shares with
+        // the ground above or below (the road over a tunnel, the path under a bridge)
+        Vector2 CellF(Vector2 p)
         {
-            float along = i / (float)alongSteps;
-            if (along < closedFrom || along > closedTo) continue;
-            foreach (float across in new[] { -wallOut, 0f, 1f, 1f + wallOut })
-            {
-                Vector2Int c = Cell(At(along, across));
-                if (Inside(c) && !passage.Contains(c)) walls.Add(c);
-            }
+            Vector3 w = map.ToWorld(new CoursePoint(p.x, p.y));
+            return new Vector2(w.x / map.CellSize + cols / 2f, w.y / map.CellSize + rows / 2f);
         }
-
-        int opened = 0;
+        Vector2 from = CellF((t.a1 + t.b1) / 2f), to = CellF((t.a2 + t.b2) / 2f);
+        var own = new List<Vector2Int>();
+        var shared = new List<Vector2Int>();
         foreach (Vector2Int c in passage)
         {
-            if (speed[c.y, c.x] > 0.01f) continue;
+            if (speed[c.y, c.x] <= 0.01f) own.Add(c);
+            else shared.Add(c);
+        }
+        int opened = 0;
+        foreach (Vector2Int c in own)
+        {
             speed[c.y, c.x] = 1.2f;
             opened++;
         }
-        foreach (Vector2Int c in walls) speed[c.y, c.x] = 0f;
+        levels.Add(from, to, own, shared);
         return opened;
     }
 }
