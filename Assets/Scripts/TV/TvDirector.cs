@@ -786,8 +786,15 @@ public class TvDirector : MonoBehaviour
             if (!(runner is NetworkPlayer player) || !player.IsValidRunner) continue;
             bool punched = player.relaySplitLeg == producedLeg && player.relaySplitCount > current.ordinal
                            && current.ordinal < player.relaySplits.Length && player.relaySplits[current.ordinal] > 0;
-            // The time comes up when the runner is seen punching, not a moment before
-            if (punched && current.view != null && current.view.PunchToCome(runner)) punched = false;
+            // The time comes up when the runner is seen punching, not a moment before. Until then the runner is listed
+            // as on its way with the clock still going, up to its punch time (2026-11-16: in the last second before the
+            // punch on TV the box said "Nobody on the way here yet", since the race itself had already passed the control)
+            if (punched && current.view != null && current.view.PunchToCome(runner))
+            {
+                int split = player.relaySplits[current.ordinal];
+                into.Add(new Split { name = player.RunnerLabel, color = ColorOf(runner), seconds = Mathf.Min(RelayRace.TeamSeconds(player), split), running = true });
+                continue;
+            }
             if (punched)
             {
                 into.Add(new Split { name = player.RunnerLabel, color = ColorOf(runner), seconds = player.relaySplits[current.ordinal] });
