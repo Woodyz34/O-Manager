@@ -69,9 +69,8 @@ public class CardManager : MonoBehaviour
     // "Your runners": the runners the player owns, plus runners on loan up to 10 (RunnerCollection.CardsForRace)
     public void ShowOwnedCards()
     {
-        // With a max overall the cheapest missing runner is lent when none of the player's own is under it
-        List<CardData> owned = RunnerRules.Cap > 0 && RelayRace.Active == null ? UnderCap(RunnerRules.YourRunnersPool(new List<LegSex> { LegSex.Any }, RunnerRules.Cap))
-            : RunnerCollection.CardsForRace();
+        // The max average overall is for relays only (2026-11-16), so an individual race offers every runner
+        List<CardData> owned = RunnerCollection.CardsForRace();
         foreach (CardData card in owned)
         {
             Offer(card);
@@ -90,8 +89,8 @@ public class CardManager : MonoBehaviour
     // An individual race with a max overall (RunnerRules.Cap): only the runners at or under it
     static List<CardData> UnderCap(List<CardData> cards)
     {
-        if (RunnerRules.Cap <= 0 || RelayRace.Active != null) return cards;   // relays: RelayRace checks the whole team
-        return cards.FindAll(c => RunnerRules.BudgetCost(c) <= RunnerRules.Cap);
+        // Since 2026-11-16 the max is for relays only, and RelayRace checks the whole team there
+        return cards;
     }
 
     // The ON LOAN ribbon on runners the player only has for this round (lent, or out of an "Open packs" pack).
