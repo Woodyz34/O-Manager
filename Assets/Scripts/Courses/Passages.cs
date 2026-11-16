@@ -40,16 +40,7 @@ public static class Passages
 
         int rows = speed.GetLength(0), cols = speed.GetLength(1);
         // The cells the blocking lines run through: only these are opened again
-        HashSet<Vector2Int> lineCells = new HashSet<Vector2Int>();
-        float step = Mathf.Max(0.25f, map.gridSize * 0.25f);
-        foreach (Vector2[] line in lines)
-        {
-            for (int i = 0; i + 1 < line.Length; i++)
-            {
-                int n = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(line[i], line[i + 1]) / step));
-                for (int k = 0; k <= n; k++) lineCells.Add(Cell(map, Vector2.Lerp(line[i], line[i + 1], k / (float)n)));
-            }
-        }
+        HashSet<Vector2Int> lineCells = LineCells(map, sprint);
 
         int opened = 0;
         float reach = map.gridSize * 1.6f;
@@ -70,6 +61,28 @@ public static class Passages
             }
         }
         Debug.Log($"Passages: {gaps.Count} gaps in fences, walls and cliffs on {map.displayName}, {opened} cells opened");
+    }
+
+    static readonly Dictionary<string, HashSet<Vector2Int>> lineCellCache = new Dictionary<string, HashSet<Vector2Int>>();
+
+    // Every grid cell a blocking line (fence, wall, cliff ...) runs through
+    public static HashSet<Vector2Int> LineCells(MapDefinition map, bool sprint)
+    {
+        string key = map.linesPath + (sprint ? "|s" : "|f");
+        if (lineCellCache.TryGetValue(key, out HashSet<Vector2Int> known)) return known;
+        var cells = new HashSet<Vector2Int>();
+        lineCellCache[key] = cells;
+        if (string.IsNullOrEmpty(map.linesPath)) return cells;
+        float step = Mathf.Max(0.25f, map.gridSize * 0.25f);
+        foreach (Vector2[] line in Lines(map, sprint))
+        {
+            for (int i = 0; i + 1 < line.Length; i++)
+            {
+                int n = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(line[i], line[i + 1]) / step));
+                for (int k = 0; k <= n; k++) cells.Add(Cell(map, Vector2.Lerp(line[i], line[i + 1], k / (float)n)));
+            }
+        }
+        return cells;
     }
 
     static Vector2Int Cell(MapDefinition map, Vector2 p) => map.ToCell(new CoursePoint(p.x, p.y));
