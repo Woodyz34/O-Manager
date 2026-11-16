@@ -233,10 +233,13 @@ public static class LobbyVisit
     }
 }
 
-// Hides the "While you wait" card while something else is open in the lobby (choose course, AI course,
-// runner pool, game mode, colour picker...), so it stays in the background and never covers a pop-up.
+// Keeps the "While you wait" card in the background of the lobby (2026-11-16: it used to be hidden while anything
+// else was open, so it jumped away and back; the user wants it always there). Pop-ups made in code have their own
+// canvas above it anyway. The lobby's own big windows (choose course, AI course, the old runner pool panel) are in
+// the lobby's canvas under the card, so each gets a canvas of its own that sorts above the card.
 public class LobbyVisitCard : MonoBehaviour
 {
+    const int AboveCard = 10;
     Canvas canvas;
     MapSelectUI maps;
     GameModeSelect pools;
@@ -255,28 +258,22 @@ public class LobbyVisitCard : MonoBehaviour
         nextCheck = Time.unscaledTime + 0.1f;
         // While visiting the shop or the course builder LobbyVisit has switched the canvas off; leave it alone
         if (LobbyVisit.Active) return;
-        bool show = !SomethingOpen();
-        if (canvas.enabled != show) canvas.enabled = show;
+        if (!canvas.enabled) canvas.enabled = true;
+        if (maps != null) Lift(maps.mapSelectPanel);
+        if (pools != null) Lift(pools.gameModeSelectPanel);
+        AICoursePanel ai = FindObjectOfType<AICoursePanel>();
+        if (ai != null) Lift(ai.gameObject);
     }
 
-    bool SomethingOpen()
+    // An open lobby window draws above the card
+    void Lift(GameObject window)
     {
-        if (maps != null && maps.mapSelectPanel != null && maps.mapSelectPanel.activeInHierarchy) return true;
-        if (pools != null && pools.gameModeSelectPanel != null && pools.gameModeSelectPanel.activeInHierarchy) return true;
-        if (FindObjectOfType<AICoursePanel>() != null) return true;
-        // Pop-ups made in code have their own canvas above this one (the short toast messages do not count)
-        foreach (Canvas other in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
-        {
-            if (other == canvas || !other.isRootCanvas || !other.isActiveAndEnabled) continue;
-            if (other.renderMode != RenderMode.ScreenSpaceOverlay || other.sortingOrder <= canvas.sortingOrder) continue;
-            if (other.name == "Toast" || other.name == "Esc menu") continue;
-            if (other.GetComponent<LoadingScreenUI>() != null) continue;
-            if (other.GetComponent<HoverTip>() != null) continue;   // the hover text's canvas is always there
-            // Canvases that live for the whole game (the updater's version label, the F3 FPS meter...) are not
-            // lobby pop-ups. The updater's canvas (2026-11-14) was always there and hid this card for good.
-            if (other.gameObject.scene.name == "DontDestroyOnLoad") continue;
-            return true;
-        }
-        return false;
+        if (window == null || !window.activeInHierarchy) return;
+        Canvas own = window.GetComponent<Canvas>();
+        if (own != null && (!own.overrideSorting || own.sortingOrder >= AboveCard)) return;
+        if (own == null) own = window.AddComponent<Canvas>();
+        own.overrideSorting = true;
+        own.sortingOrder = Mathf.Max(AboveCard, canvas.sortingOrder + 5);
+        if (window.GetComponent<GraphicRaycaster>() == null) window.AddComponent<GraphicRaycaster>();
     }
 }
