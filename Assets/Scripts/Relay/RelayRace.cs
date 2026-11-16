@@ -473,7 +473,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     int statsDueForLeg = -1;
     bool statsDueFinal;
     float statsDueSince;
-    const float StatsLongestWait = 10f;
+    const float StatsLongestWait = 18f;   // the whole finish shot (TvDirector.FinishLongest + FinishHold) fits
 
     void AskForStats(bool final)
     {
