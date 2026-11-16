@@ -21,6 +21,7 @@ public static class Passages
 
     static readonly Dictionary<string, List<Gap>> cache = new Dictionary<string, List<Gap>>();
     static readonly Dictionary<string, List<Vector2[]>> lineCache = new Dictionary<string, List<Vector2[]>>();
+    static readonly HashSet<Vector2[]> trimmable = new HashSet<Vector2[]>();   // lines whose end cells StubCells may open
 
     // gridName is "<package root>grid"; the map objects are in "<package root>lines"
     public static void Apply(string gridName, float[,] speed)
@@ -35,12 +36,22 @@ public static class Passages
         bool sprint = map.gridSize < 5f;
         List<Vector2[]> lines = Lines(map, sprint);
         if (lines.Count == 0) return;
-        List<Gap> gaps = Gaps(map, lines, sprint);
-        if (gaps.Count == 0) return;
-
         int rows = speed.GetLength(0), cols = speed.GetLength(1);
         // The cells the blocking lines run through: only these are opened again
         HashSet<Vector2Int> lineCells = LineCells(map, sprint);
+
+        int stubs = 0;
+        if (!sprint)
+        {
+            foreach (Vector2Int c in StubCells(map, lines))
+            {
+                if (c.x >= 0 && c.y >= 0 && c.x < cols && c.y < rows) stubs += OpenCell(speed, c, lineCells);
+            }
+            if (stubs > 0) Debug.Log($"Passages: {stubs} cells opened where a cliff or fence only just reaches into them on {map.displayName}");
+        }
+
+        List<Gap> gaps = Gaps(map, lines, sprint);
+        if (gaps.Count == 0) return;
 
         int opened = 0;
         float reach = map.gridSize * 1.6f;
@@ -86,6 +97,77 @@ public static class Passages
     }
 
     static Vector2Int Cell(MapDefinition map, Vector2 p) => map.ToCell(new CoursePoint(p.x, p.y));
+
+    static readonly Dictionary<string, List<Vector2Int>> stubCache = new Dictionary<string, List<Vector2Int>>();
+
+    // Forest maps (2026-11-16): the import closes every 10 m cell a blocking line touches, so a cliff that ends just
+    // inside a cell closes the whole cell, and the gap beside the cliff's end was gone (Illern: a cliff reaching 0.7 m
+    // into a cell shut the way between it and the next cliff). The end cells of blocking lines that hold less than
+    // StubShare of a cell of line (all blocking lines counted) are opened again; the barrier is at most that much shorter.
+    // An end that touches another blocking line (two fence pieces joined, a T) is left alone, or the fence would leak.
+    const float StubShare = 0.3f;
+
+    static List<Vector2Int> StubCells(MapDefinition map, List<Vector2[]> lines)
+    {
+        if (stubCache.TryGetValue(map.linesPath, out List<Vector2Int> known)) return known;
+        var stubs = new List<Vector2Int>();
+        stubCache[map.linesPath] = stubs;
+        // Metres of blocking line in every cell, and the line pieces in it
+        var length = new Dictionary<Vector2Int, float>();
+        var pieces = new Dictionary<Vector2Int, List<(int line, int piece)>>();
+        float step = Mathf.Max(0.25f, map.gridSize * 0.05f);
+        for (int l = 0; l < lines.Count; l++)
+        {
+            Vector2[] line = lines[l];
+            for (int i = 0; i + 1 < line.Length; i++)
+            {
+                float d = Vector2.Distance(line[i], line[i + 1]);
+                if (d < 1e-4f) continue;
+                int n = Mathf.Max(1, Mathf.CeilToInt(d / step));
+                for (int k = 0; k < n; k++)
+                {
+                    Vector2Int c = Cell(map, Vector2.Lerp(line[i], line[i + 1], (k + 0.5f) / n));
+                    length.TryGetValue(c, out float sum);
+                    length[c] = sum + d / n;
+                    if (!pieces.TryGetValue(c, out var list)) pieces[c] = list = new List<(int, int)>();
+                    if (list.Count == 0 || list[list.Count - 1] != (l, i)) list.Add((l, i));
+                }
+            }
+        }
+        float most = map.gridSize * StubShare;
+        const float touching = 2.5f;
+        var done = new HashSet<Vector2Int>();
+        var bad = new HashSet<Vector2Int>();
+        for (int l = 0; l < lines.Count; l++)
+        {
+            Vector2[] line = lines[l];
+            if (Vector2.Distance(line[0], line[line.Length - 1]) < 0.01f) continue;   // a closed ring has no ends
+            foreach (Vector2 end in new[] { line[0], line[line.Length - 1] })
+            {
+                Vector2Int c = Cell(map, end);
+                if (!trimmable.Contains(line)) { bad.Add(c); continue; }
+                if (!length.TryGetValue(c, out float metres) || metres >= most) continue;
+                bool joined = false;
+                for (int dx = -1; dx <= 1 && !joined; dx++)
+                {
+                    for (int dy = -1; dy <= 1 && !joined; dy++)
+                    {
+                        if (!pieces.TryGetValue(new Vector2Int(c.x + dx, c.y + dy), out var list)) continue;
+                        foreach ((int other, int piece) in list)
+                        {
+                            if (other == l) continue;
+                            Vector2[] o = lines[other];
+                            if (Vector2.Distance(end, NearestOnPiece(end, o[piece], o[piece + 1])) < touching) { joined = true; break; }
+                        }
+                    }
+                }
+                if (joined) bad.Add(c);
+                else done.Add(c);
+            }
+        }
+        foreach (Vector2Int c in done) if (!bad.Contains(c)) stubs.Add(c);
+        return stubs;
+    }
 
     static bool OpenBeyond(MapDefinition map, float[,] speed, Gap gap, float reach)
     {
@@ -145,8 +227,13 @@ public static class Passages
                 string type = (string)geometry?["type"] ?? "";
                 JArray coords = geometry?["coordinates"] as JArray;
                 if (coords == null) continue;
+                int before = lines.Count;
                 if (type == "LineString") AddLine(lines, coords);
                 else if (type == "MultiLineString") foreach (JToken part in coords) AddLine(lines, part as JArray);
+                // Cliffs (2xx), walls and fences (5xx, not building outlines): the ends that may be trimmed.
+                // Lake shores, vegetation edges and buildings keep their cells.
+                bool trim = layer.StartsWith("2") || (layer.StartsWith("5") && !layer.StartsWith("521"));
+                for (int k = before; k < lines.Count; k++) if (trim) trimmable.Add(lines[k]);
             }
         }
         catch (Exception e)
