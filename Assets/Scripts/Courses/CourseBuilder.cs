@@ -510,6 +510,13 @@ public class CourseBuilder : MonoBehaviour
             return;
         }
 
+        // F over the last control: it becomes the finish
+        if (!typing && hover.kind == HoverKind.Mark && IsLastControl(hover.mark) && Input.GetKeyDown(KeyCode.F))
+        {
+            MakeFinish(hover.mark.item);
+            return;
+        }
+
         // Right click (without dragging) on a mark removes it
         if (Input.GetMouseButtonUp(1) && !panning && !overUI)
         {
@@ -634,7 +641,8 @@ public class CourseBuilder : MonoBehaviour
         {
             drawn.Add(Ring(hover.mark, accent));
             string also = relay && hover.mark.type != MarkType.BranchControl ? LegsText(LinksAt(hover.mark.position)) : "";
-            tip = MarkName(hover.mark) + ": drag to move, right-click to remove" + (also.Length > 0 ? "\nSame control on " + also + ": it moves there too (hold Alt for this leg only)" : "");
+            tip = MarkName(hover.mark) + ": drag to move, right-click to remove"
+                + (IsLastControl(hover.mark) ? "\nPress F to make it the finish" : "") + (also.Length > 0 ? "\nSame control on " + also + ": it moves there too (hold Alt for this leg only)" : "");
         }
         else if (hover.kind == HoverKind.Fork)
         {
@@ -1485,6 +1493,30 @@ public class CourseBuilder : MonoBehaviour
             case MarkType.Control: course.items[mark.item].point = world; break;
             case MarkType.BranchControl: forks[mark.fork].branches[mark.branch][mark.index] = world; break;
         }
+    }
+
+    // The last control of the course (not on a fork): it can be turned into the finish (2026-11-16: before, it had to be
+    // removed and a finish put in its place)
+    bool IsLastControl(Mark mark)
+    {
+        EditCourse course = Cur;
+        return mark != null && mark.type == MarkType.Control && mark.item >= 0 && mark.item == course.items.Count - 1
+            && course.items[mark.item].fork < 0;
+    }
+
+    void MakeFinish(int item)
+    {
+        EditCourse course = Cur;
+        if (item < 0 || item >= course.items.Count || course.items[item].fork >= 0) return;
+        PushUndo();
+        insertAfter = null;
+        cursorKey = null;
+        bool hadFinish = course.finish.HasValue;
+        course.finish = course.items[item].point;
+        course.items.RemoveAt(item);
+        errorPoint = null;
+        SetStatus(hadFinish ? "The last control is the finish now (the old finish was removed)." : "The last control is the finish now.", false);
+        Redraw();
     }
 
     void RemoveMark(Mark mark)
@@ -2772,13 +2804,21 @@ public class CourseBuilder : MonoBehaviour
                         ("Fork", CourseUI.ButtonKind.Secondary, () => MakeFork(index)),
                         ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
                         ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
+                    if (index == course.items.Count - 1) AddRow("", 30, CourseUI.Ink, FontStyles.Normal, 34,
+                        ("Make finish", CourseUI.ButtonKind.Light, () => MakeFinish(index)));
                     if (item.tv) AddTvRow(item.point);
                 }
                 else
                 {
-                    AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
-                        ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
-                        ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
+                    if (index == course.items.Count - 1)
+                        AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
+                            ("Finish", CourseUI.ButtonKind.Light, () => MakeFinish(index)),
+                            ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
+                            ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
+                    else
+                        AddRow(text, 38, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6,
+                            ("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)),
+                            ("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
                 }
                 previous = item.point;
                 continue;
