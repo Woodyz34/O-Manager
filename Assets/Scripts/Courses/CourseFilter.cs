@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 // Searching and filtering course lists (the lobby's course page and the single-player page)
 public static class CourseFilter
@@ -18,6 +19,34 @@ public static class CourseFilter
     }
 
     public static readonly string[] KindNames = { "All courses", "Individual", "Relay", "Forest", "Sprint" };
+
+    // Several types at once (2026-11-16, mix and match): ticked among Individual/Relay and among Forest/Sprint.
+    // Within a pair any ticked one matches; nothing ticked in a pair = both.
+    public static readonly string[] TypeOptions = { "Individual", "Relay", "Forest", "Sprint" };
+
+    public static string TypesLabel(HashSet<string> types)
+    {
+        if (types == null || types.Count == 0 || types.Count == TypeOptions.Length) return "Type: All";
+        var names = new List<string>();
+        foreach (string t in TypeOptions) if (types.Contains(t)) names.Add(t);
+        return "Type: " + string.Join(", ", names);
+    }
+
+    public static bool MatchesTypes(CourseData course, HashSet<string> types)
+    {
+        if (course == null) return false;
+        if (types == null || types.Count == 0) return true;
+        bool format = types.Contains("Individual") || types.Contains("Relay");
+        if (format && !types.Contains(course.IsRelay() ? "Relay" : "Individual")) return false;
+        bool ground = types.Contains("Forest") || types.Contains("Sprint");
+        if (ground && !types.Contains(course.IsSprint() ? "Sprint" : "Forest")) return false;
+        return true;
+    }
+
+    public static bool Matches(CourseData course, string search, HashSet<string> types)
+    {
+        return MatchesTypes(course, types) && Matches(course, search, Kind.All);
+    }
 
     public static Kind Next(Kind kind) => (Kind)(((int)kind + 1) % 5);
 
