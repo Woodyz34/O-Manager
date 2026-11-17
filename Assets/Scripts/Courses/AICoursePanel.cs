@@ -112,6 +112,12 @@ public class AICoursePanel : MonoBehaviour
         CourseUI.Stretch(shade.rectTransform);
         AICoursePanel panel = shade.gameObject.AddComponent<AICoursePanel>();
 
+        Canvas canvas = shade.gameObject.AddComponent<Canvas>();
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = 100;
+
+        shade.gameObject.AddComponent<GraphicRaycaster>();
+
         Image card = CourseUI.CardPanel("Window", shade.transform);
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1240, 950));
 
