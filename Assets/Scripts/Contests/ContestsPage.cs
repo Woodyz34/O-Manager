@@ -261,7 +261,7 @@ public class ContestsPage : MonoBehaviour
 
         CourseData course = ContestRun.ReadCourse(c.course);
         Image frame = CourseUI.Panel("Picture", card.transform, CourseUI.CardSolid);
-        CourseUI.Size(frame, 230);
+        CourseUI.Size(frame, 206);
         frame.gameObject.AddComponent<RectMask2D>();
         Texture2D thumbnail = course != null ? CourseThumbnail.Get(course) : null;
         if (thumbnail != null && (c.Started || c.Done))
@@ -281,8 +281,9 @@ public class ContestsPage : MonoBehaviour
             CourseUI.Stretch(hidden.rectTransform, 16, 16, 16, 16);
         }
 
-        TextMeshProUGUI rules = CourseUI.Text("Rules", card.transform, ContestRun.RunnerText(c), 19, CourseUI.InkMuted);
-        CourseUI.Size(rules, 52);
+        TextMeshProUGUI rules = CourseUI.Text("Rules", card.transform, "<b>" + ContestRun.CourseText(c, course) + "</b>\n" + ContestRun.RunnerText(c), 19, CourseUI.InkMuted);
+        rules.richText = true;
+        CourseUI.Size(rules, 76);
         TextMeshProUGUI prizes = CourseUI.Text("Prizes", card.transform, PrizeText(c), 19, CourseUI.Ink);
         prizes.richText = true;
         CourseUI.Size(prizes, 78);

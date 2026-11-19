@@ -61,6 +61,17 @@ public static class ContestRun
         return GameModes.MakeSameStats(new List<Vector2Int> { new Vector2Int(100, technique) }, new List<int> { 100 });
     }
 
+    // "Long · 9.8 km · 12 controls" before the start (2026-11-19, the user): the course once laid, else what the
+    // contest's seed will lay. Never the map.
+    public static string CourseText(ContestInfo c, CourseData course)
+    {
+        CourseGenerator.Settings planned = SettingsFor(c);
+        string kind = CourseGenerator.KindName(planned.kind);
+        if (course != null && course.controls != null)
+            return kind + " · " + course.LengthText() + " · " + course.controls.Count + " controls";
+        return kind + " · about " + planned.lengthKm.ToString("0.0", CultureInfo.InvariantCulture) + " km · about " + planned.controls + " controls";
+    }
+
     public static ExtraMode ModesFor(ContestInfo c) => c.RouteChoice ? ExtraMode.RouteChoice : ExtraMode.None;
 
     // How the contest's AI course is laid (2026-11-19, the user): a random length and number of controls, drawn from the
