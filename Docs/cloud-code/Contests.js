@@ -16,8 +16,8 @@
 //   Private custom data "contests_meta"         key "cleaned": { ids: [ contests already cleaned up ] }
 //
 // Clean-up: once a contest is over (and its 3 late hours have passed) the next "status" call deletes its replays
-// and its course. Only the small list of names and results stays, so players who come back later still get
-// their prize money.
+// and its course. The small list of names and results stays KEEP_DAYS (30) more days, so players who come back
+// later still get their prize money; then it is deleted too.
 //
 // The first player of a contest lays its AI course in the game and sends it here ("setCourse"); everyone after runs
 // the same course. Prizes are worked out when a player asks for them after the contest is over ("claim").
@@ -43,9 +43,9 @@ const MAX_REPLAY_CHARS = 400000;
 const MAX_NAME = 24;
 const LATE_MINUTES = 180;          // a run started before the end may be handed in up to 3 hours after it
 const HISTORY_KEEP = 120;
-const CLEAN_WEEKS = 4;             // how far back clean-up looks (in case nobody opened the game for a while)
-const CLEAN_DAYS = 14;
-const CLEANED_KEEP = 200;
+const CLEAN_DAYS = 28;             // how far back clean-up looks (in case nobody opened the game for a while)
+const KEEP_DAYS = 30;              // the leaderboard (names and results) is kept this long for late prize claims
+const CLEANED_KEEP = 400;
 
 // Prize money (kr). The top three's prizes grow with every player: the pot (sum of the top three) gets
 // GROWTH more for each player after the first three, shared out in the same proportions.
@@ -292,57 +292,80 @@ async function status(api, context, me, now, logger) {
 
 // ---- Clean-up of contests that are over ----
 
-// The contests of the last weeks and days whose late hours are over
-function finishedIds(now) {
+// The contests of the last daysBack days (weekly ones included) that ended more than minAge ms ago
+function finishedIds(now, minAge, daysBack) {
   const ids = [];
   const add = periodId => {
     for (const kind of KINDS) {
       const id = periodId + "_" + kind;
-      if (ids.indexOf(id) < 0 && now > endOf(id) + LATE_MINUTES * 60000) ids.push(id);
+      if (ids.indexOf(id) < 0 && now > endOf(id) + minAge) ids.push(id);
     }
   };
-  for (let k = 1; k <= CLEAN_WEEKS; k++) add(periods(now - k * 7 * 86400000).w.id);
-  for (let k = 1; k <= CLEAN_DAYS; k++) add(periods(now - k * 86400000).d.id);
+  for (let k = 1; k <= daysBack; k++) {
+    const p = periods(now - k * 86400000);
+    add(p.w.id);
+    add(p.d.id);
+  }
   return ids;
 }
 
-// Cleans at most one contest with something in it per call (and skips up to 8 empty ones), so opening the contests
-// page stays quick
+// Two steps: 3 hours after a contest ends its replays and course go; KEEP_DAYS after that the leaderboard goes
+// too. Does at most one contest with something in it per call (and skips up to 8 empty ones), so opening the
+// contests page stays quick.
 async function cleanUp(api, context, now, logger) {
   const item = await getItem(api, context.projectId, "contests_meta", "cleaned");
   let meta = item ? (typeof item.value === "string" ? JSON.parse(item.value) : item.value) : null;
   if (!meta || !Array.isArray(meta.ids)) meta = { ids: [] };
-  const todo = finishedIds(now).filter(x => meta.ids.indexOf(x) < 0).slice(0, 8);
+  if (!Array.isArray(meta.dropped)) meta.dropped = [];
+
+  const todo = [];
+  const drops = finishedIds(now, KEEP_DAYS * 86400000, KEEP_DAYS + CLEAN_DAYS);
+  for (const id of finishedIds(now, LATE_MINUTES * 60000, CLEAN_DAYS)) {
+    if (meta.ids.indexOf(id) < 0 && drops.indexOf(id) < 0) todo.push({ id, drop: false });
+  }
+  for (const id of drops) {
+    if (meta.dropped.indexOf(id) < 0) todo.push({ id, drop: true });
+  }
   if (todo.length === 0) return;
 
-  for (const id of todo) {
-    const { board } = await loadBoard(api, context, id);
+  for (const t of todo.slice(0, 8)) {
+    const { board, writeLock } = await loadBoard(api, context, t.id);
     const players = Object.keys(board.entries).filter(key => board.entries[key] && board.entries[key].state === "done");
-    for (let i = 0; i < players.length; i += 10) {
-      await Promise.all(players.slice(i, i + 10).map(key => deleteReplay(api, context, id, key)));
+    if (meta.ids.indexOf(t.id) < 0) {
+      for (let i = 0; i < players.length; i += 10) {
+        await Promise.all(players.slice(i, i + 10).map(key => deleteItem(api, context, "contest_" + t.id + "_r", key)));
+      }
+      // Checked, so a delete that silently did nothing is noticed (warning in the Cloud Code logs) and tried again
+      if (players.length > 0 && await getItem(api, context.projectId, "contest_" + t.id + "_r", players[0]))
+        throw new Error("replays of " + t.id + " were not deleted");
+      if (board.course && !t.drop) {
+        await updateBoard(api, context, t.id, b => {
+          if (!b.course) return { unchanged: true };
+          b.course = null;
+        });
+      }
+      meta.ids.push(t.id);
     }
-    // Checked, so a delete that silently did nothing is noticed (warning in the Cloud Code logs) and tried again
-    if (players.length > 0 && await getItem(api, context.projectId, "contest_" + id + "_r", players[0]))
-      throw new Error("replays of " + id + " were not deleted");
-    if (board.course) {
-      await updateBoard(api, context, id, b => {
-        if (!b.course) return { unchanged: true };
-        b.course = null;
-      });
+    if (t.drop) {
+      if (writeLock) {
+        await deleteItem(api, context, "contest_" + t.id, "board");
+        if (await getItem(api, context.projectId, "contest_" + t.id, "board")) throw new Error("board of " + t.id + " was not deleted");
+      }
+      meta.dropped.push(t.id);
     }
-    meta.ids.push(id);
-    if (players.length > 0 || board.course) {
-      logger.info("cleanUp: " + id + ", " + players.length + " replays deleted");
+    if (writeLock) {
+      logger.info("cleanUp: " + t.id + (t.drop ? " deleted" : ", " + players.length + " replays deleted"));
       break;
     }
   }
   if (meta.ids.length > CLEANED_KEEP) meta.ids = meta.ids.slice(meta.ids.length - CLEANED_KEEP);
+  if (meta.dropped.length > CLEANED_KEEP) meta.dropped = meta.dropped.slice(meta.dropped.length - CLEANED_KEEP);
   await api.setPrivateCustomItem(context.projectId, "contests_meta", { key: "cleaned", value: meta });
 }
 
-async function deleteReplay(api, context, id, playerId) {
+async function deleteItem(api, context, customId, key) {
   try {
-    await api.deletePrivateCustomItem(playerId, context.projectId, "contest_" + id + "_r");
+    await api.deletePrivateCustomItem(key, context.projectId, customId);
   } catch (err) {
     if (err && err.response && err.response.status === 404) return;   // never saved, or already gone
     throw err;
@@ -448,10 +471,16 @@ async function claim(api, context, me, now, logger) {
     const end = endOf(h.id);
     if (end <= 0 || now <= end + LATE_MINUTES * 60000) continue;   // late runs may still come in
     let list = [];
-    try { list = standings(h.id, (await loadBoard(api, context, h.id)).board); } catch (err) { logger.warning("claim: " + h.id + " " + err); continue; }
-    const row = list.find(r => r.playerId === me);
+    let gone = false;
+    try {
+      const loaded = await loadBoard(api, context, h.id);
+      gone = !loaded.writeLock;                 // deleted KEEP_DAYS after the end: too late for its prize
+      list = standings(h.id, loaded.board);
+    } catch (err) { logger.warning("claim: " + h.id + " " + err); continue; }
     h.paid = true;
     changed = true;
+    if (gone) continue;
+    const row = list.find(r => r.playerId === me);
     paid.push({ id: h.id, place: row ? row.place : 0, of: list.length, prize: row ? row.prize : 0, finished: !!row });
   }
   if (changed) await saveHistory(api, context, me, history);
