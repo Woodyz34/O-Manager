@@ -294,7 +294,18 @@ public class LobbySettingsUI : MonoBehaviour
         int progress = 0;
         guestNote = null;
         CourseData course = CourseLibrary.Current;
-        if (owner.Length > 0 && course != null)
+        if (owner.Length == 0 && course != null)
+        {
+            // A map that is not private (2026-11-19): ready once this computer has it. A map the host has just imported
+            // reaches the others through the shared maps, which are looked for again while it is missing.
+            if (MapDefinition.FindExact(course.mapId) != null) readyId = course.mapId;
+            else
+            {
+                SharedMaps.RefreshForLobby();
+                guestNote = SharedMaps.Downloading != null ? "Downloading the map " + SharedMaps.Downloading + " ..." : "Getting the host's map ...";
+            }
+        }
+        else if (owner.Length > 0 && course != null)
         {
             if (owner == CloudCourses.PlayerId)
             {
