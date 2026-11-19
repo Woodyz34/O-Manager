@@ -158,6 +158,9 @@ public class PathfindingManager : MonoBehaviour
                 gridData = packageData;
                 speedGrid2D = packageSpeed;
                 slopeFactors = packageSlopes;
+                // Dark green open in a forest race on a sprint map, shut in a sprint race (before the slope model,
+                // which only converts the cells someone can run in)
+                RaceGreen.Apply(gridName, speedGrid2D);
                 TerrainSpeedModel.Apply(speedGrid2D, slopeFactors);
                 Passages.Apply(gridName, speedGrid2D);
                 Tunnels.Apply(gridName, speedGrid2D);
