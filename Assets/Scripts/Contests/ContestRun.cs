@@ -122,6 +122,9 @@ public static class ContestRun
         if (maps.Count == 0) throw new ContestException("There is no " + (c.Sprint ? "sprint" : "forest") + " map in the game for this contest.");
         long seed = c.seed;
         Exception last = null;
+        // Let the loading card show before the map's grid is read (that takes a moment on this thread)
+        await Task.Yield();
+        await Task.Yield();
         // A map that can not take the course: the next one
         for (int attempt = 0; attempt < maps.Count; attempt++)
         {

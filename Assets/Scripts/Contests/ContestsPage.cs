@@ -361,9 +361,12 @@ public class ContestsPage : MonoBehaviour
             if (course == null) problem = "The contest course could not be read. Update the game and try again.";
             if (problem != null) throw new ContestException(problem + " (Your try is not used.)");
 
+            card = UIProgressCard.Show("Starting the contest...");
+            card.Set("Asking Unity Cloud", 0.9f);
             courseJson = await ContestCloud.StartAsync(c.id, name);
             CourseData started = ContestRun.ReadCourse(courseJson) ?? course;
-            if (this == null) return;
+            if (this == null) { card.Close(); return; }
+            card.Set("Loading the race", 1f);
             ContestRun.Begin(c, started);
         }
         catch (Exception e)
