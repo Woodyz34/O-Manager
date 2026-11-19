@@ -86,8 +86,8 @@ public class TvDirector : MonoBehaviour
     // How many runners the spot shows on this leg, the first ones there (0 = all): the host's settings
     int Limit(Spot spot)
     {
-        if (spot.start) return 0;
         HostSettings.Values settings = HostSettings.Current;
+        if (spot.start) return settings.tvStartShown;
         bool finish = spot == finishSpot || (finishSpot != null && finishSpot.controlIndex > 0 && spot.controlIndex == finishSpot.controlIndex);
         return finish ? settings.tvFinishShown : settings.tvControlShown;
     }
@@ -623,7 +623,7 @@ public class TvDirector : MonoBehaviour
                 // The runner sets off: its first metres
                 if (pass == Pass.None)
                 {
-                    if (d < 8f && !spot.off)
+                    if (d < 8f && !spot.off && MayFilm(spot, runner))
                     {
                         pass = Pass.In;
                         spot.since[runner] = now;
