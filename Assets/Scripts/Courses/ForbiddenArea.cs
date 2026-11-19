@@ -10,7 +10,9 @@ using UnityEngine;
 public class ForbiddenArea
 {
     public const int MaxCorners = 40;       // per area or line
-    public const int MaxAreas = 20;         // areas and lines together
+    // Areas and lines together. No real limit since 2026-11-19 (the user: "no max"); only a guard against broken data.
+    // What limits them is the corners in all of them together (MaxCornersTotal), so the course still fits in the lobby.
+    public const int MaxAreas = 1000;
     public const int MaxCornersTotal = 150; // keeps the course small enough to send in the lobby (6 characters a corner)
 
     public List<CoursePoint> corners = new List<CoursePoint>();

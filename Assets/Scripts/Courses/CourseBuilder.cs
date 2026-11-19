@@ -1362,11 +1362,7 @@ public class CourseBuilder : MonoBehaviour
         }
         if (openArea == null)
         {
-            if (ShapeCount >= ForbiddenArea.MaxAreas)
-            {
-                SetStatus("A course can have at most " + ForbiddenArea.MaxAreas + " out-of-bounds areas and boundaries together.", true);
-                return;
-            }
+            // No limit on how many (2026-11-19); only on the corners of them all together, below
         }
         if (openArea != null && openArea.Count >= ForbiddenArea.MaxCorners)
         {
