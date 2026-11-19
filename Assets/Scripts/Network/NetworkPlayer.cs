@@ -123,6 +123,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // The player is drawing its route right now (the leaderboard shows the ones who are not done yet)
     [Networked] public NetworkBool drawingNow { get; set; }
 
+    // A lobby chat message (LobbyChat), sent from the writer's own player to everyone
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_Chat(string text)
+    {
+        LobbyChat.Receive(this, text);
+    }
+
     // The host kicks a player (2026-11-19, someone went AFK): sent from the host's player to everyone, and the kicked
     // player leaves for the main menu
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
