@@ -73,7 +73,8 @@ public class RunSession : MonoBehaviour
     RelayTrack track;
     bool ok;
     float resultSeconds;
-    int paid;
+    float[] finalSplits;
+    bool atResults;
 
     // What is hidden of the 2D competition while running, to be shown again
     Camera mainCam;
@@ -134,6 +135,7 @@ public class RunSession : MonoBehaviour
                                  : "This map has no 3D world. Import it again (OCAD or OOM) to run it yourself.");
             return;
         }
+        data = WithHills(data, RunSettings.Hills);
         loadingCard.Set("Reading the terrain", 0.08f);
         try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds)); }
         catch (Exception e)
@@ -179,7 +181,7 @@ public class RunSession : MonoBehaviour
         handMap.transform.SetParent(transform, true);
         EnsureListener();
 
-        track = new RelayTrack { label = RunnerName, isLocal = true, color = PlayerColor.HasSaved ? PlayerColor.Saved : CourseUI.Accent };
+        track = new RelayTrack { label = RunnerName, isLocal = true, color = TrackColour() };
         phase = Phase.Countdown;
         countdown = 5.2f;
         lastBeep = 99;
@@ -187,8 +189,31 @@ public class RunSession : MonoBehaviour
         hintText.text = Hint();
     }
 
+    // The player's colour for the GPS line, never white or near white (2026-11-19, Anders: white cannot be seen on the map)
+    static Color TrackColour()
+    {
+        Color c = PlayerColor.HasSaved ? PlayerColor.Saved : CourseUI.Accent;
+        float light = 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+        Color.RGBToHSV(c, out _, out float saturation, out _);
+        return light > 0.8f || (light > 0.6f && saturation < 0.25f) ? CourseUI.Accent : c;
+    }
+
     static string Hint() => "W A S D: run    Mouse: look    Shift: jog    Space: jump    Left mouse: map up/down    F4: speed and ground\n"
                             + "With the map up: scroll to zoom, hold right mouse to move it, Q / E for the previous / next leg";
+
+    // The world with the hills made higher (a copy: the TV controls keep the map's own heights). Heights are stretched
+    // round the mean, so the lowest and highest ground move apart and every slope gets steeper by the same share.
+    static TvWorldData.Data WithHills(TvWorldData.Data data, float scale)
+    {
+        TvHeights source = data.heights;
+        if (source == null || source.h == null || source.h.Length == 0 || Mathf.Approximately(scale, 1f)) return data;
+        double sum = 0;
+        foreach (float v in source.h) sum += v;
+        float mean = (float)(sum / source.h.Length);
+        TvHeights higher = new TvHeights { cell = source.cell, minx = source.minx, miny = source.miny, rows = source.rows, cols = source.cols, h = new float[source.h.Length] };
+        for (int i = 0; i < source.h.Length; i++) higher.h[i] = mean + (source.h[i] - mean) * scale;
+        return new TvWorldData.Data { mapId = data.mapId, layer = data.layer, heights = higher, look = data.look, speeds = data.speeds };
+    }
 
     // A spot near the start where the runner can stand
     void FreeSpot(ref double e, ref double n)
@@ -217,7 +242,7 @@ public class RunSession : MonoBehaviour
             nextHide = Time.unscaledTime + 0.5f;
             HideCanvases();
         }
-        if (player == null) return;
+        if (player == null || atResults) return;
         float dt = Time.deltaTime;
         bool playing = phase == Phase.Countdown || phase == Phase.Running;
 
@@ -310,9 +335,10 @@ public class RunSession : MonoBehaviour
         if (bigText != null && phase == Phase.Running) bigText.text = "";
     }
 
+    // GPS points stamped with the race clock in replay seconds, like every other competition's replay
     void Sample()
     {
-        track.times.Add(gameSeconds);
+        track.times.Add(player.raceSeconds / PackRunning.GameSecondsPerSecond);
         track.positions.Add(mapDef.ToWorld(new CoursePoint(player.e, player.n)));
     }
 
@@ -372,6 +398,10 @@ public class RunSession : MonoBehaviour
         return next == controls + 1 ? splits : null;
     }
 
+    // The finish: the time and the split times go to the race like a 2D runner's, and the usual statistics screen
+    // (results, split times, replay) and the usual results with prize money follow (2026-11-19, Anders: the same
+    // results as every other competition). Missing a control is told at once; the result list has no
+    // disqualification yet, so the time is still listed (comes with multiplayer).
     void Finish()
     {
         phase = Phase.Finished;
@@ -384,125 +414,92 @@ public class RunSession : MonoBehaviour
         float best = Best(course.id);
         bool record = ok && (best <= 0f || resultSeconds < best);
         if (record) SetBest(course.id, resultSeconds);
-        paid = CompetitionRewards.ForTime(CompetitionFlow.PlayedSeconds);
-        if (paid > 0 && Money.Instance != null) Money.Instance.AddMoney(paid);
         PlayerPrefs.Save();
-        Invoke(nameof(ShowResults), 1.2f);
-        ShowResultsLater(splits, best, record);
+        finalSplits = splits;
+
+        float km = player.distance / 1000f;
+        string pace = km > 0.05f ? Pace(resultSeconds / km) + " min/km" : "";
+        string missed = ok ? "" : "\n<size=45%><color=#FF8A6A>Disqualified: " + MissedText() + "</color></size>";
+        bigText.text = (ok ? "Finish!" : "Finish") + "  " + RaceTime(resultSeconds)
+                       + "\n<size=45%>You ran " + km.ToString("0.00") + " km   " + pace
+                       + (record && best > 0f ? "   New record!" : best > 0f && ok ? "   Record " + RaceTime(best) : "") + "</size>" + missed;
+        Invoke(nameof(ToResults), ok ? 3.5f : 6f);
     }
 
-    float[] shownSplits;
-    float shownBest;
-    bool shownRecord;
-
-    void ShowResultsLater(float[] splits, float best, bool record)
+    static string Pace(float secondsPerKm)
     {
-        shownSplits = splits;
-        shownBest = best;
-        shownRecord = record;
-        bigText.text = ok ? "Finish!" : "Finish";
+        int s = Mathf.RoundToInt(secondsPerKm);
+        return (s / 60) + ":" + (s % 60).ToString("00");
     }
 
-    void ShowResults()
+    // "control 3" or "controls 3, 4" not punched in order
+    string MissedText()
+    {
+        List<int> missing = new List<int>();
+        int next = 0, controls = world.FlagCount - 1;
+        foreach (int p in punches)
+        {
+            if (p == next) next++;
+        }
+        for (int i = next; i < controls; i++) missing.Add(i + 1);
+        if (missing.Count == 0) return "the controls were not punched in order";
+        if (missing.Count > 4) return missing.Count + " controls not punched in order (from control " + missing[0] + ")";
+        return (missing.Count == 1 ? "control " : "controls ") + string.Join(", ", missing) + " not punched in order";
+    }
+
+    // The race clock at every control and the finish, written on the player as the 2D race does it
+    void Report(float[] splits)
+    {
+        NetworkPlayer np = NetworkPlayer.Local;
+        if (np == null || np.Object == null || !np.Object.HasStateAuthority) return;
+        int controls = world.FlagCount - 1;
+        int total = Mathf.Max(1, Mathf.RoundToInt(resultSeconds));
+        np.relaySplits.Set(0, 0);
+        np.relaySplitVariants.Set(0, 0);
+        for (int i = 0; i < controls && i + 1 < np.relaySplits.Length; i++)
+        {
+            int at = splits != null ? Mathf.RoundToInt(splits[i]) : PunchedAt(i);
+            np.relaySplits.Set(i + 1, at);
+            np.relaySplitVariants.Set(i + 1, 0);
+        }
+        if (controls + 1 < np.relaySplits.Length)
+        {
+            np.relaySplits.Set(controls + 1, total);
+            np.relaySplitVariants.Set(controls + 1, 0);
+        }
+        np.relaySplitLeg = 0;
+        np.relaySplitCount = Mathf.Min(np.relaySplits.Length, controls + 2);
+        np.relayLegTimes.Set(0, total);
+        np.relayTotals.Set(0, total);
+        np.hourCount = total / 3600;
+        np.minuterCount = total / 60 % 60;
+        np.secoundCount = total % 60;
+        np.raceFinished = true;
+        if (IndividualRace.Active != null) IndividualRace.Active.UseTracks(new List<RelayTrack> { track });
+    }
+
+    // The first time a control was punched, or 0 when it never was
+    int PunchedAt(int control)
+    {
+        for (int k = 0; k < punches.Count; k++)
+            if (punches[k] == control) return Mathf.RoundToInt(punchTimes[k]);
+        return 0;
+    }
+
+    // From the 3D finish to the 2D map, where the statistics screen opens over it as in every competition
+    void ToResults()
     {
         if (this == null) return;
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
         bigText.text = "";
-        BuildResults(shownSplits, shownBest, shownRecord);
-    }
-
-    void BuildResults(float[] splits, float best, bool record)
-    {
-        if (results != null) Destroy(results);
-        results = new GameObject("Run results", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        results.transform.SetParent(transform, false);
-        Canvas canvas = results.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 120;
-        own.Add(canvas);
-        ScreenSettings.Fit(results.GetComponent<CanvasScaler>());
-
-        Image card = CourseUI.CardPanel("Card", results.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820, 860));
-        CourseUI.Column(card.gameObject, 10, new RectOffset(40, 40, 30, 30));
-        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, ok ? "Finished!" : "Disqualified", 46,
-            ok ? CourseUI.Ink : CourseUI.Danger, FontStyles.Bold, TextAlignmentOptions.Center);
-        CourseUI.Size(title, 60);
-        string sub = course.name + (ok ? "" : "\nA control was missed or punched in the wrong order.");
-        TextMeshProUGUI subText = CourseUI.Text("Course", card.transform, sub, 22, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
-        CourseUI.Size(subText, ok ? 32 : 62);
-        TextMeshProUGUI time = CourseUI.Text("Time", card.transform, RaceTime(resultSeconds), 64, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
-        CourseUI.Size(time, 78);
-        float straight = course.LengthMeters(), run = player.distance;
-        string km = "You ran " + (run / 1000f).ToString("0.00") + " km (the course is " + (straight / 1000f).ToString("0.00") + " km in straight lines)";
-        if (run > 50f && resultSeconds > 0f)
-        {
-            float pace = resultSeconds / 60f / (run / 1000f);
-            km += ", " + Mathf.FloorToInt(pace) + ":" + Mathf.FloorToInt(pace % 1f * 60f).ToString("00") + " min/km";
-        }
-        TextMeshProUGUI kmText = CourseUI.Text("Distance", card.transform, km, 20, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
-        CourseUI.Size(kmText, 28);
-
-        string recordLine = !ok ? (best > 0f ? "Your record: " + RaceTime(best) : "No record on this course yet")
-                          : record ? (best > 0f ? "New record! Before: " + RaceTime(best) : "Your first record on this course!")
-                          : "Your record: " + RaceTime(best) + "  (+" + RaceTime(resultSeconds - best) + ")";
-        TextMeshProUGUI recordText = CourseUI.Text("Record", card.transform, recordLine, 24, record ? CourseUI.Forest : CourseUI.Ink,
-            FontStyles.Bold, TextAlignmentOptions.Center);
-        CourseUI.Size(recordText, 34);
-
-        // The splits: leg time and the time at each control
-        System.Text.StringBuilder lines = new System.Text.StringBuilder();
-        if (splits != null)
-        {
-            float before = 0f;
-            for (int i = 0; i < splits.Length; i++)
-            {
-                string name = i == splits.Length - 1 ? "Finish" : "Control " + (i + 1);
-                lines.Append(name).Append("<pos=45%>").Append(RaceTime(splits[i]))
-                     .Append("<pos=72%>+").Append(RaceTime(splits[i] - before)).Append('\n');
-                before = splits[i];
-            }
-        }
-        else
-        {
-            lines.Append("Punched: ");
-            for (int i = 0; i < punches.Count; i++)
-            {
-                if (i > 0) lines.Append(", ");
-                lines.Append(punches[i] == world.FlagCount - 1 ? "Finish" : (punches[i] + 1).ToString());
-            }
-        }
-        RectTransform list = CourseUI.ScrollList("Splits", card.transform, out ScrollRect scroll);
-        CourseUI.Size(scroll, 330);
-        TextMeshProUGUI splitText = CourseUI.Text("Lines", list, lines.ToString(), 22, CourseUI.Ink);
-        splitText.enableWordWrapping = true;
-        ContentSizeFitter fit = splitText.gameObject.AddComponent<ContentSizeFitter>();
-        fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        TextMeshProUGUI money = CourseUI.Text("Money", card.transform, paid > 0 ? "+" + paid + " kr for the time you played" : "",
-            22, CourseUI.Forest, FontStyles.Bold, TextAlignmentOptions.Center);
-        CourseUI.Size(money, 30);
-
-        RectTransform row = CourseUI.Rect("Buttons", card.transform);
-        HorizontalLayoutGroup layout = CourseUI.Row(row.gameObject, 16, new RectOffset(0, 0, 0, 0));
-        layout.childForceExpandWidth = true;
-        CourseUI.Size(row, 70);
-        Button replay = CourseUI.Button("Replay", row, "GPS replay", CourseUI.ButtonKind.Light, OpenReplay, 26);
-        HoverTip.Add(replay, "See your way round the course on the map.");
-        CourseUI.Button("Back", row, CompetitionFlow.BackButtonText, CourseUI.ButtonKind.Primary, CompetitionFlow.HostReturnToLobby, 26);
-    }
-
-    void OpenReplay()
-    {
-        if (results != null) results.SetActive(false);
+        atResults = true;
+        twoDHidden = false;
+        foreach (Canvas c in hiddenCanvases) if (c != null) c.enabled = true;
+        hiddenCanvases.Clear();
+        foreach (Renderer r in hiddenRenderers) if (r != null) r.enabled = true;
+        hiddenRenderers.Clear();
+        if (cameraController != null) cameraController.enabled = true;
         ShowTwoDMap(true);
-        RelayReplayView.Open(new List<RelayTrack> { track }, () =>
-        {
-            if (this == null) return;
-            ShowTwoDMap(false);
-            if (results != null) results.SetActive(true);
-        });
+        Report(finalSplits);
     }
 
     // The replay is drawn on the 2D map, so the 3D view is switched off while it plays
@@ -589,7 +586,8 @@ public class RunSession : MonoBehaviour
         HoverTip.Add(clockBack, "Your race time, as in real life.");
 
         bigText = CourseUI.Text("Big", hud.transform, "", 120, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);
-        CourseUI.Place(bigText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 120f), new Vector2(1200f, 200f));
+        CourseUI.Place(bigText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 120f), new Vector2(1500f, 420f));
+        bigText.richText = true;
         bigText.outlineWidth = 0.2f;
         bigText.outlineColor = new Color32(0, 0, 0, 200);
         factsText = CourseUI.Text("Facts", hud.transform, "", 20, Color.white, FontStyles.Bold, TextAlignmentOptions.TopLeft);

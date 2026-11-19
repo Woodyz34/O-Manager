@@ -32,22 +32,35 @@ public class RunSounds : MonoBehaviour
         return s;
     }
 
-    AudioSource Source(float volume)
+    readonly System.Collections.Generic.List<(AudioSource source, float level, RunSettings.Sound kind)> sources =
+        new System.Collections.Generic.List<(AudioSource, float, RunSettings.Sound)>();
+    float nextVolume;
+
+    AudioSource Source(float volume, RunSettings.Sound kind)
     {
         AudioSource a = gameObject.AddComponent<AudioSource>();
         a.playOnAwake = false;
         a.spatialBlend = 0f;
-        a.volume = volume;
+        sources.Add((a, volume, kind));
+        a.volume = Mathf.Clamp01(volume * RunSettings.Gain(kind));
         return a;
+    }
+
+    // The sound sliders count at once, also while the settings are open in a race
+    void Update()
+    {
+        if (Time.unscaledTime < nextVolume) return;
+        nextVolume = Time.unscaledTime + 0.2f;
+        foreach (var s in sources) s.source.volume = Mathf.Clamp01(s.level * RunSettings.Gain(s.kind));
     }
 
     void Make(bool woman)
     {
-        steps = Source(0.7f);
-        under = Source(0.45f);
-        breath = Source(0.32f);
-        voice = Source(0.85f);
-        beeps = Source(0.6f);
+        steps = Source(0.7f, RunSettings.Sound.Steps);
+        under = Source(0.45f, RunSettings.Sound.Steps);
+        breath = Source(0.32f, RunSettings.Sound.Breathing);
+        voice = Source(0.85f, RunSettings.Sound.Voice);
+        beeps = Source(0.6f, RunSettings.Sound.Beeps);
 
         dirt = Load("run_dirt", 5);
         grass = Load("run_grass", 5);

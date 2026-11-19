@@ -57,6 +57,41 @@ public static class RunSettings
         return Quality.Medium;
     }
 
+    // How much higher the hills are than on the map (2026-11-19, Anders: the ground looked flatter than the contours
+    // say; the 10 m height grid rounds off small knolls and slopes). Taken from the next race.
+    public static readonly float[] HillChoices = { 1f, 1.5f, 2f };
+    const string HillsKey = "RunYourself.Hills";
+
+    public static float Hills
+    {
+        get => Mathf.Clamp(PlayerPrefs.GetFloat(LocalPrefs.Key(HillsKey), 1.5f), 1f, 2f);
+        set => PlayerPrefs.SetFloat(LocalPrefs.Key(HillsKey), value);
+    }
+
+    // ---- Sound levels (2026-11-19, Anders: good sounds but a bit loud; one slider per kind and one for all, 50 % to
+    // start with so they can go both up and down) ----
+
+    public enum Sound { All = 0, Steps = 1, Breathing = 2, Voice = 3, Beeps = 4 }
+    static readonly string[] SoundNames = { "All sounds", "Footsteps", "Breathing", "Voice (falls, landings)", "Beeps (start, controls, finish)" };
+    static readonly float[] cachedVolume = { -1f, -1f, -1f, -1f, -1f };
+
+    public static float Volume(Sound kind)
+    {
+        int i = (int)kind;
+        if (cachedVolume[i] < 0f) cachedVolume[i] = Mathf.Clamp01(PlayerPrefs.GetFloat(LocalPrefs.Key("RunYourself.Volume." + kind), 0.5f));
+        return cachedVolume[i];
+    }
+
+    public static void SetVolume(Sound kind, float value)
+    {
+        cachedVolume[(int)kind] = Mathf.Clamp01(value);
+        PlayerPrefs.SetFloat(LocalPrefs.Key("RunYourself.Volume." + kind), cachedVolume[(int)kind]);
+    }
+
+    // What a sound of this kind is multiplied by: 0.6 of the first version's level at 50 % (it was too loud), up to
+    // 1.2 times it at 100 %, times the "all sounds" share the same way
+    public static float Gain(Sound kind) => 0.6f * (2f * Volume(kind)) * (2f * Volume(Sound.All));
+
     public static string QualityName(Quality q) => q == Quality.Low ? "Low" : q == Quality.High ? "High" : "Medium";
 
     // ---- What each level means ----
@@ -105,31 +140,58 @@ public static class RunSettings
         Image dim = CourseUI.Panel("Dim", open.transform, new Color(0f, 0f, 0f, 0.45f), false);
         CourseUI.Stretch(dim.rectTransform);
         Image card = CourseUI.CardPanel("Card", open.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860, 860));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1500, 840));
         card.gameObject.AddComponent<ClickCatcher>();
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "3D settings", 40, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 52);
         TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, RunSession.Active != null
-            ? "Mouse speed counts at once; the rest from your next race. Saved on this computer."
+            ? "Mouse speed and sounds count at once; the rest from your next race. Saved on this computer."
             : "For \"Run it yourself\". Saved on this computer.", 21, CourseUI.InkMuted);
         CourseUI.Size(hint, 30);
 
-        Chips(card.transform, "Graphics", new[] { "Low", "Medium", "High" }, (int)Level, i => { Level = (Quality)i; changed?.Invoke(); },
+        // Two columns: the race on the left, hills and sounds on the right
+        RectTransform columns = CourseUI.Rect("Columns", card.transform);
+        CourseUI.Row(columns.gameObject, 40, new RectOffset(0, 0, 0, 0)).childForceExpandHeight = false;
+        CourseUI.Size(columns, 610);
+        RectTransform left = CourseUI.Rect("Left", columns), right = CourseUI.Rect("Right", columns);
+        foreach (RectTransform column in new[] { left, right })
+        {
+            CourseUI.Column(column.gameObject, 10, new RectOffset(0, 0, 0, 0));
+            CourseUI.Size(column, -1, -1, 1f);
+        }
+
+        Chips(left, "Graphics", new[] { "Low", "Medium", "High" }, (int)Level, i => { Level = (Quality)i; changed?.Invoke(); },
             "Low: shorter view, no shadows, little undergrowth. For weak computers. High: long view and soft shadows.");
         int speedIndex = 1;   // 4 x
         for (int i = 0; i < Speeds.Length; i++) if (Mathf.Approximately(Speeds[i], GameSpeed)) speedIndex = i;
-        Chips(card.transform, "Game speed", new[] { "3 x real life", "4 x real life", "5 x real life" }, speedIndex, i => { GameSpeed = Speeds[i]; changed?.Invoke(); },
+        Chips(left, "Game speed", new[] { "3 x real life", "4 x real life", "5 x real life" }, speedIndex, i => { GameSpeed = Speeds[i]; changed?.Invoke(); },
             "How much quicker than real life you run. The race time shown is still the real-life time.");
-        Chips(card.transform, "Your runner", new[] { "Man", "Woman" }, Woman ? 1 : 0, i => { Woman = i == 1; changed?.Invoke(); },
+        Chips(left, "Your runner", new[] { "Man", "Woman" }, Woman ? 1 : 0, i => { Woman = i == 1; changed?.Invoke(); },
             "Your breathing and your groans when you fall.");
-        Chips(card.transform, "Map hand", new[] { "Left hand", "Right hand" }, RightHand ? 1 : 0, i => { RightHand = i == 1; changed?.Invoke(); },
+        Chips(left, "Map hand", new[] { "Left hand", "Right hand" }, RightHand ? 1 : 0, i => { RightHand = i == 1; changed?.Invoke(); },
             "The hand that holds the map and the thumb compass.");
 
-        TextMeshProUGUI mouseLabel = CourseUI.Text("Mouse label", card.transform, "Mouse speed", 24, CourseUI.Ink, FontStyles.Bold);
+        TextMeshProUGUI mouseLabel = CourseUI.Text("Mouse label", left, "Mouse speed", 24, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(mouseLabel, 32);
-        Slider mouse = CourseUI.SliderControl("Mouse", card.transform, 0.3f, 6f, MouseSpeed, false, v => MouseSpeed = v);
+        Slider mouse = CourseUI.SliderControl("Mouse", left, 0.3f, 6f, MouseSpeed, false, v => MouseSpeed = v);
         CourseUI.Size(mouse, 40);
+
+        int hillIndex = 1;
+        for (int i = 0; i < HillChoices.Length; i++) if (Mathf.Approximately(HillChoices[i], Hills)) hillIndex = i;
+        Chips(right, "Hills", new[] { "As on the map", "1.5 x higher", "2 x higher" }, hillIndex, i => { Hills = HillChoices[i]; changed?.Invoke(); },
+            "The height grid of the map rounds off small knolls and slopes. Higher hills make them easier to see and feel.");
+        for (int k = 0; k < SoundNames.Length; k++)
+        {
+            Sound kind = (Sound)k;
+            TextMeshProUGUI label = CourseUI.Text(SoundNames[k] + " label", right, "", 22, CourseUI.Ink, k == 0 ? FontStyles.Bold : FontStyles.Normal);
+            label.richText = true;
+            CourseUI.Size(label, 28);
+            System.Action show = () => label.text = SoundNames[(int)kind] + "  <color=#7A8A7F>" + Mathf.RoundToInt(Volume(kind) * 100f) + " %</color>";
+            show();
+            Slider slider = CourseUI.SliderControl(kind + " volume", right, 0f, 1f, Volume(kind), false, v => { SetVolume(kind, v); show(); });
+            CourseUI.Size(slider, 34);
+        }
 
         Button done = CourseUI.Button("Done", card.transform, "Done", CourseUI.ButtonKind.Primary, () => Object.Destroy(open), 24);
         CourseUI.Size(done, 58);

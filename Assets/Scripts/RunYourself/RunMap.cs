@@ -16,7 +16,7 @@ using UnityEngine.UI;
 public class RunMap : MonoBehaviour
 {
     public const int HandLayer = 30;
-    const float PaperW = 0.24f, PaperH = 0.30f;     // metres: the printed map
+    const float PaperW = 0.30f, PaperH = 0.33f;     // metres: the printed map, big and close, so reading it fills the view
     const float Aspect = PaperW / PaperH;
 
     RunPlayer player;
@@ -27,7 +27,8 @@ public class RunMap : MonoBehaviour
     Camera mapCam, handCam;
     RenderTexture texture;
     Transform rig, held, otherHand;
-    Transform needle, compass;
+    RectTransform needle;
+    Transform compass;
     bool rightHand;
     int mask;
 
@@ -134,56 +135,66 @@ public class RunMap : MonoBehaviour
         CourseUI.Stretch(picture.rectTransform, 6, 6, 6, 6);
     }
 
-    // A hand holding the bottom corner of the map: the thumb on the front, the fingers behind, a cuff at the wrist.
+    // A hand holding the side edge of the map, a little below the middle (2026-11-19, Anders: the hands hold the
+    // edges): the thumb on the front, the fingers behind it, the palm and a cuff outside the edge.
     // The holding hand carries the thumb compass.
     Transform BuildHand(Transform parent, bool right, bool withCompass)
     {
         Transform hand = new GameObject(right ? "Right hand" : "Left hand").transform;
         hand.SetParent(parent, false);
         float side = right ? 1f : -1f;
-        // The corner held: a little in from the edge, low on the sheet
-        hand.localPosition = new Vector3(side * (PaperW * 0.5f - 0.035f), -PaperH * 0.5f + 0.045f, 0f);
+        hand.localPosition = HandSpot(right);
         Color skin = new Color32(0xe0, 0xb1, 0x8f, 255), skinDark = new Color32(0xc8, 0x96, 0x74, 255);
         Color sleeve = new Color32(0x24, 0x3b, 0x2c, 255), band = new Color32(0xe8, 0x74, 0x2a, 255);
 
-        // The fingers behind the sheet, showing below its edge
+        // The fingers behind the sheet, reaching in from the edge
         for (int i = 0; i < 4; i++)
-        {
-            float x = side * (-0.012f + i * 0.017f) * -1f;
-            Part(capsule, skinDark, hand, new Vector3(x, -0.035f - i * 0.004f, 0.012f), new Vector3(0.017f, 0.032f, 0.017f), Quaternion.Euler(0f, 0f, side * 8f));
-        }
-        // The palm and the wrist, below and behind the corner
-        Part(cube, skin, hand, new Vector3(side * 0.006f, -0.075f, 0.02f), new Vector3(0.085f, 0.07f, 0.03f), Quaternion.Euler(-15f, 0f, side * 10f));
-        Part(cylinder, sleeve, hand, new Vector3(side * 0.012f, -0.14f, 0.035f), new Vector3(0.07f, 0.05f, 0.06f), Quaternion.Euler(-20f, 0f, side * 12f));
-        Part(cylinder, band, hand, new Vector3(side * 0.010f, -0.105f, 0.03f), new Vector3(0.073f, 0.008f, 0.063f), Quaternion.Euler(-20f, 0f, side * 12f));
-        // The thumb on the front of the sheet, pointing up and in
-        Part(capsule, skin, hand, new Vector3(-side * 0.004f, -0.01f, -0.012f), new Vector3(0.022f, 0.036f, 0.02f), Quaternion.Euler(0f, 0f, side * 28f));
+            Part(capsule, skinDark, hand, new Vector3(-side * 0.012f, 0.018f - i * 0.017f, 0.011f), new Vector3(0.016f, 0.03f, 0.016f), Quaternion.Euler(0f, 0f, side * 80f));
+        // The palm and the wrist outside the edge, the arm going down and out of sight
+        Part(cube, skin, hand, new Vector3(side * 0.04f, -0.01f, 0.016f), new Vector3(0.05f, 0.085f, 0.03f), Quaternion.Euler(0f, side * -20f, side * 8f));
+        Part(cube, band, hand, new Vector3(side * 0.05f, -0.065f, 0.02f), new Vector3(0.056f, 0.012f, 0.036f), Quaternion.Euler(0f, side * -20f, side * 14f));
+        Part(cube, sleeve, hand, new Vector3(side * 0.058f, -0.12f, 0.025f), new Vector3(0.06f, 0.1f, 0.04f), Quaternion.Euler(0f, side * -20f, side * 14f));
+        // The thumb on the front of the sheet, along the edge, pointing up
+        Part(capsule, skin, hand, new Vector3(-side * 0.006f, -0.004f, -0.011f), new Vector3(0.021f, 0.034f, 0.019f), Quaternion.Euler(0f, 0f, side * 12f));
 
         if (withCompass) BuildCompass(hand, side);
         return hand;
     }
 
-    // A thumb compass: a clear baseplate on the thumb with a direction arrow, and the capsule with a needle that
-    // always points to the real north
+    static Vector3 HandSpot(bool right) => new Vector3((right ? 1f : -1f) * (PaperW * 0.5f + 0.004f), -PaperH * 0.12f, 0f);
+
+    // A thumb compass, as orienteers use: a clear baseplate on the thumb with a red direction arrow and scale marks,
+    // and a clear capsule with a long needle, red to the north and white to the south, that always points to the real
+    // north. Drawn as pictures on a small sheet laid on the map (sharp at any size), the needle turned every frame.
     void BuildCompass(Transform hand, float side)
     {
-        compass = new GameObject("Thumb compass").transform;
-        compass.SetParent(hand, false);
-        compass.localPosition = new Vector3(-side * 0.012f, 0.012f, -0.03f);
-        compass.localScale = Vector3.one * 0.8f;
-        Part(cube, new Color(0.82f, 0.86f, 0.88f), compass, new Vector3(0f, 0.01f, 0.004f), new Vector3(0.044f, 0.07f, 0.004f), Quaternion.identity);
-        Part(cube, new Color(0.9f, 0.2f, 0.15f), compass, new Vector3(0f, 0.04f, 0f), new Vector3(0.006f, 0.014f, 0.003f), Quaternion.identity);
-        // The capsule: a dark ring, a pale face
-        Part(cylinder, new Color(0.15f, 0.17f, 0.18f), compass, new Vector3(0f, 0.012f, -0.001f), new Vector3(0.038f, 0.0025f, 0.038f), Quaternion.Euler(90f, 0f, 0f));
-        Part(cylinder, new Color(0.93f, 0.94f, 0.9f), compass, new Vector3(0f, 0.012f, -0.0035f), new Vector3(0.032f, 0.0012f, 0.032f), Quaternion.Euler(90f, 0f, 0f));
-        // North lines on the face
-        for (int i = -1; i <= 1; i++)
-            Part(cube, new Color(0.85f, 0.25f, 0.2f), compass, new Vector3(i * 0.007f, 0.012f, -0.0048f), new Vector3(0.0008f, 0.026f, 0.0006f), Quaternion.identity);
-        needle = new GameObject("Needle").transform;
-        needle.SetParent(compass, false);
-        needle.localPosition = new Vector3(0f, 0.012f, -0.0065f);
-        Part(cube, new Color(0.9f, 0.12f, 0.1f), needle, new Vector3(0f, 0f, 0.0075f), new Vector3(0.0035f, 0.0012f, 0.015f), Quaternion.identity);
-        Part(cube, Color.white, needle, new Vector3(0f, 0f, -0.0075f), new Vector3(0.0035f, 0.0012f, 0.015f), Quaternion.identity);
+        Canvas canvas = new GameObject("Thumb compass", typeof(Canvas)).GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.worldCamera = handCam;
+        compass = canvas.transform;
+        RectTransform rect = (RectTransform)compass;
+        rect.SetParent(hand, false);
+        rect.sizeDelta = new Vector2(58f, 92f);                        // mm
+        rect.localScale = Vector3.one * 0.001f;
+        rect.localPosition = new Vector3(-side * 0.038f, 0.02f, -0.016f);
+        rect.localRotation = Quaternion.Euler(0f, 0f, side * 6f);
+
+        RawImage plate = Picture("Baseplate", rect, RunCompassArt.Baseplate());
+        CourseUI.Stretch(plate.rectTransform);
+        RawImage capsuleFace = Picture("Capsule", rect, RunCompassArt.Capsule());
+        CourseUI.Place(capsuleFace.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2(0f, 33f), new Vector2(50f, 50f));
+        RawImage arrow = Picture("Needle", capsuleFace.rectTransform, RunCompassArt.Needle());
+        needle = arrow.rectTransform;
+        CourseUI.Place(needle, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(9f, 46f));
+    }
+
+    static RawImage Picture(string name, Transform parent, Texture2D texture)
+    {
+        RawImage image = new GameObject(name).AddComponent<RawImage>();
+        image.transform.SetParent(parent, false);
+        image.texture = texture;
+        image.raycastTarget = false;
+        return image;
     }
 
     static void Part(Mesh shape, Color color, Transform parent, Vector3 position, Vector3 scale, Quaternion rotation)
@@ -297,9 +308,11 @@ public class RunMap : MonoBehaviour
     {
         float t = Mathf.SmoothStep(0f, 1f, lift);
         float side = rightHand ? 1f : -1f;
-        Vector3 down = new Vector3(side * 0.16f, -0.42f, 0.30f), up = new Vector3(side * 0.025f, -0.075f, 0.40f);
-        Vector3 position = Vector3.Lerp(down, up, t) + new Vector3(0f, -Mathf.Sin(Mathf.PI * t) * 0.03f, Mathf.Sin(Mathf.PI * t) * 0.05f);
-        Quaternion rotation = Quaternion.Slerp(Quaternion.Euler(70f, side * 25f, side * -30f), Quaternion.Euler(28f, 0f, side * -3f), t);
+        // Up: held straight in front of the eyes and close, so the map fills the view (2026-11-19, Anders: in real life
+        // you only see the map when you read it)
+        Vector3 down = new Vector3(side * 0.14f, -0.46f, 0.26f), up = new Vector3(0f, -0.012f, 0.285f);
+        Vector3 position = Vector3.Lerp(down, up, t) + new Vector3(0f, -Mathf.Sin(Mathf.PI * t) * 0.03f, Mathf.Sin(Mathf.PI * t) * 0.04f);
+        Quaternion rotation = Quaternion.Slerp(Quaternion.Euler(70f, side * 25f, side * -30f), Quaternion.Euler(10f, 0f, side * -1.5f), t);
 
         // The hand moves with the steps, and more the harder the running is
         float shake = player.Shake + player.Jolt * 0.6f;
@@ -318,15 +331,14 @@ public class RunMap : MonoBehaviour
         {
             otherHand.gameObject.SetActive(otherGrip > 0.01f);
             float g = Mathf.SmoothStep(0f, 1f, otherGrip);
-            otherHand.localPosition = new Vector3(-side * (PaperW * 0.5f - 0.035f), -PaperH * 0.5f + 0.045f - (1f - g) * 0.2f, 0f);
+            otherHand.localPosition = HandSpot(!rightHand) + new Vector3(0f, -(1f - g) * 0.25f, 0f);
         }
 
         // The needle points to the real north, whichever way the map and the runner are turned
         if (needle != null)
         {
-            Vector3 normal = needle.parent.TransformDirection(Vector3.back);
-            Vector3 north = Vector3.ProjectOnPlane(Vector3.forward, normal);
-            if (north.sqrMagnitude > 1e-6f) needle.rotation = Quaternion.LookRotation(north.normalized, -normal);
+            Vector3 north = needle.parent.InverseTransformDirection(Vector3.forward);
+            if (north.x * north.x + north.y * north.y > 1e-8f) needle.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(-north.x, north.y) * Mathf.Rad2Deg);
         }
     }
 

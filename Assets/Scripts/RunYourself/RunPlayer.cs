@@ -11,8 +11,9 @@ using UnityEngine;
 // rough ground or a thicket, and sometimes falls.
 public class RunPlayer : MonoBehaviour
 {
-    // Real-life running speed (m/s) in white forest at the middle of every terrain slider: 4:54 min/km
-    public const float ForestSpeed = 3.4f;
+    // Real-life running speed (m/s) in white forest at the middle of every terrain slider: 4:23 min/km
+    // (2026-11-19: was 3.4; Anders's first full course came out at 10:45 min/km, he expected about 6)
+    public const float ForestSpeed = 3.8f;
     const float Reach = 0.3f;            // half the runner's width
     const float EyeHeight = 1.68f;
 
@@ -135,7 +136,7 @@ public class RunPlayer : MonoBehaviour
             float dirFactor = fwd > 0 ? (side != 0 ? 0.95f : 1f) : fwd < 0 ? 0.45f : 0.6f;
             bool jog = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             target = ForestSpeed * ground.speed * SlopeFactor(gradient, ground.rough) * dirFactor
-                     * (jog ? 0.55f : 1f) * (mapUp ? 0.9f : 1f);
+                     * (jog ? 0.55f : 1f) * (mapUp ? 0.6f : 1f);   // reading the map: you can't run fast and read (Anders, 2026-11-19)
             if (stumbleTimer > 0f) target *= 0.4f;
         }
         float rate = target > speed ? 6f : 11f;     // real-life m/s gained or lost per (real) second
