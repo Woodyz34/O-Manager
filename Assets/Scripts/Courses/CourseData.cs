@@ -44,7 +44,9 @@ public class CourseData
     public List<ForbiddenArea> forbidden = new List<ForbiddenArea>();
     // Relays on forest maps: the controls (and the finish) with a TV camera. During the race a small 3D view of the
     // control shows the runners passing it (TV/TvDirector). Only common controls, the ones every team runs.
-    public const int MaxTvControls = 6;
+    // (2026-11-19: no real limit any more, the user wants as many as they like; 90 keeps the TV shot numbers below
+    // the start and finish shots, TvDirector)
+    public const int MaxTvControls = 90;
     public List<CoursePoint> tvControls = new List<CoursePoint>();
 
     public bool HasTvControl(CoursePoint point)

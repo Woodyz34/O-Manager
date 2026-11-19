@@ -82,6 +82,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     void OnDestroy()
     {
         if (Active == this) Active = null;
+        RelayClock.LegOver();
         if (hud != null) Destroy(hud);
         if (statsUI != null) Destroy(statsUI.gameObject);
     }
@@ -340,6 +341,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
         }
         int waitSeconds = Mathf.Max(0, ourTime - firstTime);
         legStartSeconds = ourTime;
+        RelayClock.LegStarts(leg, firstTime);
         recorder.Begin(leg, agent);
         if (waitSeconds <= 0)
         {
@@ -586,6 +588,9 @@ public class RelayRace : MonoBehaviour, IRaceStats
 
     void Update()
     {
+        // The host's race clock of the leg runs until every team is in (RelayClock)
+        RelayClock.Tick(Time.deltaTime);
+        if (leg >= 0 && AllTeamsFinished(leg)) RelayClock.LegOver();
         // After the last leg: the statistics come up once every team is in, before the results
         if (leg >= 0 && leg == course.legs - 1 && statsShownForLeg < leg && statsDueForLeg < leg && AllTeamsFinished(leg))
         {

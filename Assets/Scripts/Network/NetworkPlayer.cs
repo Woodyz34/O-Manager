@@ -118,6 +118,12 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         if (lobbyCourse3.ToString() != Part(2)) lobbyCourse3 = Part(2);
         if (lobbyCourse4.ToString() != Part(3)) lobbyCourse4 = Part(3);
     }
+    // The host's lobby settings (HostSettings: TV production, race speed, bears and moves per leg), "" on the others
+    [Networked] public NetworkString<_64> hostOptions { get; set; }
+    // Relays: the host's race clock in game seconds while a leg is under way (RelayClock), so every team's clock
+    // shows exactly the same time once its runner is off; negative = no leg under way
+    [Networked] public float relayRaceClock { get; set; }
+    [Networked] public int relayRaceClockTick { get; set; }
     // The extra game modes the host has turned on in the lobby (ExtraMode flags)
     [Networked] public int lobbyModes { get; set; }
     // Secret task tasks the host has switched off in the lobby (one bit per SecretTasks.Task; 0 = all tasks on)
@@ -256,6 +262,14 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             return;
         }
+        string options = HostSettings.ToPublish;
+        if (hostOptions.ToString() != options) hostOptions = options;
+        float raceClock = RelayClock.ToPublish;
+        if (relayRaceClock != raceClock)
+        {
+            relayRaceClock = raceClock;
+            relayRaceClockTick = (int)Runner.Tick;
+        }
         Vector3Int stats = agentMovement.RunnerStats;
         int packedStats = stats == Vector3Int.zero ? 0
             : (Mathf.Clamp(stats.x, 0, 255) << 16) | (Mathf.Clamp(stats.y + 1, 0, 255) << 8) | Mathf.Clamp(stats.z, 0, 255);
@@ -299,6 +313,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     public override void Despawned(NetworkRunner runner, bool hasState)
     {
         PackRegistry.Remove(this);
+        if (Local == this) RacePace.Normal();
     }
 
 
@@ -336,6 +351,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     void Update()
     {
         if (Object == null || !Object.IsValid || !Object.HasStateAuthority || Runner == null) return;
+        RacePace.Apply(agentMovement);
         if (Time.unscaledTime < nextSpotCheck) return;
         nextSpotCheck = Time.unscaledTime + 0.5f;
         if (ActiveScene.Name != "Lobby") return;

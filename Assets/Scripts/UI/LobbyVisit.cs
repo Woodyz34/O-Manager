@@ -86,6 +86,11 @@ public static class LobbyVisit
         HoverTip.Add(shop, "Open runner packs while you wait. You come straight back to the lobby when you leave.");
         HoverTip.Add(runners, "Look at the runner cards you own. You come straight back to the lobby when you leave.");
         HoverTip.Add(builder, "Build your own courses or import maps while you wait. You come straight back to the lobby when you leave.");
+
+        // The host's lobby settings (2026-11-19), in the top right corner under the money
+        Button settings = CourseUI.Button("Lobby settings", go.transform, "Lobby settings", CourseUI.ButtonKind.Secondary, HostSettingsPopup.Open, 24);
+        CourseUI.Place(settings.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48, -128), new Vector2(250, 58));
+        HoverTip.Add(settings, "Race speed, TV controls in relays, bears and control moves per leg. The host changes them; everyone else can look.");
     }
 
     // Money always sits in the top right corner, as in the main menu, so "Leave lobby" moves to the top left

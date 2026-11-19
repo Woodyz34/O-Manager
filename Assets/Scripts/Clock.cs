@@ -192,6 +192,7 @@ public class Clock : MonoBehaviour
                 { adjustedSecondsPerUpdate = 0.05f; }
 
             sekundercount += adjustedSecondsPerUpdate;
+            FollowRelayClock(player);
             while (sekundercount >= 60)
             {
                 sekundercount -= 60;
@@ -240,6 +241,25 @@ public class Clock : MonoBehaviour
             }
         }
     }
+    // Relays: once the team's runner is off, its clock shows the race clock (RelayClock), so every team has exactly
+    // the same time (2026-11-19: they were a second or so apart). Small differences are taken up over a few steps,
+    // so the clock never jumps back and forth.
+    void FollowRelayClock(NetworkPlayer player)
+    {
+        if (RelayRace.Active == null || player == null || !player.relayRunning) return;
+        if (agentMovement.manualPathDrawer.timeToDraw) return;
+        if (!RelayClock.TryNow(out double race)) return;
+        double mine = hourCount * 3600 + minuterCount * 60 + sekundercount;
+        double off = race - mine;
+        if (System.Math.Abs(off) < 0.35) return;
+        double now = System.Math.Abs(off) > 6 ? race : mine + off * 0.3;
+        if (now < 0) now = 0;
+        hourCount = (int)(now / 3600);
+        now -= hourCount * 3600;
+        minuterCount = (int)(now / 60);
+        sekundercount = (float)(now - minuterCount * 60);
+    }
+
     public void ChangeClockRunning()
     {
         if (isClockRunning == true)
