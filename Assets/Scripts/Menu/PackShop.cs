@@ -101,6 +101,7 @@ public static class PackShop
             Money.Instance.AddMoney(-result.paid);
         }
         result.isNew = RunnerCollection.AddFromPack(result.card.RunnerName);
+        GameAnalytics.Record("pack_opened", "tier", RunnerCards.Tier(result.card).ToString(), "paid", result.paid, "is_new", result.isNew);
     }
 
     static CardData Draw()

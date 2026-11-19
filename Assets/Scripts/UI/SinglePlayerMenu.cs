@@ -368,6 +368,10 @@ public class SinglePlayerMenu : MonoBehaviour
             SceneManager = sceneManager,
             ConnectionToken = GameManager.Instance.GetConnectionsToken()
         });
+        if (result.Ok)
+        {
+            GameAnalytics.Record("single_player_started", "terrain", course != null && course.IsSprint() ? "sprint" : "forest");
+        }
         if (!result.Ok)
         {
             Debug.LogError("SinglePlayerMenu: could not start: " + result.ShutdownReason);

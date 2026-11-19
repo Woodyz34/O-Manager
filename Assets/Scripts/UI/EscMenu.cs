@@ -24,6 +24,7 @@ public class EscMenu : MonoBehaviour
     TextMeshProUGUI volumeValue;
     Slider volumeSlider;
     Button fullscreenButton;
+    Button statsButton;
     Button windowButton;
     Button endButton;
     Button mainMenuButton;
@@ -279,6 +280,21 @@ public class EscMenu : MonoBehaviour
 
     // ---- Buttons ----
 
+    void ShowStatsButton()
+    {
+        TextMeshProUGUI label = statsButton != null ? statsButton.GetComponentInChildren<TextMeshProUGUI>() : null;
+        if (label != null)
+        {
+            label.text = "Usage statistics: " + (GameAnalytics.Enabled ? "on" : "off");
+        }
+    }
+
+    void OnStatsToggle()
+    {
+        GameAnalytics.SetEnabled(!GameAnalytics.Enabled);
+        ShowStatsButton();
+    }
+
     void OnFullscreen()
     {
         ScreenSettings.SetFullscreen(true);
@@ -510,6 +526,11 @@ public class EscMenu : MonoBehaviour
 
         RectTransform gap = CourseUI.Rect("Gap", card.transform);
         CourseUI.Size(gap, 6);
+
+        statsButton = CourseUI.Button("Usage statistics", card.transform, "", CourseUI.ButtonKind.Light, OnStatsToggle, 22);
+        CourseUI.Size(statsButton, 52);
+        ShowStatsButton();
+        HoverTip.Add(statsButton, "Anonymous statistics (how many play and what is played, no names) help make the game better. Click to turn them on or off.");
 
         Button resume = CourseUI.Button("Resume", card.transform, "Resume", CourseUI.ButtonKind.Primary, Close, 28);
         CourseUI.Size(resume, 68);

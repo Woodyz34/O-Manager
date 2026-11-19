@@ -235,6 +235,7 @@ public class NetworkRunnerHandler : MonoBehaviour
     public void JoinGame(SessionInfo sessionInfo)
     {
         Debug.Log($"Join session {sessionInfo.Name}");
+        GameAnalytics.Record("lobby_joined", "players", sessionInfo.PlayerCount);
 
         var clientTask = InitializeNetworkRunner(networkRunner, GameMode.Shared, GameManager.Instance.GetConnectionsToken(), sessionInfo.Name, NetAddress.Any(), SceneRef.FromIndex(SceneManager.GetActiveScene().buildIndex), null);
     }
