@@ -75,10 +75,21 @@ public partial class RunSession
         NetworkPlayer local = NetworkPlayer.Local;
         if (local != null && local.Object != null && local.Object.HasStateAuthority)
         {
-            local.run3dAt = new Vector2((float)player.e, (float)player.n);
-            local.run3dYaw = player.yaw;
-            local.run3dSpeed = player.speed;
-            local.run3dFlags = FlagReady | (player.mapUp ? FlagMapUp : 0) | (player.Fallen ? FlagFallen : 0) | (player.Airborne ? FlagAir : 0) | (RunSettings.RightHand ? FlagRightHand : 0);
+            // After the finish the camera may be watching someone else: this runner stays where it came in
+            if (phase != Phase.Finished)
+            {
+                local.run3dAt = new Vector2((float)player.e, (float)player.n);
+                local.run3dYaw = player.yaw;
+                local.run3dPitch = player.pitch;
+                local.run3dSpeed = player.speed;
+                if (handMap != null)
+                {
+                    local.run3dMapLeg = handMap.Leg;
+                    local.run3dMapTurn = handMap.Turn;
+                }
+            }
+            local.run3dPunched = inOrder;
+            local.run3dFlags = phase == Phase.Finished ? FlagReady | (RunSettings.RightHand ? FlagRightHand : 0) : FlagReady | (player.mapUp ? FlagMapUp : 0) | (player.Fallen ? FlagFallen : 0) | (player.Airborne ? FlagAir : 0) | (RunSettings.RightHand ? FlagRightHand : 0);
         }
 
         if (Time.unscaledTime >= nextPlayerScan)
@@ -132,7 +143,8 @@ public partial class RunSession
             r.figure.Pose(at3.x, at3.y, at3.z, moved, at3 + Vector3.up * 1000f, 0f, dt, (ahead - ground) / 2f, (flags & FlagAir) != 0 ? 0.6f : 0f);
             // Far away runners are not drawn (the forest hides them anyway)
             float far = Vector2.Distance(r.shown, new Vector2((float)player.e, (float)player.n));
-            r.figure.SetVisible(far < world.ViewDistance);
+            // The runner watched is not drawn: the camera is in its head
+            r.figure.SetVisible(far < world.ViewDistance && r.player != watching);
         }
     }
 
@@ -233,7 +245,8 @@ public partial class RunSession
             return;
         }
         waitingForOthers = true;
-        bigText.text = "<size=50%>Waiting for the others: " + inCount + " of " + all + " in</size>";
+        OpenWatchList();
+        bigText.text = Watching ? "" : "<size=40%>Waiting for the others: " + inCount + " of " + all + " in\n<size=80%>Click a runner on the left to see what they see</size></size>";
         Invoke(nameof(AfterFinish), 0.5f);
     }
 

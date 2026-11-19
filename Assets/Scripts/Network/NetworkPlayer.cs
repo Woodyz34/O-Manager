@@ -182,6 +182,12 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public float run3dYaw { get; set; }
     [Networked] public float run3dSpeed { get; set; }
     [Networked] public int run3dFlags { get; set; }
+    // For watching a runner after the finish: the head's tilt (degrees, down positive), the leg the map shows and
+    // how far it is turned, and how many controls are punched in order (for "Leg 3 of 7")
+    [Networked] public float run3dPitch { get; set; }
+    [Networked] public int run3dMapLeg { get; set; }
+    [Networked] public float run3dMapTurn { get; set; }
+    [Networked] public int run3dPunched { get; set; }
     // Per leg (index 1 = start to control 1): the route picked and the points (RouteChoiceGame.WriteLeg / ReadLeg)
     [Networked, Capacity(52)] public NetworkArray<int> choiceLegs => default;
 
@@ -948,6 +954,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             // A new competition starts: nobody has finished or guessed yet
             raceFinished = false;
             run3dFlags = 0;
+            run3dPunched = 0;
             ClearRelayResults();
             hasGuessedImposter = false;
             imposterGuess = PlayerRef.None;

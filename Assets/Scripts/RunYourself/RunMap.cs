@@ -272,6 +272,15 @@ public class RunMap : MonoBehaviour
         }
     }
 
+    // Watching another runner: their leg and the way they turned the map
+    public float Turn => turnTarget;
+
+    public void Follow(int leg, float turned)
+    {
+        if (leg != Leg) FrameLeg(leg);
+        turnTarget = turned;
+    }
+
     public void SetUp(bool up)
     {
         Up = up;

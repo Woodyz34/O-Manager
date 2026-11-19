@@ -369,11 +369,14 @@ public partial class RunSession : MonoBehaviour
                 nextSample = gameSeconds + SampleEvery;
                 SampleOthers(gameSeconds * player.gameSpeed);
             }
+            WatchTick(dt);
         }
 
         player.Tick(dt);
         handMap.Tick(dt, phase == Phase.Running && !menuOpen);
-        clockText.text = phase == Phase.Countdown || phase == Phase.Waiting ? "0:00" : RaceTime(player.raceSeconds);
+        clockText.text = phase == Phase.Countdown || phase == Phase.Waiting ? "0:00"
+            : Watching ? (watching.raceFinished ? RaceTime(watching.relayTotals[0]) : RaceTime(gameSeconds * player.gameSpeed))
+            : RaceTime(player.raceSeconds);
         if (Input.GetKeyDown(KeyCode.F4)) showFacts = !showFacts;
         factsText.text = showFacts ? Facts() : "";
     }
@@ -443,6 +446,7 @@ public partial class RunSession : MonoBehaviour
             if (i == lastPunched) continue;
             lastPunched = i;
             punches.Add(i);
+            if (i == inOrder) inOrder++;
             punchTimes.Add(player.raceSeconds);
             if (i == world.FlagCount - 1)
             {
@@ -572,6 +576,7 @@ public partial class RunSession : MonoBehaviour
     void ToResults()
     {
         if (this == null) return;
+        CloseWatchList();
         bigText.text = "";
         atResults = true;
         twoDHidden = false;

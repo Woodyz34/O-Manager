@@ -44,6 +44,11 @@ public class RunPlayer : MonoBehaviour
     public float Effort { get; private set; }
     public bool Fallen => fallTimer > 0f;
     public bool Airborne => airborne;
+    // Watching another runner after the finish (RunSpectate): the place and head are set from outside, nothing moves
+    // by itself; the eyes bob with the other runner's speed
+    public bool puppet;
+    public float puppetSpeed;
+    public bool puppetFallen;
 
     // Mass start: where the other runners are (map metres), so nobody runs through anyone
     public readonly List<Vector2> others = new List<Vector2>();
@@ -95,6 +100,16 @@ public class RunPlayer : MonoBehaviour
         dt = Mathf.Min(dt, 0.05f);
         ground = terrain.At(e, n);
         fatigue = Mathf.Clamp01((raceSeconds / 60f - 6f) / 45f);
+        if (puppet)
+        {
+            speed = puppetSpeed;
+            airborne = false;
+            jumpY = 0f;
+            ShakeAndBreath(dt);
+            PlaceCamera(dt);
+            world.SetPlayer(e, n);
+            return;
+        }
 
         Look();
         Move(dt);
@@ -363,6 +378,12 @@ public class RunPlayer : MonoBehaviour
             height = Mathf.Lerp(EyeHeight, 0.5f, down);
             extraPitch = 50f * down;
             roll = 22f * down;
+        }
+        else if (puppet && puppetFallen)
+        {
+            height = 0.5f;
+            extraPitch = 50f;
+            roll = 22f;
         }
         else if (stumbleTimer > 0f)
         {
