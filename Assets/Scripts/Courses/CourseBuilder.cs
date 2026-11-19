@@ -236,8 +236,121 @@ public class CourseBuilder : MonoBehaviour
         }
         SelectMap(maps[0]);
         RefreshMyCourses();
+        RestoreDraft();
         // Sign in early so publishing is quick later; failure is shown when saving
         _ = CloudCourses.SignInAsync();
+    }
+
+    // ---- The work in progress is kept (2026-11-19) ----
+    // Leaving the course builder (a race starting from the lobby, back to the main menu, quitting) used to lose the
+    // course being laid. Now it is kept on this computer and comes back the next time the builder opens. "New course"
+    // or another map starts afresh as before (the empty builder is what is kept then).
+
+    const string DraftKey = "CourseBuilder.Draft";
+
+    [Serializable]
+    class Draft
+    {
+        public string course;        // CourseData as JSON
+        public bool fromSaved;       // it was a saved course being changed (Save updates it)
+        public string noStart = "";  // per course of the draft: "1" when it had no start yet
+        public string noFinish = "";
+    }
+
+    float nextDraftSave;
+    string lastDraft;
+
+    bool HasContent()
+    {
+        if (nameField != null && nameField.text.Trim().Length > 0) return true;
+        if (areas.Count > 0 || boundaries.Count > 0) return true;
+        foreach (EditCourse c in courses) if (c.start.HasValue || c.finish.HasValue || c.items.Count > 0) return true;
+        return false;
+    }
+
+    // The courses in the order BuildCourse writes them (relays: only the ones a leg uses)
+    List<EditCourse> DraftOrder()
+    {
+        List<EditCourse> order = new List<EditCourse>();
+        if (!relay)
+        {
+            order.Add(Cur);
+            return order;
+        }
+        for (int leg = 0; leg < legs && leg < legCourse.Count; leg++)
+        {
+            EditCourse c = courses[legCourse[leg]];
+            if (!order.Contains(c)) order.Add(c);
+        }
+        return order;
+    }
+
+    void SaveDraft()
+    {
+        if (map == null || nameField == null) return;
+        try
+        {
+            if (!HasContent())
+            {
+                if (lastDraft != "") PlayerPrefs.DeleteKey(DraftKey);
+                lastDraft = "";
+                return;
+            }
+            Draft draft = new Draft { course = CourseLibrary.ToJson(BuildCourse()), fromSaved = editing != null };
+            foreach (EditCourse c in DraftOrder())
+            {
+                draft.noStart += c.start.HasValue ? "0" : "1";
+                draft.noFinish += c.finish.HasValue ? "0" : "1";
+            }
+            string text = JsonUtility.ToJson(draft);
+            if (text == lastDraft) return;
+            lastDraft = text;
+            PlayerPrefs.SetString(DraftKey, text);
+            PlayerPrefs.Save();
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("CourseBuilder: could not keep the course being laid: " + e.Message);
+        }
+    }
+
+    void RestoreDraft()
+    {
+        string text = PlayerPrefs.GetString(DraftKey, "");
+        if (string.IsNullOrEmpty(text)) return;
+        try
+        {
+            Draft draft = JsonUtility.FromJson<Draft>(text);
+            CourseData course = draft != null && !string.IsNullOrEmpty(draft.course) ? CourseLibrary.Parse(draft.course) : null;
+            if (course == null || MapDefinition.Find(course.mapId) == null) return;
+            Edit(course);
+            if (!draft.fromSaved) editing = null;
+            List<EditCourse> order = DraftOrder();
+            for (int i = 0; i < order.Count; i++)
+            {
+                if (i < draft.noStart.Length && draft.noStart[i] == '1') order[i].start = null;
+                if (i < draft.noFinish.Length && draft.noFinish[i] == '1') order[i].finish = null;
+            }
+            lastDraft = text;
+            SetTool(Tool.Control);
+            SetStatus(draft.fromSaved ? "Welcome back: you were changing \"" + course.name + "\". Save to update it."
+                                      : "Welcome back: here is the course you were laying. Press New course to start afresh.", false);
+            Redraw();
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("CourseBuilder: could not bring back the course being laid: " + e.Message);
+        }
+    }
+
+    void OnDestroy()
+    {
+        SaveDraft();
+    }
+
+    void OnApplicationQuit()
+    {
+        SaveDraft();
     }
 
     // ---- Map ----
@@ -420,6 +533,12 @@ public class CourseBuilder : MonoBehaviour
 
     void Update()
     {
+        // Kept every few seconds too, in case the game is closed some other way
+        if (Time.unscaledTime >= nextDraftSave)
+        {
+            nextDraftSave = Time.unscaledTime + 5f;
+            SaveDraft();
+        }
         if (map == null || busy || MapImportPanel.IsOpen || MapEditPanel.IsOpen || mapPicker != null || coursesPopup != null)
         {
             ShowCursor(default);
