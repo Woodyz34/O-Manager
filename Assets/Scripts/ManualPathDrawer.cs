@@ -516,17 +516,51 @@ public class ManualPathDrawer : MonoBehaviour
         return SoftGround.IsSoft(map, c, manager.speedGrid2D.GetLength(0), manager.speedGrid2D.GetLength(1), ForbiddenAreas.CompetitionCells);
     }
 
-    // How much closed ground the line has crossed since blockedFrom: soft cells count half
+    // Narrow passages on sprint maps (2026-11-19, test night): a passage two or three metres wide between a fence and
+    // a house was very hard to draw in, the line slipped a cell onto the closed ground beside it and stopped. Closed
+    // cells right beside ground the runner can run on (within EdgeCells) now count very little, so the line may run
+    // a little beside a passage. The grid is not changed: the runner still runs in the passage itself (the detour),
+    // and a line that cuts across a fence or a garden is still stopped, because the way round through the real
+    // passage must be about as long as the drawn line (the tooLong check in AddCell).
+    const int EdgeCells = 2;
+    const float EdgeCellWeight = 0.1f;
+
+    bool BesideOpen(Vector2Int c)
+    {
+        float[,] grid = manager.speedGrid2D;
+        int rows = grid.GetLength(0), cols = grid.GetLength(1);
+        for (int dy = -EdgeCells; dy <= EdgeCells; dy++)
+        {
+            int y = c.y + dy;
+            if (y < 0 || y >= rows) continue;
+            for (int dx = -EdgeCells; dx <= EdgeCells; dx++)
+            {
+                int x = c.x + dx;
+                if (x >= 0 && x < cols && grid[y, x] > 0.01f) return true;
+            }
+        }
+        return false;
+    }
+
+    // How much closed ground the line has crossed since blockedFrom: soft cells count half, cells right beside open
+    // ground (a sprint passage) very little
     float ClosedWeight(int upTo, out int softCells)
     {
         float weight = 0f;
         softCells = 0;
+        bool sprint = Sprint;
         for (int i = blockedFrom + 1; i <= upTo && i < gridPath.Count; i++)
         {
             if (Passable(gridPath[i])) continue;
-            if (SoftCell(gridPath[i])) { weight += SoftCellWeight; softCells++; }
+            bool soft = SoftCell(gridPath[i]);
+            if (soft) softCells++;
+            if (sprint && BesideOpen(gridPath[i])) weight += EdgeCellWeight;
+            else if (soft) weight += SoftCellWeight;
             else weight += 1f;
         }
+        // The way round may be a little longer for each soft cell, but no more than before the edge rule (when the
+        // line stopped after 8 soft cells), so a long line along a garden can not cut across it
+        softCells = Mathf.Min(softCells, Mathf.RoundToInt(SprintMaxClosedCells / SoftCellWeight));
         return weight;
     }
 
