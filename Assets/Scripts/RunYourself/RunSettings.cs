@@ -184,6 +184,7 @@ public static class RunSettings
         for (int k = 0; k < SoundNames.Length; k++)
         {
             Sound kind = (Sound)k;
+            if (kind == Sound.Breathing) continue;   // no breathing sounds for now
             TextMeshProUGUI label = CourseUI.Text(SoundNames[k] + " label", right, "", 22, CourseUI.Ink, k == 0 ? FontStyles.Bold : FontStyles.Normal);
             label.richText = true;
             CourseUI.Size(label, 28);

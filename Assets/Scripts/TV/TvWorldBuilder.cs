@@ -662,7 +662,7 @@ public class TvWorldBuilder
         dz /= len;
         if (rocky) cliffs.Add((mx, mz, dx, dz, c));
 
-        var best = new Dictionary<int, (float d, float side)>();
+        var best = new Dictionary<int, (float d, float side, float qx, float qz, float nx, float nz)>();
         for (int q = 0; q + 3 < c.Length; q += 2)
         {
             float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
@@ -675,15 +675,29 @@ public class TvWorldBuilder
             {
                 if (best.TryGetValue(k, out var known) && known.d <= d) return;
                 float px = k % N - R, pz = k / N - R;
-                best[k] = (d, (px - qx) * nx + (pz - qz) * nz);
+                best[k] = (d, (px - qx) * nx + (pz - qz) * nz, qx, qz, nx, nz);
             });
         }
+        // The height grid (10 m) already has the cliff's height as a smooth slope across it. The slope is gathered
+        // into the step: the ground above is lifted to the height a few metres above the cliff and the ground below
+        // lowered to the height a few metres below, so the foot is flat ground and the cliff rises from it
+        // (2026-11-19, Anders: the old drop dug a trench at the foot of a cliff that rises from flat ground).
+        // Where the grid has less height than the map's cliff, the rest is shared half up, half down.
+        const float Reach = 6f;
         foreach (var pair in best)
         {
             float d = pair.Value.d, side = pair.Value.side;
-            if (side <= -0.5f) continue;
+            if (d > Reach + 1f) continue;
+            float qx = pair.Value.qx, qz = pair.Value.qz, nx = pair.Value.nx, nz = pair.Value.nz;
+            float top = BaseHeight(qx - nx * Reach, qz - nz * Reach), foot = BaseHeight(qx + nx * Reach, qz + nz * Reach);
+            float extra = Math.Min(drop, Math.Max(0f, drop - (top - foot))) * 0.5f;
+            float high = top + extra, low = Math.Min(foot, top) - extra;
             // A rock cliff drops at once (a vertical face is built on it, CliffFaces); an earth bank slopes
-            F[pair.Key] -= drop * (rocky ? Sm(-0.25f, 0.45f, side) : Sm(-0.5f, 0.9f, side)) * (1f - Sm(1.2f, 10f, d));
+            float down = rocky ? Sm(-0.25f, 0.45f, side) : Sm(-0.5f, 0.9f, side);
+            float want = high + (low - high) * down;
+            int k = pair.Key;
+            float here = BaseHeight(k % N - R, k / N - R);
+            F[k] += (want - here) * (1f - Sm(Reach - 2f, Reach + 1f, d));
             float face = Sm(-0.8f, 0.2f, side) * (1f - Sm(1.3f, 2.6f, d));
             if (rocky) rock[pair.Key] = Math.Max(rock[pair.Key], face);
             else soil[pair.Key] = Math.Max(soil[pair.Key], face * 0.8f);
@@ -692,7 +706,7 @@ public class TvWorldBuilder
 
     // ---- Paths and roads: a colour on the ground, and no trees on them ----
 
-    static readonly TvColor Gravel = TvColor.Hex("#9a917f"), Earth = TvColor.Hex("#7b6546"), Asphalt = TvColor.Hex("#6f6e6c"),
+    static readonly TvColor Gravel = TvColor.Hex("#9a917f"), Earth = TvColor.Hex("#8c7250"), Asphalt = TvColor.Hex("#6f6e6c"),
         RideGrass = TvColor.Hex("#7d8a4a"), Ballast = TvColor.Hex("#7f7a73");
 
     void Tracks()
@@ -705,10 +719,12 @@ public class TvWorldBuilder
             {
                 case WorldLineKind.WideRoad: half = 2.6f; strength = 1f; color = Gravel; break;
                 case WorldLineKind.Road: half = 1.8f; strength = 1f; color = Gravel; break;
-                case WorldLineKind.Track: half = 1.3f; strength = 0.9f; color = Earth; break;
-                case WorldLineKind.Footpath: half = 0.75f; strength = 0.9f; color = Earth; break;
-                case WorldLineKind.SmallPath: half = 0.5f; strength = 0.8f; color = Earth; break;
-                case WorldLineKind.FaintPath: half = 0.4f; strength = 0.5f; color = Earth; break;
+                // Paths a little wider and clearer than in real life (2026-11-19, Anders: hard to find; the ground
+                // has one corner per metre, so a narrow path barely showed)
+                case WorldLineKind.Track: half = 1.5f; strength = 1f; color = Earth; break;
+                case WorldLineKind.Footpath: half = 1.05f; strength = 1f; color = Earth; break;
+                case WorldLineKind.SmallPath: half = 0.85f; strength = 0.95f; color = Earth; break;
+                case WorldLineKind.FaintPath: half = 0.65f; strength = 0.75f; color = Earth; break;
                 case WorldLineKind.Ride: half = 1.6f; strength = 0.35f; color = RideGrass; break;
                 case WorldLineKind.Railway: half = 2.2f; strength = 1f; color = Ballast; break;
                 case WorldLineKind.Wall: case WorldLineKind.RuinedWall: case WorldLineKind.HighWall:

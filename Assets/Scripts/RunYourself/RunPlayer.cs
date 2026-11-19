@@ -179,7 +179,7 @@ public class RunPlayer : MonoBehaviour
                     if (speed > ForestSpeed * 0.35f)
                     {
                         // Ran into it without jumping
-                        Fall(1.8f);
+                        Fall(0.9f);
                         break;
                     }
                     // Slowly: climbs over
@@ -267,7 +267,7 @@ public class RunPlayer : MonoBehaviour
         float fallChance = 0.2f + 0.45f * Mathf.Clamp01(-gradient * 4f) * fatigue + 0.15f * Mathf.Clamp01(ground.rough - 1f);
         if (random.NextDouble() < fallChance)
         {
-            Fall(1.6f + (float)random.NextDouble() * 0.6f);
+            Fall(0.8f + (float)random.NextDouble() * 0.3f);   // quick (2026-11-19, Anders: the fall took too long)
             return;
         }
         stumbleTimer = 0.5f;
@@ -302,7 +302,7 @@ public class RunPlayer : MonoBehaviour
         float moving = speed > 0.3f ? 1f : 0f;
         float effortTarget = 0.18f + moving * (0.3f + 0.45f * sf + 2.5f * Mathf.Max(0f, gradient)) + 0.3f * fatigue;
         Effort = Mathf.MoveTowards(Effort, Mathf.Clamp01(effortTarget), dt * (effortTarget > Effort ? 0.25f : 0.08f));
-        if (controlsOn || raceSeconds > 0f) sounds.Breathe(Effort, !airborne && speed > 0.3f && !Fallen);
+        // No breathing sounds (2026-11-19, Anders: the breathing sounded like groaning). Effort is still kept.
     }
 
     // ---- The eyes ----
@@ -316,9 +316,9 @@ public class RunPlayer : MonoBehaviour
         float height = EyeHeight + jumpY + bob, extraPitch = 0f, roll = sway;
         if (Fallen)
         {
-            // Down on the ground, then up again over the last 0.6 s
+            // Down on the ground, then up again over the last 0.35 s
             float t = 1f - fallTimer / fallLength;
-            float down = t < 0.15f ? t / 0.15f : fallTimer < 0.6f ? fallTimer / 0.6f : 1f;
+            float down = t < 0.15f ? t / 0.15f : fallTimer < 0.35f ? fallTimer / 0.35f : 1f;
             down = Mathf.SmoothStep(0f, 1f, down);
             height = Mathf.Lerp(EyeHeight, 0.5f, down);
             extraPitch = 50f * down;
