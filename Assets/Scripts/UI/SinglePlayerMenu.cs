@@ -290,7 +290,7 @@ public class SinglePlayerMenu : MonoBehaviour
         bool noRunners = (modes & ExtraModes.NoRunners) != 0;
         poolValue.text = noRunners ? "No runners" : GameModes.PoolName(pool);
         modeValue.text = ExtraModes.Describe(modes);
-        runSettingsButton.SetActive((modes & ExtraMode.RunYourself) != 0);
+        runSettingsButton.SetActive((modes & ExtraModes.RunModes) != 0);
         courseValue.text = course != null ? LobbySettingsUI.CourseTitle(course) : "Pick a course";
 
         int owned = GameModes.OwnedRunnerCount();

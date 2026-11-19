@@ -17,12 +17,13 @@ public enum ExtraMode
     RouteAnalysis = 8,
     RouteChoice = 16,
     SecretTask = 32,
-    RunYourself = 64,     // the player runs the course in 3D, first person (RunSession); single player for now
+    RunYourself = 64,     // the player runs the course in 3D, first person (RunSession); everyone in their own world
+    RunMass = 128,        // the same with a mass start: everyone in one world, seeing each other
 }
 
 public static class ExtraModes
 {
-    public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.SecretTask, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis, ExtraMode.RouteChoice, ExtraMode.RunYourself };
+    public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.SecretTask, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis, ExtraMode.RouteChoice, ExtraMode.RunYourself, ExtraMode.RunMass };
 
     // Every mode, for "show them all"
     public static ExtraMode AllMask
@@ -35,17 +36,19 @@ public static class ExtraModes
         }
     }
 
-    // The modes a multiplayer lobby offers. Run it yourself is single player only until mass start and individual
-    // start online are built.
+    // The modes a multiplayer lobby offers: all of them (2026-11-19: Run it yourself online)
     public static ExtraMode LobbyMask => AllMask & ~SinglePlayerOnly;
-    public const ExtraMode SinglePlayerOnly = ExtraMode.RunYourself;
+    public const ExtraMode SinglePlayerOnly = ExtraMode.None;
+
+    // The two ways to run it yourself
+    public const ExtraMode RunModes = ExtraMode.RunYourself | ExtraMode.RunMass;
 
     // Modes that can be played alone in single player (2026-11-13). The imposter modes need someone to fool, a bear
     // you hid yourself is no surprise, and a control you moved yourself is no trick.
     public const ExtraMode Solo = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself;
 
     // Modes that cannot be combined with any other mode
-    public const ExtraMode Alone = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself;
+    public const ExtraMode Alone = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself | ExtraMode.RunMass;
 
     // The two imposter modes both pick one imposter, so only one of them can be on
     public const ExtraMode ImposterKinds = ExtraMode.Imposter | ExtraMode.SecretTask;
@@ -72,10 +75,10 @@ public static class ExtraModes
     }
 
     // Modes where nobody picks a runner (everyone gets the same one), so the runner pool does not matter
-    public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself;
+    public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself | ExtraMode.RunMass;
 
     // Modes that only work on individual courses, not relays
-    public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself;
+    public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself | ExtraMode.RunMass;
 
     // Modes that only work in the forest, not on sprint courses. None since 2026-11-19: Bears and Move a control work
     // on sprint too (a moved control must be reachable, MoveControlMode.PlaceProblem)
@@ -95,6 +98,7 @@ public static class ExtraModes
             case ExtraMode.RouteAnalysis: return "Route analysis";
             case ExtraMode.RouteChoice: return "Route choice game";
             case ExtraMode.RunYourself: return "Run it yourself (3D)";
+            case ExtraMode.RunMass: return "Run it yourself: mass start (3D)";
             default: return mode.ToString();
         }
     }
@@ -109,7 +113,8 @@ public static class ExtraModes
             case ExtraMode.MoveControl: return "Everyone may move controls up to 100 m while drawing. Good routes can turn bad.";
             case ExtraMode.RouteAnalysis: return "Nobody runs: everyone draws the whole course the way they would run it, then you compare the route choices. Played on its own.";
             case ExtraMode.RouteChoice: return "Nobody runs: on each leg, pick the fastest of 2 to 4 routes. Points for right answers, more the quicker you are. Played on its own.";
-            case ExtraMode.RunYourself: return "Be the runner: run the course yourself in 3D with the map in your hand. Forest courses only. Played on its own.";
+            case ExtraMode.RunYourself: return "Be the runner: run the course yourself in 3D with the map in your hand. Online everyone runs in their own forest; compare the times and routes afterwards. Forest courses only. Played on its own.";
+            case ExtraMode.RunMass: return "Run it yourself in 3D, all starting together in the same forest: you see the others run and read their maps, and you can bump into each other. Forest courses only. Played on its own.";
             default: return "";
         }
     }
@@ -156,7 +161,7 @@ public static class ExtraModes
             ExtraMode notRelay = modes & IndividualOnly;
             if (notRelay != ExtraMode.None) return "\"" + Describe(notRelay) + "\" only works on individual courses, not relays. Choose another course or game mode.";
         }
-        if ((modes & ExtraMode.RunYourself) != 0)
+        if ((modes & RunModes) != 0)
         {
             MapDefinition map = MapDefinition.FindExact(course.mapId);
             if (course.IsSprint() || (map != null && map.IsSprint)) return "\"Run it yourself\" only works on forest courses for now. Choose a forest course.";
@@ -176,7 +181,7 @@ public static class ExtraModes
         if (course == null) return null;
         if ((mode & IndividualOnly) != 0 && course.IsRelay()) return "You can't have this game mode on a relay";
         if ((mode & ForestOnly) != 0 && course.IsSprint()) return "You can't have this game mode on sprint";
-        if ((mode & ExtraMode.RunYourself) != 0 && course.IsSprint()) return "Run it yourself works on forest courses only, for now";
+        if ((mode & RunModes) != 0 && course.IsSprint()) return "Run it yourself works on forest courses only, for now";
         return null;
     }
 

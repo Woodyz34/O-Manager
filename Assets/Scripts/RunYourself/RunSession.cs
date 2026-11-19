@@ -14,13 +14,14 @@ using UnityEngine.UI;
 //
 // The competition scene is still loaded underneath: its 2D map and course are what the map in the hand films, and
 // the GPS replay afterwards is the usual relay replay on that map.
-public class RunSession : MonoBehaviour
+public partial class RunSession : MonoBehaviour
 {
     public const string RunnerName = "You";
     const float PunchReach = 0.6f;      // metres from the punching unit (the flag) that punch it
     const float SampleEvery = 0.25f;    // seconds between GPS points
 
-    public static bool On => ExtraModes.Is(ExtraMode.RunYourself) && RelayRace.Active == null;
+    public static bool On => (ExtraModes.Is(ExtraMode.RunYourself) || ExtraModes.Is(ExtraMode.RunMass)) && RelayRace.Active == null;
+    public static bool Mass => ExtraModes.Is(ExtraMode.RunMass);
     public static RunSession Active { get; private set; }
 
     // Instead of the choose-a-runner screen: everyone is ready at once
@@ -51,7 +52,7 @@ public class RunSession : MonoBehaviour
 
     // ---- The race ----
 
-    enum Phase { Loading, Countdown, Running, Finished, Failed }
+    enum Phase { Loading, Waiting, Countdown, Running, Finished, Failed }
 
     Phase phase = Phase.Loading;
     CourseData course;
@@ -106,6 +107,7 @@ public class RunSession : MonoBehaviour
 
     void Start()
     {
+        if (IndividualRace.Active != null) IndividualRace.Active.ManualStats = true;
         Load();
     }
 
@@ -167,6 +169,7 @@ public class RunSession : MonoBehaviour
         world.Loading = true;
 
         double se = points[0].e, sn = points[0].n;
+        StartSpot(ref se, ref sn);
         FreeSpot(ref se, ref sn);
         world.SetPlayer(se, sn);
 
@@ -191,12 +194,15 @@ public class RunSession : MonoBehaviour
         player = RunPlayer.Create(world, terrain, sounds, se, sn, yaw, UnityEngine.Random.Range(0, int.MaxValue));
         player.transform.SetParent(transform, true);
         player.Moved = CheckPunch;
+        // Online everyone runs at the same speed, so the mass start is fair and the replays line up
+        if (Online) player.gameSpeed = 4f;
         handMap = RunMap.Create(player, mapDef, points, mainMask);
         handMap.transform.SetParent(transform, true);
         EnsureListener();
 
         track = new RelayTrack { label = RunnerName, isLocal = true, color = TrackColour() };
-        phase = Phase.Countdown;
+        phase = Online ? Phase.Waiting : Phase.Countdown;
+        waitingSince = Time.unscaledTime;
         countdown = 5.2f;
         lastBeep = 99;
         bigText.text = "";
@@ -265,7 +271,8 @@ public class RunSession : MonoBehaviour
         }
         if (player == null || atResults) return;
         float dt = Time.deltaTime;
-        bool playing = phase == Phase.Countdown || phase == Phase.Running;
+        bool playing = phase == Phase.Waiting || phase == Phase.Countdown || phase == Phase.Running;
+        NetTick(dt);
 
         // The mouse turns the head while running; any menu or window (Esc menu, settings, a pop-up) frees it and the
         // runner stops taking keys until it is closed
@@ -279,7 +286,18 @@ public class RunSession : MonoBehaviour
         Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
         Cursor.visible = !locked;
 
-        if (phase == Phase.Countdown)
+        if (phase == Phase.Waiting)
+        {
+            // Online: the countdown starts when everyone has built the forest
+            int ready = ReadyCount(out int all);
+            bigText.text = "<size=45%>Waiting for the others to load the forest (" + ready + " of " + all + " ready)</size>";
+            if (ready >= all || Time.unscaledTime - waitingSince > 90f)
+            {
+                phase = Phase.Countdown;
+                bigText.text = "";
+            }
+        }
+        else if (phase == Phase.Countdown)
         {
             countdown -= dt;
             int second = Mathf.CeilToInt(countdown);
@@ -313,7 +331,7 @@ public class RunSession : MonoBehaviour
 
         player.Tick(dt);
         handMap.Tick(dt, phase == Phase.Running && !menuOpen);
-        clockText.text = phase == Phase.Countdown ? "0:00" : RaceTime(player.raceSeconds);
+        clockText.text = phase == Phase.Countdown || phase == Phase.Waiting ? "0:00" : RaceTime(player.raceSeconds);
         if (Input.GetKeyDown(KeyCode.F4)) showFacts = !showFacts;
         factsText.text = showFacts ? Facts() : "";
     }
@@ -359,6 +377,7 @@ public class RunSession : MonoBehaviour
     // GPS points stamped with the race clock in replay seconds, like every other competition's replay
     void Sample()
     {
+        SampleOthers();
         track.times.Add(player.raceSeconds / PackRunning.GameSecondsPerSecond);
         track.positions.Add(mapDef.ToWorld(new CoursePoint(player.e, player.n)));
     }
@@ -437,6 +456,7 @@ public class RunSession : MonoBehaviour
         if (record) SetBest(course.id, resultSeconds);
         PlayerPrefs.Save();
         finalSplits = splits;
+        Report(splits);   // at once, so the others know this runner is in
 
         float km = player.distance / 1000f;
         string pace = km > 0.05f ? Pace(resultSeconds / km) + " min/km" : "";
@@ -444,7 +464,7 @@ public class RunSession : MonoBehaviour
         bigText.text = (ok ? "Finish!" : "Finish") + "  " + RaceTime(resultSeconds)
                        + "\n<size=45%>You ran " + km.ToString("0.00") + " km   " + pace
                        + (record && best > 0f ? "   New record!" : best > 0f && ok ? "   Record " + RaceTime(best) : "") + "</size>" + missed;
-        Invoke(nameof(ToResults), ok ? 4.5f : 6.5f);
+        Invoke(nameof(AfterFinish), ok ? 4.5f : 6.5f);
     }
 
     static string Pace(float secondsPerKm)
@@ -519,11 +539,10 @@ public class RunSession : MonoBehaviour
         hiddenRenderers.Clear();
         if (cameraController != null) cameraController.enabled = true;
         ShowTwoDMap(true);
-        Report(finalSplits);
         // The usual statistics screen: results, split times, replay; then "Show the results" (prize money) and back
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
-        if (IndividualRace.Active != null) IndividualRace.Active.ShowStats(new List<RelayTrack> { track });
+        if (IndividualRace.Active != null) IndividualRace.Active.ShowStats(AllTracks());
         else CompetitionFlow.HostShowResults();
         Debug.Log("RunSession: finished, statistics shown (" + (IndividualRace.Active != null) + ")");
     }

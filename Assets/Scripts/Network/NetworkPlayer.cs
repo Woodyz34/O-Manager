@@ -176,6 +176,12 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int choiceAnswered { get; set; }
     [Networked] public int choiceQuestions { get; set; }
     [Networked] public NetworkBool choiceDone { get; set; }
+    // Run it yourself (3D, RunSession): where the runner is in the 3D world (map metres east, north), the way it
+    // faces (degrees from north), its real-life speed, and RunSession.Flag bits (map up, fallen, in the air, loaded)
+    [Networked] public Vector2 run3dAt { get; set; }
+    [Networked] public float run3dYaw { get; set; }
+    [Networked] public float run3dSpeed { get; set; }
+    [Networked] public int run3dFlags { get; set; }
     // Per leg (index 1 = start to control 1): the route picked and the points (RouteChoiceGame.WriteLeg / ReadLeg)
     [Networked, Capacity(52)] public NetworkArray<int> choiceLegs => default;
 
@@ -796,7 +802,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         }
 
         // Run it yourself (3D): nobody picks a runner; the player is the runner
-        if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RunYourself) && RelayRace.Active == null)
+        if (Object.HasStateAuthority && RunSession.On)
         {
             RunSession.Begin(this);
             return;
@@ -941,6 +947,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             // A new competition starts: nobody has finished or guessed yet
             raceFinished = false;
+            run3dFlags = 0;
             ClearRelayResults();
             hasGuessedImposter = false;
             imposterGuess = PlayerRef.None;

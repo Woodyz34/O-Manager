@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 // The runner the player is, seen through their own eyes (run-yourself game mode, RunSession).
@@ -42,13 +43,18 @@ public class RunPlayer : MonoBehaviour
     public float Jolt;                   // a knock to the map hand (landing, stumbling); RunMap lets it die away
     public float Effort { get; private set; }
     public bool Fallen => fallTimer > 0f;
+    public bool Airborne => airborne;
+
+    // Mass start: where the other runners are (map metres), so nobody runs through anyone
+    public readonly List<Vector2> others = new List<Vector2>();
+    const float BodyReach = 0.32f;
 
     // Called for every bit of the way the runner moves, so the punching units can be checked along it
     public Action<double, double, double, double> Moved;
 
     float moveDirX, moveDirZ = 1f;
     float jumpY, jumpV;
-    bool airborne;
+    bool airborne, manualJump;
     float fallTimer, fallLength = 1f;
     float stumbleTimer;
     float lastStep;
@@ -183,13 +189,22 @@ public class RunPlayer : MonoBehaviour
                 {
                     if (speed > ForestSpeed * 0.35f)
                     {
-                        // Ran into it without jumping
-                        Fall(0.9f);
-                        break;
+                        // Without Space the runner jumps by itself, but may catch a foot and fall; Space is always
+                        // clean (2026-11-19, Anders: at 4 x speed it was too hard to time)
+                        if (!manualJump && random.NextDouble() < 0.1 + 0.15 * fatigue + 0.1 * Mathf.Clamp01(hurdle - 0.6f))
+                        {
+                            Fall(0.9f);
+                            break;
+                        }
+                        if (!airborne) speed *= 0.9f;
+                        Hop(hurdle);
                     }
-                    // Slowly: climbs over
-                    Jolt += 0.3f;
-                    speed = Mathf.Min(speed, ForestSpeed * 0.25f);
+                    else
+                    {
+                        // Slowly: climbs over
+                        Jolt += 0.3f;
+                        speed = Mathf.Min(speed, ForestSpeed * 0.25f);
+                    }
                 }
             }
             if (terrain.Blocked(ne, nn, Reach))
@@ -204,6 +219,15 @@ public class RunPlayer : MonoBehaviour
                 }
             }
             world.PushOut(ref ne, ref nn, Reach);
+            foreach (Vector2 o in others)
+            {
+                double ox = ne - o.x, oz = nn - o.y, d2 = ox * ox + oz * oz, r = BodyReach * 2f;
+                if (d2 >= r * r) continue;
+                double d = Math.Sqrt(d2);
+                if (d < 1e-4) { ox = moveDirZ; oz = -moveDirX; d = 1; }
+                ne = o.x + ox / d * r;
+                nn = o.y + oz / d * r;
+            }
             if (terrain.Blocked(ne, nn, Reach)) break;
             double de = ne - e, dn = nn - n;
             double pe = e, pn = n;
@@ -227,11 +251,21 @@ public class RunPlayer : MonoBehaviour
         return Mathf.Max(0.45f, 1f - steep);
     }
 
+    // A jump by itself over something in the way: just high enough
+    void Hop(float hurdle)
+    {
+        if (airborne) return;
+        airborne = true;
+        jumpV = Mathf.Sqrt(2f * 9.81f * Mathf.Max(0.3f, hurdle * 0.6f));
+        jumpY = 0.01f;
+    }
+
     void Vertical(float dt)
     {
         if (controlsOn && !Fallen && !airborne && !inputOff && Input.GetKeyDown(KeyCode.Space))
         {
             airborne = true;
+            manualJump = true;
             jumpV = 3.7f;
         }
         if (!airborne) return;
@@ -241,6 +275,7 @@ public class RunPlayer : MonoBehaviour
         {
             jumpY = 0f;
             airborne = false;
+            manualJump = false;
             Jolt += 0.7f;
             sounds.Land(ground.surface);
         }

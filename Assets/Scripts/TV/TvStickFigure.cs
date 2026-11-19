@@ -83,10 +83,11 @@ public class TvStickFigure
     public float slope, hop, hopHeight = 0.4f;     // smoothed: the ground's rise ahead, and how far into a jump over a trunk
     // After the finish: tired (0..1, bent over with the hands on the knees getting the breath back) and walking (0..1)
     public float tired, walk;
+    public int readMode = -1;        // -1 reads the map now and then by itself; 1 reading (the player holds it up); 0 not
     public float leaveX, leaveZ;     // the way it walks off after the finish
     // The map stays in one hand (the left for most runners); the other hand punches. Only when the unit is on the
     // map hand's side does the runner take the map over to the other hand for the punch.
-    readonly int mapHand;
+    public int mapHand;              // -1 left, 1 right (run it yourself: the player's own choice)
     bool swapped;
     float still, clock;
 
@@ -391,7 +392,8 @@ public class TvStickFigure
         // Standing still (and not at the unit, not done for): both hands on the map, reading it carefully
         bool standing = pace < 0.7f && near < 0.05f && tired < 0.05f && walk < 0.05f && hop < 0.05f;
         still = Mathf.MoveTowards(still, standing ? 1f : 0f, dt * 2.5f);
-        bool reading = (readClock > readEvery || near > 0.05f || climb > 0.3f || standing) && tired < 0.3f && walk < 0.5f;
+        bool reading = readMode >= 0 ? readMode == 1 && tired < 0.3f
+                     : (readClock > readEvery || near > 0.05f || climb > 0.3f || standing) && tired < 0.3f && walk < 0.5f;
         read = Mathf.MoveTowards(read, reading ? 1f : 0f, dt * 3f);
         float readNow = Mathf.SmoothStep(0f, 1f, read);
         float stillNow = Mathf.SmoothStep(0f, 1f, still);
