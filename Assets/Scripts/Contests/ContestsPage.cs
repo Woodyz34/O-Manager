@@ -340,9 +340,10 @@ public class ContestsPage : MonoBehaviour
         UIProgressCard card = null;
         try
         {
-            // Lay the course if nobody has yet (the same settings and seed whoever does it)
-            string courseJson = c.course;
-            if (string.IsNullOrEmpty(courseJson))
+            // Lay the course if nobody has yet (the same settings and seed whoever does it). Otherwise the cloud sends
+            // the course only together with the start, so nobody can look at it without using their try.
+            string courseJson = null;
+            if (!c.laid)
             {
                 CourseGenerator.Progress progress = new CourseGenerator.Progress();
                 card = UIProgressCard.Show("You are first: laying this contest's AI course...");
@@ -353,20 +354,18 @@ public class ContestsPage : MonoBehaviour
                     if (this == null) return;
                     card.Set(AICoursePanel.DescribeProgress(progress, out float share), share);
                 }
-                courseJson = await ContestCloud.SetCourseAsync(c.id, await laying);
+                courseJson = await laying;
                 card.Close();
                 card = null;
             }
-            CourseData course = ContestRun.ReadCourse(courseJson);
-            string problem = CourseLibrary.StartProblem(course);
-            if (course == null) problem = "The contest course could not be read. Update the game and try again.";
-            if (problem != null) throw new ContestException(problem + " (Your try is not used.)");
 
             card = UIProgressCard.Show("Starting the contest...");
             card.Set("Asking Unity Cloud", 0.9f);
-            courseJson = await ContestCloud.StartAsync(c.id, name);
-            CourseData started = ContestRun.ReadCourse(courseJson) ?? course;
+            string startedJson = await ContestCloud.StartAsync(c.id, name, courseJson, ContestRun.AllMapIds());
+            CourseData started = ContestRun.ReadCourse(startedJson);
             if (this == null) { card.Close(); return; }
+            string problem = started == null ? "The contest course could not be read. Update the game." : CourseLibrary.StartProblem(started);
+            if (problem != null) throw new ContestException(problem);
             card.Set("Loading the race", 1f);
             ContestRun.Begin(c, started);
         }

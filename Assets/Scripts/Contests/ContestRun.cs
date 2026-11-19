@@ -69,6 +69,8 @@ public static class ContestRun
         string kind = CourseGenerator.KindName(planned.kind);
         if (course != null && course.controls != null)
             return kind + " · " + course.LengthText() + " · " + course.controls.Count + " controls";
+        if (c.laid && c.controls > 0)
+            return kind + " · " + CourseData.KmText(c.length) + " · " + c.controls + " controls";
         return kind + " · about " + planned.lengthKm.ToString("0.0", CultureInfo.InvariantCulture) + " km · about " + planned.controls + " controls";
     }
 
@@ -110,6 +112,17 @@ public static class ContestRun
     static float Range(System.Random random, float min, float max) => min + (float)random.NextDouble() * (max - min);
 
     // The maps built into the game for this contest (never imported or shared maps: everyone must have it)
+    // Every map a contest course may be on, for the cloud's check before the try is used
+    public static List<string> AllMapIds()
+    {
+        List<string> ids = new List<string>();
+        foreach (MapDefinition map in Resources.LoadAll<MapDefinition>("MapDefs"))
+        {
+            if (map != null && !string.IsNullOrEmpty(map.id)) ids.Add(map.id);
+        }
+        return ids;
+    }
+
     static List<MapDefinition> MapsFor(ContestInfo c)
     {
         List<MapDefinition> maps = new List<MapDefinition>();

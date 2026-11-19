@@ -19,17 +19,20 @@
 // and its course. The small list of names and results stays KEEP_DAYS (30) more days, so players who come back
 // later still get their prize money; then it is deleted too.
 //
-// The first player of a contest lays its AI course in the game and sends it here ("setCourse"); everyone after runs
-// the same course. Prizes are worked out when a player asks for them after the contest is over ("claim").
+// The first player of a contest lays its AI course in the game and sends it with "start"; everyone after runs
+// the same course. The course (and so the map) is only ever sent to a player who has used their try, or when the
+// contest is over: before that "status" tells only how long it is and how many controls it has. Prizes are worked out when a player asks for them after the contest is over ("claim").
 //
 // Set up once: Unity Cloud dashboard > Cloud Code > Scripts > Create script, name "Contests", type API, paste this
 // file and publish. The parameters below are read from the script itself.
 //
 // Parameters: action (String, required) and payload (String, JSON, optional).
 // Actions:
-//   status                       the current contests, my entry in each, the course (when laid), entries so far
-//   setCourse  { id, course }    lay the course (only when there is none yet); answers with the course to use
-//   start      { id, name }      use my one try: answers with the course; a second start is refused
+//   status                       the current contests, my entry in each, entries so far; the course's length and
+//                                controls when laid, the course itself only when I have started it
+//   start      { id, name, maps, course? }   use my one try: answers with the course to run. "course" lays it when
+//                                nobody has yet (else the first one stays); "maps" lists the maps this game has,
+//                                and a course on a map not in it is refused without using the try
 //   submit     { id, score, seconds, replay }   my result (after start, once)
 //   board      { id }            the leaderboard: only after my own run, or when the contest is over
 //   replays    { id, players }   replays of up to 6 players (comma separated ids), same rule as board
@@ -67,7 +70,6 @@ module.exports = async ({ params, context, logger }) => {
 
   switch (action) {
     case "status": return await status(api, context, me, now, logger);
-    case "setCourse": return await setCourse(api, context, payload, now);
     case "start": return await start(api, context, me, payload, now);
     case "submit": return await submit(api, context, me, payload, now);
     case "board": return await board(api, context, me, payload, now);
@@ -273,6 +275,7 @@ async function status(api, context, me, now, logger) {
       let board = emptyBoard();
       try { board = (await loadBoard(api, context, id)).board; } catch (err) { logger.warning("status: " + id + " " + err); }
       const mine = board.entries[me];
+      const facts = courseFacts(board.course);
       let entries = 0;
       for (const key of Object.keys(board.entries)) if (board.entries[key].state === "done") entries++;
       contests.push({
@@ -280,7 +283,10 @@ async function status(api, context, me, now, logger) {
         startsAt: p[span].startsAt, endsAt: p[span].endsAt,
         seed: seedOf(id),
         technique: seedOf(id + "#tech") % 101,
-        course: board.course,
+        course: mine || now > p[span].endsAt ? board.course : null,
+        laid: !!board.course,
+        length: facts.length,
+        controls: facts.controls,
         entries,
         mine: mine ? { state: mine.state, score: mine.score || 0, seconds: mine.seconds || 0 } : null
       });
@@ -377,26 +383,38 @@ function isCurrent(id, now) {
   return id.indexOf(p.w.id + "_") === 0 || id.indexOf(p.d.id + "_") === 0;
 }
 
-async function setCourse(api, context, payload, now) {
-  const id = checkId(payload.id);
-  if (!isCurrent(id, now)) throw new Error("This contest is over");
-  const course = String(payload.course || "");
-  if (course.length < 10 || course.length > MAX_COURSE_CHARS) throw new Error("Bad course");
-  JSON.parse(course);
-  const { board } = await updateBoard(api, context, id, b => {
-    if (b.course) return { unchanged: true };
-    b.course = course;
-  });
-  return { course: board.course };
+// The straight-line length (m, start - controls - finish) and the number of controls of a course
+function courseFacts(courseJson) {
+  if (!courseJson) return { length: 0, controls: 0 };
+  try {
+    const c = JSON.parse(courseJson);
+    const points = [c.start].concat(c.controls || []).concat([c.finish]).filter(x => x && typeof x.e === "number");
+    let length = 0;
+    for (let i = 1; i < points.length; i++) length += Math.hypot(points[i].e - points[i - 1].e, points[i].n - points[i - 1].n);
+    return { length: Math.round(length), controls: (c.controls || []).length };
+  } catch (err) { return { length: 0, controls: 0 }; }
+}
+
+function mapOf(courseJson) {
+  try { return String(JSON.parse(courseJson).mapId || ""); } catch (err) { return ""; }
 }
 
 async function start(api, context, me, payload, now) {
   const id = checkId(payload.id);
   if (!isCurrent(id, now)) throw new Error("This contest is over");
   const name = String(payload.name || "Runner").replace(/[<>\n\r\t]/g, "").trim().substring(0, MAX_NAME) || "Runner";
+  const maps = String(payload.maps || "").split(",").map(x => x.trim()).filter(x => x);
+  let course = payload.course ? String(payload.course) : "";
+  if (course) {
+    if (course.length < 10 || course.length > MAX_COURSE_CHARS) throw new Error("Bad course");
+    JSON.parse(course);
+  }
   const { board, result } = await updateBoard(api, context, id, b => {
-    if (!b.course) return { unchanged: true, error: "The course is not laid yet" };
     if (b.entries[me]) return { unchanged: true, error: "You have already run this contest" };
+    if (!b.course && !course) return { unchanged: true, error: "The course is not laid yet" };
+    const use = b.course || course;
+    if (maps.length > 0 && maps.indexOf(mapOf(use)) < 0) return { unchanged: true, error: "The map of this contest is missing" };
+    if (!b.course) b.course = course;
     b.entries[me] = { name, state: "started", at: now };
   });
   if (result && result.error) throw new Error(result.error);

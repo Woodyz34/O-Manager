@@ -17,7 +17,10 @@ public class ContestInfo
     public long endsAt;
     public long seed;          // the same for everyone: picks the map and lays the course
     public int technique;      // race-forest: the technique of the contest runner
-    public string course;      // the course as JSON, or null before the first player has laid it
+    public string course;      // the course as JSON: only once I have started it (or it is over), so nobody sees it first
+    public bool laid;          // someone has laid the course
+    public float length;       // its straight-line length in metres, when laid
+    public int controls;       // its number of controls, when laid
     public int entries;        // finished runs so far
     public ContestEntry mine;  // null when I have not started it
 
@@ -82,17 +85,11 @@ public static class ContestCloud
         return output["contests"] != null ? output["contests"].ToObject<List<ContestInfo>>() : new List<ContestInfo>();
     }
 
-    // Lays the course when nobody has yet; answers with the course everyone runs (maybe another player's)
-    public static async Task<string> SetCourseAsync(string id, string courseJson)
+    // Uses up the one try; answers with the course to run. courseJson lays it when nobody has yet (else the first
+    // one stays); maps are the maps this game has, so a course on a missing map is refused before the try is used.
+    public static async Task<string> StartAsync(string id, string name, string courseJson, IEnumerable<string> maps)
     {
-        JObject output = await Call("setCourse", new { id, course = courseJson });
-        return (string)output["course"];
-    }
-
-    // Uses up the one try; answers with the course
-    public static async Task<string> StartAsync(string id, string name)
-    {
-        JObject output = await Call("start", new { id, name });
+        JObject output = await Call("start", new { id, name, course = courseJson, maps = string.Join(",", maps) });
         return (string)output["course"];
     }
 
@@ -170,7 +167,7 @@ public static class ContestCloud
     {
         "You have already run this contest", "Run the contest first", "This contest is over", "Too late to hand in",
         "Start the contest first", "Already handed in", "The course is not laid yet", "The contest is busy, try again",
-        "Replay too big", "Bad course"
+        "Replay too big", "Bad course", "The map of this contest is missing"
     };
 
     static string ScriptError(string body)
