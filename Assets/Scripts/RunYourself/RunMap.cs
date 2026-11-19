@@ -86,7 +86,11 @@ public class RunMap : MonoBehaviour
         // The eyes for what is in the hand, drawn on top of the world
         player.cam.cullingMask &= ~(1 << HandLayer);
         handCam = new GameObject("Run hand camera").AddComponent<Camera>();
-        handCam.transform.SetParent(player.cam.transform, false);
+        // Not on the runner's camera: the world lies thousands of metres from the origin, where a float can't hold
+        // millimetres, and the hand and the map trembled and flickered (2026-11-19). The hand camera stands still near
+        // the origin and only turns as the head turns.
+        handCam.transform.SetParent(transform, false);
+        handCam.transform.SetPositionAndRotation(HandCamSpot, player.cam.transform.rotation);
         handCam.clearFlags = CameraClearFlags.Depth;
         handCam.cullingMask = 1 << HandLayer;
         handCam.fieldOfView = player.cam.fieldOfView;
@@ -149,13 +153,13 @@ public class RunMap : MonoBehaviour
 
         // The fingers behind the sheet, reaching in from the edge
         for (int i = 0; i < 4; i++)
-            Part(capsule, skinDark, hand, new Vector3(-side * 0.012f, 0.018f - i * 0.017f, 0.011f), new Vector3(0.016f, 0.03f, 0.016f), Quaternion.Euler(0f, 0f, side * 80f));
+            Part(capsule, skinDark, hand, new Vector3(-side * 0.012f, 0.02f - i * 0.0145f, 0.009f), new Vector3(0.0125f, 0.026f, 0.0115f), Quaternion.Euler(0f, 0f, side * 80f));
         // The palm and the wrist outside the edge, the arm going down and out of sight
-        Part(cube, skin, hand, new Vector3(side * 0.04f, -0.01f, 0.016f), new Vector3(0.05f, 0.085f, 0.03f), Quaternion.Euler(0f, side * -20f, side * 8f));
+        Part(cube, skin, hand, new Vector3(side * 0.038f, -0.008f, 0.014f), new Vector3(0.045f, 0.072f, 0.022f), Quaternion.Euler(0f, side * -20f, side * 8f));
         Part(cube, band, hand, new Vector3(side * 0.05f, -0.065f, 0.02f), new Vector3(0.056f, 0.012f, 0.036f), Quaternion.Euler(0f, side * -20f, side * 14f));
         Part(cube, sleeve, hand, new Vector3(side * 0.058f, -0.12f, 0.025f), new Vector3(0.06f, 0.1f, 0.04f), Quaternion.Euler(0f, side * -20f, side * 14f));
         // The thumb on the front of the sheet, along the edge, pointing up
-        Part(capsule, skin, hand, new Vector3(-side * 0.006f, -0.004f, -0.011f), new Vector3(0.021f, 0.034f, 0.019f), Quaternion.Euler(0f, 0f, side * 12f));
+        Part(capsule, skin, hand, new Vector3(-side * 0.004f, -0.006f, -0.008f), new Vector3(0.0145f, 0.027f, 0.012f), Quaternion.Euler(0f, 0f, side * 12f));
 
         if (withCompass) BuildCompass(hand, side);
         return hand;
@@ -176,7 +180,9 @@ public class RunMap : MonoBehaviour
         rect.SetParent(hand, false);
         rect.sizeDelta = new Vector2(58f, 92f);                        // mm
         rect.localScale = Vector3.one * 0.001f;
-        rect.localPosition = new Vector3(-side * 0.038f, 0.02f, -0.016f);
+        // On top of the thumb (a thumb compass lies over the thumb, which holds the map under it), well in front of it
+        // so no part of the thumb cuts through the plate
+        rect.localPosition = new Vector3(-side * 0.03f, 0.012f, -0.024f);
         rect.localRotation = Quaternion.Euler(0f, 0f, side * 6f);
 
         RawImage plate = Picture("Baseplate", rect, RunCompassArt.Baseplate());
@@ -259,6 +265,8 @@ public class RunMap : MonoBehaviour
         player.mapUp = up;
     }
 
+    static readonly Vector3 HandCamSpot = new Vector3(0f, 300f, 0f);
+
     // ---- Every frame ----
 
     public void Tick(float dt, bool input)
@@ -287,7 +295,7 @@ public class RunMap : MonoBehaviour
         if (drag)
         {
             // The map follows the mouse, in the map's own turned directions
-            float k = 0.012f * size;
+            float k = 0.035f * size;   // 2026-11-19, Anders: was too slow
             Vector3 move = Quaternion.Euler(0f, 0f, -turn) * new Vector3(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y"), 0f) * k;
             lookAtTarget -= move;
             lookAt -= move;
@@ -301,6 +309,8 @@ public class RunMap : MonoBehaviour
         lift = Mathf.MoveTowards(lift, Up ? 1f : 0f, dt * 2.6f);
         bool still = player.speed < 0.4f && !player.Fallen;
         otherGrip = Mathf.MoveTowards(otherGrip, still && Up ? 1f : 0f, dt * 3f);
+        handCam.transform.SetPositionAndRotation(HandCamSpot, player.cam.transform.rotation);
+        handCam.fieldOfView = player.cam.fieldOfView;
         Place(dt);
 
         mapCam.enabled = lift > 0.001f;

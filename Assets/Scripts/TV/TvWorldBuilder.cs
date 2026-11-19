@@ -583,9 +583,9 @@ public class TvWorldBuilder
             float[] c = line.xz;
             switch (line.kind)
             {
-                // An impassable cliff is far too high to jump down; a passable one about a metre and a half, so it
+                // An impassable cliff is far too high to jump down (4 m); a passable one about a metre and a half, so it
                 // can be jumped down and climbed up (2026-11-19, Anders)
-                case WorldLineKind.Cliff: Cliff(c, 5f, true); break;
+                case WorldLineKind.Cliff: Cliff(c, 4f, true); break;
                 case WorldLineKind.SmallCliff: Cliff(c, 1.5f, true); break;
                 case WorldLineKind.EarthBank: Cliff(c, 1.0f, false); break;
                 case WorldLineKind.EarthWall: Groove(c, 0.6f, 1.6f, 0.5f, false); break;
@@ -1291,6 +1291,7 @@ public class TvWorldBuilder
                 if (nx * cliff.dx + nz * cliff.dz < 0f) { nx = -nx; nz = -nz; }
                 int steps = Math.Max(1, (int)Math.Ceiling(len / 0.7f));
                 int first = -1;
+                const int Rows = 4;   // the face in bands, each bulging a little its own way, so it is not one flat slab
                 for (int k = 0; k <= steps; k++)
                 {
                     float f = k / (float)steps, px = ax + sx * f, pz = az + sz * f;
@@ -1299,24 +1300,39 @@ public class TvWorldBuilder
                     float top = H(px - nx * 0.7f, pz - nz * 0.7f) + 0.1f, foot = H(px + nx * 1.1f, pz + nz * 1.1f) - 0.35f;
                     if (top < foot + 0.5f) top = foot + 0.5f;
                     float lean = (TvRandom.Noise((px + ox) * 0.9f + 7f, (pz + oz) * 0.9f) - 0.5f) * 0.5f;
-                    TvColor face = (TvRandom.Noise((px + ox) * 0.5f, (pz + oz) * 0.5f + 3f) > 0.5f) ? Rock : RockDark;
-                    int v0 = rockMesh.Vertex(fx - nx * 0.12f, top, fz - nz * 0.12f, nx + lean * nz, 0.15f, nz - lean * nx, face);
-                    rockMesh.Vertex(fx + nx * 0.05f, foot, fz + nz * 0.05f, nx + lean * nz, 0.05f, nz - lean * nx, face);
+                    int v0 = -1;
+                    for (int r = 0; r <= Rows; r++)
+                    {
+                        float h = r / (float)Rows;                       // 0 top .. 1 foot
+                        float y = top + (foot - top) * h;
+                        float bulge = r == 0 || r == Rows ? 0f : (TvRandom.Noise((px + ox) * 1.1f + r * 3.1f, (pz + oz) * 1.1f + y * 0.9f) - 0.5f) * 0.45f;
+                        float out0 = -0.12f + 0.17f * h + bulge;
+                        // Grey granite in patches, lichen-pale near the top, darker and damp at the foot
+                        float patch = TvRandom.Noise((px + ox) * 0.45f + y * 0.6f, (pz + oz) * 0.45f - y * 0.4f);
+                        TvColor col = Rock.Lerp(RockDark, Math.Max(0f, Math.Min(1f, patch * 1.3f - 0.15f)));
+                        if (h < 0.3f) col = col.Lerp(LichenRock, (0.3f - h) * 1.6f * TvRandom.Noise((px + ox) * 0.8f, (pz + oz) * 0.8f + 11f));
+                        if (h > 0.75f) col = col.Lerp(RockDark, (h - 0.75f) * 2.4f);
+                        int v = rockMesh.Vertex(fx + nx * out0, y, fz + nz * out0, nx + lean * nz + bulge * 0.8f * nx, 0.15f - bulge * 0.3f, nz - lean * nx + bulge * 0.8f * nz, col);
+                        if (r == 0) v0 = v;
+                    }
                     if (k > 0)
                     {
-                        int a = first, b = first + 1, cc = v0, d = v0 + 1;   // a, cc: tops; b, d: feet
                         // Front faces must run clockwise seen from the low side
-                        float ux = fx - (rockMesh.positions[a * 3]), uz = fz - (rockMesh.positions[a * 3 + 2]);
+                        float ux = fx - (rockMesh.positions[first * 3]), uz = fz - (rockMesh.positions[first * 3 + 2]);
                         bool flip = (ux * nz - uz * nx) < 0f;
-                        if (flip)
+                        for (int r = 0; r < Rows; r++)
                         {
-                            rockMesh.triangles.Add(a); rockMesh.triangles.Add(cc); rockMesh.triangles.Add(b);
-                            rockMesh.triangles.Add(cc); rockMesh.triangles.Add(d); rockMesh.triangles.Add(b);
-                        }
-                        else
-                        {
-                            rockMesh.triangles.Add(a); rockMesh.triangles.Add(b); rockMesh.triangles.Add(cc);
-                            rockMesh.triangles.Add(cc); rockMesh.triangles.Add(b); rockMesh.triangles.Add(d);
+                            int a2 = first + r, b2 = first + r + 1, c2 = v0 + r, d2 = v0 + r + 1;   // a2, c2: upper; b2, d2: lower
+                            if (flip)
+                            {
+                                rockMesh.triangles.Add(a2); rockMesh.triangles.Add(c2); rockMesh.triangles.Add(b2);
+                                rockMesh.triangles.Add(c2); rockMesh.triangles.Add(d2); rockMesh.triangles.Add(b2);
+                            }
+                            else
+                            {
+                                rockMesh.triangles.Add(a2); rockMesh.triangles.Add(b2); rockMesh.triangles.Add(c2);
+                                rockMesh.triangles.Add(c2); rockMesh.triangles.Add(b2); rockMesh.triangles.Add(d2);
+                            }
                         }
                     }
                     first = v0;

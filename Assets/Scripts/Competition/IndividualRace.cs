@@ -34,6 +34,18 @@ public class IndividualRace : MonoBehaviour, IRaceStats
     // Run it yourself (2026-11-19): the runner ran in the 3D world, so the replay shows that GPS track
     public void UseTracks(List<RelayTrack> tracks) => ownTracks = tracks;
 
+    // Run it yourself: the statistics screen at once when the runner is in (the 2D race never started for real)
+    public void ShowStats(List<RelayTrack> tracks)
+    {
+        ownTracks = tracks;
+        if (statsShown) return;
+        statsShown = true;
+        started = true;
+        recorder.Stop();
+        statsUI = RelayStatsUI.Create(this);
+        statsUI.Open(0, true, ownTracks);
+    }
+
     public bool FinalResultsAllowed { get; private set; }
     public CourseData Course => course;
     public bool IsRelay => false;

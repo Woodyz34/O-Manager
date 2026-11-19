@@ -423,7 +423,7 @@ public class RunSession : MonoBehaviour
         bigText.text = (ok ? "Finish!" : "Finish") + "  " + RaceTime(resultSeconds)
                        + "\n<size=45%>You ran " + km.ToString("0.00") + " km   " + pace
                        + (record && best > 0f ? "   New record!" : best > 0f && ok ? "   Record " + RaceTime(best) : "") + "</size>" + missed;
-        Invoke(nameof(ToResults), ok ? 3.5f : 6f);
+        Invoke(nameof(ToResults), ok ? 4.5f : 6.5f);
     }
 
     static string Pace(float secondsPerKm)
@@ -475,7 +475,6 @@ public class RunSession : MonoBehaviour
         np.minuterCount = total / 60 % 60;
         np.secoundCount = total % 60;
         np.raceFinished = true;
-        if (IndividualRace.Active != null) IndividualRace.Active.UseTracks(new List<RelayTrack> { track });
     }
 
     // The first time a control was punched, or 0 when it never was
@@ -500,6 +499,12 @@ public class RunSession : MonoBehaviour
         if (cameraController != null) cameraController.enabled = true;
         ShowTwoDMap(true);
         Report(finalSplits);
+        // The usual statistics screen: results, split times, replay; then "Show the results" (prize money) and back
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        if (IndividualRace.Active != null) IndividualRace.Active.ShowStats(new List<RelayTrack> { track });
+        else CompetitionFlow.HostShowResults();
+        Debug.Log("RunSession: finished, statistics shown (" + (IndividualRace.Active != null) + ")");
     }
 
     // The replay is drawn on the 2D map, so the 3D view is switched off while it plays

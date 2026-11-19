@@ -11,9 +11,9 @@ using UnityEngine;
 // rough ground or a thicket, and sometimes falls.
 public class RunPlayer : MonoBehaviour
 {
-    // Real-life running speed (m/s) in white forest at the middle of every terrain slider: 4:23 min/km
-    // (2026-11-19: was 3.4; Anders's first full course came out at 10:45 min/km, he expected about 6)
-    public const float ForestSpeed = 3.8f;
+    // Real-life running speed (m/s) in white forest at the middle of every terrain slider: 3:58 min/km
+    // (2026-11-19: was 3.4, then 3.8; Anders's courses still felt slow, he expects about 6 min/km over a whole course)
+    public const float ForestSpeed = 4.2f;
     const float Reach = 0.3f;            // half the runner's width
     const float EyeHeight = 1.68f;
 
@@ -128,7 +128,7 @@ public class RunPlayer : MonoBehaviour
 
         // The slope the way the runner goes, over 6 m so bumps and the steps of cliffs don't count
         float y1 = world.GroundY(e + moveDirX * 3.0, n + moveDirZ * 3.0), y0 = world.GroundY(e - moveDirX * 3.0, n - moveDirZ * 3.0);
-        gradient = Mathf.Lerp(gradient, Mathf.Clamp((y1 - y0) / 6f, -1.2f, 1.2f), 0.25f);
+        gradient = Mathf.Lerp(gradient, Mathf.Clamp((y1 - y0) / 6f / RunSettings.Hills, -1.2f, 1.2f), 0.25f);   // the real slope: the hills are drawn higher (RunSettings.Hills) to be seen
 
         float target = 0f;
         if (wish)
@@ -286,7 +286,7 @@ public class RunPlayer : MonoBehaviour
         float sf = Mathf.Clamp(speed / (ForestSpeed * 1.25f), 0f, 1.3f);
         float down = 1f + Mathf.Clamp(-gradient, 0f, 0.45f) * 4.5f;
         float up = 1f - Mathf.Clamp(gradient, 0f, 0.3f) * 1.6f;
-        float target = speed > 0.2f ? (0.08f + Mathf.Pow(sf, 1.4f)) * down * up * ground.rough * (1f + 0.35f * fatigue) : 0.03f;
+        float target = speed > 0.2f ? (0.08f + Mathf.Pow(sf, 1.4f)) * down * up * ground.rough * (1f + 0.35f * fatigue) : 0f;   // standing: still hands
         if (airborne) target *= 0.6f;
         Shake = Mathf.Lerp(Shake, target, 1f - Mathf.Exp(-dt * 6f));
         Jolt = Mathf.Max(0f, Jolt - dt * 3f);
