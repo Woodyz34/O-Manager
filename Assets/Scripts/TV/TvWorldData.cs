@@ -16,6 +16,7 @@ public static class TvWorldData
         public WorldLayer layer;
         public TvHeights heights;
         public TerrainLook look;
+        public TerrainSpeeds speeds;     // the map's terrain sliders (run-yourself game mode); never null
     }
 
     static Data cached;
@@ -92,7 +93,8 @@ public static class TvWorldData
             Debug.LogWarning("TvWorldData: could not read map.json of " + map.id + ": " + e.Message);
         }
         // The look is read every time, since it can be changed in Edit map without building the map again
-        if (known) return new Data { mapId = map.id, layer = cached.layer, heights = cached.heights, look = (look ?? new TerrainLook()).Safe() };
+        TerrainSpeeds speeds = info?.terrain ?? new TerrainSpeeds();
+        if (known) return new Data { mapId = map.id, layer = cached.layer, heights = cached.heights, look = (look ?? new TerrainLook()).Safe(), speeds = speeds };
         string source = world == null ? LocalSource(map, out _) : null;
         string folder = map.folder;
         if (world == null && source == null)
@@ -121,7 +123,7 @@ public static class TvWorldData
                 try { File.WriteAllBytes(Path.Combine(folder, "world.bytes"), layer.ToBytes()); }
                 catch (Exception) { }
             }
-            return new Data { mapId = map.id, layer = layer, heights = TvHeights.Read(grid), look = (look ?? new TerrainLook()).Safe() };
+            return new Data { mapId = map.id, layer = layer, heights = TvHeights.Read(grid), look = (look ?? new TerrainLook()).Safe(), speeds = speeds };
         });
         cached = data;
         return data;

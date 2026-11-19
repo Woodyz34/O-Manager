@@ -46,7 +46,7 @@ public class TvWorldView : MonoBehaviour
     static Texture2D grain;
 
     // Fine light and dark grains for the ground, the same every time
-    static Texture2D Grain()
+    public static Texture2D Grain()
     {
         if (grain != null) return grain;
         const int Size = 128;
@@ -89,6 +89,7 @@ public class TvWorldView : MonoBehaviour
     {
         public string name;
         public bool castShadows;
+        public byte group;          // TvMesh.group: the run-yourself world draws some only near or only far
         public Vector3[] vertices, normals;
         public Color32[] colors;
         public int[] triangles;
@@ -97,6 +98,7 @@ public class TvWorldView : MonoBehaviour
         {
             name = source.name;
             castShadows = source.castShadows;
+            group = source.group;
             int count = source.VertexCount;
             vertices = new Vector3[count];
             normals = new Vector3[count];
@@ -113,7 +115,7 @@ public class TvWorldView : MonoBehaviour
         }
     }
 
-    static Mesh ToMesh(MeshArrays source)
+    public static Mesh ToMesh(MeshArrays source)
     {
         var mesh = new Mesh { name = source.name };
         if (source.vertices.Length > 65000) mesh.indexFormat = IndexFormat.UInt32;

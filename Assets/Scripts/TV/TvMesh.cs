@@ -9,6 +9,9 @@ public class TvMesh
 {
     public string name;
     public bool castShadows = true;
+    // The run-yourself world (RunYourself/RunWorld.cs): drawn always, only near the runner, or only far from them
+    public const byte Always = 0, Near = 1, Far = 2;
+    public byte group = Always;
     public readonly List<float> positions = new List<float>();   // x, y, z
     public readonly List<float> normals = new List<float>();
     public readonly List<byte> colors = new List<byte>();        // r, g, b (sRGB)
@@ -420,6 +423,16 @@ public class TvRandom
     }
 
     public float Range(float a, float b) => a + (b - a) * Value();
+
+    // Starts the numbers again from a place (whole metres) and a purpose, so the same place always gets the same
+    // numbers (the run-yourself world, built piece by piece)
+    public void Reseed(int i, int j, int salt)
+    {
+        uint h = (uint)i * 374761393u + (uint)j * 668265263u + (uint)salt * 2246822519u;
+        h = (h ^ (h >> 13)) * 1274126177u;
+        h ^= h >> 16;
+        state = h == 0 ? 1u : h;
+    }
 
     // Smooth noise over the plane, 0..1, the same for the same place
     public static float Noise(float x, float y)

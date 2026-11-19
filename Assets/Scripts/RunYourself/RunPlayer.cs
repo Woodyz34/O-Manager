@@ -1,0 +1,306 @@
+using System;
+using UnityEngine;
+
+// The runner the player is, seen through their own eyes (run-yourself game mode, RunSession).
+// W A S D run (always flat out unless Shift is held, which jogs: easier to read the map), the mouse turns the head,
+// Space jumps (stone walls, fences and fallen trunks: run into one without jumping and you fall).
+// The speed follows the ground (RunTerrain, with the map's own terrain sliders) and the slope (the game's slope model,
+// TerrainSpeedModel), and the whole game runs RunSettings.GameSpeed times quicker than real life.
+// The map in the hand (RunMap) shakes with Shake: more the quicker the runner goes, downhill and on rough ground,
+// less uphill and on a road. A tired runner (later in the race) stumbles more easily, above all fast downhill in
+// rough ground or a thicket, and sometimes falls.
+public class RunPlayer : MonoBehaviour
+{
+    // Real-life running speed (m/s) in white forest at the middle of every terrain slider: 4:54 min/km
+    public const float ForestSpeed = 3.4f;
+    const float Reach = 0.3f;            // half the runner's width
+    const float EyeHeight = 1.68f;
+
+    public RunWorld world;
+    public RunTerrain terrain;
+    public RunSounds sounds;
+    public Camera cam;
+
+    public double e, n;                  // where the runner is, on the map
+    public float yaw;                    // degrees; 0 = north, 90 = east
+    public float pitch;                  // degrees; positive = looking down
+    public float speed;                  // real-life m/s; the runner moves GameSpeed times this
+    public float gameSpeed = 3f;
+    public bool controlsOn;              // off before the start and after the finish
+    public bool mapUp;                   // RunMap: the map is held up (a little slower)
+    public bool lookHeld;                // RunMap: the mouse moves the map, not the head
+    public float raceSeconds;            // the race clock (real-life seconds), kept by RunSession
+    public float distance;               // metres run
+
+    public RunTerrain.Ground ground;
+    public float gradient;               // rise per metre in the way the runner moves
+    public float fatigue;                // 0 fresh .. 1 tired (late in the race)
+    public float Shake { get; private set; }
+    public float StepPhase { get; private set; }
+    public float Jolt;                   // a knock to the map hand (landing, stumbling); RunMap lets it die away
+    public float Effort { get; private set; }
+    public bool Fallen => fallTimer > 0f;
+
+    // Called for every bit of the way the runner moves, so the punching units can be checked along it
+    public Action<double, double, double, double> Moved;
+
+    float moveDirX, moveDirZ = 1f;
+    float jumpY, jumpV;
+    bool airborne;
+    float fallTimer, fallLength = 1f;
+    float stumbleTimer;
+    float lastStep;
+    System.Random random;
+
+    public static RunPlayer Create(RunWorld world, RunTerrain terrain, RunSounds sounds, double e, double n, float yaw, int seed)
+    {
+        RunPlayer p = new GameObject("Run player").AddComponent<RunPlayer>();
+        p.world = world;
+        p.terrain = terrain;
+        p.sounds = sounds;
+        p.e = e;
+        p.n = n;
+        p.yaw = yaw;
+        p.random = new System.Random(seed);
+        p.gameSpeed = RunSettings.GameSpeed;
+
+        p.cam = new GameObject("Run camera").AddComponent<Camera>();
+        p.cam.transform.SetParent(p.transform, false);
+        p.cam.clearFlags = CameraClearFlags.SolidColor;
+        p.cam.backgroundColor = RunWorld.SkyColor;
+        p.cam.nearClipPlane = 0.12f;
+        p.cam.farClipPlane = world.ViewDistance + 20f;
+        p.cam.fieldOfView = 72f;
+        p.cam.depth = 5;
+        p.cam.allowHDR = false;
+        p.cam.allowMSAA = world.Msaa > 1;
+        p.cam.renderingPath = RenderingPath.Forward;
+        p.cam.useOcclusionCulling = false;
+        p.PlaceCamera(0f);
+        return p;
+    }
+
+    // ---- Every frame (RunSession calls it) ----
+
+    public void Tick(float dt)
+    {
+        dt = Mathf.Min(dt, 0.05f);
+        ground = terrain.At(e, n);
+        fatigue = Mathf.Clamp01((raceSeconds / 60f - 6f) / 45f);
+
+        Look();
+        Move(dt);
+        Vertical(dt);
+        Stumbling(dt);
+        ShakeAndBreath(dt);
+        PlaceCamera(dt);
+        world.SetPlayer(e, n);
+    }
+
+    void Look()
+    {
+        if (Cursor.lockState != CursorLockMode.Locked || lookHeld || Fallen) return;
+        float s = RunSettings.MouseSpeed;
+        yaw = Mathf.Repeat(yaw + Input.GetAxisRaw("Mouse X") * s, 360f);
+        pitch = Mathf.Clamp(pitch - Input.GetAxisRaw("Mouse Y") * s, -75f, 80f);
+    }
+
+    void Move(float dt)
+    {
+        int fwd = 0, side = 0;
+        bool keys = controlsOn && !Fallen && !EscMenu.IsOpen;
+        if (keys)
+        {
+            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) fwd++;
+            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) fwd--;
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) side++;
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) side--;
+        }
+        bool wish = fwd != 0 || side != 0;
+        if (wish)
+        {
+            float a = (yaw + Mathf.Atan2(side, fwd) * Mathf.Rad2Deg) * Mathf.Deg2Rad;
+            moveDirX = Mathf.Sin(a);
+            moveDirZ = Mathf.Cos(a);
+        }
+
+        // The slope the way the runner goes
+        float y1 = world.GroundY(e + moveDirX * 1.5, n + moveDirZ * 1.5), y0 = world.GroundY(e - moveDirX * 1.5, n - moveDirZ * 1.5);
+        gradient = Mathf.Clamp((y1 - y0) / 3f, -1.5f, 1.5f);
+
+        float target = 0f;
+        if (wish)
+        {
+            float dirFactor = fwd > 0 ? (side != 0 ? 0.95f : 1f) : fwd < 0 ? 0.45f : 0.6f;
+            bool jog = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            target = ForestSpeed * ground.speed * TerrainSpeedModel.Factor(gradient, ground.speed) * dirFactor
+                     * (jog ? 0.55f : 1f) * (mapUp ? 0.9f : 1f);
+            if (stumbleTimer > 0f) target *= 0.4f;
+        }
+        float rate = target > speed ? 6f : 11f;     // real-life m/s gained or lost per (real) second
+        speed = Mathf.MoveTowards(speed, target, rate * dt);
+        if (Fallen) speed = 0f;
+        if (speed < 0.01f) return;
+
+        // The way in small steps, so nothing thin is jumped over between two frames
+        float total = speed * gameSpeed * dt;
+        int parts = Mathf.Max(1, Mathf.CeilToInt(total / 0.35f));
+        float step = total / parts;
+        for (int i = 0; i < parts && !Fallen; i++)
+        {
+            double ne = e + moveDirX * step, nn = n + moveDirZ * step;
+            if (terrain.Crosses(e, n, ne, nn, out float hurdle, out bool wall))
+            {
+                if (wall)
+                {
+                    speed *= 0.3f;
+                    break;
+                }
+                if (jumpY < hurdle * 0.55f)
+                {
+                    if (speed > ForestSpeed * 0.35f)
+                    {
+                        // Ran into it without jumping
+                        Fall(1.8f);
+                        break;
+                    }
+                    // Slowly: climbs over
+                    Jolt += 0.3f;
+                    speed = Mathf.Min(speed, ForestSpeed * 0.25f);
+                }
+            }
+            if (terrain.Blocked(ne, nn, Reach))
+            {
+                // Slide along whatever is in the way
+                if (!terrain.Blocked(ne, n, Reach)) nn = n;
+                else if (!terrain.Blocked(e, nn, Reach)) ne = e;
+                else
+                {
+                    speed *= 0.3f;
+                    break;
+                }
+            }
+            world.PushOut(ref ne, ref nn, Reach);
+            if (terrain.Blocked(ne, nn, Reach)) break;
+            double de = ne - e, dn = nn - n;
+            double pe = e, pn = n;
+            e = ne;
+            n = nn;
+            distance += (float)Math.Sqrt(de * de + dn * dn);
+            Moved?.Invoke(pe, pn, e, n);
+        }
+    }
+
+    void Vertical(float dt)
+    {
+        if (controlsOn && !Fallen && !airborne && !EscMenu.IsOpen && Input.GetKeyDown(KeyCode.Space))
+        {
+            airborne = true;
+            jumpV = 3.7f;
+        }
+        if (!airborne) return;
+        jumpV -= 9.81f * dt;
+        jumpY += jumpV * dt;
+        if (jumpY <= 0f)
+        {
+            jumpY = 0f;
+            airborne = false;
+            Jolt += 0.7f;
+            sounds.Footstep(ground.surface, 1f);
+        }
+    }
+
+    public void Fall(float seconds)
+    {
+        if (Fallen) return;
+        fallTimer = fallLength = seconds;
+        speed = 0f;
+        airborne = false;
+        jumpY = 0f;
+        Jolt += 2.5f;
+        sounds.Groan();
+    }
+
+    // Stumbling: almost never early in the race; tired, fast, downhill and in rough ground far more often
+    void Stumbling(float dt)
+    {
+        if (fallTimer > 0f) fallTimer -= dt;
+        if (stumbleTimer > 0f) stumbleTimer -= dt;
+        if (!controlsOn || Fallen || airborne || stumbleTimer > 0f) return;
+        float tired = 0.03f + fatigue;
+        float down = 1f + Mathf.Clamp(-gradient, 0f, 0.5f) * 10f;
+        float rough = ground.rough * ground.rough;
+        float fast = Mathf.Pow(Mathf.Clamp01(speed / (ForestSpeed * 1.1f)), 3f);
+        float perSecond = 0.02f * tired * down * rough * fast;
+        if (random.NextDouble() >= perSecond * dt) return;
+        float fallChance = 0.2f + 0.45f * Mathf.Clamp01(-gradient * 4f) * fatigue + 0.15f * Mathf.Clamp01(ground.rough - 1f);
+        if (random.NextDouble() < fallChance)
+        {
+            Fall(1.6f + (float)random.NextDouble() * 0.6f);
+            return;
+        }
+        stumbleTimer = 0.5f;
+        speed *= 0.45f;
+        Jolt += 1.6f;
+        sounds.Grunt();
+    }
+
+    void ShakeAndBreath(float dt)
+    {
+        float sf = Mathf.Clamp(speed / (ForestSpeed * 1.25f), 0f, 1.3f);
+        float down = 1f + Mathf.Clamp(-gradient, 0f, 0.45f) * 4.5f;
+        float up = 1f - Mathf.Clamp(gradient, 0f, 0.3f) * 1.6f;
+        float target = speed > 0.2f ? (0.08f + Mathf.Pow(sf, 1.4f)) * down * up * ground.rough * (1f + 0.35f * fatigue) : 0.03f;
+        if (airborne) target *= 0.6f;
+        Shake = Mathf.Lerp(Shake, target, 1f - Mathf.Exp(-dt * 6f));
+        Jolt = Mathf.Max(0f, Jolt - dt * 3f);
+
+        // Steps: quicker the faster the runner goes
+        if (!airborne && speed > 0.3f && !Fallen)
+        {
+            float cadence = (2.3f + 1.2f * Mathf.Clamp01(sf)) * (0.7f + 0.1f * gameSpeed);
+            StepPhase += cadence * dt;
+            float steps = Mathf.Floor(StepPhase * 2f);
+            if (steps != lastStep)
+            {
+                lastStep = steps;
+                sounds.Footstep(ground.surface, sf);
+            }
+        }
+
+        float moving = speed > 0.3f ? 1f : 0f;
+        float effortTarget = 0.18f + moving * (0.3f + 0.45f * sf + 2.5f * Mathf.Max(0f, gradient)) + 0.3f * fatigue;
+        Effort = Mathf.MoveTowards(Effort, Mathf.Clamp01(effortTarget), dt * (effortTarget > Effort ? 0.25f : 0.08f));
+        if (controlsOn || raceSeconds > 0f) sounds.Breathe(Effort);
+    }
+
+    // ---- The eyes ----
+
+    void PlaceCamera(float dt)
+    {
+        float groundY = world.GroundY(e, n);
+        float sf = Mathf.Clamp01(speed / (ForestSpeed * 1.25f));
+        float bob = airborne ? 0f : (Mathf.Abs(Mathf.Sin(Mathf.PI * StepPhase * 2f)) - 0.5f) * 0.055f * sf;
+        float sway = Mathf.Sin(Mathf.PI * StepPhase * 2f) * 0.6f * sf;
+        float height = EyeHeight + jumpY + bob, extraPitch = 0f, roll = sway;
+        if (Fallen)
+        {
+            // Down on the ground, then up again over the last 0.6 s
+            float t = 1f - fallTimer / fallLength;
+            float down = t < 0.15f ? t / 0.15f : fallTimer < 0.6f ? fallTimer / 0.6f : 1f;
+            down = Mathf.SmoothStep(0f, 1f, down);
+            height = Mathf.Lerp(EyeHeight, 0.5f, down);
+            extraPitch = 50f * down;
+            roll = 22f * down;
+        }
+        else if (stumbleTimer > 0f)
+        {
+            float k = Mathf.Sin(Mathf.PI * (1f - stumbleTimer / 0.5f));
+            height -= 0.18f * k;
+            extraPitch = 14f * k;
+            roll = 6f * k;
+        }
+        transform.position = world.ToScene(e, n, groundY + height);
+        cam.transform.localRotation = Quaternion.Euler(Mathf.Clamp(pitch + extraPitch, -80f, 89f), yaw, -roll);
+    }
+}

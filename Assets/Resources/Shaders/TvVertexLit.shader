@@ -2,7 +2,8 @@
 // picture looks the same whatever lights and quality settings the game has: a warm sun (the scene's sun gives only the
 // direction and the shadows), light from the sky above and from the ground below, film-like tone mapping (ACES) and fog
 // into the sky colour far away. The colour comes from every corner of the mesh (written in sRGB), times _Color. The
-// ground also gets a fine grain (_DetailTex, repeated every 5 metres).
+// ground also gets a fine grain (_DetailTex, repeated every 5 metres). Also used by the run-yourself game mode's world
+// (RunYourself/RunWorld.cs), which sets the fog to its own view distance.
 Shader "O-Manager/TvVertexLit"
 {
     Properties
@@ -10,6 +11,8 @@ Shader "O-Manager/TvVertexLit"
         _Color ("Color", Color) = (1,1,1,1)
         _DetailTex ("Ground grain", 2D) = "white" {}
         _Detail ("Ground grain strength", Range(0,1)) = 0
+        _FogStart ("Fog start (m)", Float) = 45
+        _FogEnd ("Fog end (m)", Float) = 230
     }
     SubShader
     {
@@ -26,12 +29,13 @@ Shader "O-Manager/TvVertexLit"
         #define TV_SKY_LIGHT half3(0.592, 0.708, 0.812)
         #define TV_GROUND_LIGHT half3(0.078, 0.070, 0.038)
         #define TV_FOG half3(0.571, 0.672, 0.701)
-        #define TV_FOG_START 45.0
-        #define TV_FOG_END 230.0
 
         fixed4 _Color;
         sampler2D _DetailTex;
         half _Detail;
+        // The TV's fog starts at 45 m and the sky takes over at 230 m; the run-yourself world sets its own (RunWorld)
+        float _FogStart;
+        float _FogEnd;
 
         struct Input
         {
@@ -98,7 +102,7 @@ Shader "O-Manager/TvVertexLit"
         void tvFinal (Input IN, SurfaceOutput o, inout fixed4 color)
         {
             float3 c = TvTone(max(color.rgb, 0.0));
-            float fog = smoothstep(TV_FOG_START, TV_FOG_END, IN.tvDepth);
+            float fog = smoothstep(_FogStart, _FogEnd, IN.tvDepth);
             color.rgb = lerp(c, TV_FOG, fog);
         }
         ENDCG

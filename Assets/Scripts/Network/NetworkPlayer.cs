@@ -795,6 +795,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             return;
         }
 
+        // Run it yourself (3D): nobody picks a runner; the player is the runner
+        if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RunYourself) && RelayRace.Active == null)
+        {
+            RunSession.Begin(this);
+            return;
+        }
+
         // "Open packs": first the packs, then the usual picking among the runners that came out of them
         if (Object.HasStateAuthority && RunnerRules.OpenPacksRound)
         {
@@ -1284,6 +1291,11 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             // Route choice game: questions on the map, nobody draws or runs
             RouteChoiceGame.Start(agent);
+        }
+        else if (RunSession.On)
+        {
+            // Run it yourself: the race is run in the 3D world; the 2D runner stands still
+            RunSession.StartRace(agent);
         }
         else
         {

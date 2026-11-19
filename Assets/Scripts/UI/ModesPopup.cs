@@ -13,7 +13,7 @@ public class ModesPopup : MonoBehaviour
     ExtraMode modes;
     Action<ExtraMode> chosen;
     RectTransform list;
-    ExtraMode offered = ExtraModes.AllMask;
+    ExtraMode offered = ExtraModes.LobbyMask;
     string hintText;
     bool readOnly;
     int tasksOff;
@@ -32,7 +32,7 @@ public class ModesPopup : MonoBehaviour
         canvas.sortingOrder = 200;
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
         open = go.AddComponent<ModesPopup>();
-        open.offered = offered ?? ExtraModes.AllMask;
+        open.offered = offered ?? ExtraModes.LobbyMask;
         open.modes = current & open.offered;
         open.chosen = onChosen;
         open.readOnly = readOnly;

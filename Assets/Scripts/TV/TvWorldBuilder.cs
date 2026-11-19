@@ -82,6 +82,18 @@ public class TvWorldInput
     public float camDirX, camDirZ;      // where the TV camera should stand, as a direction from the control (0, 0 = anywhere)
     public bool start;                  // the start of a leg and not a control: no flag and no punching unit
     public float legDirX, legDirZ;      // at the start: the way the first leg goes (0, 0 = not known)
+
+    // ---- The run-yourself game mode (RunYourself/RunWorld.cs): the whole map, built as square pieces round the
+    // runner. A piece has no TV camera and no control of its own, and fits its neighbours without a seam: the noise
+    // patterns start at the same place (anchor) for every piece, y = 0 is the same height everywhere (baseHeight),
+    // every tree, stone and tuft belongs to exactly one piece, and a piece is built the same on every computer.
+    public bool chunk;                  // radius = half the side of the piece
+    public bool chunkDetail;            // only the near detail of a piece: undergrowth and the young trees of thickets
+    public float baseHeight;            // the map height that is y = 0
+    public double anchorE, anchorN;     // where the noise patterns start
+    public List<float> flags;           // the course's controls in this piece: x, z (metres from its centre) for each
+    public List<TvSolid> baseSolids;    // chunkDetail: the stones and trunks the piece itself has (nothing grows in them)
+    public float undergrowthShare = 1f; // chunkDetail: how much undergrowth (the player's 3D quality)
 }
 
 // Something a runner cannot run through: a stone, a tree trunk, a pole
@@ -93,6 +105,9 @@ public struct TvSolid
 public class TvWorld
 {
     public float radius;
+    // A piece of the run-yourself world (TvWorldInput.chunk): where the flag of each control in it stands, x, z as in
+    // TvWorldInput.flags (beside a stone or a knoll top, clear of it)
+    public readonly List<float> flagSpots = new List<float>();
     public int size;                    // corners per side of the ground: 2 * radius + 1, one per metre
     public float[] ground;              // size * size heights, [j * size + i], i east and j north
     public readonly List<TvMesh> meshes = new List<TvMesh>();
@@ -188,6 +203,10 @@ public class TvWorldBuilder
     const int DrawTiles = 10;
     TvMesh groundMesh, rockMesh, thingMesh, wireMesh;
     TvMesh[] treeMeshes, tuftMeshes;
+    // A piece of the run-yourself world: the trees as they are drawn far away, and the young trees of the thickets
+    TvMesh treeFarMesh, thicketMesh;
+    readonly bool chunk;
+    readonly float ox, oz;              // the piece's centre from the anchor: added to x, z wherever a noise pattern is read
 
     public TvWorldBuilder(TvWorldInput input)
     {
@@ -195,10 +214,16 @@ public class TvWorldBuilder
         layer = input.layer;
         look = (input.look ?? new TerrainLook()).Safe();
         random = new TvRandom(input.seed * 7919 + (int)(input.centerE * 3.0) + (int)(input.centerN * 5.0) * 31);
-        R = Math.Max(40, Math.Min(160, (int)input.radius));
+        chunk = input.chunk;
+        R = chunk ? Math.Max(4, Math.Min(160, (int)input.radius)) : Math.Max(40, Math.Min(160, (int)input.radius));
         N = 2 * R + 1;
         cE = (float)input.centerE;
         cN = (float)input.centerN;
+        if (chunk)
+        {
+            ox = (float)(input.centerE - input.anchorE);
+            oz = (float)(input.centerN - input.anchorN);
+        }
     }
 
     public static TvWorld Build(TvWorldInput input)
@@ -211,7 +236,15 @@ public class TvWorldBuilder
     static float Sm(float a, float b, float x) => TvShapeBuilder.Smooth(a, b, x);
     static float Lerp(float a, float b, float t) => a + (b - a) * t;
     float Rr(float a, float b) => random.Range(a, b);
-    bool Inside(float x, float z, float margin) => x > -R + margin && x < R - margin && z > -R + margin && z < R - margin;
+    // A piece of the run-yourself world keeps whatever stands on its own square (the margin is for the TV's edge)
+    bool Inside(float x, float z, float margin) => chunk ? x >= -R && x < R && z >= -R && z < R
+        : x > -R + margin && x < R - margin && z > -R + margin && z < R - margin;
+
+    // Run-yourself pieces: the same numbers for the same place on the map, whatever piece it is built in
+    void Reseed(float x, float z, int salt)
+    {
+        random.Reseed((int)Math.Floor(x + ox), (int)Math.Floor(z + oz), salt);
+    }
 
     byte CellAt(float x, float z) => layer.At(input.centerE + x, input.centerN + z);
     static int Base(byte cell) => cell & WorldCell.BaseMask;
@@ -311,6 +344,12 @@ public class TvWorldBuilder
             tuftMeshes[i] = new TvMesh { name = "Undergrowth " + i, castShadows = false };
         }
 
+        if (chunk)
+        {
+            BuildPiece();
+            return world;
+        }
+
         MakeShapes();
         Heights();
         Tracks();
@@ -340,17 +379,182 @@ public class TvWorldBuilder
         return world;
     }
 
+    // ---- A piece of the run-yourself world ----
+
+    // The whole piece is one tile, drawn or not as a whole (RunWorld decides by its distance from the runner).
+    // The base build has everything but the near detail, plus a cheaper copy of the ground and the trees for far away;
+    // the detail build (chunkDetail) is only the undergrowth and the young trees of the thickets, made when the runner
+    // comes near and thrown away when they leave.
+    void BuildPiece()
+    {
+        world.radius = R;
+        world.size = N;
+        // The control and the TV camera are far away, so nothing is kept clear for them
+        world.flagX = world.flagZ = world.camX = world.camZ = 1e6f;
+        world.hasUnit = false;
+        lines = NearLines(14f);
+        points = NearPoints(12f);
+        F = new float[N * N];
+        rock = new float[N * N];
+        trackBlend = new float[N * N];
+        trackColor = new TvColor[N * N];
+        clear = new float[N * N];
+        water = new float[N * N];
+        bog = new float[N * N];
+        soil = new float[N * N];
+        for (int i = 0; i < clear.Length; i++) clear[i] = 99f;
+        groundMesh = new TvMesh { name = "Ground", castShadows = false, group = TvMesh.Near };
+        rockMesh = new TvMesh { name = "Rocks" };
+        thingMesh = new TvMesh { name = "Things" };
+        wireMesh = new TvMesh { name = "Wires", castShadows = false };
+        waterMesh = new TvMesh { name = "Water", castShadows = false };
+        treeMeshes = new[] { new TvMesh { name = "Trees", group = TvMesh.Near } };
+        treeFarMesh = new TvMesh { name = "Trees far", castShadows = false, group = TvMesh.Far };
+        tuftMeshes = new[] { new TvMesh { name = "Undergrowth", castShadows = false } };
+        thicketMesh = new TvMesh { name = "Thickets" };
+
+        MakeShapes();
+        Heights();
+        Tracks();
+        world.ground = F;
+        if (input.chunkDetail)
+        {
+            if (input.baseSolids != null) world.solids.AddRange(input.baseSolids);
+            Thickets();
+            Undergrowth();
+            Keep(tuftMeshes[0]);
+            Keep(thicketMesh);
+            return;
+        }
+        Ground();
+        Waters();
+        Stones();
+        Structures();
+        Flags();
+        Trees();
+        Keep(groundMesh);
+        Keep(GroundFar());
+        Keep(waterMesh);
+        Keep(rockMesh);
+        Keep(thingMesh);
+        Keep(wireMesh);
+        Keep(treeMeshes[0]);
+        Keep(treeFarMesh);
+    }
+
+    void Keep(TvMesh m)
+    {
+        if (m == null || m.VertexCount == 0) return;
+        world.meshes.Add(m);
+        world.vertices += m.VertexCount;
+        world.triangles += m.triangles.Count / 3;
+    }
+
+    // The ground far away: every fourth corner, with a short skirt hanging down at the edge, so the small steps
+    // against a finer neighbour never show the sky through
+    TvMesh GroundFar()
+    {
+        const int Step = 4;
+        var m = new TvMesh { name = "Ground far", castShadows = false, group = TvMesh.Far };
+        int n = (N - 1) / Step + 1;
+        List<float> p = groundMesh.positions, nm = groundMesh.normals;
+        List<byte> c = groundMesh.colors;
+        for (int j = 0; j < n; j++)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                int k = Math.Min(N - 1, j * Step) * N + Math.Min(N - 1, i * Step);
+                m.Vertex(p[k * 3], p[k * 3 + 1], p[k * 3 + 2], nm[k * 3], nm[k * 3 + 1], nm[k * 3 + 2], new TvColor(c[k * 3], c[k * 3 + 1], c[k * 3 + 2]));
+            }
+        }
+        for (int j = 0; j < n - 1; j++)
+        {
+            for (int i = 0; i < n - 1; i++)
+            {
+                int a = j * n + i;
+                m.triangles.Add(a); m.triangles.Add(a + n); m.triangles.Add(a + 1);
+                m.triangles.Add(a + 1); m.triangles.Add(a + n); m.triangles.Add(a + n + 1);
+            }
+        }
+        // The skirt: the edge again, 0.6 m lower, joined to the edge facing out
+        void Skirt(int a, int b, bool flip)
+        {
+            int a2 = m.Vertex(m.positions[a * 3], m.positions[a * 3 + 1] - 0.6f, m.positions[a * 3 + 2], 0f, 1f, 0f,
+                new TvColor(m.colors[a * 3], m.colors[a * 3 + 1], m.colors[a * 3 + 2]));
+            int b2 = m.Vertex(m.positions[b * 3], m.positions[b * 3 + 1] - 0.6f, m.positions[b * 3 + 2], 0f, 1f, 0f,
+                new TvColor(m.colors[b * 3], m.colors[b * 3 + 1], m.colors[b * 3 + 2]));
+            if (flip) { m.triangles.Add(a); m.triangles.Add(b); m.triangles.Add(a2); m.triangles.Add(b); m.triangles.Add(b2); m.triangles.Add(a2); }
+            else { m.triangles.Add(a); m.triangles.Add(a2); m.triangles.Add(b); m.triangles.Add(b); m.triangles.Add(a2); m.triangles.Add(b2); }
+        }
+        for (int i = 0; i < n - 1; i++)
+        {
+            Skirt(i, i + 1, true);                                   // south edge
+            Skirt((n - 1) * n + i, (n - 1) * n + i + 1, false);      // north edge
+            Skirt(i * n, (i + 1) * n, false);                        // west edge
+            Skirt(i * n + n - 1, (i + 1) * n + n - 1, true);         // east edge
+        }
+        return m;
+    }
+
+    // The flag of every control of the course in the piece, beside the feature it marks, as at a TV control
+    void Flags()
+    {
+        if (input.flags == null) return;
+        for (int f = 0; f + 1 < input.flags.Count; f += 2)
+        {
+            float fx = input.flags[f], fz = input.flags[f + 1];
+            float px = fx, pz = fz;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                foreach (TvSolid s in world.solids)
+                {
+                    float dx = px - s.x, dz = pz - s.z, d = (float)Math.Sqrt(dx * dx + dz * dz), need = s.r + 0.45f;
+                    if (d >= need) continue;
+                    if (d < 0.05f) { dx = 0.6f; dz = -0.8f; d = 1f; }
+                    px = s.x + dx / d * need;
+                    pz = s.z + dz / d * need;
+                }
+            }
+            world.flagSpots.Add(px);
+            world.flagSpots.Add(pz);
+            Reseed(fx, fz, 91);
+            thingMesh.Add(FlagShape(random), px, H(px, pz), pz, 1f, 1f, 1f, Rr(0f, 6.283f));
+            world.solids.Add(new TvSolid { x = px, z = pz, r = 0.12f });
+        }
+    }
+
+    // The stand with the punching unit on top and the orange and white flag under it; it stands at 0, 0
+    public static TvShape FlagShape(TvRandom random)
+    {
+        TvColor white = TvColor.Hex("#f4f2ea"), orange = TvColor.Hex("#f26a1b");
+        var b = new TvShapeBuilder(random);
+        float side = 0.3f, r = side / (float)Math.Sqrt(3.0);
+        for (int i = 0; i < 3; i++)
+        {
+            float t0 = i * 2.094395f, t1 = t0 + 2.094395f;
+            float x0 = (float)Math.Cos(t0) * r, z0 = (float)Math.Sin(t0) * r, x1 = (float)Math.Cos(t1) * r, z1 = (float)Math.Sin(t1) * r;
+            // Each face: white above the diagonal, orange under it; both sides of the cloth
+            b.Triangle(x0, 0.85f, z0, x1, 0.85f, z1, x0, 0.55f, z0, 0f, 0.7f, 0f, white);
+            b.Triangle(x1, 0.85f, z1, x1, 0.55f, z1, x0, 0.55f, z0, 0f, 0.7f, 0f, orange);
+            b.Triangle(x0 * 0.98f, 0.85f, z0 * 0.98f, x1 * 0.98f, 0.85f, z1 * 0.98f, x0 * 0.98f, 0.55f, z0 * 0.98f, x0 + x1, 0.7f, z0 + z1, white);
+            b.Triangle(x1 * 0.98f, 0.85f, z1 * 0.98f, x1 * 0.98f, 0.55f, z1 * 0.98f, x0 * 0.98f, 0.55f, z0 * 0.98f, x0 + x1, 0.7f, z0 + z1, orange);
+        }
+        b.Tube(0.018f, 0.018f, 1.0f, 0f, 6, TvColor.Hex("#d8d8d2"));
+        b.Box(-0.05f, 0.985f, -0.075f, 0.05f, 1.055f, 0.075f, TvColor.Hex("#c8281e"));
+        return b.Done();
+    }
+
     // ---- Heights: the map's heights, cliffs as steps, knolls and pits, a little roughness ----
 
     void Heights()
     {
-        baseHeight = BaseHeight(0f, 0f);
+        baseHeight = chunk ? input.baseHeight : BaseHeight(0f, 0f);
         for (int j = 0; j < N; j++)
         {
             for (int i = 0; i < N; i++)
             {
                 float x = i - R, z = j - R;
-                F[j * N + i] = BaseHeight(x, z) - baseHeight + (TvRandom.Patches(x * 0.35f + 31f, z * 0.35f + 17f) - 0.5f) * 0.22f;
+                F[j * N + i] = Plain(x, z);
             }
         }
 
@@ -408,6 +612,9 @@ public class TvWorldBuilder
             }
         }
     }
+
+    // The map's heights with a little roughness, before knolls, cliffs and ditches
+    float Plain(float x, float z) => BaseHeight(x, z) - baseHeight + (TvRandom.Patches((x + ox) * 0.35f + 31f, (z + oz) * 0.35f + 17f) - 0.5f) * 0.22f;
 
     void Bump(float x, float z, float height, float spread)
     {
@@ -573,9 +780,10 @@ public class TvWorldBuilder
                 int k = j * N + i;
                 float x = i - R, z = j - R;
                 // The 2 m cells' edges are made ragged, so the ground does not show squares
-                byte cell = CellAt(x + (TvRandom.Noise(x * 0.4f, z * 0.4f) - 0.5f) * 3f, z + (TvRandom.Noise(x * 0.4f + 9f, z * 0.4f) - 0.5f) * 3f);
+                float ax = x + ox, az = z + oz;
+                byte cell = CellAt(x + (TvRandom.Noise(ax * 0.4f, az * 0.4f) - 0.5f) * 3f, z + (TvRandom.Noise(ax * 0.4f + 9f, az * 0.4f) - 0.5f) * 3f);
                 int kind = Base(cell);
-                float f = TvRandom.Patches(x * 0.12f, z * 0.12f), f2 = TvRandom.Noise(x * 0.9f, z * 0.9f);
+                float f = TvRandom.Patches(ax * 0.12f, az * 0.12f), f2 = TvRandom.Noise(ax * 0.9f, az * 0.9f);
                 TvColor c;
                 bool hard = false;
                 switch (kind)
@@ -585,14 +793,14 @@ public class TvWorldBuilder
                     case WorldCell.LightGreen: c = LightGreen.Lerp(floor.a, f * 0.5f); break;
                     case WorldCell.Green: c = MidGreen; break;
                     case WorldCell.DarkGreen: c = DarkGreen; break;
-                    case WorldCell.Cultivated: c = Field.Lerp(Field2, Sm(0.4f, 0.6f, TvRandom.Noise(x * 0.05f, z * 0.6f))); break;
+                    case WorldCell.Cultivated: c = Field.Lerp(Field2, Sm(0.4f, 0.6f, TvRandom.Noise(ax * 0.05f, az * 0.6f))); break;
                     case WorldCell.Water: c = Water.Lerp(WaterDeep, f); hard = true; break;
                     case WorldCell.BareRock: c = Rock.Lerp(LichenRock, f2 * 0.6f); hard = true; break;
                     case WorldCell.Sand: c = SandColor.Shade(0.94f + f2 * 0.1f); break;
                     case WorldCell.Paved: case WorldCell.Building: c = Paved.Shade(0.95f + f2 * 0.08f); hard = true; break;
                     case WorldCell.Plot: c = Plot.Lerp(OpenGreen, f); break;
                     default:
-                        c = floor.a.Lerp(floor.b, Sm(0.35f, 0.7f, f)).Lerp(floor.c, Sm(0.55f, 0.8f, TvRandom.Noise(x * 0.2f + 40f, z * 0.2f)) * 0.7f);
+                        c = floor.a.Lerp(floor.b, Sm(0.35f, 0.7f, f)).Lerp(floor.c, Sm(0.55f, 0.8f, TvRandom.Noise(ax * 0.2f + 40f, az * 0.2f)) * 0.7f);
                         break;
                 }
                 if (!hard)
@@ -606,6 +814,12 @@ public class TvWorldBuilder
                 }
                 // Steep ground and cliff faces show the rock
                 float sx = F[k + (i < N - 1 ? 1 : 0)] - F[k - (i > 0 ? 1 : 0)], sz = F[k + (j < N - 1 ? N : 0)] - F[k - (j > 0 ? N : 0)];
+                if (chunk)
+                {
+                    // At a piece's edge the slope is taken over the edge too, so the light has no seam
+                    if (i == 0 || i == N - 1) sx = (i < N - 1 ? F[k + 1] : Plain(x + 1f, z)) - (i > 0 ? F[k - 1] : Plain(x - 1f, z));
+                    if (j == 0 || j == N - 1) sz = (j < N - 1 ? F[k + N] : Plain(x, z + 1f)) - (j > 0 ? F[k - N] : Plain(x, z - 1f));
+                }
                 float slope = (float)Math.Sqrt(sx * sx + sz * sz) / 2f;
                 if (kind != WorldCell.Water) c = c.Lerp(RockDark, Math.Max(rock[k] * 0.95f, Sm(0.75f, 1.3f, slope)));
                 c = c.Shade(0.86f + f2 * 0.24f);
@@ -681,7 +895,7 @@ public class TvWorldBuilder
                     if (corner[q] >= 0) return corner[q];
                     float x = ci - R, z = cj - R;
                     // The sky shows in the water in broad streaks; marsh pools are dark and brown
-                    float glint = TvRandom.Noise(x * 0.12f + 3f, z * 0.05f);
+                    float glint = TvRandom.Noise((x + ox) * 0.12f + 3f, (z + oz) * 0.05f);
                     TvColor c = k == 3 ? bogC.Shade(0.9f + 0.2f * glint) : deep.Lerp(sky, 0.15f + 0.45f * glint);
                     corner[q] = waterMesh.Vertex(x, level[q] + lift, z, 0f, 1f, 0f, c);
                     return corner[q];
@@ -696,12 +910,16 @@ public class TvWorldBuilder
     // Open water in a marsh or a narrow marsh strip: where the noise is high
     bool MarshPool(float x, float z, bool marsh, float strip)
     {
+        x += ox;
+        z += oz;
         float n = TvRandom.Patches(x * 0.13f + 11f, z * 0.13f - 4f) + TvRandom.Noise(x * 0.6f, z * 0.6f) * 0.1f;
         return (marsh && n > 0.6f) || (strip > 0.55f && TvRandom.Patches(x * 0.3f + 11f, z * 0.3f - 4f) > 0.38f);
     }
 
     float H(float x, float z)
     {
+        // Beyond a piece's edge: the map's own heights (a wire or a wall reaching over to the next piece)
+        if (chunk && (x < -R || x > R || z < -R || z > R)) return BaseHeight(x, z) - baseHeight;
         float fx = x + R, fz = z + R;
         fx = fx < 0f ? 0f : fx > N - 1.001f ? N - 1.001f : fx;
         fz = fz < 0f ? 0f : fz > N - 1.001f ? N - 1.001f : fz;
@@ -714,7 +932,7 @@ public class TvWorldBuilder
     // ---- The low-poly shapes everything is put together from ----
 
     TvShape[] rocks, rocksLow, bushShapes, youngSpruce, youngLeafy;
-    TvShape rootPlate, logShape, bigTree, poolShape;
+    TvShape rootPlate, logShape, bigTree, poolShape, spruceFar;
     TvShape[] pineNear, pineFar, pine2Near, pine2Far, spruceShape, birchNear, birchFar, beechNear, beechFar;
     TvShape tuftBerry, tuftHeath, tuftGrass, tuftDry, tuftShort, tuftFern, tuftBerryNear, tuftHeathNear;
 
@@ -803,6 +1021,16 @@ public class TvWorldBuilder
         pine2Near = new[] { Pine2(true), Pine2(true) };
         pine2Far = new[] { Pine2(false), Pine2(false) };
         spruceShape = new[] { Spruce(), Spruce() };
+        if (chunk)
+        {
+            // A spruce for far away: fewer and plainer layers
+            var b = new TvShapeBuilder(random);
+            b.Tube(0.17f, 0.06f, 13f, 0f, 3, bark);
+            b.Cone(2.4f, 5.6f, 2.2f, 5, spruceG);
+            b.Cone(1.8f, 5f, 6f, 5, spruceG2);
+            b.Cone(1.1f, 4.4f, 9.6f, 5, spruceG);
+            spruceFar = b.Done();
+        }
         birchNear = new[] { Birch(true), Birch(true) };
         birchFar = new[] { Birch(false), Birch(false) };
         beechNear = new[] { Beech(true), Beech(true) };
@@ -930,7 +1158,7 @@ public class TvWorldBuilder
     // Small or far stones get the plain shape: nobody sees the extra facets
     TvShape RockFor(float x, float z, float size)
     {
-        bool near = size > 0.3f && x * x + z * z < 60f * 60f;
+        bool near = chunk ? size > 0.5f : size > 0.3f && x * x + z * z < 60f * 60f;
         return near ? rocks[(int)(random.Value() * rocks.Length) % rocks.Length] : rocksLow[(int)(random.Value() * rocksLow.Length) % rocksLow.Length];
     }
 
@@ -991,9 +1219,10 @@ public class TvWorldBuilder
         }
 
         // Boulder fields and stony ground drawn as areas
-        for (float gz = -R + 2f; gz < R - 2f; gz += 2f)
+        float edge = chunk ? 0f : 2f;   // a run-yourself piece reaches its own edge
+        for (float gz = -R + edge; gz < R - edge; gz += 2f)
         {
-            for (float gx = -R + 2f; gx < R - 2f; gx += 2f)
+            for (float gx = -R + edge; gx < R - edge; gx += 2f)
             {
                 byte cell = CellAt(gx + 1f, gz + 1f);
                 if ((cell & WorldCell.Boulders) != 0)
@@ -1177,7 +1406,7 @@ public class TvWorldBuilder
                         Bar(thingMesh, x, y - 0.2f, z, x, y + 2.1f, z, 0.07f, 0.06f, 5, grey.Shade(Rr(0.85f, 1.05f)));
                         if (!float.IsNaN(lastX) && (x - lastX) * (x - lastX) + (z - lastZ) * (z - lastZ) < 25f)
                         {
-                            bool near = x * x + z * z < 55f * 55f;
+                            bool near = chunk || x * x + z * z < 55f * 55f;
                             foreach (float up in near ? new[] { 0.1f, 0.35f, 0.65f, 1f, 1.4f, 1.95f } : new[] { 0.1f, 1f, 1.95f })
                                 Bar(wireMesh, lastX, lastY + up, lastZ, x, y + up, z, 0.008f, 0.008f, 3, wireC);
                             if (near)
@@ -1195,7 +1424,7 @@ public class TvWorldBuilder
                     for (int q = 0; q + 3 < c.Length; q += 2)
                     {
                         float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
-                        if (!Inside(ax, az, 2f) || !Inside(bx, bz, 2f)) continue;
+                        if (chunk ? !Inside((ax + bx) / 2f, (az + bz) / 2f, 0f) : !Inside(ax, az, 2f) || !Inside(bx, bz, 2f)) continue;
                         Bar(thingMesh, ax, H(ax, az) + 0.2f, az, bx, H(bx, bz) + 0.2f, bz, 0.19f, 0.13f, 6, TvColor.Hex("#5e5346"));
                         // Runners jump over a fallen trunk, so it is not a solid to go round
                         world.AddHurdle(ax, az, bx, bz, 0.4f);
@@ -1376,14 +1605,17 @@ public class TvWorldBuilder
 
     void Buildings()
     {
-        double e0 = Math.Floor((input.centerE - R - layer.minE) / layer.cell), n0 = Math.Floor((input.centerN - R - layer.minN) / layer.cell);
-        int cells = (int)(2 * R / layer.cell) + 2;
+        // A piece looks a little past its edge, so a house across the edge is one house, built by the piece its middle is in
+        int reach = chunk ? R + 40 : R;
+        double e0 = Math.Floor((input.centerE - reach - layer.minE) / layer.cell), n0 = Math.Floor((input.centerN - reach - layer.minN) / layer.cell);
+        int cells = (int)(2 * reach / layer.cell) + 2;
         var isHouse = new bool[cells * cells];
         float CellX(int i) => (float)(layer.minE + (e0 + i + 0.5) * layer.cell - input.centerE);
         float CellZ(int j) => (float)(layer.minN + (n0 + j + 0.5) * layer.cell - input.centerN);
         for (int j = 0; j < cells; j++)
             for (int i = 0; i < cells; i++)
-                isHouse[j * cells + i] = Base(layer.At(input.centerE + CellX(i), input.centerN + CellZ(j))) == WorldCell.Building && Inside(CellX(i), CellZ(j), 2f);
+                isHouse[j * cells + i] = Base(layer.At(input.centerE + CellX(i), input.centerN + CellZ(j))) == WorldCell.Building
+                                         && (chunk || Inside(CellX(i), CellZ(j), 2f));
 
         var seen = new bool[cells * cells];
         var group = new List<int>();
@@ -1406,6 +1638,12 @@ public class TvWorldBuilder
                     int nk = nj * cells + ni;
                     if (isHouse[nk] && !seen[nk]) { seen[nk] = true; todo.Push(nk); }
                 }
+            }
+            if (chunk)
+            {
+                float mx = 0f, mz = 0f;
+                foreach (int k in group) { mx += CellX(k % cells); mz += CellZ(k / cells); }
+                if (!Inside(mx / group.Count, mz / group.Count, 0f)) continue;
             }
             House(group, cells, CellX, CellZ);
         }
@@ -1587,22 +1825,7 @@ public class TvWorldBuilder
         world.hasUnit = !input.start;
         if (input.start) return;
 
-        TvColor white = TvColor.Hex("#f4f2ea"), orange = TvColor.Hex("#f26a1b");
-        var b = new TvShapeBuilder(random);
-        float side = 0.3f, r = side / (float)Math.Sqrt(3.0);
-        for (int i = 0; i < 3; i++)
-        {
-            float t0 = i * 2.094395f, t1 = t0 + 2.094395f;
-            float x0 = (float)Math.Cos(t0) * r, z0 = (float)Math.Sin(t0) * r, x1 = (float)Math.Cos(t1) * r, z1 = (float)Math.Sin(t1) * r;
-            // Each face: white above the diagonal, orange under it; both sides of the cloth
-            b.Triangle(x0, 0.85f, z0, x1, 0.85f, z1, x0, 0.55f, z0, 0f, 0.7f, 0f, white);
-            b.Triangle(x1, 0.85f, z1, x1, 0.55f, z1, x0, 0.55f, z0, 0f, 0.7f, 0f, orange);
-            b.Triangle(x0 * 0.98f, 0.85f, z0 * 0.98f, x1 * 0.98f, 0.85f, z1 * 0.98f, x0 * 0.98f, 0.55f, z0 * 0.98f, x0 + x1, 0.7f, z0 + z1, white);
-            b.Triangle(x1 * 0.98f, 0.85f, z1 * 0.98f, x1 * 0.98f, 0.55f, z1 * 0.98f, x0 * 0.98f, 0.55f, z0 * 0.98f, x0 + x1, 0.7f, z0 + z1, orange);
-        }
-        b.Tube(0.018f, 0.018f, 1.0f, 0f, 6, TvColor.Hex("#d8d8d2"));
-        b.Box(-0.05f, 0.985f, -0.075f, 0.05f, 1.055f, 0.075f, TvColor.Hex("#c8281e"));
-        thingMesh.Add(b.Done(), fx, y, fz, 1f, 1f, 1f, Rr(0f, 6.283f));
+        thingMesh.Add(FlagShape(random), fx, y, fz, 1f, 1f, 1f, Rr(0f, 6.283f));
     }
 
     // ---- The TV camera's spot: the direction with the fewest stones and walls between it and the control ----
@@ -1669,6 +1892,7 @@ public class TvWorldBuilder
 
     int Tile(float x, float z)
     {
+        if (chunk) return 0;   // a run-yourself piece is one tile
         int i = Math.Max(0, Math.Min(TreeTiles - 1, (int)((x + R) / (2f * R) * TreeTiles)));
         int j = Math.Max(0, Math.Min(TreeTiles - 1, (int)((z + R) / (2f * R) * TreeTiles)));
         return j * TreeTiles + i;
@@ -1676,7 +1900,7 @@ public class TvWorldBuilder
 
     bool Blocked(float x, float z, float gap)
     {
-        if (x * x + z * z < 9f) return true;                                  // the control stands free
+        if (!chunk && x * x + z * z < 9f) return true;                        // the control stands free
         float dx = x - world.flagX, dz = z - world.flagZ;
         if (dx * dx + dz * dz < 6f) return true;
         // Nothing between the TV camera and the control
@@ -1723,15 +1947,26 @@ public class TvWorldBuilder
         bool beech = look.forest == TerrainLook.Beech;
         // Bare ground carries fewer trees
         float thin = look.ground == TerrainLook.Stone ? 0.55f : look.ground == TerrainLook.Sand || look.ground == TerrainLook.Lichen ? 0.8f : 1f;
-        for (float gz = -R + 3f; gz < R - 3f; gz += Step)
+        // A run-yourself piece: the squares of the steps lie the same way on the whole map, a square belongs to the
+        // piece its corner is in, and each square draws its own numbers, so a tree is the same in every build
+        float first = -R + 3f, last = R - 3f;
+        float firstX = first, firstZ = first;
+        if (chunk)
         {
-            for (float gx = -R + 3f; gx < R - 3f; gx += Step)
+            firstX = (float)Math.Ceiling((-R + ox) / Step) * Step - ox;
+            firstZ = (float)Math.Ceiling((-R + oz) / Step) * Step - oz;
+            last = R;
+        }
+        for (float gz = firstZ; gz < last; gz += Step)
+        {
+            for (float gx = firstX; gx < last; gx += Step)
             {
+                if (chunk) Reseed(gx + Step * 0.5f, gz + Step * 0.5f, 17);
                 float x = gx + Rr(0f, Step), z = gz + Rr(0f, Step);
                 byte cell = CellAt(x, z);
                 int kind = Base(cell);
                 bool marsh = (cell & WorldCell.Marsh) != 0;
-                float clump = TvRandom.Patches(x * 0.05f + 7f, z * 0.05f + 3f), p, s;
+                float clump = TvRandom.Patches((x + ox) * 0.05f + 7f, (z + oz) * 0.05f + 3f), p, s;
                 Tree tree;
                 switch (kind)
                 {
@@ -1768,32 +2003,43 @@ public class TvWorldBuilder
                 }
                 if (random.Value() > p || Blocked(x, z, 1.3f)) continue;
 
-                bool near = x * x + z * z < 70f * 70f;
+                bool near = chunk || x * x + z * z < 70f * 70f;
                 int pick = random.Value() < 0.5f ? 0 : 1;
-                TvShape shape;
+                TvShape shape, far;
                 float trunk;
                 switch (tree)
                 {
-                    case Tree.Pine: shape = (near ? pineNear : pineFar)[pick]; trunk = 0.3f; break;
-                    case Tree.Pine2: shape = (near ? pine2Near : pine2Far)[pick]; trunk = 0.28f; break;
-                    case Tree.Spruce: shape = spruceShape[pick]; trunk = 0.45f; break;   // the low branches are in the way too
-                    case Tree.Birch: shape = (near ? birchNear : birchFar)[pick]; trunk = 0.22f; break;
-                    default: shape = (near ? beechNear : beechFar)[pick]; trunk = 0.42f; break;
+                    case Tree.Pine: shape = (near ? pineNear : pineFar)[pick]; far = pineFar[pick]; trunk = 0.3f; break;
+                    case Tree.Pine2: shape = (near ? pine2Near : pine2Far)[pick]; far = pine2Far[pick]; trunk = 0.28f; break;
+                    case Tree.Spruce: shape = spruceShape[pick]; far = spruceFar; trunk = 0.45f; break;   // the low branches are in the way too
+                    case Tree.Birch: shape = (near ? birchNear : birchFar)[pick]; far = birchFar[pick]; trunk = 0.22f; break;
+                    default: shape = (near ? beechNear : beechFar)[pick]; far = beechFar[pick]; trunk = 0.42f; break;
                 }
-                treeMeshes[Tile(x, z)].Add(shape, x, H(x, z) - 0.15f, z, s, s * Rr(0.9f, 1.12f), s, Rr(0f, 6.283f), Rr(0.82f, 1.12f), Rr(-0.03f, 0.03f), Rr(-0.03f, 0.03f));
+                float y = H(x, z) - 0.15f, sy = s * Rr(0.9f, 1.12f), yaw = Rr(0f, 6.283f), tint = Rr(0.82f, 1.12f), tx = Rr(-0.03f, 0.03f), tz = Rr(-0.03f, 0.03f);
+                treeMeshes[Tile(x, z)].Add(shape, x, y, z, s, sy, s, yaw, tint, tx, tz);
+                // A piece of the run-yourself world: the same tree, cheaper, for when it is far from the runner
+                if (chunk) treeFarMesh.Add(far, x, y, z, s, sy, s, yaw, tint, tx, tz);
                 world.trees++;
                 world.solids.Add(new TvSolid { x = x, z = z, r = Math.Max(0.18f, trunk * (0.5f + s * 0.5f)) });
             }
         }
 
-        // Thickets near the camera: green areas packed with young trees, as hard to see through as they are to run through
+        if (!chunk) Thickets();
+    }
+
+    // Thickets near the camera: green areas packed with young trees, as hard to see through as they are to run through.
+    // A run-yourself piece has them over the whole piece, in its near detail.
+    void Thickets()
+    {
         const float Near = 75f, Fine = 0.95f;
-        for (float gz = -Near; gz < Near; gz += Fine)
+        TvMesh target = chunk ? thicketMesh : null;
+        float from = chunk ? -R : -Near, to = chunk ? R : Near;
+        for (float gz = from; gz < to; gz += Fine)
         {
-            for (float gx = -Near; gx < Near; gx += Fine)
+            for (float gx = from; gx < to; gx += Fine)
             {
                 float x = gx + Rr(-0.4f, 0.4f), z = gz + Rr(-0.4f, 0.4f);
-                if (x * x + z * z > Near * Near || !Inside(x, z, 2f)) continue;
+                if ((!chunk && x * x + z * z > Near * Near) || !Inside(x, z, 2f)) continue;
                 int kind = Base(CellAt(x, z));
                 float p, h;
                 switch (kind)
@@ -1807,7 +2053,7 @@ public class TvWorldBuilder
                 bool spruce = ThicketTree(kind != WorldCell.LightGreen) != Tree.Birch;
                 TvShape[] set = spruce ? youngSpruce : youngLeafy;
                 float sc = h / 2.5f;
-                treeMeshes[Tile(x, z)].Add(set[(int)(random.Value() * set.Length) % set.Length], x, H(x, z) - 0.05f, z,
+                (target ?? treeMeshes[Tile(x, z)]).Add(set[(int)(random.Value() * set.Length) % set.Length], x, H(x, z) - 0.05f, z,
                     sc * Rr(0.85f, 1.2f), sc, sc * Rr(0.85f, 1.2f), Rr(0f, 6.283f), Rr(0.8f, 1.1f), Rr(-0.04f, 0.04f), Rr(-0.04f, 0.04f));
                 world.trees++;
             }
@@ -1832,10 +2078,22 @@ public class TvWorldBuilder
         }
         if (look.forest == TerrainLook.Beech) amount -= 0.12f;
         int tries = (int)(26000f * (0.6f + look.undergrowth * 0.8f));
+        // A run-yourself piece: as many per square metre as round a TV control, times the player's 3D quality
+        if (chunk) tries = (int)(tries * (2f * R) * (2f * R) / (Math.PI * Reach * Reach) * Math.Max(0f, input.undergrowthShare));
         for (int i = 0; i < tries; i++)
         {
-            float a = Rr(0f, 6.283f), d = (float)Math.Sqrt(random.Value()) * Reach;
-            float x = (float)Math.Cos(a) * d, z = (float)Math.Sin(a) * d;
+            float x, z;
+            if (chunk)
+            {
+                x = Rr(-R, R);
+                z = Rr(-R, R);
+            }
+            else
+            {
+                float a = Rr(0f, 6.283f), d = (float)Math.Sqrt(random.Value()) * Reach;
+                x = (float)Math.Cos(a) * d;
+                z = (float)Math.Sin(a) * d;
+            }
             if (!Inside(x, z, 2f)) continue;
             byte cell = CellAt(x, z);
             int kind = Base(cell);
@@ -1849,7 +2107,7 @@ public class TvWorldBuilder
             if (MarshPool((float)Math.Floor(x), (float)Math.Floor(z), (cell & WorldCell.Marsh) != 0, strip)) continue;   // open water
             bool marsh = (cell & WorldCell.Marsh) != 0 || strip > 0.4f, open = kind == WorldCell.Open || kind == WorldCell.OpenTrees || kind == WorldCell.Plot;
             bool roughOpen = kind == WorldCell.RoughOpen || kind == WorldCell.RoughOpenTrees;
-            float rough = TvRandom.Patches(x * 0.07f + 20f, z * 0.07f + 11f) + amount + ((cell & WorldCell.Undergrowth) != 0 ? 0.3f : 0f);
+            float rough = TvRandom.Patches((x + ox) * 0.07f + 20f, (z + oz) * 0.07f + 11f) + amount + ((cell & WorldCell.Undergrowth) != 0 ? 0.3f : 0f);
             TvShape shape;
             float s, tint;
             if (open || marsh)
@@ -1889,7 +2147,7 @@ public class TvWorldBuilder
                     tint = Rr(0.75f, 1f);
                 }
             }
-            if (x * x + z * z < 18f * 18f)
+            if (!chunk && x * x + z * z < 18f * 18f)
             {
                 if (shape == tuftBerry) shape = tuftBerryNear;
                 else if (shape == tuftHeath) shape = tuftHeathNear;
