@@ -59,6 +59,25 @@ public class MainMenuUI : MonoBehaviour
         Show(homePanel);
         PrivateMaps.ForgetBorrowed();   // copies of other players' private maps are only for the lobby they were in
         SharedMaps.CheckOnce();   // maps other players have shared, downloaded in the background
+        AddContestsButton();
+        ContestsPage.ClaimInBackground();   // prize money from weekly and daily contests that are over
+        // Back from a contest race (or left it from the Esc menu): straight to the contests page again
+        if (ContestRun.Active != null) ContestRun.Leave();
+        if (ContestRun.ReturnToContests)
+        {
+            ContestRun.ReturnToContests = false;
+            ContestsPage.Open();
+        }
+    }
+
+    // The weekly and daily contests (2026-11-19): a button at the bottom middle of the home screen, between Quit
+    // and Course builder. Made here in code, so the scene does not have to be rebuilt.
+    void AddContestsButton()
+    {
+        if (homePanel == null || homePanel.transform.Find("Contests") != null) return;
+        Button contests = CourseUI.Button("Contests", homePanel.transform, "Weekly & daily contests", CourseUI.ButtonKind.Primary, ContestsPage.Open, 26);
+        CourseUI.Place((RectTransform)contests.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 44), new Vector2(420, 56));
+        HoverTip.Add(contests, "This week's and today's contests: one try each, a shared leaderboard and prize money for the best.");
     }
 
     static void BackGoesToLobby(GameObject panel)

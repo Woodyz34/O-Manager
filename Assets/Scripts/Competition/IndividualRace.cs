@@ -113,6 +113,7 @@ public class IndividualRace : MonoBehaviour, IRaceStats
         {
             statsShown = true;
             recorder.Stop();
+            SendContestResult();
             statsUI = RelayStatsUI.Create(this);
             statsUI.Open(0, true, recorder.Tracks);
         }
@@ -120,6 +121,17 @@ public class IndividualRace : MonoBehaviour, IRaceStats
         {
             statsUI.Close();
         }
+    }
+
+    // A weekly or daily contest (ContestRun): the finish time and the way round go to the leaderboard
+    void SendContestResult()
+    {
+        if (!ContestRun.InRace) return;
+        NetworkPlayer local = NetworkPlayer.Local;
+        if (local == null || local.Object == null || !local.Object.IsValid || !local.raceFinished) return;
+        int seconds = local.hourCount * 3600 + local.minuterCount * 60 + local.secoundCount;
+        RelayTrack track = recorder.Tracks.Find(t => t.isLocal);
+        ContestRun.OnRaceFinished(seconds, track);
     }
 
     static bool AllFinished()
