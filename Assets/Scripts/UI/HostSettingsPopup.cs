@@ -52,7 +52,9 @@ public class HostSettingsPopup : MonoBehaviour
         RectTransform list = CourseUI.ScrollList("Settings", card.transform, out ScrollRect scroll);
         RectTransform viewport = scroll.GetComponent<RectTransform>();
         CourseUI.Place(viewport, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -120), new Vector2(840, 740));
-        CourseUI.Column(list.gameObject, 10, new RectOffset(16, 16, 6, 12));
+        CourseUI.Column(list.gameObject, 10, new RectOffset(16, 32, 6, 12));
+        // A scrollbar to drag, and a quicker wheel (2026-11-19: the list moved slowly, and the map behind scrolled too)
+        FastScroll.Add(scroll)?.OnLightCard();
 
         AddHeading(list, "Speed");
         AddSlider(list, "Race speed on the map", "How fast the race runs while you follow it on the map.",
@@ -67,6 +69,9 @@ public class HostSettingsPopup : MonoBehaviour
             1, HostSettings.MaxShown + 1, () => values.tvControlShown == 0 ? HostSettings.MaxShown + 1 : values.tvControlShown,
             v => values.tvControlShown = v > HostSettings.MaxShown ? 0 : v, v => v > HostSettings.MaxShown ? "All" : "Top " + v);
         AddToggle(list, "Start of every leg on TV", "Off: only the start of the first leg.", () => values.tvStartEveryLeg, v => values.tvStartEveryLeg = v);
+        AddSlider(list, "Runners shown at the start", "Only the first ones off are filmed.",
+            1, HostSettings.MaxShown + 1, () => values.tvStartShown == 0 ? HostSettings.MaxShown + 1 : values.tvStartShown,
+            v => values.tvStartShown = v > HostSettings.MaxShown ? 0 : v, v => v > HostSettings.MaxShown ? "All" : "Top " + v);
         AddToggle(list, "Finish of every leg on TV", "Off: only the finish of the last leg.", () => values.tvFinishEveryLeg, v => values.tvFinishEveryLeg = v);
         AddSlider(list, "Runners shown at the finish", "Only the first ones in are filmed.",
             1, HostSettings.MaxShown + 1, () => values.tvFinishShown == 0 ? HostSettings.MaxShown + 1 : values.tvFinishShown,

@@ -14,7 +14,18 @@ using UnityEngine.SceneManagement;
 // A route choice that was good can turn out bad.
 public static class MoveControlMode
 {
-    public const float MaxMeters = 100f;
+    // How far a control may be moved: 100 m in the forest, 50 m on a sprint course (2026-11-19, the user: 100 m is far
+    // too far on a sprint map)
+    public const float ForestMaxMeters = 100f;
+    public const float SprintMaxMeters = 50f;
+    public static float MaxMeters
+    {
+        get
+        {
+            bool sprint = CourseLoader.Loaded != null ? CourseLoader.Loaded.IsSprint() : CourseLoader.LoadedMap != null && CourseLoader.LoadedMap.IsSprint;
+            return sprint ? SprintMaxMeters : ForestMaxMeters;
+        }
+    }
     public const int MaxMoves = 3;
 
     // ---- A player's moves (NetworkPlayer.moveControls / moveTargets) ----

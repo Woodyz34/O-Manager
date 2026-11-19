@@ -950,7 +950,7 @@ public class RouteChoiceView : MonoBehaviour
         {
             info.text = "Waiting for " + string.Join(", ", waiting) + " to finish. The prize money is handed out when everyone is done.";
             AddStandings(players);
-            TextMeshProUGUI note = CourseUI.Text("Note", body, "Everyone who plays to the end gets " + CompetitionRewards.PerHalfMinute + " kr for every 30 seconds played, and more for a good place among the others.", 20, CourseUI.InkMuted);
+            TextMeshProUGUI note = CourseUI.Text("Note", body, "Everyone who plays to the end gets " + MoneyLabel.Format(CompetitionRewards.PerHalfMinute) + " for every 30 seconds played, and more for a good place among the others.", 20, CourseUI.InkMuted);
             CourseUI.Size(note, 60);
             return;
         }
@@ -1001,19 +1001,19 @@ public class RouteChoiceView : MonoBehaviour
 
         List<CanvasGroup> lines = new List<CanvasGroup>();
         float y = -70f;
-        lines.Add(PrizeLine(card.transform, ref y, "Time played", "+" + paidTookPart + " kr"));
-        if (paidPlace > 0) lines.Add(PrizeLine(card.transform, ref y, CompetitionFlow.Ordinal(paidPlace) + " place of " + paidPlaceOf, "+" + paidForPlace + " kr"));
+        lines.Add(PrizeLine(card.transform, ref y, "Time played", "+" + MoneyLabel.Format(paidTookPart)));
+        if (paidPlace > 0) lines.Add(PrizeLine(card.transform, ref y, CompetitionFlow.Ordinal(paidPlace) + " place of " + paidPlaceOf, "+" + MoneyLabel.Format(paidForPlace)));
 
         int total = paidTookPart + paidForPlace;
         TextMeshProUGUI totalLabel = CourseUI.Text("Total label", card.transform, "Total", 24, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
         CourseUI.Place(totalLabel.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-300, 70), new Vector2(200, 60));
-        TextMeshProUGUI totalText = CourseUI.Text("Total", card.transform, "+" + total + " kr", 54, CourseUI.Accent, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+        TextMeshProUGUI totalText = CourseUI.Text("Total", card.transform, "+" + MoneyLabel.Format(total), 54, CourseUI.Accent, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
         CourseUI.Place(totalText.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28, 64), new Vector2(270, 72));
         totalText.enableWordWrapping = false;
         TextMeshProUGUI balance = CourseUI.Text("Balance", card.transform, "", 20, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.MidlineRight);
         CourseUI.Place(balance.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28, 20), new Vector2(500, 34));
         int after = Money.Instance != null ? Money.Instance.GetMoney() : 0;
-        balance.text = Money.Instance != null ? "You now have " + after + " kr" : "";
+        balance.text = Money.Instance != null ? "You now have " + MoneyLabel.Format(after) : "";
 
         if (animate && isActiveAndEnabled) prizeShow = StartCoroutine(PrizeShow(lines, totalText, total, balance, Money.Instance != null ? balanceBefore : -1, after));
     }
@@ -1040,7 +1040,7 @@ public class RouteChoiceView : MonoBehaviour
         foreach (CanvasGroup g in lines) g.alpha = 0f;
         if (totalText == null) yield break;
         totalText.text = "+0 kr";
-        if (before >= 0) balance.text = "You had " + before + " kr";
+        if (before >= 0) balance.text = "You had " + MoneyLabel.Format(before);
         yield return new WaitForSecondsRealtime(0.3f);
         // The lines slide in one by one
         foreach (CanvasGroup g in lines)
@@ -1062,12 +1062,12 @@ public class RouteChoiceView : MonoBehaviour
         for (float t = 0f; t < 1.1f; t += Time.unscaledDeltaTime)
         {
             float k = 1f - Mathf.Pow(1f - t / 1.1f, 3f);
-            totalText.text = "+" + Mathf.RoundToInt(total * k) + " kr";
-            if (before >= 0) balance.text = "You now have " + Mathf.RoundToInt(Mathf.Lerp(before, after, k)) + " kr";
+            totalText.text = "+" + MoneyLabel.Format(Mathf.RoundToInt(total * k));
+            if (before >= 0) balance.text = "You now have " + MoneyLabel.Format(Mathf.RoundToInt(Mathf.Lerp(before, after, k)));
             yield return null;
         }
-        totalText.text = "+" + total + " kr";
-        if (before >= 0) balance.text = "You now have " + after + " kr";
+        totalText.text = "+" + MoneyLabel.Format(total);
+        if (before >= 0) balance.text = "You now have " + MoneyLabel.Format(after);
         RectTransform pop = totalText.rectTransform;
         for (float t = 0f; t < 0.3f; t += Time.unscaledDeltaTime)
         {

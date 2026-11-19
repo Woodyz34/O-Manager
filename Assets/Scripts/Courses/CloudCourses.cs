@@ -51,16 +51,8 @@ public static class CloudCourses
 
     static async Task SignIn()
     {
-        if (UnityServices.State != ServicesInitializationState.Initialized)
-        {
-            InitializationOptions options = new InitializationOptions();
-            if (Application.isEditor)
-            {
-                // ParrelSync clones on the same computer would otherwise share one anonymous player (same idea as Money.Key)
-                options.SetProfile("editor" + (Animator.StringToHash(Application.dataPath) & 0x7fffffff));
-            }
-            await UnityServices.InitializeAsync(options);
-        }
+        // Shared with the usage statistics (GameAnalytics), so the services start only once
+        await GameAnalytics.EnsureServices();
         if (!AuthenticationService.Instance.IsSignedIn)
         {
             await AuthenticationService.Instance.SignInAnonymouslyAsync();

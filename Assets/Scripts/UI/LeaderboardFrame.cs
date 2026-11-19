@@ -17,6 +17,7 @@ public class LeaderboardFrame : MonoBehaviour
     float scale;
     bool hidden;
     Button toggle;
+    GameObject showTab;   // only while hidden: the small tab at the screen edge that brings it back
 
     public static void Attach(RectTransform panel)
     {
@@ -37,25 +38,44 @@ public class LeaderboardFrame : MonoBehaviour
         scale = Mathf.Clamp(PlayerPrefs.GetFloat(ScaleKey, DefaultScale), MinScale, MaxScale);
         hidden = PlayerPrefs.GetInt(HiddenKey, 0) == 1;
 
-        // The tab on the right side of the card
+        // The controls sit inside the card, in the top right corner beside the "Leaderboard" heading (2026-11-19, the
+        // user: a box of their own beside the card did not look like part of it): smaller, bigger, hide
+        RectTransform controls = CourseUI.Rect("Leaderboard controls", panel);
+        CourseUI.Place(controls, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-14f, -14f), new Vector2(3 * 36f + 2 * 6f, 36f));
+        controls.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;   // the card may have a layout of its own
+        CourseUI.Row(controls.gameObject, 6, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        Button smaller = CourseUI.Button("Smaller", controls, "-", CourseUI.ButtonKind.Light, () => Resize(-Step), 24);
+        Fixed(smaller);
+        Button bigger = CourseUI.Button("Bigger", controls, "+", CourseUI.ButtonKind.Light, () => Resize(Step), 24);
+        Fixed(bigger);
+        toggle = CourseUI.Button("Hide", controls, "<", CourseUI.ButtonKind.Secondary, Toggle, 22);
+        Fixed(toggle);
+
+        // While hidden only this tab shows, at the edge of the screen, joined to the card's right side
         Image tab = CourseUI.Panel("Leaderboard tab", panel, CourseUI.Card);
-        CourseUI.Place(tab.rectTransform, new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(2f, 0f), new Vector2(46f, 150f));
-        tab.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;   // the card may have a layout of its own
-        CourseUI.Column(tab.gameObject, 4, new RectOffset(4, 4, 4, 4));
-        toggle = CourseUI.Button("Hide", tab.transform, "<", CourseUI.ButtonKind.Secondary, () =>
-        {
-            hidden = !hidden;
-            Save();
-            Apply();
-        }, 24);
-        CourseUI.Size(toggle, 44);
-        Button bigger = CourseUI.Button("Bigger", tab.transform, "+", CourseUI.ButtonKind.Light, () => Resize(Step), 24);
-        CourseUI.Size(bigger, 44);
-        Button smaller = CourseUI.Button("Smaller", tab.transform, "-", CourseUI.ButtonKind.Light, () => Resize(-Step), 24);
-        CourseUI.Size(smaller, 44);
-        HoverTip.Add(toggle, "Hide the leaderboard in the edge of the screen, or show it again.");
+        CourseUI.Place(tab.rectTransform, new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, 0f), new Vector2(46f, 52f));
+        tab.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+        Button show = CourseUI.Button("Show", tab.transform, ">", CourseUI.ButtonKind.Secondary, Toggle, 22);
+        CourseUI.Place((RectTransform)show.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(36f, 36f));
+        showTab = tab.gameObject;
+        HoverTip.Add(show, "Show the leaderboard again.");
+        HoverTip.Add(toggle, "Hide the leaderboard in the edge of the screen.");
         HoverTip.Add(bigger, "Make the leaderboard bigger.");
         HoverTip.Add(smaller, "Make the leaderboard smaller.");
+        Apply();
+    }
+
+    static void Fixed(Button button)
+    {
+        LayoutElement size = button.gameObject.AddComponent<LayoutElement>();
+        size.minWidth = size.preferredWidth = 36f;
+        size.minHeight = size.preferredHeight = 36f;
+    }
+
+    void Toggle()
+    {
+        hidden = !hidden;
+        Save();
         Apply();
     }
 
@@ -78,7 +98,7 @@ public class LeaderboardFrame : MonoBehaviour
         if (panel == null) return;
         panel.localScale = new Vector3(scale, scale, 1f);
         panel.anchoredPosition = new Vector2(hidden ? -width * scale : 0f, panel.anchoredPosition.y);
-        if (toggle != null) CourseUI.SetButtonText(toggle, hidden ? ">" : "<");
+        if (showTab != null) showTab.SetActive(hidden);
     }
 }
 

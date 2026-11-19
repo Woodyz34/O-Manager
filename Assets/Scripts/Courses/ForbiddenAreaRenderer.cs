@@ -13,6 +13,7 @@ public class ForbiddenAreaRenderer : MonoBehaviour
     float stripeShare = 0.32f;
     float borderMeters = 3.5f;
     float boundaryMeters = 7f;      // 707: 0.7 mm, a little thinner than that at 1:15 000 so it does not hide the map
+    float bridgeHalfMeters = 7f;    // a bridge (708-style ")("): half the distance between its two side lines
 
     readonly List<GameObject> parts = new List<GameObject>();
     readonly List<LineRenderer> lines = new List<LineRenderer>();
@@ -37,6 +38,7 @@ public class ForbiddenAreaRenderer : MonoBehaviour
         stripeSpacingMeters = sprint ? 3.2f : 12f;
         borderMeters = sprint ? 1f : 3.5f;
         boundaryMeters = sprint ? 2.4f : 7f;
+        bridgeHalfMeters = sprint ? 2.2f : 7f;
     }
 
     public void Clear()
@@ -63,14 +65,15 @@ public class ForbiddenAreaRenderer : MonoBehaviour
         {
             if (area == null || !area.IsValid) continue;
             List<Vector3> corners = area.corners.ConvertAll(c => map.ToWorld(c));
-            if (area.line) AddBoundary(corners, false, Purple);
+            if (area.bridge) AddBridge(corners, false, Purple);
+            else if (area.line) AddBoundary(corners, false, Purple);
             else AddArea(corners, false, Purple);
         }
     }
 
     // The course builder: finished areas and boundary lines, the one being drawn (open), and handles on every corner
-    // when editing. badArea counts the areas first, then the lines.
-    public void DrawEditing(List<List<Vector3>> areas, List<List<Vector3>> boundaries, List<Vector3> open, bool openIsLine, bool showHandles, int badArea = -1)
+    // when editing. badArea counts the areas first, then the lines, then the bridges.
+    public void DrawEditing(List<List<Vector3>> areas, List<List<Vector3>> boundaries, List<List<Vector3>> bridges, List<Vector3> open, bool openIsLine, bool showHandles, int badArea = -1)
     {
         Clear();
         for (int a = 0; a < areas.Count; a++)
@@ -80,6 +83,13 @@ public class ForbiddenAreaRenderer : MonoBehaviour
         for (int b = 0; b < boundaries.Count; b++)
         {
             AddBoundary(boundaries[b], showHandles, areas.Count + b == badArea ? CourseRenderer.ErrorRed : Purple);
+        }
+        if (bridges != null)
+        {
+            for (int b = 0; b < bridges.Count; b++)
+            {
+                AddBridge(bridges[b], showHandles, areas.Count + boundaries.Count + b == badArea ? CourseRenderer.ErrorRed : Purple);
+            }
         }
         if (open != null && open.Count > 0)
         {
@@ -163,6 +173,83 @@ public class ForbiddenAreaRenderer : MonoBehaviour
         line.positionCount = corners.Count;
         for (int k = 0; k < corners.Count; k++) line.SetPosition(k, Flat(corners[k], -1.12f));
         if (showHandles) foreach (Vector3 corner in corners) AddHandle(corner, false);
+    }
+
+    // A bridge the runners may cross on: two thin purple lines, one on each side of the drawn line, with the ends
+    // bent outwards like the map symbol for a crossing point ")("
+    void AddBridge(List<Vector3> corners, bool showHandles, Color color)
+    {
+        if (corners.Count < 2) return;
+        float half = bridgeHalfMeters * Scale;
+        for (int side = -1; side <= 1; side += 2)
+        {
+            List<Vector3> points = new List<Vector3>();
+            for (int k = 0; k < corners.Count; k++)
+            {
+                // The side direction at a corner: the mean of the two segments' sides
+                Vector2 normal = Vector2.zero;
+                if (k > 0) normal += Vector2.Perpendicular(((Vector2)(corners[k] - corners[k - 1])).normalized);
+                if (k + 1 < corners.Count) normal += Vector2.Perpendicular(((Vector2)(corners[k + 1] - corners[k])).normalized);
+                if (normal.sqrMagnitude < 1e-6f) normal = Vector2.up;
+                normal = normal.normalized * side * half;
+                points.Add(corners[k] + (Vector3)normal);
+            }
+            // The flared ends
+            Vector3 startDir = ((Vector2)(corners[1] - corners[0])).normalized;
+            Vector3 endDir = ((Vector2)(corners[corners.Count - 1] - corners[corners.Count - 2])).normalized;
+            Vector3 startOut = (points[0] - corners[0]).normalized * half * 0.7f;
+            Vector3 endOut = (points[points.Count - 1] - corners[corners.Count - 1]).normalized * half * 0.7f;
+            points.Insert(0, points[0] - startDir * half * 0.8f + startOut);
+            points.Add(points[points.Count - 1] + endDir * half * 0.8f + endOut);
+
+            LineRenderer line = NewLine("Bridge", false, borderMeters);
+            line.startColor = line.endColor = color;
+            line.positionCount = points.Count;
+            for (int k = 0; k < points.Count; k++) line.SetPosition(k, Flat(points[k], -1.12f));
+        }
+        AddBridgePath(corners, half);
+        if (showHandles) foreach (Vector3 corner in corners) AddHandle(corner, false);
+    }
+
+    // A black dashed path down the middle of a bridge, like a path on the map, so it reads as a way across
+    // (2026-11-19, the user: a temporary bridge or logs laid over the water on a training)
+    void AddBridgePath(List<Vector3> corners, float half)
+    {
+        float dash = half * 1.1f, gap = half * 0.45f;
+        Color ink = new Color(0.1f, 0.1f, 0.1f, 1f);
+        int made = 0;
+        float carried = 0f;   // how far into the current dash or gap the last segment ended
+        bool on = true;
+        for (int k = 0; k + 1 < corners.Count && made < 200; k++)
+        {
+            Vector2 a = corners[k], b = corners[k + 1];
+            float length = Vector2.Distance(a, b);
+            if (length < 1e-5f) continue;
+            Vector2 dir = (b - a) / length;
+            float at = 0f;
+            while (at < length && made < 200)
+            {
+                float piece = (on ? dash : gap) - carried;
+                float end = Mathf.Min(length, at + piece);
+                if (on && end - at > 1e-5f)
+                {
+                    LineRenderer line = NewLine("Bridge path", false, borderMeters * 0.9f);
+                    line.startColor = line.endColor = ink;
+                    line.numCapVertices = 0;
+                    line.positionCount = 2;
+                    line.SetPosition(0, Flat(a + dir * at, -1.13f));
+                    line.SetPosition(1, Flat(a + dir * end, -1.13f));
+                    made++;
+                }
+                carried += end - at;
+                at = end;
+                if (carried >= (on ? dash : gap) - 1e-5f)
+                {
+                    carried = 0f;
+                    on = !on;
+                }
+            }
+        }
     }
 
     // A small square on a corner that can be dragged; the first corner of an area being drawn is larger,

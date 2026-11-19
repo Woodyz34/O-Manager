@@ -70,7 +70,7 @@ public static class LobbyVisit
         go.AddComponent<LobbyVisitCard>();
 
         Image card = CourseUI.CardPanel("While you wait", go.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(48, 48), new Vector2(420, 292));
+        CourseUI.Place(card.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(48, 48), new Vector2(420, 362));
         CourseUI.Column(card.gameObject, 10, new RectOffset(26, 26, 20, 24));
 
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "While you wait", 30, CourseUI.Ink, FontStyles.Bold);
@@ -86,11 +86,58 @@ public static class LobbyVisit
         HoverTip.Add(shop, "Open runner packs while you wait. You come straight back to the lobby when you leave.");
         HoverTip.Add(runners, "Look at the runner cards you own. You come straight back to the lobby when you leave.");
         HoverTip.Add(builder, "Build your own courses or import maps while you wait. You come straight back to the lobby when you leave.");
+        // The lobby chat (2026-11-19): a fourth button like the others, with a red dot for unread messages
+        Button chat = CourseUI.Button("Chat", card.transform, "Chat", CourseUI.ButtonKind.Light, LobbyChat.ToggleWindow, 24);
+        CourseUI.Size(chat, 60);
+        LobbyChat.AttachButton(chat);
+        HoverTip.Add(chat, "Chat with the others in the lobby.");
 
-        // The host's lobby settings (2026-11-19), in the top right corner under the money
-        Button settings = CourseUI.Button("Lobby settings", go.transform, "Lobby settings", CourseUI.ButtonKind.Secondary, HostSettingsPopup.Open, 24);
-        CourseUI.Place(settings.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48, -128), new Vector2(250, 58));
-        HoverTip.Add(settings, "Race speed, TV controls in relays, bears and control moves per leg. The host changes them; everyone else can look.");
+        // The lobby settings are in the Esc menu, under Settings (2026-11-19, the user: the button covered the long
+        // lobby summary at the top)
+    }
+
+    // Keeps the Lobby settings button just left of the money pill, as high and as round as it (the pill grows with
+    // the amount)
+    class BesideMoney : MonoBehaviour
+    {
+        RectTransform pill;
+        bool styled;
+
+        void LateUpdate()
+        {
+            if (pill == null)
+            {
+                foreach (MoneyLabel label in UnityEngine.Object.FindObjectsByType<MoneyLabel>(FindObjectsSortMode.None))
+                {
+                    if (label.gameObject.name == "Money pill" && label.gameObject.scene.name == LobbyScene) { pill = (RectTransform)label.transform; break; }
+                }
+                if (pill == null) return;
+            }
+            RectTransform rect = (RectTransform)transform;
+            if (!styled)
+            {
+                styled = true;
+                Image pillImage = pill.GetComponent<Image>();
+                Image mine = GetComponent<Image>();
+                if (pillImage != null && mine != null)
+                {
+                    mine.sprite = pillImage.sprite;
+                    mine.type = pillImage.type;
+                    mine.pixelsPerUnitMultiplier = pillImage.pixelsPerUnitMultiplier;
+                    mine.color = pillImage.color;
+                }
+                Shadow pillShadow = pill.GetComponent<Shadow>();
+                if (pillShadow != null && GetComponent<Shadow>() == null)
+                {
+                    Shadow shadow = gameObject.AddComponent<Shadow>();
+                    shadow.effectColor = pillShadow.effectColor;
+                    shadow.effectDistance = pillShadow.effectDistance;
+                }
+            }
+            float height = pill.rect.height > 1f ? pill.rect.height : 58f;
+            rect.sizeDelta = new Vector2(rect.sizeDelta.x, height);
+            rect.anchoredPosition = new Vector2(pill.anchoredPosition.x - pill.rect.width - 16f, pill.anchoredPosition.y);
+        }
     }
 
     // Money always sits in the top right corner, as in the main menu, so "Leave lobby" moves to the top left

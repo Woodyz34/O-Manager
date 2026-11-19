@@ -134,7 +134,8 @@ public class LobbyChat : MonoBehaviour
     {
         root = new GameObject("Lobby chat canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         root.transform.SetParent(transform, false);
-        try { root.tag = "Canvas"; } catch (UnityException) { }   // clicks here do not reach the map under it
+        // No "Canvas" tag here (2026-11-19): this canvas lives on between scenes, and the race found it by that tag and
+        // put its clock in it, so the race time stayed in the top right corner of the lobby afterwards
         Canvas canvas = root.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 150;   // above the lobby, under pop-ups (200+) and the Esc menu
@@ -145,19 +146,10 @@ public class LobbyChat : MonoBehaviour
             events.transform.SetParent(transform, false);
         }
 
-        // The button in the bottom left corner
-        Button open = CourseUI.Button("Chat button", root.transform, "Chat", CourseUI.ButtonKind.Secondary, Toggle, 24);
-        CourseUI.Place((RectTransform)open.transform, Vector2.zero, Vector2.zero, new Vector2(24, 24), new Vector2(110, 56));
-        HoverTip.Add(open, "Chat with the others in the lobby.");
-        dot = CourseUI.Panel("Unread", open.transform, CourseUI.Danger);
-        CourseUI.Place(dot.rectTransform, new Vector2(1, 1), new Vector2(0.5f, 0.5f), new Vector2(-6, -6), new Vector2(20, 20));
-        dot.raycastTarget = false;
-        dot.gameObject.SetActive(false);
-
-        // The window above it
+        // The window, beside the "While you wait" card that has the Chat button (LobbyVisit.AddButtons)
         Image card = CourseUI.CardPanel("Chat window", root.transform);
         window = card.gameObject;
-        CourseUI.Place(card.rectTransform, Vector2.zero, Vector2.zero, new Vector2(24, 92), new Vector2(480, 420));
+        CourseUI.Place(card.rectTransform, Vector2.zero, Vector2.zero, new Vector2(484, 48), new Vector2(480, 420));
 
         TextMeshProUGUI heading = CourseUI.Text("Heading", card.transform, "Chat", 28, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Place(heading.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(20, -12), new Vector2(300, 40));
@@ -180,6 +172,25 @@ public class LobbyChat : MonoBehaviour
 
         window.SetActive(false);
         dirty = true;
+    }
+
+    // The Chat button in the "While you wait" card (2026-11-19: a white button like the others there, instead of a
+    // green one of its own in the corner). It gets the red dot for unread messages.
+    public static void AttachButton(Button button)
+    {
+        if (button == null) return;
+        Image d = CourseUI.Panel("Unread", button.transform, CourseUI.Danger);
+        CourseUI.Place(d.rectTransform, new Vector2(1, 1), new Vector2(0.5f, 0.5f), new Vector2(-10, -10), new Vector2(20, 20));
+        d.raycastTarget = false;
+        d.gameObject.SetActive(unread);
+        if (instance != null) instance.dot = d;
+    }
+
+    public static void ToggleWindow()
+    {
+        if (instance == null) return;
+        if (instance.root == null && instance.ShouldShow()) instance.Build();
+        instance.Toggle();
     }
 
     void Toggle()
