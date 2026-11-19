@@ -425,18 +425,29 @@ public static class CompetitionRewards
             : "Played " + (minutes > 0 ? minutes + " min " : "") + Mathf.FloorToInt(seconds % 60f) + " s";
     }
 
-    public static int ForPlace(int place, int runners, bool finished)
+    // 50 kr for every runner beaten, and 50 more for beating everyone. A tie beats nobody (2026-11-19, the user: two
+    // players who both score 0 in the route choice game, or both stop at once, should not both get money for a win),
+    // so it is the number of runners strictly behind that counts, not the place.
+    public static int ForBeaten(int beaten, int runners, bool finished)
     {
-        if (!finished)
-        {
-            return DidNotFinish;
-        }
-        int reward = PerRunnerBeaten * Mathf.Max(0, runners - place);
-        if (place == 1 && runners >= 2)
-        {
-            reward += WinnerBonus;
-        }
+        if (!finished) return DidNotFinish;
+        beaten = Mathf.Clamp(beaten, 0, Mathf.Max(0, runners - 1));
+        int reward = PerRunnerBeaten * beaten;
+        if (runners >= 2 && beaten == runners - 1) reward += WinnerBonus;
         return reward;
+    }
+
+    // The runners strictly behind me in a race: slower, or not at the finish
+    public static int Beaten(Standing me, List<Standing> standings)
+    {
+        if (me == null || !me.finished || standings == null) return 0;
+        int beaten = 0;
+        foreach (Standing s in standings)
+        {
+            if (s == me) continue;
+            if (!s.finished || s.seconds > me.seconds) beaten++;
+        }
+        return beaten;
     }
 
     // The imposter's top places that pay nothing: the top third (1 of 3, 2 of 6, 3 of 8 or 9)
