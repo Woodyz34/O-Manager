@@ -168,10 +168,10 @@ public class MainMenuUI : MonoBehaviour
         bool canBuy = PackShop.CanBuy();
 
         if (runnersCaption != null) runnersCaption.text = owned + " of " + total + " runners collected";
-        if (shopCaption != null) shopCaption.text = price == 0 ? "Your first pack is free" : "Runner packs for " + price + " kr";
+        if (shopCaption != null) shopCaption.text = price == 0 ? "Your first pack is free" : "Runner packs for " + MoneyLabel.Format(price);
 
         if (buyButton != null) buyButton.interactable = canBuy;
-        if (buyLabel != null) buyLabel.text = price == 0 ? "Open free pack" : "Open pack   " + price + " kr";
+        if (buyLabel != null) buyLabel.text = price == 0 ? "Open free pack" : "Open pack   " + MoneyLabel.Format(price);
         if (noteText != null)
         {
             if (PackShop.AllCollected())
@@ -180,7 +180,7 @@ public class MainMenuUI : MonoBehaviour
             }
             else if (!canBuy)
             {
-                noteText.text = "You need " + (price - money) + " kr more. Compete to earn money.";
+                noteText.text = "You need " + MoneyLabel.Format(price - money) + " more. Compete to earn money.";
             }
             else if (price == 0)
             {

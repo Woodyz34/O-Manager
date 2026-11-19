@@ -779,7 +779,7 @@ public class PackOpening : MonoBehaviour
         {
             int price = PackShop.CurrentPrice();
             anotherButton.gameObject.SetActive(PackShop.CanBuy());
-            anotherLabel.text = price == 0 ? "Open free pack" : "Open another (" + price + " kr)";
+            anotherLabel.text = price == 0 ? "Open free pack" : "Open another (" + MoneyLabel.Format(price) + ")";
             ShowMoney();
         }
         yield return UIAnim.Wait(0.3f);
@@ -798,11 +798,8 @@ public class PackOpening : MonoBehaviour
         {
             Canvas canvas = GetComponentInChildren<Canvas>(true);
             if (canvas == null) return;
-            Image pill = CourseUI.Panel("Money pill", canvas.transform, CourseUI.Card);
-            if (CourseUI.Skin != null && CourseUI.Skin.pill != null) pill.sprite = CourseUI.Skin.pill;
-            CourseUI.Place(pill.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48, -40), new Vector2(220, 66));
-            TextMeshProUGUI amount = CourseUI.Text("Amount", pill.transform, "", 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
-            CourseUI.Stretch(amount.rectTransform, 12, 12, 0, 0);
+            TextMeshProUGUI amount;
+            Image pill = MoneyLabel.CreatePill(canvas.transform, new Vector2(-48, -40), out amount);
             pill.gameObject.SetActive(false);
             MoneyLabel label = pill.gameObject.AddComponent<MoneyLabel>();
             label.text = amount;

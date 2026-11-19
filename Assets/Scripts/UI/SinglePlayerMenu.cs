@@ -116,11 +116,7 @@ public class SinglePlayerMenu : MonoBehaviour
         CourseUI.Place((RectTransform)leave.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(48, -40), new Vector2(250, 66));
 
         // Top right: your money
-        Image moneyPill = CourseUI.Panel("Money pill", page, CourseUI.Card);
-        if (CourseUI.Skin != null && CourseUI.Skin.pill != null) moneyPill.sprite = CourseUI.Skin.pill;
-        CourseUI.Place(moneyPill.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48, -40), new Vector2(220, 66));
-        moneyText = CourseUI.Text("Amount", moneyPill.transform, "", 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
-        CourseUI.Stretch(moneyText.rectTransform, 12, 12, 0, 0);
+        Image moneyPill = MoneyLabel.CreatePill(page, new Vector2(-48, -40), out moneyText);
 
         // Top middle: what you will play, as in the lobby
         Image setup = CourseUI.CardPanel("Game setup card", page);
@@ -274,7 +270,7 @@ public class SinglePlayerMenu : MonoBehaviour
         if (startButton == null) return;
         CourseData course = Chosen;
         string problem = Problem();
-        string money = Money.Instance != null ? Money.Instance.GetMoney() + " kr" : "";
+        string money = Money.Instance != null ? MoneyLabel.Format(Money.Instance.GetMoney()) : "";
         string state = (course != null ? course.id + course.name : "") + "|" + pool + "|" + (int)modes + "|" + problem + "|" + starting
                        + "|" + GameModes.OwnedRunnerCount() + "|" + money;
         if (state == shownState) return;
