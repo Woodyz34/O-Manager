@@ -92,7 +92,34 @@ public class EndScreenUI : MonoBehaviour
         waitingText.text = "";
 
         lobbyButton.onClick.AddListener(CompetitionFlow.HostReturnToLobby);
-        revealNowButton.onClick.AddListener(CompetitionFlow.HostRevealImposter);
+        revealNowButton.onClick.AddListener(ConfirmRevealNow);
+    }
+
+    // The host's "reveal now" asks first (2026-11-19: the host revealed the imposter before the others had guessed,
+    // most likely by pressing this button by mistake)
+    void ConfirmRevealNow()
+    {
+        if (CompetitionFlow.RevealStarted) return;
+        int waiting = 0;
+        CompetitionFlow.TryGetImposter(out PlayerRef imposter);
+        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        {
+            if (player.Object == null || !player.Object.IsValid || player.Object.StateAuthority == imposter) continue;
+            if (!player.hasGuessedImposter) waiting++;
+        }
+        string hint = waiting == 0 ? "Everyone has guessed." : waiting == 1 ? "1 player has not guessed yet." : waiting + " players have not guessed yet.";
+        ChoicePopup.Open("Reveal the imposter now?", new[]
+        {
+            new ChoicePopup.Option
+            {
+                id = "reveal",
+                title = "Yes, reveal now",
+                description = "Nobody can guess after this. Without it the imposter is shown when everyone has guessed or the time is up."
+            }
+        }, null, id =>
+        {
+            if (id == "reveal") CompetitionFlow.HostRevealImposter();
+        }, hint);
     }
 
     void OnDestroy()

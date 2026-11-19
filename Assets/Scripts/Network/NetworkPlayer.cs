@@ -394,6 +394,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     {
         if (Object == null || !Object.IsValid || !Object.HasStateAuthority || Runner == null) return;
         RacePace.Apply(agentMovement);
+        WatchForStuckStart();
         if (Time.unscaledTime < nextSpotCheck) return;
         nextSpotCheck = Time.unscaledTime + 0.5f;
         if (ActiveScene.Name != "Lobby") return;
@@ -635,6 +636,48 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         else if (Runner.IsServer || Runner.IsSharedModeMasterClient)
         {
             Runner.LoadScene("Lobby");
+        }
+    }
+
+    // A player who never gets a runner (2026-11-19: a new player in their very first game, an Imposter round, sat on
+    // the waiting page while everyone else waited for them). Whatever stopped it, after 10 seconds without a runner
+    // and without the runner picker the picking is started again, a few times at most.
+    float stuckSince = -1f;
+    int stuckRetries;
+
+    void WatchForStuckStart()
+    {
+        if (ActiveScene.Name == "Lobby" || agentMovement == null || manager == null)
+        {
+            stuckSince = -1f;
+            stuckRetries = 0;
+            return;
+        }
+        bool stuck = agentMovement.WaitingForAllPlayersToChooseRunner && !HasChoosenRunner
+            && (manager.ChooseRunnerPanel == null || !manager.ChooseRunnerPanel.activeSelf)
+            && !RouteAnalysis.On && !RouteChoiceGame.On && !RunnerRules.OpenPacksRound && !CompetitionFlow.ResultsShown;
+        if (!stuck)
+        {
+            stuckSince = -1f;
+            return;
+        }
+        if (stuckSince < 0f)
+        {
+            stuckSince = Time.unscaledTime;
+            return;
+        }
+        if (Time.unscaledTime - stuckSince < 10f || stuckRetries >= 3) return;
+        stuckRetries++;
+        stuckSince = Time.unscaledTime;
+        string mode = GetSharedGameMode();
+        Debug.LogWarning("NetworkPlayer: no runner after 10 s, starting the picking again (" + mode + ")");
+        try
+        {
+            ShowChooseRunnerForMode(mode);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("NetworkPlayer: could not start the picking again: " + e);
         }
     }
 
