@@ -133,9 +133,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // starts (ExtraMode flags + ExtraModes.KnownBit, 0 = not set)
     [Networked] public int competitionModes { get; set; }
 
-    // Bears mode: where this player hid their bear (BearMode)
-    [Networked] public NetworkBool bearPlaced { get; set; }
-    [Networked] public Vector2 bearPosition { get; set; }
+    // Bears mode: the bears this player hid (BearMode): x and y on the map, z how big (1 = a normal bear, 2 = twice
+    // the reach after saving one on a relay leg, 0 = no bear in that place)
+    [Networked, Capacity(BearMode.MaxBears)] public NetworkArray<Vector3> bears => default;
 
     // Move a control mode: the control this player moved and where to (MoveControlMode)
     [Networked] public NetworkBool moveUsed { get; set; }
@@ -170,8 +170,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         choiceQuestions = 0;
         choiceDone = false;
         for (int i = 0; i < choiceLegs.Length; i++) choiceLegs.Set(i, 0);
-        bearPlaced = false;
-        bearPosition = Vector2.zero;
+        for (int i = 0; i < bears.Length; i++) bears.Set(i, Vector3.zero);
         moveUsed = false;
         moveControl = -1;
         moveTarget = Vector2.zero;
@@ -179,9 +178,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     // Sent by a runner who got scared by someone's bear: everyone sees it
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    public void RPC_BearScare(PlayerRef owner, Vector2 where)
+    public void RPC_BearScare(PlayerRef owner, int slot, Vector2 where)
     {
-        BearMode.OnScare(owner, where, this);
+        BearMode.OnScare(owner, slot, where, this);
     }
 
     // Relays: where this team's runner is, so the other runners can run behind it or hang on to it (PackRunning)

@@ -14,31 +14,93 @@ using UnityEngine;
 // Each player's runner checks the bears itself (BearWatcher); the bears' places are shared on the owners' NetworkPlayers.
 public static class BearMode
 {
-    public const float FindMeters = 45f;            // a runner this close finds the bear
-    public const float AvoidMeters = 70f;           // the detour keeps about this far away from it
+    // 2026-11-19: half the reach it had (a runner got scared from the path below the bear), and a bigger bear for
+    // every bear saved on a relay (size 2 = twice the reach)
+    public const float FindMeters = 22.5f;          // a runner this close finds a normal bear
+    public const float AvoidMeters = 40f;           // the detour keeps about this far away from it
     public const float MinFromControlMeters = 90f;  // bears are not hidden on top of the controls
     public const float ScareSeconds = 1.0f;         // how long a scared runner stands still (real seconds)
-    public const float SizeMeters = 70f;            // how big the bear is drawn on the map
+    public const float SizeMeters = 70f;            // how big a normal bear is drawn on the map
+    public const float CooldownGameSeconds = 30f;   // the same bear can scare the same runner again after this
+    public const int MaxBears = 3;                  // bears per player and leg at most (the host picks 1-3)
+    public const float BiggestBear = 8f;
 
     static float U => MapDefinition.WorldUnitsPerMeter;
 
-    // Relays too since 2026-11-16: one bear per player and leg; it stays on that leg only (RelayRace.StartLeg takes it away)
+    // Relays too since 2026-11-16: bears per player and leg; they stay on that leg only (RelayRace.StartLeg takes them away)
     public static bool On => ExtraModes.Is(ExtraMode.Bears);
 
-    static readonly HashSet<PlayerRef> found = new HashSet<PlayerRef>();
+    // A bear: its owner and its place in the owner's list
+    public static int Key(PlayerRef owner, int slot) => owner.PlayerId * MaxBears + slot;
+
+    static readonly HashSet<int> found = new HashSet<int>();
+    // Relays: bears not hidden on the legs before, saved up for a bigger bear (local player)
+    static int saved;
+    // The stage each of the local player's bears was hidden on: it can be moved until that stage starts
+    static readonly Dictionary<int, int> hiddenOn = new Dictionary<int, int>();
 
     public static void Reset()
     {
         found.Clear();
+        saved = 0;
+        hiddenOn.Clear();
     }
 
-    public static bool IsFound(PlayerRef owner) => found.Contains(owner);
+    public static bool IsFound(int key) => found.Contains(key);
 
-    // A bear taken away or hidden somewhere new (next relay leg): it has to be found again
-    public static void Forget(PlayerRef owner) => found.Remove(owner);
+    // A bear taken away or hidden somewhere new (next relay leg, dragged): it has to be found again
+    public static void Forget(int key) => found.Remove(key);
+
+    // ---- Sizes ----
+
+    public static float FindRadiusMeters(float size) => FindMeters * Mathf.Max(1f, size);
+    public static float AvoidRadiusMeters(float size) => AvoidMeters * Mathf.Max(1f, size);
+    public static float DrawnMeters(float size) => SizeMeters * Mathf.Pow(Mathf.Max(1f, size), 0.6f);
+    // Controls keep clear of the bear's reach
+    public static float KeepFromControlMeters(float size) => Mathf.Max(MinFromControlMeters, FindRadiusMeters(size) + 30f);
+    // The size the local player's next bear gets
+    public static float NextSize => Mathf.Min(BiggestBear, 1f + saved);
+    public static int Saved => saved;
+
+    // ---- The local player's bears ----
+
+    public static int Placed(NetworkPlayer player)
+    {
+        int count = 0;
+        if (player == null) return 0;
+        for (int i = 0; i < MaxBears; i++) if (player.bears[i].z > 0f) count++;
+        return count;
+    }
+
+    // How many more bears the local player may hide now (the host's "bears per player and leg")
+    public static int Left(NetworkPlayer player) => Mathf.Max(0, Mathf.Min(MaxBears, HostSettings.BearsPerLeg) - Placed(player));
+
+    // A relay leg or an individual race's stretch: bears can be moved while it is drawn
+    static int Stage(AgentMovement agent)
+    {
+        if (RelayRace.Active != null) return RelayRace.CurrentLegIndex;
+        return 1000 + (agent != null ? agent.currentKontroll : 0);
+    }
+
+    // Can the local player drag this bear now? Only on the stage it was hidden on, until that stage starts running
+    // (2026-11-19: it used to be stuck where it was first put)
+    public static bool Movable(NetworkPlayer local, AgentMovement agent, int slot)
+    {
+        if (local == null || agent == null || agent.manualPathDrawer == null || local.bears[slot].z <= 0f) return false;
+        if (!hiddenOn.TryGetValue(slot, out int stage) || stage != Stage(agent)) return false;
+        return agent.manualPathDrawer.timeToDraw || agent.WaitingForAllPlayersToDraw;
+    }
+
+    // A new relay leg: the last leg's bears go, the ones not hidden are saved for a bigger bear
+    public static void NewLeg(NetworkPlayer np, int legIndex)
+    {
+        if (legIndex > 0 && On) saved += Left(np);
+        for (int i = 0; i < MaxBears; i++) np.bears.Set(i, Vector3.zero);
+        hiddenOn.Clear();
+    }
 
     // Why a bear cannot be hidden here, or null when it can
-    public static string PlaceProblem(Vector3 world, PathfindingManager manager)
+    public static string PlaceProblem(Vector3 world, PathfindingManager manager, float size = 1f)
     {
         if (manager == null || manager.speedGrid2D == null) return "The map is not ready yet.";
         int rows = manager.speedGrid2D.GetLength(0);
@@ -49,11 +111,12 @@ public static class BearMode
         {
             return "The bear has to be on the map.";
         }
+        float keep = KeepFromControlMeters(size);
         foreach (Transform point in manager.controlPoints)
         {
-            if (point != null && Vector2.Distance(point.position, world) < MinFromControlMeters * U)
+            if (point != null && Vector2.Distance(point.position, world) < keep * U)
             {
-                return "Too close to a control. Hide the bear at least " + Mathf.RoundToInt(MinFromControlMeters) + " m from the controls.";
+                return "Too close to a control. Hide the bear at least " + Mathf.RoundToInt(keep) + " m from the controls.";
             }
         }
         return null;
@@ -61,14 +124,29 @@ public static class BearMode
 
     public static void Place(NetworkPlayer local, Vector3 world)
     {
-        local.bearPosition = new Vector2(world.x, world.y);
-        local.bearPlaced = true;
+        AgentMovement agent = local.agentMovement;
+        for (int i = 0; i < MaxBears; i++)
+        {
+            if (local.bears[i].z > 0f) continue;
+            local.bears.Set(i, new Vector3(world.x, world.y, NextSize));
+            saved = 0;
+            hiddenOn[i] = Stage(agent);
+            return;
+        }
+    }
+
+    // Dragged somewhere else while drawing
+    public static void Move(NetworkPlayer local, int slot, Vector3 world)
+    {
+        Vector3 bear = local.bears[slot];
+        if (bear.z <= 0f) return;
+        local.bears.Set(slot, new Vector3(world.x, world.y, bear.z));
     }
 
     // Received by everyone when a runner got scared by a bear
-    public static void OnScare(PlayerRef owner, Vector2 where, NetworkPlayer scared)
+    public static void OnScare(PlayerRef owner, int slot, Vector2 where, NetworkPlayer scared)
     {
-        bool first = found.Add(owner);
+        bool first = found.Add(Key(owner, slot));
         NetworkPlayer ownerPlayer = CompetitionFlow.FindPlayer(owner);
         bool ownerIsMe = ownerPlayer != null && ownerPlayer.Object != null && ownerPlayer.Object.HasStateAuthority;
         bool scaredIsMe = scared != null && scared.Object != null && scared.Object.HasStateAuthority;
@@ -80,7 +158,7 @@ public static class BearMode
 
         if (BearWatcher.Instance != null)
         {
-            BearWatcher.Instance.PlayRoar(owner, where, first);
+            BearWatcher.Instance.PlayRoar(Key(owner, slot), where, first);
         }
         if (first)
         {
@@ -179,8 +257,10 @@ public class BearWatcher : MonoBehaviour
         public bool popped;
     }
 
-    readonly Dictionary<PlayerRef, View> views = new Dictionary<PlayerRef, View>();
-    readonly HashSet<PlayerRef> scaredBy = new HashSet<PlayerRef>();
+    readonly Dictionary<int, View> views = new Dictionary<int, View>();
+    // When each bear last scared the local runner (Time.time): it can scare it again after a cooldown (2026-11-19:
+    // a runner scared once could run straight into the same bear later)
+    readonly Dictionary<int, float> scaredAt = new Dictionary<int, float>();
     float nextSync;
     bool scaring;
 
@@ -227,9 +307,9 @@ public class BearWatcher : MonoBehaviour
         }
     }
 
-    readonly Dictionary<PlayerRef, Vector2> lastPlace = new Dictionary<PlayerRef, Vector2>();
+    readonly Dictionary<int, Vector3> lastPlace = new Dictionary<int, Vector3>();
 
-    // Your own bear is shown faded; someone else's only once it has been found.
+    // Your own bears are shown faded; someone else's only once found.
     // Relays: a bear taken away at a new leg is hidden, and a bear hidden somewhere new is unfound and can scare again.
     void SyncViews()
     {
@@ -237,35 +317,53 @@ public class BearWatcher : MonoBehaviour
         {
             if (player.Object == null || !player.Object.IsValid) continue;
             PlayerRef owner = player.Object.StateAuthority;
-            bool moved = !player.bearPlaced || !lastPlace.TryGetValue(owner, out Vector2 was) || was != player.bearPosition;
-            if (moved && lastPlace.ContainsKey(owner))
-            {
-                lastPlace.Remove(owner);
-                BearMode.Forget(owner);
-                scaredBy.Remove(owner);
-                if (views.TryGetValue(owner, out View old) && old.root != null) old.root.SetActive(false);
-            }
-            if (!player.bearPlaced) continue;
-            lastPlace[owner] = player.bearPosition;
             bool mine = player.Object.HasStateAuthority;
-            bool found = BearMode.IsFound(owner);
-            if (!mine && !found) continue;
-            View view = GetView(owner);
-            Vector2 at = player.bearPosition;
-            view.root.transform.position = new Vector3(at.x, at.y, -1.4f);
-            if (!view.root.activeSelf) view.root.SetActive(true);
-            Color color = Color.white;
-            color.a = found ? 1f : 0.55f;
-            if (!view.popped) view.sprite.color = color;
-            view.label.text = mine ? "Your bear" : ExtraModes.HideOwners ? "A bear" : BearMode.Name(player) + "'s bear";
+            for (int slot = 0; slot < BearMode.MaxBears; slot++)
+            {
+                int key = BearMode.Key(owner, slot);
+                Vector3 bear = player.bears[slot];
+                bool placed = bear.z > 0f;
+                bool moved = !placed || !lastPlace.TryGetValue(key, out Vector3 was) || was != bear;
+                if (moved && lastPlace.ContainsKey(key))
+                {
+                    lastPlace.Remove(key);
+                    // Your own bear dragged a little while drawing is still the same bear; anything else is a new one
+                    if (!placed || !mine)
+                    {
+                        BearMode.Forget(key);
+                        scaredAt.Remove(key);
+                    }
+                    if (views.TryGetValue(key, out View old) && old.root != null && (!placed || !mine)) old.root.SetActive(false);
+                }
+                if (!placed) continue;
+                lastPlace[key] = bear;
+                bool found = BearMode.IsFound(key);
+                if (!mine && !found) continue;
+                View view = GetView(key);
+                view.root.transform.position = new Vector3(bear.x, bear.y, -1.4f);
+                view.root.transform.localScale = Vector3.one * BearMode.DrawnMeters(bear.z) * U;
+                if (!view.root.activeSelf) view.root.SetActive(true);
+                Color color = Color.white;
+                color.a = found ? 1f : 0.55f;
+                if (!view.popped) view.sprite.color = color;
+                string size = bear.z > 1.01f ? " (" + Mathf.RoundToInt(bear.z) + "x)" : "";
+                view.label.text = (mine ? "Your bear" : ExtraModes.HideOwners ? "A bear" : BearMode.Name(player) + "'s bear") + size;
+            }
         }
     }
 
-    View GetView(PlayerRef owner)
+    // The local player's own bear moves at once while it is dragged, not only at the next sync
+    public void ShowOwnAt(int key, Vector3 bear)
     {
-        if (views.TryGetValue(owner, out View view) && view.root != null) return view;
+        if (!views.TryGetValue(key, out View view) || view.root == null) return;
+        view.root.transform.position = new Vector3(bear.x, bear.y, -1.4f);
+    }
+
+    View GetView(int key)
+    {
+        if (views.TryGetValue(key, out View view) && view.root != null) return view;
         view = new View();
-        view.root = new GameObject("Bear " + owner.PlayerId);
+        view.root = new GameObject("Bear " + key);
         GameObject art = new GameObject("Picture");
         art.transform.SetParent(view.root.transform, false);
         view.sprite = art.AddComponent<SpriteRenderer>();
@@ -286,14 +384,14 @@ public class BearWatcher : MonoBehaviour
         view.label.outlineWidth = 0.2f;
         view.label.outlineColor = new Color32(255, 255, 255, 200);
         view.label.sortingOrder = 31;
-        views[owner] = view;
+        views[key] = view;
         return view;
     }
 
     // Everyone: the bear jumps up and roars where it stands
-    public void PlayRoar(PlayerRef owner, Vector2 where, bool first)
+    public void PlayRoar(int key, Vector2 where, bool first)
     {
-        View view = GetView(owner);
+        View view = GetView(key);
         view.root.transform.position = new Vector3(where.x, where.y, -1.4f);
         view.root.SetActive(true);
         StartCoroutine(Pop(view, first));
@@ -352,35 +450,43 @@ public class BearWatcher : MonoBehaviour
         if (local == null || local.Object == null || !local.Object.HasStateAuthority) return;
         AgentMovement agent = local.agentMovement;
         if (agent == null || agent.pathfindingManager == null || agent.manualPathDrawer == null) return;
-        // Only while actually running a stretch, and not in the middle of a mistake
+        // Only while actually running a stretch. Also in the middle of a mistake (2026-11-19: a lost runner ran
+        // straight through a bear); then it only stands still a moment, the mistake keeps its own way.
         if (!agent.canRunNextSegment || agent.hasFinished || agent.WaitingForAllPlayersToDraw || agent.WaitingForAllPlayersToReachKontroll
-            || agent.manualPathDrawer.timeToDraw || agent.manualPathDrawer.isDrawing || agent.IsMissing || agent.modeHold
+            || agent.manualPathDrawer.timeToDraw || agent.manualPathDrawer.isDrawing || agent.modeHold || agent.relayHold
             || agent.path == null || agent.path.Count == 0 || CompetitionFlow.ResultsShown)
         {
             return;
         }
         Vector3 me = agent.transform.position;
+        float cooldown = BearMode.CooldownGameSeconds / PackRunning.GameSecondsPerSecond;
         foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player.Object == null || !player.Object.IsValid || !player.bearPlaced) continue;
+            if (player.Object == null || !player.Object.IsValid) continue;
             PlayerRef owner = player.Object.StateAuthority;
-            if (scaredBy.Contains(owner)) continue;
-            Vector2 bear = player.bearPosition;
-            if (Vector2.Distance(me, bear) <= BearMode.FindMeters * U)
+            for (int slot = 0; slot < BearMode.MaxBears; slot++)
             {
-                StartCoroutine(Scare(local, agent, owner, bear));
-                return;
+                Vector3 bear = player.bears[slot];
+                if (bear.z <= 0f) continue;
+                int key = BearMode.Key(owner, slot);
+                if (scaredAt.TryGetValue(key, out float at) && Time.time - at < cooldown) continue;
+                if (Vector2.Distance(me, bear) <= BearMode.FindRadiusMeters(bear.z) * U)
+                {
+                    StartCoroutine(Scare(local, agent, owner, slot, bear));
+                    return;
+                }
             }
         }
     }
 
-    IEnumerator Scare(NetworkPlayer local, AgentMovement agent, PlayerRef owner, Vector2 bear)
+    IEnumerator Scare(NetworkPlayer local, AgentMovement agent, PlayerRef owner, int slot, Vector3 bear)
     {
         scaring = true;
-        scaredBy.Add(owner);
+        scaredAt[BearMode.Key(owner, slot)] = Time.time;
+        bool lost = agent.IsMissing;
         agent.modeHold = true;
         agent.currentSpeed = 0f;
-        local.RPC_BearScare(owner, bear);
+        local.RPC_BearScare(owner, slot, (Vector2)bear);
 
         // "!" over the runner
         TextMeshPro shout = new GameObject("Scared").AddComponent<TextMeshPro>();
@@ -401,7 +507,7 @@ public class BearWatcher : MonoBehaviour
         Vector2Int start = agent.WorldToGridPositionCentered(agent.transform.position);
         Vector2Int bearCell = agent.WorldToGridPositionCentered(new Vector3(bear.x, bear.y, 0f));
         Vector2Int controlCell = agent.WorldToGridPositionCentered(manager.controlPoints[segmentControl].position);
-        float avoidCells = BearMode.AvoidMeters * U / manager.cellSize;
+        float avoidCells = BearMode.AvoidRadiusMeters(bear.z) * U / manager.cellSize;
         float[,] speed = manager.speedGrid2D;
         Dictionary<string, float[,]> slopes = manager.slopeFactors;
         Task<List<Vector2Int>> task = Task.Run(() => BearMode.Detour(speed, slopes, path, from, start, bearCell, avoidCells, controlCell));
@@ -422,7 +528,7 @@ public class BearWatcher : MonoBehaviour
 
         List<Vector2Int> detour = task.IsCompleted && !task.IsFaulted ? task.Result : null;
         if (task.IsFaulted) Debug.LogWarning("Bear detour failed: " + task.Exception);
-        if (detour != null && detour.Count > 0 && agent != null && agent.currentKontroll == segmentControl && !agent.hasFinished)
+        if (detour != null && detour.Count > 0 && agent != null && agent.currentKontroll == segmentControl && !agent.hasFinished && !lost && !agent.IsMissing)
         {
             agent.Initialize(detour);
         }

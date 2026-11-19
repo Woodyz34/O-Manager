@@ -97,9 +97,18 @@ public static class MoveControlMode
         if (manager.speedGrid2D[cell.y, cell.x] <= 0.01f) return "Nobody can get there. Put the control on ground you can run on.";
         // Not onto your own bear (2026-11-15). Where the others hid theirs nobody knows, so that can still happen.
         NetworkPlayer own = agent.GetComponent<NetworkPlayer>();
-        if (own != null && own.bearPlaced && Vector2.Distance(own.bearPosition, (Vector2)world) < BearMode.MinFromControlMeters * U)
+        if (own != null)
         {
-            return "Too close to your bear. Put the control at least " + Mathf.RoundToInt(BearMode.MinFromControlMeters) + " m from it.";
+            for (int slot = 0; slot < BearMode.MaxBears; slot++)
+            {
+                Vector3 bear = own.bears[slot];
+                if (bear.z <= 0f) continue;
+                float keep = BearMode.KeepFromControlMeters(bear.z);
+                if (Vector2.Distance((Vector2)bear, (Vector2)world) < keep * U)
+                {
+                    return "Too close to your bear. Put the control at least " + Mathf.RoundToInt(keep) + " m from it.";
+                }
+            }
         }
         return null;
     }
