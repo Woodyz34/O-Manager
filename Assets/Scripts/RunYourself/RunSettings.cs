@@ -9,8 +9,8 @@ public static class RunSettings
 {
     public enum Quality { Low = 0, Medium = 1, High = 2 }
 
-    const string QualityKey = "RunYourself.Quality", SpeedKey = "RunYourself.GameSpeed", WomanKey = "RunYourself.Woman",
-        MouseKey = "RunYourself.Mouse";
+    const string QualityKey = "RunYourself.Quality", SpeedKey = "RunYourself.Speed", WomanKey = "RunYourself.Woman",
+        MouseKey = "RunYourself.Mouse", HandKey = "RunYourself.RightHand";
 
     public static Quality Level
     {
@@ -18,13 +18,13 @@ public static class RunSettings
         set => PlayerPrefs.SetInt(LocalPrefs.Key(QualityKey), (int)value);
     }
 
-    // How many times quicker than real life the runner moves and the race clock runs (2026-11-19: Anders wants it
-    // quicker than real life, "3 or 4 times", to be tried out). The race time shown is still the real-life time.
-    public static readonly float[] Speeds = { 2f, 3f, 4f };
+    // How many times quicker than real life the runner moves and the race clock runs. The race time shown is still
+    // the real-life time. 2026-11-19, after the first test: 3 times was too slow; 3, 4 and 5, with 4 to start with.
+    public static readonly float[] Speeds = { 3f, 4f, 5f };
 
     public static float GameSpeed
     {
-        get => Mathf.Clamp(PlayerPrefs.GetFloat(LocalPrefs.Key(SpeedKey), 3f), 1f, 6f);
+        get => Mathf.Clamp(PlayerPrefs.GetFloat(LocalPrefs.Key(SpeedKey), 4f), 1f, 6f);
         set => PlayerPrefs.SetFloat(LocalPrefs.Key(SpeedKey), value);
     }
 
@@ -32,6 +32,13 @@ public static class RunSettings
     {
         get => PlayerPrefs.GetInt(LocalPrefs.Key(WomanKey), 0) == 1;
         set => PlayerPrefs.SetInt(LocalPrefs.Key(WomanKey), value ? 1 : 0);
+    }
+
+    // Which hand holds the map (and the thumb compass). Most hold it in the left hand.
+    public static bool RightHand
+    {
+        get => PlayerPrefs.GetInt(LocalPrefs.Key(HandKey), 0) == 1;
+        set => PlayerPrefs.SetInt(LocalPrefs.Key(HandKey), value ? 1 : 0);
     }
 
     // Degrees the head turns per unit of mouse movement
@@ -96,7 +103,7 @@ public static class RunSettings
         Image dim = CourseUI.Panel("Dim", open.transform, new Color(0f, 0f, 0f, 0.45f), false);
         CourseUI.Stretch(dim.rectTransform);
         Image card = CourseUI.CardPanel("Card", open.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860, 720));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860, 860));
         card.gameObject.AddComponent<ClickCatcher>();
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "3D settings", 40, CourseUI.Ink, FontStyles.Bold);
@@ -106,12 +113,14 @@ public static class RunSettings
 
         Chips(card.transform, "Graphics", new[] { "Low", "Medium", "High" }, (int)Level, i => { Level = (Quality)i; changed?.Invoke(); },
             "Low: shorter view, no shadows, little undergrowth. For weak computers. High: long view and soft shadows.");
-        int speedIndex = 1;
+        int speedIndex = 1;   // 4 x
         for (int i = 0; i < Speeds.Length; i++) if (Mathf.Approximately(Speeds[i], GameSpeed)) speedIndex = i;
-        Chips(card.transform, "Game speed", new[] { "2 x real life", "3 x real life", "4 x real life" }, speedIndex, i => { GameSpeed = Speeds[i]; changed?.Invoke(); },
+        Chips(card.transform, "Game speed", new[] { "3 x real life", "4 x real life", "5 x real life" }, speedIndex, i => { GameSpeed = Speeds[i]; changed?.Invoke(); },
             "How much quicker than real life you run. The race time shown is still the real-life time.");
         Chips(card.transform, "Your runner", new[] { "Man", "Woman" }, Woman ? 1 : 0, i => { Woman = i == 1; changed?.Invoke(); },
             "Your breathing and your groans when you fall.");
+        Chips(card.transform, "Map hand", new[] { "Left hand", "Right hand" }, RightHand ? 1 : 0, i => { RightHand = i == 1; changed?.Invoke(); },
+            "The hand that holds the map and the thumb compass.");
 
         TextMeshProUGUI mouseLabel = CourseUI.Text("Mouse label", card.transform, "Mouse speed", 24, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(mouseLabel, 32);
@@ -120,6 +129,8 @@ public static class RunSettings
 
         Button done = CourseUI.Button("Done", card.transform, "Done", CourseUI.ButtonKind.Primary, () => Object.Destroy(open), 24);
         CourseUI.Size(done, 58);
+        TextMeshProUGUI credit = CourseUI.Text("Credit", card.transform, RunSounds.Credit, 15, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
+        CourseUI.Size(credit, 22);
     }
 
     static void Chips(Transform parent, string label, string[] names, int chosen, System.Action<int> pick, string tip)

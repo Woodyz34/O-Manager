@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using MapImport;
 
@@ -682,7 +682,8 @@ public class TvWorldBuilder
         {
             float d = pair.Value.d, side = pair.Value.side;
             if (side <= -0.5f) continue;
-            F[pair.Key] -= drop * Sm(-0.5f, 0.9f, side) * (1f - Sm(1.2f, 10f, d));
+            // A rock cliff drops at once (a vertical face is built on it, CliffFaces); an earth bank slopes
+            F[pair.Key] -= drop * (rocky ? Sm(-0.25f, 0.45f, side) : Sm(-0.5f, 0.9f, side)) * (1f - Sm(1.2f, 10f, d));
             float face = Sm(-0.8f, 0.2f, side) * (1f - Sm(1.3f, 2.6f, d));
             if (rocky) rock[pair.Key] = Math.Max(rock[pair.Key], face);
             else soil[pair.Key] = Math.Max(soil[pair.Key], face * 0.8f);
@@ -1248,6 +1249,59 @@ public class TvWorldBuilder
                 {
                     float f = t / len, d = Rr(1.4f, 3.4f);
                     AddRock(Lerp(c[q], c[q + 2], f) + cliff.dx * d, Lerp(c[q + 1], c[q + 3], f) + cliff.dz * d, Rr(0.2f, 0.6f), 0.08f, false, Rr(0.8f, 1f));
+                }
+            }
+        }
+        CliffFaces();
+    }
+
+    // A rock cliff stands straight up (2026-11-19, Anders: a cliff is a wall, not a slope): a rough vertical face along
+    // the line, from the ground on the high side down to the foot on the low side, jagged a little along its length
+    void CliffFaces()
+    {
+        foreach (var cliff in cliffs)
+        {
+            float[] c = cliff.xz;
+            for (int q = 0; q + 3 < c.Length; q += 2)
+            {
+                float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
+                float sx = bx - ax, sz = bz - az, len = (float)Math.Sqrt(sx * sx + sz * sz);
+                if (len < 0.05f) continue;
+                if (!Inside((ax + bx) / 2f, (az + bz) / 2f, chunk ? 0f : 2f)) continue;
+                // The low side, as the drop was made
+                float nx = -sz / len, nz = sx / len;
+                if (nx * cliff.dx + nz * cliff.dz < 0f) { nx = -nx; nz = -nz; }
+                int steps = Math.Max(1, (int)Math.Ceiling(len / 0.7f));
+                int first = -1;
+                for (int k = 0; k <= steps; k++)
+                {
+                    float f = k / (float)steps, px = ax + sx * f, pz = az + sz * f;
+                    float jag = (TvRandom.Noise((px + ox) * 1.7f, (pz + oz) * 1.7f) - 0.5f) * 0.35f;
+                    float fx = px + nx * (0.15f + jag), fz = pz + nz * (0.15f + jag);
+                    float top = H(px - nx * 0.7f, pz - nz * 0.7f) + 0.1f, foot = H(px + nx * 1.1f, pz + nz * 1.1f) - 0.35f;
+                    if (top < foot + 0.5f) top = foot + 0.5f;
+                    float lean = (TvRandom.Noise((px + ox) * 0.9f + 7f, (pz + oz) * 0.9f) - 0.5f) * 0.5f;
+                    TvColor face = (TvRandom.Noise((px + ox) * 0.5f, (pz + oz) * 0.5f + 3f) > 0.5f) ? Rock : RockDark;
+                    int v0 = rockMesh.Vertex(fx - nx * 0.12f, top, fz - nz * 0.12f, nx + lean * nz, 0.15f, nz - lean * nx, face);
+                    rockMesh.Vertex(fx + nx * 0.05f, foot, fz + nz * 0.05f, nx + lean * nz, 0.05f, nz - lean * nx, face);
+                    if (k > 0)
+                    {
+                        int a = first, b = first + 1, cc = v0, d = v0 + 1;   // a, cc: tops; b, d: feet
+                        // Front faces must run clockwise seen from the low side
+                        float ux = fx - (rockMesh.positions[a * 3]), uz = fz - (rockMesh.positions[a * 3 + 2]);
+                        bool flip = (ux * nz - uz * nx) < 0f;
+                        if (flip)
+                        {
+                            rockMesh.triangles.Add(a); rockMesh.triangles.Add(cc); rockMesh.triangles.Add(b);
+                            rockMesh.triangles.Add(cc); rockMesh.triangles.Add(d); rockMesh.triangles.Add(b);
+                        }
+                        else
+                        {
+                            rockMesh.triangles.Add(a); rockMesh.triangles.Add(b); rockMesh.triangles.Add(cc);
+                            rockMesh.triangles.Add(cc); rockMesh.triangles.Add(b); rockMesh.triangles.Add(d);
+                        }
+                    }
+                    first = v0;
                 }
             }
         }

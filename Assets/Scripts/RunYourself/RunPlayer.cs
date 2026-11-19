@@ -70,7 +70,7 @@ public class RunPlayer : MonoBehaviour
         p.cam.backgroundColor = RunWorld.SkyColor;
         p.cam.nearClipPlane = 0.12f;
         p.cam.farClipPlane = world.ViewDistance + 20f;
-        p.cam.fieldOfView = 72f;
+        p.cam.fieldOfView = 62f;
         p.cam.depth = 5;
         p.cam.allowHDR = false;
         p.cam.allowMSAA = world.Msaa > 1;
@@ -124,16 +124,16 @@ public class RunPlayer : MonoBehaviour
             moveDirZ = Mathf.Cos(a);
         }
 
-        // The slope the way the runner goes
-        float y1 = world.GroundY(e + moveDirX * 1.5, n + moveDirZ * 1.5), y0 = world.GroundY(e - moveDirX * 1.5, n - moveDirZ * 1.5);
-        gradient = Mathf.Clamp((y1 - y0) / 3f, -1.5f, 1.5f);
+        // The slope the way the runner goes, over 6 m so bumps and the steps of cliffs don't count
+        float y1 = world.GroundY(e + moveDirX * 3.0, n + moveDirZ * 3.0), y0 = world.GroundY(e - moveDirX * 3.0, n - moveDirZ * 3.0);
+        gradient = Mathf.Lerp(gradient, Mathf.Clamp((y1 - y0) / 6f, -1.2f, 1.2f), 0.25f);
 
         float target = 0f;
         if (wish)
         {
             float dirFactor = fwd > 0 ? (side != 0 ? 0.95f : 1f) : fwd < 0 ? 0.45f : 0.6f;
             bool jog = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-            target = ForestSpeed * ground.speed * TerrainSpeedModel.Factor(gradient, ground.speed) * dirFactor
+            target = ForestSpeed * ground.speed * SlopeFactor(gradient, ground.rough) * dirFactor
                      * (jog ? 0.55f : 1f) * (mapUp ? 0.9f : 1f);
             if (stumbleTimer > 0f) target *= 0.4f;
         }
@@ -149,8 +149,24 @@ public class RunPlayer : MonoBehaviour
         for (int i = 0; i < parts && !Fallen; i++)
         {
             double ne = e + moveDirX * step, nn = n + moveDirZ * step;
-            if (terrain.Crosses(e, n, ne, nn, out float hurdle, out bool wall))
+            if (terrain.Crosses(e, n, ne, nn, out float hurdle, out bool wall, out bool smallCliff))
             {
+                if (smallCliff)
+                {
+                    // Down a small cliff: a jump down and a hard landing. Up it: no way.
+                    float drop = world.GroundY(e, n) - world.GroundY(ne + moveDirX * 0.8, nn + moveDirZ * 0.8);
+                    if (drop > 0.6f)
+                    {
+                        Jolt += 1.4f;
+                        speed *= 0.6f;
+                        sounds.Land(ground.surface);
+                    }
+                    else
+                    {
+                        speed *= 0.3f;
+                        break;
+                    }
+                }
                 if (wall)
                 {
                     speed *= 0.3f;
@@ -191,6 +207,19 @@ public class RunPlayer : MonoBehaviour
         }
     }
 
+    // Speed compared with flat ground on a slope (positive = uphill). Uphill from the energy it costs (Minetti); downhill
+    // a little quicker on a gentle slope, then slower the steeper it is, more so in rough ground, but never a crawl:
+    // a steep clear-cut slope downhill is still run at more than half speed (2026-11-19, Anders' test).
+    public static float SlopeFactor(float gradient, float rough)
+    {
+        if (gradient >= 0f) return Mathf.Max(0.3f, TerrainSpeedModel.EnergyCost(0f) / TerrainSpeedModel.EnergyCost(Mathf.Min(gradient, 0.45f)));
+        float down = -gradient;
+        if (down <= 0.08f) return 1f + down;                              // up to 8 % quicker
+        if (down <= 0.18f) return 1.08f - (down - 0.08f) * 0.8f;          // back to flat speed at 18 %
+        float steep = (down - 0.18f) * (1.1f + 0.5f * Mathf.Max(0f, rough - 1f));
+        return Mathf.Max(0.45f, 1f - steep);
+    }
+
     void Vertical(float dt)
     {
         if (controlsOn && !Fallen && !airborne && !EscMenu.IsOpen && Input.GetKeyDown(KeyCode.Space))
@@ -206,7 +235,7 @@ public class RunPlayer : MonoBehaviour
             jumpY = 0f;
             airborne = false;
             Jolt += 0.7f;
-            sounds.Footstep(ground.surface, 1f);
+            sounds.Land(ground.surface);
         }
     }
 
@@ -271,7 +300,7 @@ public class RunPlayer : MonoBehaviour
         float moving = speed > 0.3f ? 1f : 0f;
         float effortTarget = 0.18f + moving * (0.3f + 0.45f * sf + 2.5f * Mathf.Max(0f, gradient)) + 0.3f * fatigue;
         Effort = Mathf.MoveTowards(Effort, Mathf.Clamp01(effortTarget), dt * (effortTarget > Effort ? 0.25f : 0.08f));
-        if (controlsOn || raceSeconds > 0f) sounds.Breathe(Effort);
+        if (controlsOn || raceSeconds > 0f) sounds.Breathe(Effort, !airborne && speed > 0.3f && !Fallen);
     }
 
     // ---- The eyes ----

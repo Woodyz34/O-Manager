@@ -86,7 +86,7 @@ public class RunSession : MonoBehaviour
     bool twoDHidden;
 
     Canvas hud;
-    TextMeshProUGUI clockText, bigText, hintText;
+    TextMeshProUGUI clockText, bigText, hintText, factsText;
     GameObject backdrop;
     UIProgressCard loadingCard;
     GameObject results;
@@ -177,7 +177,6 @@ public class RunSession : MonoBehaviour
         player.Moved = CheckPunch;
         handMap = RunMap.Create(player, mapDef, points, mainMask);
         handMap.transform.SetParent(transform, true);
-        own.Add(handMap.Canvas);
         EnsureListener();
 
         track = new RelayTrack { label = RunnerName, isLocal = true, color = PlayerColor.HasSaved ? PlayerColor.Saved : CourseUI.Accent };
@@ -188,7 +187,7 @@ public class RunSession : MonoBehaviour
         hintText.text = Hint();
     }
 
-    static string Hint() => "W A S D: run    Mouse: look    Shift: jog    Space: jump    Left mouse: map up/down\n"
+    static string Hint() => "W A S D: run    Mouse: look    Shift: jog    Space: jump    Left mouse: map up/down    F4: speed and ground\n"
                             + "With the map up: scroll to zoom, hold right mouse to move it, Q / E for the previous / next leg";
 
     // A spot near the start where the runner can stand
@@ -262,6 +261,21 @@ public class RunSession : MonoBehaviour
         player.Tick(dt);
         handMap.Tick(dt, phase == Phase.Running && !EscMenu.IsOpen);
         clockText.text = phase == Phase.Countdown ? "0:00" : RaceTime(player.raceSeconds);
+        if (Input.GetKeyDown(KeyCode.F4)) showFacts = !showFacts;
+        factsText.text = showFacts ? Facts() : "";
+    }
+
+    bool showFacts;
+
+    // F4: what the runner is doing, for trying out the speeds
+    string Facts()
+    {
+        float pace = player.speed > 0.2f ? 1000f / player.speed / 60f : 0f;
+        string paceText = pace > 0f ? Mathf.FloorToInt(pace) + ":" + Mathf.FloorToInt(pace % 1f * 60f).ToString("00") + " min/km" : "standing";
+        return paceText + "   (real life)\n"
+               + "Ground: " + player.ground.surface + ", speed " + player.ground.speed.ToString("0.00") + ", rough " + player.ground.rough.ToString("0.0") + "\n"
+               + "Slope: " + (player.gradient * 100f).ToString("0") + " %, slope factor " + RunPlayer.SlopeFactor(player.gradient, player.ground.rough).ToString("0.00") + "\n"
+               + "Run so far: " + (player.distance / 1000f).ToString("0.00") + " km   Tired: " + (player.fatigue * 100f).ToString("0") + " %";
     }
 
     void ClearBig()
@@ -383,7 +397,7 @@ public class RunSession : MonoBehaviour
         ScreenSettings.Fit(results.GetComponent<CanvasScaler>());
 
         Image card = CourseUI.CardPanel("Card", results.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760, 820));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820, 860));
         CourseUI.Column(card.gameObject, 10, new RectOffset(40, 40, 30, 30));
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, ok ? "Finished!" : "Disqualified", 46,
             ok ? CourseUI.Ink : CourseUI.Danger, FontStyles.Bold, TextAlignmentOptions.Center);
@@ -393,6 +407,15 @@ public class RunSession : MonoBehaviour
         CourseUI.Size(subText, ok ? 32 : 62);
         TextMeshProUGUI time = CourseUI.Text("Time", card.transform, RaceTime(resultSeconds), 64, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Size(time, 78);
+        float straight = course.LengthMeters(), run = player.distance;
+        string km = "You ran " + (run / 1000f).ToString("0.00") + " km (the course is " + (straight / 1000f).ToString("0.00") + " km in straight lines)";
+        if (run > 50f && resultSeconds > 0f)
+        {
+            float pace = resultSeconds / 60f / (run / 1000f);
+            km += ", " + Mathf.FloorToInt(pace) + ":" + Mathf.FloorToInt(pace % 1f * 60f).ToString("00") + " min/km";
+        }
+        TextMeshProUGUI kmText = CourseUI.Text("Distance", card.transform, km, 20, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
+        CourseUI.Size(kmText, 28);
 
         string recordLine = !ok ? (best > 0f ? "Your record: " + RaceTime(best) : "No record on this course yet")
                           : record ? (best > 0f ? "New record! Before: " + RaceTime(best) : "Your first record on this course!")
@@ -459,6 +482,7 @@ public class RunSession : MonoBehaviour
     void ShowTwoDMap(bool show)
     {
         if (player != null) player.cam.enabled = !show;
+        if (handMap != null) handMap.SetVisible(!show);
         if (world != null) world.gameObject.SetActive(!show);
         if (mainCam != null) mainCam.cullingMask = show ? mainMask : 0;
         if (hud != null) hud.enabled = !show;
@@ -534,6 +558,10 @@ public class RunSession : MonoBehaviour
         CourseUI.Place(bigText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 120f), new Vector2(1200f, 200f));
         bigText.outlineWidth = 0.2f;
         bigText.outlineColor = new Color32(0, 0, 0, 200);
+        factsText = CourseUI.Text("Facts", hud.transform, "", 20, Color.white, FontStyles.Bold, TextAlignmentOptions.TopLeft);
+        CourseUI.Place(factsText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(20f, -20f), new Vector2(700f, 140f));
+        factsText.outlineWidth = 0.2f;
+        factsText.outlineColor = new Color32(0, 0, 0, 200);
         hintText = CourseUI.Text("Hint", hud.transform, "", 18, new Color(1f, 1f, 1f, 0.85f), FontStyles.Normal, TextAlignmentOptions.Center);
         CourseUI.Place(hintText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(1600f, 56f));
         foreach (Graphic g in hud.GetComponentsInChildren<Graphic>(true)) g.raycastTarget = false;

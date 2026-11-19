@@ -76,7 +76,7 @@ public class RunTerrain
             case WorldLineKind.WideRoad: case WorldLineKind.Road: case WorldLineKind.Track: case WorldLineKind.Footpath:
             case WorldLineKind.SmallPath: case WorldLineKind.FaintPath: case WorldLineKind.Ride: case WorldLineKind.Railway:
             case WorldLineKind.Stream: case WorldLineKind.SmallStream: case WorldLineKind.Ditch: case WorldLineKind.NarrowMarsh:
-            case WorldLineKind.Cliff: case WorldLineKind.HighFence: case WorldLineKind.HighWall:
+            case WorldLineKind.Cliff: case WorldLineKind.SmallCliff: case WorldLineKind.HighFence: case WorldLineKind.HighWall:
             case WorldLineKind.Wall: case WorldLineKind.RuinedWall: case WorldLineKind.Fence: case WorldLineKind.RuinedFence: case WorldLineKind.Log:
                 return true;
             default:
@@ -211,10 +211,12 @@ public class RunTerrain
 
     // True when the step from a to b goes over something a runner jumps (a stone wall, a fence, a fallen trunk), or
     // through an impassable cliff, fence or wall (then blocked is true)
-    public bool Crosses(double ae, double an, double be, double bn, out float height, out bool blocked)
+    // A small cliff (smallCliff true) is a rock face of under 2 m: a runner can jump down it but not run up it
+    public bool Crosses(double ae, double an, double be, double bn, out float height, out bool blocked, out bool smallCliff)
     {
         height = 0f;
         blocked = false;
+        smallCliff = false;
         float ax = (float)(ae - layer.minE), az = (float)(an - layer.minN), bx = (float)(be - layer.minE), bz = (float)(bn - layer.minN);
         List<int> near = BucketAt((ax + bx) / 2f, (az + bz) / 2f);
         if (near == null) return false;
@@ -231,10 +233,12 @@ public class RunTerrain
                 case WorldLineKind.RuinedFence: h = 0.6f; break;
                 case WorldLineKind.Log: h = 0.45f; break;
                 case WorldLineKind.Cliff: case WorldLineKind.HighFence: case WorldLineKind.HighWall: h = -1f; break;
+                case WorldLineKind.SmallCliff: h = -2f; break;
                 default: continue;
             }
             if (!Intersect(ax, az, bx, bz, p.ax, p.az, p.bx, p.bz)) continue;
-            if (h < 0f) blocked = true;
+            if (h == -2f) smallCliff = true;
+            else if (h < 0f) blocked = true;
             else height = Math.Max(height, h);
             any = true;
         }

@@ -2,24 +2,26 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// The sounds of the run-yourself game mode, all made in code when the race loads, so nothing has to be recorded:
-// footsteps that sound like the ground (gravel, earth, moss, twigs in a thicket, a squelching marsh, splashing water,
-// hard rock), the runner's breathing (ten different people, five women and five men, one picked at random each
-// race; harder uphill, at speed and late in the race), groans when the runner falls, and the beeps of the punching
-// units and the start clock.
-// Recorded sounds can replace the made ones: put .wav files in Assets/Resources/RunSounds named like
-// groan_woman_1, groan_man_2, step_gravel_1 ... and they are used instead.
+// The sounds of the run-yourself game mode. Footsteps, landings, the rustle of a thicket and the groans of a fall are
+// real recordings (Resources/RunSounds, from "Oculus Audio Pack 01" by Oculus VR, LLC, CC BY 4.0: the credit is
+// shown in the 3D settings window and in Docs/run-sounds-credits.md). The kind of ground decides which recording is
+// played and how (earth, grass, hard ground, a squelch in a marsh, a splash in a stream). The breathing is made in
+// code (no free recording of a running breath was to be found) and follows the steps, as a runner's does; a
+// recorded breath can replace it: put breath_man_1.wav ... breath_woman_10.wav (one whole breath each) in
+// Resources/RunSounds. The beeps of the punching units and the start clock are made in code too.
 public class RunSounds : MonoBehaviour
 {
     const int Rate = 44100;
+    public const string Credit = "Footsteps and voices: \"Oculus Audio Pack 01\" by Oculus VR, LLC, CC BY 4.0";
 
-    AudioSource steps, breath, voice, beeps;
-    readonly Dictionary<RunTerrain.Surface, AudioClip[]> stepClips = new Dictionary<RunTerrain.Surface, AudioClip[]>();
-    AudioClip[] inhale, exhale, groans, grunts;
+    AudioSource steps, under, breath, voice, beeps;
+    AudioClip[] dirt, grass, hard, landDirt, landGrass, landHard, brush, squelch, splash;
+    AudioClip[] inhale, exhale, wholeBreaths, groans, grunts;
     AudioClip punch, finish, startShort, startLong;
     System.Random random = new System.Random();
-    float nextBreath;
+    int stepsInBreath;
     bool breathIn = true;
+    float effortNow;
 
     public static RunSounds Create(Transform parent, bool woman, int seed)
     {
@@ -41,33 +43,33 @@ public class RunSounds : MonoBehaviour
 
     void Make(bool woman)
     {
-        steps = Source(0.55f);
-        breath = Source(0.5f);
-        voice = Source(0.8f);
+        steps = Source(0.7f);
+        under = Source(0.45f);
+        breath = Source(0.32f);
+        voice = Source(0.85f);
         beeps = Source(0.6f);
 
-        stepClips[RunTerrain.Surface.Road] = Clips("step_gravel", 4, i => Step(0.09f, 3500f, 0f, 0.6f, 0.35f, 0f, 0f, i));
-        stepClips[RunTerrain.Surface.Path] = Clips("step_earth", 4, i => Step(0.07f, 1300f, 85f, 0.25f, 0.1f, 0f, 0f, i));
-        stepClips[RunTerrain.Surface.Forest] = Clips("step_moss", 4, i => Step(0.08f, 800f, 75f, 0.15f, 0.05f, 0.08f, 0f, i));
-        stepClips[RunTerrain.Surface.Open] = Clips("step_grass", 4, i => Step(0.08f, 1700f, 70f, 0.12f, 0.05f, 0.18f, 0f, i));
-        stepClips[RunTerrain.Surface.Rough] = Clips("step_twigs", 4, i => Step(0.09f, 900f, 75f, 0.15f, 0.05f, 0.3f, 0.6f, i));
-        stepClips[RunTerrain.Surface.Thicket] = Clips("step_thicket", 4, i => Step(0.1f, 800f, 70f, 0.15f, 0.05f, 0.55f, 0.8f, i));
-        stepClips[RunTerrain.Surface.Marsh] = Clips("step_marsh", 4, Squelch);
-        stepClips[RunTerrain.Surface.Water] = Clips("step_water", 4, Splash);
-        stepClips[RunTerrain.Surface.Rock] = Clips("step_rock", 4, i => Step(0.035f, 5000f, 140f, 0.9f, 0.6f, 0f, 0f, i));
-        stepClips[RunTerrain.Surface.Paved] = stepClips[RunTerrain.Surface.Rock];
-        stepClips[RunTerrain.Surface.Sand] = Clips("step_sand", 4, i => Step(0.1f, 2500f, 50f, 0.2f, 0.4f, 0f, 0f, i));
+        dirt = Load("run_dirt", 5);
+        grass = Load("run_grass", 5);
+        hard = Load("run_hard", 5);
+        landDirt = Load("land_dirt", 2);
+        landGrass = Load("land_grass", 2);
+        landHard = Load("land_hard", 2);
+        brush = Load("brush", 4);
+        squelch = Made("squelch", 4, Squelch);
+        splash = Made("splash", 4, Splash);
 
-        // One of ten people: five women and five men, each breathing their own way
+        // Two recorded voices for each, one picked at random for the race
+        string who = (woman ? "woman" : "man") + (1 + random.Next(2));
+        groans = Load("groan_" + who, 3);
+        grunts = Load("grunt_" + who, 1);
+
+        // The breath: recorded whole breaths if there are any, otherwise made for one of five people
+        wholeBreaths = Load("breath_" + (woman ? "woman" : "man"), 10);
         int person = random.Next(5);
-        float pitch = (woman ? 1.25f : 1f) * (0.9f + 0.05f * person);
-        float voiced = 0.04f + 0.035f * ((person * 3) % 5);
-        float f0 = (woman ? 205f : 112f) * (0.92f + 0.04f * person);
-        string who = woman ? "woman" : "man";
-        inhale = Clips("breath_in_" + who, 3, i => Breath(0.28f + 0.03f * person, 1100f * pitch, 0.6f, 0f, f0, i));
-        exhale = Clips("breath_out_" + who, 3, i => Breath(0.34f + 0.025f * person, 820f * pitch, 1f, voiced, f0, i));
-        groans = Clips("groan_" + who, 3, i => Groan(f0 * (1.02f + 0.05f * i), woman, 0.42f + 0.06f * i, i));
-        grunts = Clips("grunt_" + who, 2, i => Groan(f0 * 1.1f, woman, 0.16f, i + 7));
+        float tract = (woman ? 1.18f : 1f) * (0.92f + 0.04f * person);
+        inhale = Made("inhale", 4, i => Breath(0.32f, false, tract, i));
+        exhale = Made("exhale", 4, i => Breath(0.42f, true, tract, i));
 
         punch = Tone(2730f, 0.16f, 0.5f);
         finish = Tone(2730f, 0.5f, 0.55f);
@@ -75,18 +77,22 @@ public class RunSounds : MonoBehaviour
         startLong = Tone(1400f, 0.75f, 0.55f);
     }
 
-    // A recorded sound from Resources/RunSounds when there is one, otherwise made here
-    AudioClip[] Clips(string name, int count, Func<int, float[]> make)
+    static AudioClip[] Load(string name, int count)
     {
         var list = new List<AudioClip>();
         for (int i = 1; i <= count; i++)
         {
-            AudioClip recorded = Resources.Load<AudioClip>("RunSounds/" + name + "_" + i);
-            if (recorded != null) list.Add(recorded);
+            AudioClip clip = Resources.Load<AudioClip>("RunSounds/" + name + "_" + i);
+            if (clip != null) list.Add(clip);
         }
-        if (list.Count > 0) return list.ToArray();
-        for (int i = 0; i < count; i++) list.Add(ToClip(name + " " + i, make(i)));
         return list.ToArray();
+    }
+
+    AudioClip[] Made(string name, int count, Func<int, float[]> make)
+    {
+        var list = new AudioClip[count];
+        for (int i = 0; i < count; i++) list[i] = ToClip(name + " " + i, make(i));
+        return list;
     }
 
     static AudioClip ToClip(string name, float[] data)
@@ -96,39 +102,107 @@ public class RunSounds : MonoBehaviour
         return clip;
     }
 
+    AudioClip Pick(AudioClip[] clips) => clips == null || clips.Length == 0 ? null : clips[random.Next(clips.Length)];
+
+    float Vary(float around, float spread) => around * (1f - spread + 2f * spread * (float)random.NextDouble());
+
     // ---- Playing ----
 
+    // One footstep. strength 0..1: how fast the runner goes.
     public void Footstep(RunTerrain.Surface surface, float strength)
     {
-        if (!stepClips.TryGetValue(surface, out AudioClip[] clips) || clips.Length == 0) return;
-        steps.pitch = 0.9f + (float)random.NextDouble() * 0.2f;
-        steps.PlayOneShot(clips[random.Next(clips.Length)], Mathf.Clamp(0.35f + 0.65f * strength, 0.2f, 1f));
+        float loud = Mathf.Clamp(0.45f + 0.55f * strength, 0.25f, 1f);
+        AudioClip clip;
+        float pitch, volume = loud, extra = 0f;
+        AudioClip layer = null;
+        switch (surface)
+        {
+            case RunTerrain.Surface.Road: case RunTerrain.Surface.Paved: clip = Pick(hard); pitch = 1f; volume *= 0.75f; break;
+            case RunTerrain.Surface.Rock: clip = Pick(hard); pitch = 1.12f; volume *= 0.55f; break;
+            case RunTerrain.Surface.Path: case RunTerrain.Surface.Sand: clip = Pick(dirt); pitch = 1f; break;
+            case RunTerrain.Surface.Forest: clip = Pick(dirt); pitch = 0.86f; volume *= 0.8f; break;   // soft moss and needles
+            case RunTerrain.Surface.Open: clip = Pick(grass); pitch = 1f; break;
+            case RunTerrain.Surface.Rough: clip = Pick(grass); pitch = 0.92f; layer = random.NextDouble() < 0.35 ? Pick(brush) : null; extra = 0.35f; break;
+            case RunTerrain.Surface.Thicket: clip = Pick(grass); pitch = 0.88f; layer = Pick(brush); extra = 0.75f; break;
+            case RunTerrain.Surface.Marsh: clip = Pick(grass); pitch = 0.8f; volume *= 0.6f; layer = Pick(squelch); extra = 0.8f; break;
+            case RunTerrain.Surface.Water: clip = Pick(squelch); pitch = 0.9f; volume *= 0.5f; layer = Pick(splash); extra = 0.9f; break;
+            default: clip = Pick(dirt); pitch = 1f; break;
+        }
+        if (clip != null)
+        {
+            steps.pitch = Vary(pitch, 0.06f);
+            steps.PlayOneShot(clip, Vary(volume, 0.12f));
+        }
+        if (layer != null)
+        {
+            under.pitch = Vary(1f, 0.1f);
+            under.PlayOneShot(layer, Vary(extra * loud, 0.2f));
+        }
+
+        // The breath follows the steps: in over a few steps, out over a few, fewer steps the harder the work
+        stepsInBreath++;
+        int stepsPerHalf = effortNow > 0.7f ? 2 : effortNow > 0.35f ? 3 : 4;
+        if (stepsInBreath >= stepsPerHalf || (breathIn && stepsInBreath >= stepsPerHalf - 1 && effortNow > 0.85f))
+        {
+            stepsInBreath = 0;
+            Breath(breathIn);
+            breathIn = !breathIn;
+        }
     }
 
-    // effort 0..1: resting to flat out; breathing gets quicker and louder
-    public void Breathe(float effort)
+    public void Land(RunTerrain.Surface surface)
     {
-        if (Time.time < nextBreath) return;
-        effort = Mathf.Clamp01(effort);
-        AudioClip[] set = breathIn ? inhale : exhale;
-        breath.pitch = 0.95f + (float)random.NextDouble() * 0.1f + effort * 0.05f;
-        breath.PlayOneShot(set[random.Next(set.Length)], 0.12f + 0.75f * effort);
-        float cycle = Mathf.Lerp(2.6f, 1.05f, effort);          // seconds per whole breath
-        nextBreath = Time.time + cycle * (breathIn ? 0.42f : 0.58f) * (0.92f + 0.16f * (float)random.NextDouble());
+        AudioClip[] set = surface == RunTerrain.Surface.Road || surface == RunTerrain.Surface.Paved || surface == RunTerrain.Surface.Rock ? landHard
+                        : surface == RunTerrain.Surface.Path || surface == RunTerrain.Surface.Forest || surface == RunTerrain.Surface.Sand ? landDirt : landGrass;
+        AudioClip clip = Pick(set);
+        if (clip == null) return;
+        steps.pitch = Vary(1f, 0.05f);
+        steps.PlayOneShot(clip, 0.9f);
+    }
+
+    // effort 0..1: resting to flat out. Standing still the breath goes on by itself; running it follows the steps.
+    float nextStillBreath;
+
+    public void Breathe(float effort, bool running)
+    {
+        effortNow = Mathf.Clamp01(effort);
+        if (running) return;
+        if (Time.time < nextStillBreath) return;
+        Breath(breathIn);
         breathIn = !breathIn;
+        float cycle = Mathf.Lerp(3.2f, 1.1f, effortNow);
+        nextStillBreath = Time.time + cycle * (breathIn ? 0.55f : 0.45f) * Vary(1f, 0.08f);
+    }
+
+    void Breath(bool inward)
+    {
+        float level = 0.08f + 0.92f * effortNow * effortNow;
+        if (wholeBreaths.Length > 0)
+        {
+            if (!inward) return;   // a recorded breath has both halves
+            breath.pitch = Vary(1f, 0.04f);
+            breath.PlayOneShot(Pick(wholeBreaths), level);
+            return;
+        }
+        breath.pitch = Vary(1f + 0.06f * effortNow, 0.04f);
+        breath.PlayOneShot(Pick(inward ? inhale : exhale), level * (inward ? 0.7f : 1f));
     }
 
     public void Groan()
     {
-        voice.pitch = 0.95f + (float)random.NextDouble() * 0.1f;
-        voice.PlayOneShot(groans[random.Next(groans.Length)], 1f);
-        nextBreath = Time.time + 0.8f;
+        AudioClip clip = Pick(groans);
+        if (clip == null) return;
+        voice.pitch = Vary(1f, 0.04f);
+        voice.PlayOneShot(clip, 1f);
+        stepsInBreath = -4;
     }
 
     public void Grunt()
     {
-        voice.pitch = 0.95f + (float)random.NextDouble() * 0.1f;
-        voice.PlayOneShot(grunts[random.Next(grunts.Length)], 0.7f);
+        AudioClip clip = Pick(grunts);
+        if (clip == null) return;
+        voice.pitch = Vary(1.05f, 0.05f);
+        voice.PlayOneShot(clip, 0.55f);
     }
 
     public void Punch() => beeps.PlayOneShot(punch, 1f);
@@ -170,31 +244,6 @@ public class RunSounds : MonoBehaviour
         return d;
     }
 
-    // A footstep: a burst of filtered noise (the ground), a low thump (the foot), crackle (gravel, twigs on the ground),
-    // a rustle (leaves and branches brushing the legs) and now and then a twig snapping
-    float[] Step(float length, float tone, float thump, float hard, float crackle, float rustle, float snap, int variant)
-    {
-        float total = length + rustle * 0.25f + 0.05f;
-        var d = new float[(int)(total * Rate)];
-        var ground = new Band(tone * (0.85f + 0.3f * (float)random.NextDouble()), 0.9f);
-        var leaves = new Band(3800f, 0.7f);
-        var twig = new Band(2200f + 1200f * (float)random.NextDouble(), 6f);
-        bool snaps = snap > 0f && random.NextDouble() < snap * 0.6f;
-        float snapAt = 0.01f + 0.05f * (float)random.NextDouble();
-        for (int i = 0; i < d.Length; i++)
-        {
-            float t = i / (float)Rate;
-            float env = t < 0.004f ? t / 0.004f : Mathf.Exp(-(t - 0.004f) / (length * (0.35f - 0.2f * hard)));
-            float v = ground.Run(Noise()) * env * 1.4f;
-            if (thump > 0f) v += Mathf.Sin(2f * Mathf.PI * thump * t) * Mathf.Exp(-t / 0.035f) * 0.6f;
-            if (crackle > 0f && random.NextDouble() < crackle * 0.02f * env) v += Noise() * env * 1.5f;
-            if (rustle > 0f) v += leaves.Run(Noise()) * rustle * Mathf.Exp(-t / (0.08f + rustle * 0.1f)) * Mathf.Clamp01(t / 0.02f);
-            if (snaps && t >= snapAt) v += twig.Run(t - snapAt < 0.002f ? Noise() * 6f : 0f) * 1.2f;
-            d[i] = v;
-        }
-        return Normalize(d, 0.8f);
-    }
-
     float[] Squelch(int variant)
     {
         var d = new float[(int)(0.22f * Rate)];
@@ -226,59 +275,36 @@ public class RunSounds : MonoBehaviour
         return Normalize(d, 0.75f);
     }
 
-    // A breath: air through the throat and mouth (noise through a broad resonance), with a little voice on the way
-    // out when the runner is working hard
-    float[] Breath(float length, float formant, float strength, float voiced, float f0, int variant)
+    // A breath: only air, no voice. Pink noise (as rushing air sounds) through the broad resonances of the mouth and
+    // throat; out through the mouth with a quick start and a long fall, in with more hiss and a softer start. The
+    // loudness wavers a little, as a real breath does.
+    float[] Breath(float length, bool outward, float tract, int variant)
     {
-        length *= 0.9f + 0.2f * (float)random.NextDouble();
+        length = Vary(length, 0.15f);
         var d = new float[(int)(length * Rate)];
-        var mouth = new Band(formant * (0.95f + 0.1f * variant / 3f), 1.4f);
-        var throat = new Band(formant * 2.3f, 2f);
-        var vowel = new Band(formant * 0.75f, 4f);
-        float phase = 0f;
+        float f1 = (outward ? 620f : 900f) * tract * Vary(1f, 0.08f), f2 = (outward ? 1500f : 2300f) * tract * Vary(1f, 0.08f);
+        var r1 = new Band(f1, 0.8f);
+        var r2 = new Band(f2, 1.1f);
+        var hiss = new Band(outward ? 3800f : 5200f, 0.9f);
+        float b0 = 0f, b1 = 0f, b2 = 0f, flutter = 0f;
         for (int i = 0; i < d.Length; i++)
         {
             float t = i / (float)Rate, u = t / length;
-            float env = Mathf.Sin(Mathf.PI * Mathf.Pow(u, 0.6f)) * (1f - 0.3f * u);
-            float air = Noise();
-            float v = mouth.Run(air) + throat.Run(air) * 0.35f;
-            if (voiced > 0f)
-            {
-                phase += f0 * (1f - 0.1f * u) / Rate;
-                phase -= Mathf.Floor(phase);
-                v += vowel.Run(phase * 2f - 1f) * voiced * 4f;
-            }
-            d[i] = v * env * strength;
+            // Pink noise (Paul Kellet's economy filter)
+            float white = Noise();
+            b0 = 0.99765f * b0 + white * 0.0990460f;
+            b1 = 0.96300f * b1 + white * 0.2965164f;
+            b2 = 0.57000f * b2 + white * 1.0526913f;
+            float pink = (b0 + b1 + b2 + white * 0.1848f) * 0.25f;
+            float env = outward ? Mathf.Clamp01(u / 0.12f) * Mathf.Pow(1f - u, 1.4f)
+                                : Mathf.Pow(Mathf.Sin(Mathf.PI * Mathf.Clamp01(u)), 1.3f);
+            if ((i & 255) == 0) flutter = 0.85f + 0.3f * (float)random.NextDouble();
+            float v = r1.Run(pink) * 1.0f + r2.Run(pink) * 0.6f + hiss.Run(white) * (outward ? 0.12f : 0.3f) + pink * 0.15f;
+            d[i] = v * env * flutter;
         }
-        return Normalize(d, 0.6f * strength);
-    }
-
-    // A groan when falling: a voiced "oof" (pulses from the throat through the vowel's resonances), breath on top
-    float[] Groan(float f0, bool woman, float length, int variant)
-    {
-        var d = new float[(int)(length * Rate)];
-        float f1 = woman ? 560f : 470f, f2 = woman ? 1000f : 850f, f3 = woman ? 2900f : 2500f;
-        var r1 = new Band(f1 * (0.95f + 0.03f * variant), 5f);
-        var r2 = new Band(f2 * (0.95f + 0.04f * variant), 6f);
-        var r3 = new Band(f3, 8f);
-        var air = new Band(f2, 1.5f);
-        float phase = 0f;
-        for (int i = 0; i < d.Length; i++)
-        {
-            float t = i / (float)Rate, u = t / length;
-            float env = Mathf.Clamp01(t / 0.015f) * Mathf.Pow(1f - u, 1.6f);
-            float pitch = f0 * (1.12f - 0.3f * u) * (1f + 0.01f * Mathf.Sin(2f * Mathf.PI * 6f * t));
-            phase += pitch / Rate;
-            float pulse = 0f;
-            if (phase >= 1f)
-            {
-                phase -= 1f;
-                pulse = 1f;
-            }
-            float voiceSound = r1.Run(pulse) * 1f + r2.Run(pulse) * 0.6f + r3.Run(pulse) * 0.2f;
-            d[i] = (voiceSound * 3f + air.Run(Noise()) * 0.25f) * env;
-        }
-        return Normalize(d, 0.85f);
+        // Soften the edges of the flutter steps
+        for (int i = 1; i < d.Length; i++) d[i] = d[i] * 0.6f + d[i - 1] * 0.4f;
+        return Normalize(d, outward ? 0.7f : 0.5f);
     }
 
     static AudioClip Tone(float freq, float length, float level)
