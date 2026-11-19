@@ -11,7 +11,7 @@ using UnityEngine.UI;
 // wheel zooms, the right mouse button held drags it, Q / E show the leg before or after the one shown.
 // The map is held in the left hand unless the player picks the right (RunSettings.RightHand); standing still, the
 // other hand takes hold too. The map shakes as RunPlayer.Shake says: running fast, downhill, in rough ground or a
-// thicket it is hard to read; jogging, uphill or on a road it is steady.
+// thicket it is hard to read; standing, uphill or on a road it is steady.
 // Everything in the hand is drawn by a camera of its own after the world, so trees never cut through the map.
 public class RunMap : MonoBehaviour
 {
@@ -270,8 +270,16 @@ public class RunMap : MonoBehaviour
             {
                 float scroll = Input.mouseScrollDelta.y;
                 if (Mathf.Abs(scroll) > 0.01f) sizeTarget = Mathf.Clamp(sizeTarget * Mathf.Pow(0.87f, scroll), minSize, maxSize);
-                if (Input.GetKeyDown(KeyCode.Q)) FrameLeg(Leg - 1);
-                if (Input.GetKeyDown(KeyCode.E)) FrameLeg(Leg + 1);
+                // Q / E turn the map (to lay it along the compass when going on a bearing); Shift / Ctrl show the
+                // next / previous leg (2026-11-19, Anders)
+                float spin = (Input.GetKey(KeyCode.E) ? 1f : 0f) - (Input.GetKey(KeyCode.Q) ? 1f : 0f);
+                if (spin != 0f)
+                {
+                    turnTarget += spin * 110f * Time.unscaledDeltaTime;
+                    turn = turnTarget;
+                }
+                if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift)) FrameLeg(Leg + 1);
+                if (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl)) FrameLeg(Leg - 1);
             }
         }
         bool drag = input && Up && Input.GetMouseButton(1);

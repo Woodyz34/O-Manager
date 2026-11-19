@@ -198,8 +198,8 @@ public class RunSession : MonoBehaviour
         return light > 0.8f || (light > 0.6f && saturation < 0.25f) ? CourseUI.Accent : c;
     }
 
-    static string Hint() => "W A S D: run    Mouse: look    Shift: jog    Space: jump    Left mouse: map up/down    F4: speed and ground\n"
-                            + "With the map up: scroll to zoom, hold right mouse to move it, Q / E for the previous / next leg";
+    static string Hint() => "W A S D: run    Mouse: look    Space: jump    Left mouse: map up/down    F4: speed and ground\n"
+                            + "With the map up: scroll to zoom, hold right mouse to move it, Q / E to turn it, Shift / Ctrl for the next / previous leg";
 
     // The world with the hills made higher (a copy: the TV controls keep the map's own heights). Heights are stretched
     // round the mean, so the lowest and highest ground move apart and every slope gets steeper by the same share.

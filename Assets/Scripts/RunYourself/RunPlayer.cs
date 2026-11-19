@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 
 // The runner the player is, seen through their own eyes (run-yourself game mode, RunSession).
-// W A S D run (always flat out unless Shift is held, which jogs: easier to read the map), the mouse turns the head,
+// W A S D run (always flat out; slower with the map up), the mouse turns the head,
 // Space jumps (stone walls, fences and fallen trunks: run into one without jumping and you fall).
 // The speed follows the ground (RunTerrain, with the map's own terrain sliders) and the slope (the game's slope model,
 // TerrainSpeedModel), and the whole game runs RunSettings.GameSpeed times quicker than real life.
@@ -134,9 +134,8 @@ public class RunPlayer : MonoBehaviour
         if (wish)
         {
             float dirFactor = fwd > 0 ? (side != 0 ? 0.95f : 1f) : fwd < 0 ? 0.45f : 0.6f;
-            bool jog = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             target = ForestSpeed * ground.speed * SlopeFactor(gradient, ground.rough) * dirFactor
-                     * (jog ? 0.55f : 1f) * (mapUp ? 0.6f : 1f);   // reading the map: you can't run fast and read (Anders, 2026-11-19)
+                     * (mapUp ? 0.6f : 1f);   // reading the map: you can't run fast and read (Anders, 2026-11-19)
             if (stumbleTimer > 0f) target *= 0.4f;
         }
         float rate = target > speed ? 6f : 11f;     // real-life m/s gained or lost per (real) second
