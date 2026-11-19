@@ -41,6 +41,10 @@ public static class ExtraModes
     // Modes that cannot be combined with any other mode
     public const ExtraMode Alone = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
+    // Extras that go on top of a game mode (Normal, Imposter or Secret task), never a game mode of their own
+    // (2026-11-19: "Bears" alone looked like a mode without a base)
+    public const ExtraMode AddOns = ExtraMode.Bears | ExtraMode.MoveControl;
+
     // The two imposter modes both pick one imposter, so only one of them can be on
     public const ExtraMode ImposterKinds = ExtraMode.Imposter | ExtraMode.SecretTask;
 
@@ -111,6 +115,7 @@ public static class ExtraModes
     {
         if (modes == ExtraMode.None) return "Normal: no extra game modes. Everyone just races to finish first.";
         List<string> lines = new List<string>();
+        if ((modes & ~AddOns) == ExtraMode.None) lines.Add("Normal: everyone races to finish first.");
         foreach (ExtraMode mode in All)
         {
             if ((modes & mode) != 0) lines.Add(Title(mode) + ": " + Description(mode));
@@ -119,10 +124,11 @@ public static class ExtraModes
     }
 
     // "Normal", or the modes that are on: "Imposter + Bears"
-    public static string Describe(ExtraMode modes)
+    public static string Describe(ExtraMode modes, bool withBase = true)
     {
         if (modes == ExtraMode.None) return "Normal";
         List<string> names = new List<string>();
+        if (withBase && (modes & ~AddOns) == ExtraMode.None) names.Add("Normal");   // "Normal + Bears"
         foreach (ExtraMode mode in All)
         {
             if ((modes & mode) != 0) names.Add(Title(mode));
@@ -135,6 +141,7 @@ public static class ExtraModes
     {
         if ((modes & mode) != 0) return modes & ~mode;
         if ((mode & Alone) != 0) return mode;
+        if ((mode & AddOns) != 0 && (modes & Alone) != 0) return modes;   // no extras on route analysis or route choice
         if ((mode & ImposterKinds) != 0) modes &= ~ImposterKinds;
         return (modes & ~Alone) | mode;
     }
@@ -146,12 +153,12 @@ public static class ExtraModes
         if (course.IsRelay())
         {
             ExtraMode notRelay = modes & IndividualOnly;
-            if (notRelay != ExtraMode.None) return "\"" + Describe(notRelay) + "\" only works on individual courses, not relays. Choose another course or game mode.";
+            if (notRelay != ExtraMode.None) return "\"" + Describe(notRelay, false) + "\" only works on individual courses, not relays. Choose another course or game mode.";
         }
         if (course.IsSprint())
         {
             ExtraMode notSprint = modes & ForestOnly;
-            if (notSprint != ExtraMode.None) return "\"" + Describe(notSprint) + "\" only works on forest courses, not sprint. Choose another course or game mode.";
+            if (notSprint != ExtraMode.None) return "\"" + Describe(notSprint, false) + "\" only works on forest courses, not sprint. Choose another course or game mode.";
         }
         return null;
     }
