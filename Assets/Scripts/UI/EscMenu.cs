@@ -28,6 +28,7 @@ public class EscMenu : MonoBehaviour
     Button endButton;
     Button mainMenuButton;
     TextMeshProUGUI hostNote;
+    Button settingsButton;
     float endConfirmUntil = -1f;
 
     // The key bindings page
@@ -233,6 +234,7 @@ public class EscMenu : MonoBehaviour
         bool host = inCompetition && CompetitionFlow.IsHostRunner(runner);
 
         endButton.gameObject.SetActive(host);
+        if (settingsButton != null) settingsButton.gameObject.SetActive(runner != null && ActiveScene.Name != "MainMenu");
         if (host)
         {
             bool confirming = Time.unscaledTime < endConfirmUntil;
@@ -514,6 +516,15 @@ public class EscMenu : MonoBehaviour
 
         Button keys = CourseUI.Button("Key bindings", card.transform, "Key bindings", CourseUI.ButtonKind.Light, () => ShowKeysPage(true), 26);
         CourseUI.Size(keys, 68);
+
+        // The host's lobby settings (speeds, TV, bears and moves), also during the race (2026-11-19)
+        settingsButton = CourseUI.Button("Lobby settings", card.transform, "Lobby settings", CourseUI.ButtonKind.Light, () =>
+        {
+            Close();
+            HostSettingsPopup.Open();
+        }, 26);
+        CourseUI.Size(settingsButton, 68);
+        HoverTip.Add(settingsButton, "Race speed, TV controls, bears and control moves. Only the host can change them, also during the race.");
 
         endButton = CourseUI.Button("End competition", card.transform, "End competition for everyone", CourseUI.ButtonKind.Danger, OnEndCompetition, 26);
         CourseUI.Size(endButton, 68);
