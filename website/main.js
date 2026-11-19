@@ -317,7 +317,8 @@
     document.querySelectorAll(".dl-os").forEach(function (e) { e.textContent = osNames[os]; });
     $("dlIcon").innerHTML = os === "win" ? osIcons.win : osIcons.other;
     document.querySelectorAll(".dl-steps").forEach(function (e) { e.hidden = e.getAttribute("data-os") !== os; });
-    document.querySelectorAll("#dlOther button").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-os") === os); });
+    // "Another computer?" only offers the other two systems
+    document.querySelectorAll("#dlOther button").forEach(function (b) { b.hidden = b.getAttribute("data-os") === os; });
     btn.href = asset ? asset.browser_download_url : os === "win" && releaseState !== "ok" ? repoUrl + "/latest" : "#download";
     if (releaseState === "ok" && asset) {
       var d = new Date(release.published_at), mb = (asset.size / 1048576).toFixed(0) + " MB · ";

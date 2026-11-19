@@ -313,10 +313,13 @@ section { position: relative; }
 .dl-card h2 { margin-bottom: 10px; }
 .dl-sub { color: var(--ink-soft); font-size: 1.1rem; margin-bottom: 28px; }
 .dl-meta { margin: 16px 0 0; font-size: .92rem; color: var(--ink-soft); min-height: 1.6em; }
-.dl-other { margin: 6px 0 0; font-size: .92rem; color: var(--ink-soft); }
-.dl-other button { font: inherit; color: var(--ink); background: none; border: 0; padding: 2px 4px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-.dl-other button.on { font-weight: 700; text-decoration: none; cursor: default; }
-.dl-steps[hidden] { display: none; }
+.dl-other { margin: 14px 0 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; font-size: .92rem; color: var(--ink-soft); }
+.dl-chips { display: inline-flex; gap: 8px; }
+.dl-other button { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-weight: 600; color: var(--ink); background: var(--cream-100); border: 1px solid rgba(23, 51, 36, .14); border-radius: 999px; padding: 7px 14px 7px 11px; cursor: pointer; transition: background .2s, border-color .2s, transform .2s var(--ease); }
+.dl-other button:hover { background: #fff; border-color: var(--orange); transform: translateY(-1px); }
+.dl-other button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dl-other button svg .f { fill: currentColor; stroke: none; }
+.dl-other button[hidden], .dl-steps[hidden] { display: none !important; }
 .dl-steps { list-style: none; padding: 0; margin: 34px 0 0; display: grid; gap: 12px; text-align: left; }
 .dl-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; background: var(--cream-100); }
 .dl-steps li > b { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--cream-50); font-size: .85rem; }
