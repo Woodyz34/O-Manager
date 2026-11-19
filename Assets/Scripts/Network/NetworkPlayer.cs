@@ -120,6 +120,18 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     }
     // The host's lobby settings (HostSettings: TV production, race speed, bears and moves per leg), "" on the others
     [Networked] public NetworkString<_64> hostOptions { get; set; }
+    // The player is drawing its route right now (the leaderboard shows the ones who are not done yet)
+    [Networked] public NetworkBool drawingNow { get; set; }
+
+    // The host kicks a player (2026-11-19, someone went AFK): sent from the host's player to everyone, and the kicked
+    // player leaves for the main menu
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_Kick(PlayerRef who)
+    {
+        if (Runner == null || who != Runner.LocalPlayer) return;
+        UIToast.Show("The host took you out of the game.", 5f);
+        SceneLoader.LeaveSession(Runner, "MainMenu");
+    }
     // Relays: the host's race clock in game seconds while a leg is under way (RelayClock), so every team's clock
     // shows exactly the same time once its runner is off; negative = no leg under way
     [Networked] public float relayRaceClock { get; set; }
@@ -266,6 +278,11 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         }
         string options = HostSettings.ToPublish;
         if (hostOptions.ToString() != options) hostOptions = options;
+        // Still drawing (the others see it on the leaderboard, 2026-11-19)
+        ManualPathDrawer drawing = agentMovement.manualPathDrawer;
+        bool drawingNowValue = ActiveScene.Name != "Lobby" && drawing != null && drawing.timeToDraw
+            && !agentMovement.WaitingForAllPlayersToDraw && !agentMovement.WaitingForAllPlayersToChooseRunner && !CompetitionFlow.ResultsShown;
+        if (drawingNow != drawingNowValue) drawingNow = drawingNowValue;
         float raceClock = RelayClock.ToPublish;
         if (relayRaceClock != raceClock)
         {

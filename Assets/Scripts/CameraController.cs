@@ -44,6 +44,9 @@ public class CameraController : MonoBehaviour
     private bool wasFollowing = false;
     // Set by the TV production (TvViewer): a place the following camera shows in place of the player's own runner
     public static Vector3? LookHere;
+    // Another player's runner picked on the leaderboard (2026-11-19): Follow runner follows it instead of your own,
+    // without Follow runner the map jumps there once. Pick your own row to come back.
+    public static Transform Watched;
     private AgentMovement agent;
     private Button followButton;
     private TextMeshProUGUI followButtonText;
@@ -184,13 +187,15 @@ public class CameraController : MonoBehaviour
             bool wanted = cam != null && cam.enabled;
             if (ear.enabled != wanted) ear.enabled = wanted;
         }
-        if (cam == null || !cam.enabled || !IsFollowingRunner())
+        if (Watched != null && ActiveScene.Name == "Lobby") Watched = null;
+        bool watching = Watched != null && followRunner && agent != null && agent.manualPathDrawer != null && !agent.manualPathDrawer.timeToDraw;
+        if (cam == null || !cam.enabled || (!IsFollowingRunner() && !watching))
         {
             return;
         }
         // Efter att löparen har flyttats i Update, så att kameran inte ligger en bildruta efter
         // In a TV production the map goes to where something happens (another team's mistake) and back again
-        Vector3 look = LookHere ?? transform.position;
+        Vector3 look = LookHere ?? (Watched != null ? Watched.position : transform.position);
         cam.transform.position = new Vector3(look.x, look.y, -10f);
     }
 
@@ -213,6 +218,20 @@ public class CameraController : MonoBehaviour
     private bool IsFollowingRunner()
     {
         return followRunner && IsRunPhase();
+    }
+
+    // A row on the leaderboard was clicked: watch that runner (your own: back to your own)
+    public void ShowRunner(Transform runner)
+    {
+        if (runner == null) return;
+        Watched = runner == transform ? null : runner;
+        if (agent == null) agent = GetComponent<AgentMovement>();
+        bool drawing = agent != null && agent.manualPathDrawer != null && agent.manualPathDrawer.timeToDraw;
+        // Without Follow runner (or while drawing) the map just jumps there; you move it about yourself from there
+        if (cam != null && (!followRunner || drawing))
+        {
+            cam.transform.position = new Vector3(runner.position.x, runner.position.y, cam.transform.position.z);
+        }
     }
 
     public void ToggleFollowRunner()
