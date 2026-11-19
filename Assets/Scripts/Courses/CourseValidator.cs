@@ -159,6 +159,27 @@ public static class CourseValidator
         return id >= 0 && p.size[id] < p.biggest * ShutInShare;
     }
 
+    // Can a runner get from a to b on this grid (the same connected piece of open ground)? Used by Move a control
+    // (2026-11-19): a moved control must be somewhere the runners can get to.
+    public static bool SamePiece(float[,] speed, Vector2Int a, Vector2Int b)
+    {
+        if (speed == null) return true;
+        int rows = speed.GetLength(0), cols = speed.GetLength(1);
+        a = RunCell(speed, a);
+        b = RunCell(speed, b);
+        if (a.x < 0 || b.x < 0 || a.x >= cols || b.x >= cols || a.y >= rows || b.y >= rows) return false;
+        Pieces p = PiecesOf(speed);
+        int pa = p.piece[a.y * cols + a.x], pb = p.piece[b.y * cols + b.x];
+        return pa >= 0 && pa == pb;
+    }
+
+    // The grid changed in place (out-of-bounds areas closed after the pieces were counted): count them again
+    public static void ForgetPieces()
+    {
+        piecesOf = null;
+        pieces = null;
+    }
+
     static Pieces PiecesOf(float[,] speed)
     {
         if (ReferenceEquals(speed, piecesOf) && pieces != null) return pieces;

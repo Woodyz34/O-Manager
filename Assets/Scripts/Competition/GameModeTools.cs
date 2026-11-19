@@ -270,21 +270,24 @@ public class GameModeTools : MonoBehaviour
         if (moveButton != null)
         {
             string cannot = MoveControlMode.CannotMove(local, agent);
-            bool movedHere = local.moveUsed && local.moveControl == agent.currentKontroll;
+            bool movedHere = MoveControlMode.MovedTo(local, agent.currentKontroll, out _);
+            bool allUsed = MoveControlMode.AllUsed(local);
             moveButton.interactable = cannot == null;
             CourseUI.SetButtonText(moveButton, tool == Tool.Move ? "Cancel"
                 : movedHere ? "Move control " + agent.currentKontroll + " again"
                 : cannot == null ? "Move control " + agent.currentKontroll
-                : local.moveUsed ? "Move used" : "Move a control");
+                : allUsed ? "Moves used" : "Move a control");
             CourseUI.SetButtonColor(moveButton, tool == Tool.Move ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
             if (tool == Tool.Move) text = "Click where control " + agent.currentKontroll + " should be, at most " + Mathf.RoundToInt(MoveControlMode.MaxMeters) + " m from where it was laid. Right-click to cancel.";
-            else if (text == null && cannot != null && !local.moveUsed) text = cannot;
+            else if (text == null && cannot != null && !allUsed) text = cannot;
         }
         if (text == null)
         {
             text = !string.IsNullOrEmpty(hintOverride) && Time.unscaledTime < hintUntil ? hintOverride
                 : (bearButton != null ? BearHint(local) : "")
-                  + (moveButton != null && !local.moveUsed ? "One control move each: the control you are drawing to." : "");
+                  + (moveButton != null && !MoveControlMode.AllUsed(local)
+                      ? (HostSettings.MovesPerLeg == 1 ? "One control move each" : HostSettings.MovesPerLeg + " control moves each") + ": the control you are drawing to."
+                      : "");
         }
         hint.text = text;
     }

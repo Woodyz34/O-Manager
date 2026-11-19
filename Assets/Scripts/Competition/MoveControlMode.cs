@@ -15,6 +15,38 @@ using UnityEngine.SceneManagement;
 public static class MoveControlMode
 {
     public const float MaxMeters = 100f;
+    public const int MaxMoves = 3;
+
+    // ---- A player's moves (NetworkPlayer.moveControls / moveTargets) ----
+
+    public static int Used(NetworkPlayer player)
+    {
+        int count = 0;
+        for (int i = 0; i < MaxMoves; i++) if (player.moveControls[i] > 0) count++;
+        return count;
+    }
+
+    // The place the player moved control index to, if it did
+    public static bool MovedTo(NetworkPlayer player, int index, out Vector2 target)
+    {
+        for (int i = 0; i < MaxMoves; i++)
+        {
+            if (player.moveControls[i] != index || index <= 0) continue;
+            target = player.moveTargets[i];
+            return true;
+        }
+        target = Vector2.zero;
+        return false;
+    }
+
+    public static bool AllUsed(NetworkPlayer player) => Used(player) >= Mathf.Clamp(HostSettings.MovesPerLeg, 1, MaxMoves);
+
+    static string UsedList(NetworkPlayer player)
+    {
+        List<string> list = new List<string>();
+        for (int i = 0; i < MaxMoves; i++) if (player.moveControls[i] > 0) list.Add(player.moveControls[i].ToString());
+        return string.Join(", ", list);
+    }
 
     static float U => MapDefinition.WorldUnitsPerMeter;
 
@@ -71,7 +103,10 @@ public static class MoveControlMode
     // Why the local player cannot move the control they are drawing to now, or null when they can
     public static string CannotMove(NetworkPlayer local, AgentMovement agent)
     {
-        if (local.moveUsed && local.moveControl != agent.currentKontroll) return "You have used your move (control " + local.moveControl + ").";
+        if (AllUsed(local) && !MovedTo(local, agent.currentKontroll, out _))
+        {
+            return Used(local) == 1 ? "You have used your move (control " + UsedList(local) + ")." : "You have used your moves (controls " + UsedList(local) + ").";
+        }
         if (agent.pathfindingManager == null) return "The map is not ready yet.";
         if (agent.currentKontroll >= agent.pathfindingManager.controlPoints.Count - 1) return "The finish cannot be moved.";
         if (handled.Contains(agent.currentKontroll)) return "This control has already been moved.";
@@ -95,6 +130,14 @@ public static class MoveControlMode
         if (manager == null || manager.speedGrid2D == null) return "The map is not ready yet.";
         Vector2Int cell = agent.WorldToGridPositionCentered(world);
         if (manager.speedGrid2D[cell.y, cell.x] <= 0.01f) return "Nobody can get there. Put the control on ground you can run on.";
+        // Not inside a closed garden, a fenced yard or behind out-of-bounds: the runners must be able to get there
+        // from the control before (2026-11-19, sprint maps)
+        int index = agent.currentKontroll;
+        if (index > 0 && index - 1 < manager.controlPoints.Count)
+        {
+            Vector2Int from = agent.WorldToGridPositionCentered(manager.controlPoints[index - 1].position);
+            if (!CourseValidator.SamePiece(manager.speedGrid2D, from, cell)) return "Nobody can get there from the control before. Put it where the runners can reach it.";
+        }
         // Not onto your own bear (2026-11-15). Where the others hid theirs nobody knows, so that can still happen.
         NetworkPlayer own = agent.GetComponent<NetworkPlayer>();
         if (own != null)
@@ -123,7 +166,10 @@ public static class MoveControlMode
         if (speed == null) return middle;
         int rows = speed.GetLength(0), cols = speed.GetLength(1);
         Vector2Int cell = manager.WorldToGridPositionCentered(new Vector3(middle.x, middle.y, 0f));
-        if (speed[cell.y, cell.x] > 0.01f) return middle;
+        // Somewhere the runners can get to from the control before (2026-11-19)
+        Vector2Int before = index > 0 ? manager.WorldToGridPositionCentered(manager.controlPoints[index - 1].position) : cell;
+        bool Reachable(int x, int y) => CourseValidator.SamePiece(speed, before, new Vector2Int(x, y));
+        if (speed[cell.y, cell.x] > 0.01f && Reachable(cell.x, cell.y)) return middle;
         Vector2 original = Original(index);
         float max = MaxMeters * U;
         int reach = Mathf.CeilToInt(2f * max / Mathf.Max(0.0001f, manager.cellSize));
@@ -138,6 +184,7 @@ public static class MoveControlMode
                 Vector3 centre = manager.GridToWorldPosition(y, x);
                 Vector2 at = new Vector2(centre.x, centre.y);
                 if (Vector2.Distance(at, original) > max) continue;
+                if (!Reachable(x, y)) continue;
                 float distance = (at - middle).sqrMagnitude;
                 if (distance < bestDistance) { bestDistance = distance; best = at; }
             }
@@ -150,9 +197,12 @@ public static class MoveControlMode
     {
         int index = agent.currentKontroll;
         world = Clamp(index, world);
-        local.moveControl = index;
-        local.moveTarget = new Vector2(world.x, world.y);
-        local.moveUsed = true;
+        int slot = -1;
+        for (int i = 0; i < MaxMoves && slot < 0; i++) if (local.moveControls[i] == index) slot = i;
+        for (int i = 0; i < MaxMoves && slot < 0; i++) if (local.moveControls[i] <= 0) slot = i;
+        if (slot < 0) return;
+        local.moveControls.Set(slot, index);
+        local.moveTargets.Set(slot, new Vector2(world.x, world.y));
 
         Transform point = agent.pathfindingManager.controlPoints[index];
         point.position = new Vector3(world.x, world.y, point.position.z);
@@ -175,9 +225,9 @@ public static class MoveControlMode
         Vector2 sum = Vector2.zero;
         foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player.Object == null || !player.Object.IsValid || !player.moveUsed || player.moveControl != index) continue;
+            if (player.Object == null || !player.Object.IsValid || !MovedTo(player, index, out Vector2 target)) continue;
             movers.Add(player);
-            sum += player.moveTarget;
+            sum += target;
         }
         handled.Add(index);
         if (movers.Count == 0) return false;
