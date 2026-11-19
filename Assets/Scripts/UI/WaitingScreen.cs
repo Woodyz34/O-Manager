@@ -27,6 +27,7 @@ public class WaitingScreen : MonoBehaviour
     }
 
     TextMeshProUGUI heading;
+    TextMeshProUGUI sub;
     TextMeshProUGUI players;
     Button changeButton;
     GameObject card;
@@ -58,7 +59,7 @@ public class WaitingScreen : MonoBehaviour
         heading = CourseUI.Text("Heading", card.transform, "Waiting for the others", 46, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Place(heading.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -36), new Vector2(700, 64));
 
-        TextMeshProUGUI sub = CourseUI.Text("Subheading", card.transform, "The race starts when everyone has chosen a runner.", 24, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
+        sub = CourseUI.Text("Subheading", card.transform, "The race starts when everyone has chosen a runner.", 24, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
         CourseUI.Place(sub.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -102), new Vector2(700, 40));
 
         players = CourseUI.Text("Players", card.transform, "", 26, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.Center);
@@ -84,6 +85,11 @@ public class WaitingScreen : MonoBehaviour
             && (manager.ChooseRunnerPanel == null || !manager.ChooseRunnerPanel.activeSelf);
         if (card.activeSelf != waiting) card.SetActive(waiting);
         if (!waiting) return;
+        // Same stats (Imposter, Secret task...): nobody picks a runner, so the ones not ready are still loading in, and
+        // there is no runner to change to (2026-11-19)
+        bool noPicking = GameModes.SameStatsLegs != null;
+        sub.text = noPicking ? "The race starts when everyone is in." : "The race starts when everyone has chosen a runner.";
+        if (changeButton.gameObject.activeSelf == noPicking) changeButton.gameObject.SetActive(!noPicking);
 
         StringBuilder text = new StringBuilder();
         List<string> ready = new List<string>();
@@ -95,7 +101,7 @@ public class WaitingScreen : MonoBehaviour
             if (string.IsNullOrEmpty(name)) name = "Player";
             (p.HasChoosenRunner ? ready : choosing).Add(name);
         }
-        if (choosing.Count > 0) text.Append("<color=#E8742A><b>Still choosing:</b></color> ").Append(string.Join(", ", choosing)).Append('\n');
+        if (choosing.Count > 0) text.Append(noPicking ? "<color=#E8742A><b>Still loading in:</b></color> " : "<color=#E8742A><b>Still choosing:</b></color> ").Append(string.Join(", ", choosing)).Append('\n');
         if (ready.Count > 0) text.Append("<color=#3F7D54><b>Ready:</b></color> ").Append(string.Join(", ", ready));
         players.text = text.ToString();
     }
