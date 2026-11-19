@@ -28,7 +28,7 @@ public class LobbyPlayerListUI : MonoBehaviour
         Refresh();
     }
 
-    // With up to 20 players the list is taller than the screen, so it sits in a box that scrolls
+    // With up to 100 players the list is taller than the screen, so it sits in a box that scrolls
     const float MaxListHeight = 560f;
     LayoutElement viewportSize;
     RectTransform content;
