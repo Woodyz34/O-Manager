@@ -71,8 +71,9 @@ public static class ExtraModes
     // Modes that only work on individual courses, not relays
     public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
 
-    // Modes that only work in the forest, not on sprint courses (Imposter works on both)
-    public const ExtraMode ForestOnly = ExtraMode.Bears | ExtraMode.MoveControl;
+    // Modes that only work in the forest, not on sprint courses. None since 2026-11-19: Bears and Move a control work
+    // on sprint too (a moved control must be reachable, MoveControlMode.PlaceProblem)
+    public const ExtraMode ForestOnly = ExtraMode.None;
 
     // Set on the value the host shares, so "nothing turned on" can be told apart from "not arrived yet"
     public const int KnownBit = 1 << 30;
@@ -97,8 +98,8 @@ public static class ExtraModes
         {
             case ExtraMode.Imposter: return "One random player secretly has to finish last. Can you spot who?";
             case ExtraMode.SecretTask: return "Everyone but one gets a secret task. The imposter isn't told it and must blend in.";
-            case ExtraMode.Bears: return "Everyone hides one bear while drawing. Runners who find it get scared and run round it. Forest only.";
-            case ExtraMode.MoveControl: return "Everyone may move one control up to 100 m while drawing. Good routes can turn bad. Forest only.";
+            case ExtraMode.Bears: return "Everyone hides bears while drawing. Runners who find one get scared and run round it.";
+            case ExtraMode.MoveControl: return "Everyone may move controls up to 100 m while drawing. Good routes can turn bad.";
             case ExtraMode.RouteAnalysis: return "Nobody runs: everyone draws the whole course the way they would run it, then you compare the route choices. Played on its own.";
             case ExtraMode.RouteChoice: return "Nobody runs: on each leg, pick the fastest of 2 to 4 routes. Points for right answers, more the quicker you are. Played on its own.";
             default: return "";

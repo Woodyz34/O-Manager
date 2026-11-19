@@ -137,10 +137,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // the reach after saving one on a relay leg, 0 = no bear in that place)
     [Networked, Capacity(BearMode.MaxBears)] public NetworkArray<Vector3> bears => default;
 
-    // Move a control mode: the control this player moved and where to (MoveControlMode)
-    [Networked] public NetworkBool moveUsed { get; set; }
-    [Networked] public int moveControl { get; set; }
-    [Networked] public Vector2 moveTarget { get; set; }
+    // Move a control mode: the controls this player moved (0 = no move in that place) and where to (MoveControlMode).
+    // Up to three: the host picks how many moves everyone gets (2026-11-19)
+    [Networked, Capacity(MoveControlMode.MaxMoves)] public NetworkArray<int> moveControls => default;
+    [Networked, Capacity(MoveControlMode.MaxMoves)] public NetworkArray<Vector2> moveTargets => default;
 
     // Route analysis: this player's drawn routes, simplified (grid cells packed as row * columns + column), where each
     // leg ends in that list, and the time the standard runner would need on each leg (RouteAnalysis)
@@ -171,9 +171,11 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         choiceDone = false;
         for (int i = 0; i < choiceLegs.Length; i++) choiceLegs.Set(i, 0);
         for (int i = 0; i < bears.Length; i++) bears.Set(i, Vector3.zero);
-        moveUsed = false;
-        moveControl = -1;
-        moveTarget = Vector2.zero;
+        for (int i = 0; i < moveControls.Length; i++)
+        {
+            moveControls.Set(i, 0);
+            moveTargets.Set(i, Vector2.zero);
+        }
     }
 
     // Sent by a runner who got scared by someone's bear: everyone sees it
