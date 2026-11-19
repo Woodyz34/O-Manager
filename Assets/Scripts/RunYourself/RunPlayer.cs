@@ -28,7 +28,8 @@ public class RunPlayer : MonoBehaviour
     public float gameSpeed = 3f;
     public bool controlsOn;              // off before the start and after the finish
     public bool mapUp;                   // RunMap: the map is held up (a little slower)
-    public bool lookHeld;                // RunMap: the mouse moves the map, not the head
+    public bool lookHeld;
+    public bool inputOff;                // a menu or window is open: no keys                // RunMap: the mouse moves the map, not the head
     public float raceSeconds;            // the race clock (real-life seconds), kept by RunSession
     public float distance;               // metres run
 
@@ -108,7 +109,7 @@ public class RunPlayer : MonoBehaviour
     void Move(float dt)
     {
         int fwd = 0, side = 0;
-        bool keys = controlsOn && !Fallen && !EscMenu.IsOpen;
+        bool keys = controlsOn && !Fallen && !inputOff;
         if (keys)
         {
             if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) fwd++;
@@ -222,7 +223,7 @@ public class RunPlayer : MonoBehaviour
 
     void Vertical(float dt)
     {
-        if (controlsOn && !Fallen && !airborne && !EscMenu.IsOpen && Input.GetKeyDown(KeyCode.Space))
+        if (controlsOn && !Fallen && !airborne && !inputOff && Input.GetKeyDown(KeyCode.Space))
         {
             airborne = true;
             jumpV = 3.7f;

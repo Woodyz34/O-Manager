@@ -221,8 +221,15 @@ public class RunSession : MonoBehaviour
         float dt = Time.deltaTime;
         bool playing = phase == Phase.Countdown || phase == Phase.Running;
 
-        // The mouse turns the head while running; the Esc menu frees it
-        bool locked = playing && !EscMenu.IsOpen;
+        // The mouse turns the head while running; any menu or window (Esc menu, settings, a pop-up) frees it and the
+        // runner stops taking keys until it is closed
+        if (Time.unscaledTime >= nextMenuCheck)
+        {
+            nextMenuCheck = Time.unscaledTime + 0.15f;
+            menuOpen = MenuOpen();
+        }
+        player.inputOff = menuOpen;
+        bool locked = playing && !menuOpen;
         Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
         Cursor.visible = !locked;
 
@@ -259,13 +266,31 @@ public class RunSession : MonoBehaviour
         }
 
         player.Tick(dt);
-        handMap.Tick(dt, phase == Phase.Running && !EscMenu.IsOpen);
+        handMap.Tick(dt, phase == Phase.Running && !menuOpen);
         clockText.text = phase == Phase.Countdown ? "0:00" : RaceTime(player.raceSeconds);
         if (Input.GetKeyDown(KeyCode.F4)) showFacts = !showFacts;
         factsText.text = showFacts ? Facts() : "";
     }
 
     bool showFacts;
+    bool menuOpen;
+    float nextMenuCheck;
+
+    // True while a window that wants the mouse is open: the Esc menu, the settings, or any other pop-up with buttons
+    // above the race (they all sit at sorting order 200 and up)
+    bool MenuOpen()
+    {
+        if (EscMenu.IsOpen || HostSettingsPopup.IsOpen || RunSettings.IsOpen) return true;
+        foreach (GraphicRaycaster r in FindObjectsByType<GraphicRaycaster>(FindObjectsSortMode.None))
+        {
+            if (!r.enabled || !r.gameObject.activeInHierarchy) continue;
+            Canvas c = r.GetComponent<Canvas>();
+            if (c == null || !c.enabled || own.Contains(c) || c.renderMode == RenderMode.WorldSpace) continue;
+            if (c.name == "Toast") continue;   // a short message in the corner, not a window
+            if (c.sortingOrder >= 200) return true;
+        }
+        return false;
+    }
 
     // F4: what the runner is doing, for trying out the speeds
     string Facts()

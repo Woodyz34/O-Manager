@@ -91,6 +91,8 @@ public static class RunSettings
 
     static GameObject open;
 
+    public static bool IsOpen => open != null;
+
     public static void Open(System.Action changed = null)
     {
         if (open != null) Object.Destroy(open);
@@ -108,7 +110,9 @@ public static class RunSettings
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "3D settings", 40, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 52);
-        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, "For \"Run it yourself\". Saved on this computer.", 21, CourseUI.InkMuted);
+        TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, RunSession.Active != null
+            ? "Mouse speed counts at once; the rest from your next race. Saved on this computer."
+            : "For \"Run it yourself\". Saved on this computer.", 21, CourseUI.InkMuted);
         CourseUI.Size(hint, 30);
 
         Chips(card.transform, "Graphics", new[] { "Low", "Medium", "High" }, (int)Level, i => { Level = (Quality)i; changed?.Invoke(); },
