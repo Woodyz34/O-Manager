@@ -68,6 +68,9 @@ public class Clock : MonoBehaviour
             // Klockan ska inte ticka vidare i lobbyn om tävlingen avbröts mitt i ett lopp
             StopTicking();
             endScreenRequested = false;
+            // The race's clock and finish texts never show in the lobby (2026-11-19: the time stayed in the corner)
+            if (instantiatedDashboard != null && instantiatedDashboard.scene.name != scene.name) Destroy(instantiatedDashboard);
+            instantiatedDashboard = null;
         }
     }
 
