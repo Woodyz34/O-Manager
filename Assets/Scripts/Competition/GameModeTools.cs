@@ -61,8 +61,14 @@ public class GameModeTools : MonoBehaviour
 
     static float U => MapDefinition.WorldUnitsPerMeter;
 
-    // True while a tool takes the clicks on the map (and on the frame a click was used by one)
-    public static bool TakesMouse => instance != null && (instance.tool != Tool.None || instance.clickFrame == Time.frameCount);
+    // True while a tool takes the clicks on the map (and on the frame a click was used by one), and while the mouse is
+    // over the player's own bear, which can be dragged somewhere else
+    public static bool TakesMouse => instance != null && (instance.tool != Tool.None || instance.clickFrame == Time.frameCount
+        || instance.dragging >= 0 || instance.overBear >= 0);
+
+    // Dragging one of the local player's own bears (2026-11-19), and the bear the mouse is over
+    int dragging = -1, overBear = -1;
+    Vector3 dragFrom;
 
     void Awake()
     {
@@ -86,6 +92,7 @@ public class GameModeTools : MonoBehaviour
             && agent.manualPathDrawer.timeToDraw && (!agent.manualPathDrawer.relayMode || BearMode.On) && !agent.WaitingForAllPlayersToDraw
             && !CompetitionFlow.ResultsShown && agent.pathfindingManager != null;
 
+        DragOwnBear(local, agent);
         if (!drawing)
         {
             SetTool(Tool.None);
@@ -112,7 +119,7 @@ public class GameModeTools : MonoBehaviour
 
         if (tool == Tool.Bear)
         {
-            string problem = BearMode.PlaceProblem(mouse, agent.pathfindingManager);
+            string problem = BearMode.PlaceProblem(mouse, agent.pathfindingManager, BearMode.NextSize);
             ShowBearGhost(mouse, problem == null && !overUI);
             if (Input.GetMouseButtonDown(0) && !overUI)
             {
@@ -145,6 +152,71 @@ public class GameModeTools : MonoBehaviour
                 SetTool(Tool.None);
                 Flash("Control " + index + " moved. The others find out when everyone has drawn. Now draw your line to its new place.");
             }
+        }
+    }
+
+    // The player's own bears hidden on this stretch can be dragged elsewhere until everyone has drawn and the
+    // running starts: press on the bear, drag, let go. A place where a bear may not be puts it back.
+    void DragOwnBear(NetworkPlayer local, AgentMovement agent)
+    {
+        overBear = -1;
+        Camera cam = Camera.main;
+        bool ready = BearMode.On && cam != null && agent != null && local.Object != null && local.Object.IsValid && tool == Tool.None
+            && !CompetitionFlow.ResultsShown && agent.pathfindingManager != null && !EscMenu.IsOpen;
+        if (!ready)
+        {
+            if (dragging >= 0 && local != null && local.Object != null && local.Object.IsValid) BearMode.Move(local, dragging, dragFrom);
+            dragging = -1;
+            return;
+        }
+        Vector3 mouse = cam.ScreenToWorldPoint(Input.mousePosition);
+        mouse.z = -1.5f;
+        if (dragging >= 0)
+        {
+            if (!BearMode.Movable(local, agent, dragging))
+            {
+                BearMode.Move(local, dragging, dragFrom);
+                dragging = -1;
+                return;
+            }
+            float size = local.bears[dragging].z;
+            string problem = BearMode.PlaceProblem(mouse, agent.pathfindingManager, size);
+            if (BearWatcher.Instance != null) BearWatcher.Instance.ShowOwnAt(BearMode.Key(local.Object.StateAuthority, dragging), mouse);
+            if (Input.GetMouseButton(0))
+            {
+                if (problem == null) BearMode.Move(local, dragging, mouse);
+                return;
+            }
+            // Let go
+            clickFrame = Time.frameCount;
+            if (problem != null)
+            {
+                BearMode.Move(local, dragging, dragFrom);
+                Flash(problem);
+            }
+            else
+            {
+                BearMode.Move(local, dragging, mouse);
+                Flash("Your bear has moved.");
+            }
+            dragging = -1;
+            return;
+        }
+        if (agent.manualPathDrawer != null && agent.manualPathDrawer.isDrawing) return;
+        for (int slot = 0; slot < BearMode.MaxBears; slot++)
+        {
+            if (!BearMode.Movable(local, agent, slot)) continue;
+            Vector3 bear = local.bears[slot];
+            float reach = BearMode.DrawnMeters(bear.z) * U * 0.45f;
+            if (Vector2.Distance(mouse, bear) > reach) continue;
+            overBear = slot;
+            if (Input.GetMouseButtonDown(0) && !agent.manualPathDrawer.IsPointerOverTaggedCanvas())
+            {
+                dragging = slot;
+                dragFrom = new Vector3(bear.x, bear.y, 0f);
+                clickFrame = Time.frameCount;
+            }
+            return;
         }
     }
 
@@ -184,9 +256,14 @@ public class GameModeTools : MonoBehaviour
         string text = null;
         if (bearButton != null)
         {
-            bool placed = local.bearPlaced;
+            int left = BearMode.Left(local);
+            bool placed = left <= 0;
+            float next = BearMode.NextSize;
+            string big = next > 1.01f ? " (" + Mathf.RoundToInt(next) + "x)" : "";
             bearButton.interactable = !placed;
-            CourseUI.SetButtonText(bearButton, tool == Tool.Bear ? "Cancel" : placed ? "Bear hidden" : "Hide your bear");
+            CourseUI.SetButtonText(bearButton, tool == Tool.Bear ? "Cancel"
+                : placed ? (BearMode.Placed(local) > 1 ? "Bears hidden" : "Bear hidden")
+                : HostSettings.BearsPerLeg > 1 ? "Hide a bear" + big + " · " + left + " left" : "Hide your bear" + big);
             CourseUI.SetButtonColor(bearButton, tool == Tool.Bear ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Secondary);
             if (tool == Tool.Bear) text = "Click on the map where your bear should hide (not near a control). Right-click to cancel.";
         }
@@ -206,10 +283,22 @@ public class GameModeTools : MonoBehaviour
         if (text == null)
         {
             text = !string.IsNullOrEmpty(hintOverride) && Time.unscaledTime < hintUntil ? hintOverride
-                : (bearButton != null && !local.bearPlaced ? (RelayRace.Active != null ? "One bear each per leg: it stays on this leg. " : "One bear each, for the whole race. ") : "")
+                : (bearButton != null ? BearHint(local) : "")
                   + (moveButton != null && !local.moveUsed ? "One control move each: the control you are drawing to." : "");
         }
         hint.text = text;
+    }
+
+    static string BearHint(NetworkPlayer local)
+    {
+        int each = HostSettings.BearsPerLeg;
+        string count = each == 1 ? "One bear" : each + " bears";
+        string hint = BearMode.Left(local) > 0
+            ? (RelayRace.Active != null ? count + " each per leg: they stay on this leg. Save one for a bigger bear on the next leg. "
+                                        : count + " each, for the whole race. ")
+            : "";
+        if (BearMode.Placed(local) > 0) hint += "Drag your bear to move it until the start. ";
+        return hint;
     }
 
     void Flash(string message)
@@ -248,6 +337,7 @@ public class GameModeTools : MonoBehaviour
             bearGhost.transform.localScale = Vector3.one * BearMode.SizeMeters * U;
         }
         bearGhost.SetActive(true);
+        bearGhost.transform.localScale = Vector3.one * BearMode.DrawnMeters(BearMode.NextSize) * U;
         bearGhost.transform.position = at;
         if (Camera.main != null) bearGhost.transform.rotation = Camera.main.transform.rotation;
         bearGhostSprite.color = ok ? new Color(1f, 1f, 1f, 0.75f) : new Color(1f, 0.45f, 0.45f, 0.6f);
