@@ -23,7 +23,7 @@ public class MapImportPanel : MonoBehaviour
     public const double PixelsPerMm = 16;   // about 400 dpi: sharp, and the picture stays a manageable size
     public const int MaxPictureSide = 16384; // the largest texture Unity can make
 
-    static readonly string[] MapExtensions = { "ocd", "omap", "xmap" };
+    internal static readonly string[] MapExtensions = { "ocd", "omap", "xmap" };
     static readonly string[] MapTypes = { "forest", "sprint", "both" };
 
     Action<MapDefinition> onImported;
@@ -247,7 +247,7 @@ public class MapImportPanel : MonoBehaviour
 
     // ---- Choosing files ----
 
-    static string LastFolder()
+    internal static string LastFolder()
     {
         string folder = PlayerPrefs.GetString("MapImport.Folder", "");
         if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder)) return folder;
