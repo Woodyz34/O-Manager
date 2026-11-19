@@ -201,6 +201,7 @@ public class PackOpening : MonoBehaviour
         buttons.interactable = false;
         buttons.blocksRaycasts = false;
         skipButton.gameObject.SetActive(false);
+        if (moneyPill != null) moneyPill.SetActive(false);
 
         foreach (Graphic graphic in tierTinted)
         {
@@ -779,11 +780,36 @@ public class PackOpening : MonoBehaviour
             int price = PackShop.CurrentPrice();
             anotherButton.gameObject.SetActive(PackShop.CanBuy());
             anotherLabel.text = price == 0 ? "Open free pack" : "Open another (" + price + " kr)";
+            ShowMoney();
         }
         yield return UIAnim.Wait(0.3f);
         buttons.blocksRaycasts = true;
         buttons.interactable = true;
         yield return UIAnim.Run(0.35f, t => buttons.alpha = t);
+    }
+
+    // Your money in the top right corner while you choose to open another pack or go to My Runners (2026-11-19), in
+    // the same pill as on the other pages
+    GameObject moneyPill;
+
+    void ShowMoney()
+    {
+        if (moneyPill == null)
+        {
+            Canvas canvas = GetComponentInChildren<Canvas>(true);
+            if (canvas == null) return;
+            Image pill = CourseUI.Panel("Money pill", canvas.transform, CourseUI.Card);
+            if (CourseUI.Skin != null && CourseUI.Skin.pill != null) pill.sprite = CourseUI.Skin.pill;
+            CourseUI.Place(pill.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48, -40), new Vector2(220, 66));
+            TextMeshProUGUI amount = CourseUI.Text("Amount", pill.transform, "", 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+            CourseUI.Stretch(amount.rectTransform, 12, 12, 0, 0);
+            pill.gameObject.SetActive(false);
+            MoneyLabel label = pill.gameObject.AddComponent<MoneyLabel>();
+            label.text = amount;
+            moneyPill = pill.gameObject;
+        }
+        moneyPill.transform.SetAsLastSibling();
+        moneyPill.SetActive(true);
     }
 
     void ShowCardSide(bool faceUp)
