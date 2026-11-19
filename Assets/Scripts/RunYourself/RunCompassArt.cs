@@ -7,41 +7,68 @@ public static class RunCompassArt
     const int Ppm = 4;
     static Texture2D plate, capsule, needle;
 
-    // The clear baseplate: rounded, a faint tint, a dark rim, a red direction arrow at the top, millimetre scale
-    // marks along the inner edge and a few lines along the direction of travel
+    // The plate of a thumb compass (2026-11-19, Anders: it looked like a baseplate compass, not a thumb compass):
+    // clear and a little tinted, square at the back where the thumb goes, narrowing to a rounded point in front with
+    // a red direction arrow and a dark rubber strap across the back that goes round the thumb. 36 x 62 mm; the front is up.
+    public const float PlateW = 36f, PlateH = 62f, StrapFrom = 5f, StrapTo = 13f, CapsuleY = 29f, CapsuleD = 30f, TaperFrom = 32f;
+
     public static Texture2D Baseplate()
     {
         if (plate != null) return plate;
-        int w = 58 * Ppm, h = 92 * Ppm;
+        int w = (int)PlateW * Ppm, h = (int)PlateH * Ppm;
         Color[] px = Blank(w, h);
-        Color tint = new Color(0.86f, 0.93f, 0.95f, 0.28f), rim = new Color(0.12f, 0.16f, 0.18f, 0.9f);
-        Color red = new Color(0.86f, 0.12f, 0.1f, 1f), mark = new Color(0.08f, 0.1f, 0.12f, 0.95f);
-        float r = 7f * Ppm;
+        Color tint = new Color(0.86f, 0.93f, 0.95f, 0.3f), rim = new Color(0.12f, 0.16f, 0.18f, 0.9f);
+        Color red = new Color(0.86f, 0.12f, 0.1f, 1f);
+        Color strap = new Color(0.16f, 0.17f, 0.19f, 0.96f), strapLight = new Color(0.36f, 0.38f, 0.41f, 0.95f);
+        float cx = w * 0.5f;
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
-                float d = RoundRect(x + 0.5f, y + 0.5f, w, h, r);   // < 0 inside
+                float d = ThumbPlate(x + 0.5f, y + 0.5f);   // < 0 inside, in pixels
                 float inside = Mathf.Clamp01(0.5f - d);
                 if (inside <= 0f) continue;
-                float edge = Mathf.Clamp01(1.5f * Ppm * 0.5f - Mathf.Abs(d + 1.2f * Ppm)) ;
                 Over(px, w, x, y, tint, inside);
-                Over(px, w, x, y, rim, Mathf.Clamp01(edge) * inside);
+                Over(px, w, x, y, rim, Mathf.Clamp01(0.75f * Ppm - Mathf.Abs(d + 0.9f * Ppm)) * inside);
+                // The rubber strap across the back, with a lighter ridge along it
+                float sy = (y + 0.5f) / Ppm;
+                if (sy > StrapFrom && sy < StrapTo)
+                {
+                    float edge = Mathf.Clamp01(Mathf.Min(sy - StrapFrom, StrapTo - sy) * Ppm * 0.5f);
+                    Over(px, w, x, y, strap, edge * inside);
+                    float ridge = 1f - Mathf.Abs(sy - (StrapFrom + StrapTo) * 0.5f) / 1.2f;
+                    if (ridge > 0f) Over(px, w, x, y, strapLight, ridge * 0.6f * inside);
+                }
             }
-        // Direction arrow at the top
-        float cx = w * 0.5f, top = h - 6f * Ppm;
-        Triangle(px, w, h, new Vector2(cx, top), new Vector2(cx - 7f * Ppm, top - 13f * Ppm), new Vector2(cx + 7f * Ppm, top - 13f * Ppm), red);
-        Rect(px, w, h, cx - 1.6f * Ppm, top - 30f * Ppm, cx + 1.6f * Ppm, top - 12f * Ppm, red);
-        // Lines along the direction of travel either side of the capsule
-        for (int s = -1; s <= 1; s += 2)
-            Rect(px, w, h, cx + s * 22f * Ppm - 0.3f * Ppm, 8f * Ppm, cx + s * 22f * Ppm + 0.3f * Ppm, h - 24f * Ppm, mark * new Color(1, 1, 1, 0.55f));
-        // A millimetre scale on the outer long edge (the side away from the thumb is chosen by the hand's mirror)
-        for (int mm = 0; mm <= 70; mm++)
+        // The red direction arrow at the front point, and the direction line from the capsule up to it
+        float tipY = h - 3f * Ppm;
+        Triangle(px, w, h, new Vector2(cx, tipY), new Vector2(cx - 3.2f * Ppm, tipY - 8f * Ppm), new Vector2(cx + 3.2f * Ppm, tipY - 8f * Ppm), red);
+        Rect(px, w, h, cx - 0.5f * Ppm, (CapsuleY + CapsuleD * 0.5f + 0.5f) * Ppm, cx + 0.5f * Ppm, tipY - 7.5f * Ppm, red);
+        return plate = Make("Thumb compass plate", w, h, px);
+    }
+
+    // The outline of the thumb plate as a distance (pixels, negative inside): straight sides at the back with round
+    // corners, then narrowing to a blunt point in front
+    static float ThumbPlate(float x, float y)
+    {
+        float w = PlateW * Ppm, h = PlateH * Ppm, mx = Mathf.Abs(x - w * 0.5f);
+        float straightTo = TaperFrom * Ppm, tip = 2.5f * Ppm, corner = 4f * Ppm;
+        float d = mx - w * 0.5f;
+        if (y > straightTo)
         {
-            float y = 10f * Ppm + mm * Ppm, len = (mm % 10 == 0 ? 5f : mm % 5 == 0 ? 3.5f : 2f) * Ppm;
-            Rect(px, w, h, 2.6f * Ppm, y - 0.18f * Ppm, 2.6f * Ppm + len, y + 0.18f * Ppm, mark);
-            Rect(px, w, h, w - 2.6f * Ppm - len, y - 0.18f * Ppm, w - 2.6f * Ppm, y + 0.18f * Ppm, mark);
+            // The slanted side: from the full width down to the blunt tip, measured square to the side
+            float run = h - straightTo, drop = w * 0.5f - tip;
+            float half = w * 0.5f - drop * (y - straightTo) / run;
+            d = (mx - half) * run / Mathf.Sqrt(run * run + drop * drop);
         }
-        return plate = Make("Compass plate", w, h, px);
+        d = Mathf.Max(d, y - h);
+        // The back edge and its round corners
+        d = Mathf.Max(d, -y);
+        if (y < corner && mx > w * 0.5f - corner)
+        {
+            float qx = mx - (w * 0.5f - corner), qy = corner - y;
+            d = Mathf.Sqrt(qx * qx + qy * qy) - corner;
+        }
+        return d;
     }
 
     // The capsule: clear liquid in a black ring, with north-south lines to line up with the map's north lines

@@ -86,6 +86,8 @@ public partial class RunSession
                 {
                     local.run3dMapLeg = handMap.Leg;
                     local.run3dMapTurn = handMap.Turn;
+                    local.run3dMapAt = handMap.LookAt;
+                    local.run3dMapSize = handMap.Size;
                 }
             }
             local.run3dPunched = inOrder;

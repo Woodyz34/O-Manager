@@ -165,7 +165,7 @@ public class RunMap : MonoBehaviour
 
     static Vector3 HandSpot(bool right) => new Vector3((right ? 1f : -1f) * (PaperW * 0.5f + 0.004f), -PaperH * 0.12f, 0f);
 
-    // A thumb compass, as orienteers use: a clear baseplate on the thumb with a red direction arrow and scale marks,
+    // A thumb compass, as orienteers use: a clear plate on the thumb with a strap and a red direction arrow,
     // and a clear capsule with a long needle, red to the north and white to the south, that always points to the real
     // north. Drawn as pictures on a small sheet laid on the map (sharp at any size), the needle turned every frame.
     void BuildCompass(Transform hand, float side)
@@ -176,12 +176,15 @@ public class RunMap : MonoBehaviour
         compass = canvas.transform;
         RectTransform rect = (RectTransform)compass;
         rect.SetParent(hand, false);
-        rect.sizeDelta = new Vector2(58f, 92f);                        // mm
+        rect.sizeDelta = new Vector2(RunCompassArt.PlateW, RunCompassArt.PlateH);   // mm
         rect.localScale = Vector3.one * 0.001f;
-        // On top of the thumb (a thumb compass lies over the thumb, which holds the map under it), well in front of it
-        // so no part of the thumb cuts through the plate
-        rect.localPosition = new Vector3(-side * 0.03f, 0.012f, -0.024f);
-        rect.localRotation = Quaternion.Euler(0f, 0f, side * 6f);
+        // On the thumb (2026-11-19, Anders: a thumb compass, worn on the thumb): along the thumb, the strap round the
+        // middle of it and the point reaching past its tip, in front of it so the thumb shows through the clear plate
+        const float tilt = 12f;                                         // as the thumb leans
+        float strapToMiddle = (RunCompassArt.PlateH * 0.5f - (RunCompassArt.StrapFrom + RunCompassArt.StrapTo) * 0.5f) * 0.001f;
+        Vector3 along = Quaternion.Euler(0f, 0f, side * tilt) * Vector3.up;
+        rect.localPosition = new Vector3(-side * 0.004f, -0.004f, -0.024f) + along * strapToMiddle;
+        rect.localRotation = Quaternion.Euler(0f, 0f, side * tilt);
 
         // Always drawn last and over everything in the hand, the map and the thumb included
         canvas.overrideSorting = true;
@@ -189,10 +192,11 @@ public class RunMap : MonoBehaviour
         RawImage plate = Picture("Baseplate", rect, RunCompassArt.Baseplate());
         CourseUI.Stretch(plate.rectTransform);
         RawImage capsuleFace = Picture("Capsule", rect, RunCompassArt.Capsule());
-        CourseUI.Place(capsuleFace.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2(0f, 33f), new Vector2(50f, 50f));
+        float d = RunCompassArt.CapsuleD;
+        CourseUI.Place(capsuleFace.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2(0f, RunCompassArt.CapsuleY), new Vector2(d, d));
         RawImage arrow = Picture("Needle", capsuleFace.rectTransform, RunCompassArt.Needle());
         needle = arrow.rectTransform;
-        CourseUI.Place(needle, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(9f, 46f));
+        CourseUI.Place(needle, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(d * 9f / 50f, d * 46f / 50f));
     }
 
     static Material onTop;
@@ -274,11 +278,19 @@ public class RunMap : MonoBehaviour
 
     // Watching another runner: their leg and the way they turned the map
     public float Turn => turnTarget;
+    public Vector2 LookAt => lookAtTarget;
+    public float Size => sizeTarget;
 
-    public void Follow(int leg, float turned)
+    // Their zoom and where they dragged the map follow too (0 size: not known yet, the leg is framed instead)
+    public void Follow(int leg, float turned, Vector2 at, float zoom)
     {
         if (leg != Leg) FrameLeg(leg);
         turnTarget = turned;
+        if (zoom > 0f)
+        {
+            lookAtTarget = new Vector3(at.x, at.y, lookAtTarget.z);
+            sizeTarget = Mathf.Clamp(zoom, minSize, maxSize);
+        }
     }
 
     public void SetUp(bool up)

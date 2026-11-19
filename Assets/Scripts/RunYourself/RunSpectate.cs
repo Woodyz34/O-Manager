@@ -6,7 +6,7 @@ using UnityEngine.UI;
 // Run it yourself online: watching the others after the finish (2026-11-19, Anders). Waiting at the finish for the
 // rest was dull, so a list of the runners shows on the left (only after the finish; while running it would only take
 // up the screen). Click a runner to see through their eyes: their head, their map when they hold it up (the leg they
-// look at, turned as they turned it), their running. The list says how far everyone has got ("Leg 3 of 7") and the
+// look at, turned, zoomed and dragged as they have it), their running. The list says how far everyone has got ("Leg 3 of 7") and the
 // times of those in. The clock is the race clock everyone shares (everyone started together).
 public partial class RunSession
 {
@@ -127,7 +127,7 @@ public partial class RunSession
         // Their map, when they hold it up: the leg they look at, turned as they have it
         bool up = (watching.run3dFlags & FlagMapUp) != 0 && !watching.raceFinished;
         if (handMap.Up != up) handMap.SetUp(up);
-        handMap.Follow(watching.run3dMapLeg, watching.run3dMapTurn);
+        handMap.Follow(watching.run3dMapLeg, watching.run3dMapTurn, watching.run3dMapAt, watching.run3dMapSize);
     }
 
     // The first runner still out, after the one watched now in the list's order

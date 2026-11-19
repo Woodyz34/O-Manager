@@ -187,6 +187,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public float run3dPitch { get; set; }
     [Networked] public int run3dMapLeg { get; set; }
     [Networked] public float run3dMapTurn { get; set; }
+    [Networked] public Vector2 run3dMapAt { get; set; }     // the map point in the middle of the sheet (zoomed and dragged)
+    [Networked] public float run3dMapSize { get; set; }     // how far the map is zoomed out
     [Networked] public int run3dPunched { get; set; }
     // Per leg (index 1 = start to control 1): the route picked and the points (RouteChoiceGame.WriteLeg / ReadLeg)
     [Networked, Capacity(52)] public NetworkArray<int> choiceLegs => default;
