@@ -25,6 +25,9 @@ public class MoneyLabel : MonoBehaviour
         {
             pill.sprite = CourseUI.Skin.pill;
             pill.type = Image.Type.Sliced;
+            // The same soft, round ends as the main menu's and the lobby's pill (2026-11-19, the user: without this the
+            // ends came out pointed). Every money pill uses this look.
+            pill.pixelsPerUnitMultiplier = 128f / 60f;
         }
         pill.raycastTarget = true;
         CourseUI.Place(pill.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), anchoredPosition, new Vector2(220, 60));
