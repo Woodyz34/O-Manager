@@ -134,7 +134,8 @@ public class LobbyChat : MonoBehaviour
     {
         root = new GameObject("Lobby chat canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         root.transform.SetParent(transform, false);
-        try { root.tag = "Canvas"; } catch (UnityException) { }   // clicks here do not reach the map under it
+        // No "Canvas" tag here (2026-11-19): this canvas lives on between scenes, and the race found it by that tag and
+        // put its clock in it, so the race time stayed in the top right corner of the lobby afterwards
         Canvas canvas = root.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 150;   // above the lobby, under pop-ups (200+) and the Esc menu
