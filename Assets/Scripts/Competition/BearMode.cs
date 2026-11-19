@@ -53,11 +53,24 @@ public static class BearMode
 
     // ---- Sizes ----
 
-    public static float FindRadiusMeters(float size) => FindMeters * Mathf.Max(1f, size);
-    public static float AvoidRadiusMeters(float size) => AvoidMeters * Mathf.Max(1f, size);
-    public static float DrawnMeters(float size) => SizeMeters * Mathf.Pow(Mathf.Max(1f, size), 0.6f);
+    // A sprint map is drawn at a much bigger scale (1:4 000 against 1:15 000 in the forest), so a bear of the forest's
+    // size covered whole blocks there (2026-11-19, the user). On a sprint course the bear, its reach and the detour
+    // around it are this share of the forest's.
+    public const float SprintScale = 0.4f;
+    public static float MapScale
+    {
+        get
+        {
+            bool sprint = CourseLoader.Loaded != null ? CourseLoader.Loaded.IsSprint() : CourseLoader.LoadedMap != null && CourseLoader.LoadedMap.IsSprint;
+            return sprint ? SprintScale : 1f;
+        }
+    }
+
+    public static float FindRadiusMeters(float size) => FindMeters * MapScale * Mathf.Max(1f, size);
+    public static float AvoidRadiusMeters(float size) => AvoidMeters * MapScale * Mathf.Max(1f, size);
+    public static float DrawnMeters(float size) => SizeMeters * MapScale * Mathf.Pow(Mathf.Max(1f, size), 0.6f);
     // Controls keep clear of the bear's reach
-    public static float KeepFromControlMeters(float size) => Mathf.Max(MinFromControlMeters, FindRadiusMeters(size) + 30f);
+    public static float KeepFromControlMeters(float size) => Mathf.Max(MinFromControlMeters * MapScale, FindRadiusMeters(size) + 30f * MapScale);
     // The size the local player's next bear gets
     public static float NextSize => Mathf.Min(BiggestBear, 1f + saved);
     public static int Saved => saved;
@@ -369,7 +382,7 @@ public class BearWatcher : MonoBehaviour
         view.sprite = art.AddComponent<SpriteRenderer>();
         view.sprite.sprite = ModeBanner.BearSprite;
         view.sprite.sortingOrder = 30;
-        float size = BearMode.SizeMeters * U;
+        float size = BearMode.DrawnMeters(1f) * U;
         view.root.transform.localScale = Vector3.one * size;
 
         view.label = new GameObject("Name").AddComponent<TextMeshPro>();

@@ -20,7 +20,8 @@ public class EraserButton : MonoBehaviour
     Image image;
     ManualPathDrawer drawer;
     float nextLook, nextDrawerLook;
-    int cursorShown;   // 0 the normal pointer, 1 pencil, 2 eraser
+    int cursorShown;   // 0 the normal pointer, 1 pencil, 2 eraser, 3 move (over the player's own bear)
+    static Texture2D moveCursor;
 
     void Update()
     {
@@ -53,7 +54,12 @@ public class EraserButton : MonoBehaviour
     void UpdateCursor()
     {
         int want = 0;
-        if (drawer != null && drawer.timeToDraw && !EscMenu.IsOpen && !GameModeTools.TakesMouse
+        if (GameModeTools.OverOwnBear && !EscMenu.IsOpen)
+        {
+            // 2026-11-19, the user: show that the bear can be moved
+            want = 3;
+        }
+        else if (drawer != null && drawer.timeToDraw && !EscMenu.IsOpen && !GameModeTools.TakesMouse
             && !drawer.IsPointerOverTaggedCanvas())
         {
             want = drawer.Erasing ? 2 : 1;
@@ -61,7 +67,8 @@ public class EraserButton : MonoBehaviour
         if (want == cursorShown) return;
         cursorShown = want;
         MakeCursors();
-        if (want == 1) Cursor.SetCursor(pencilCursor, PencilHotspot, CursorMode.Auto);
+        if (want == 3) Cursor.SetCursor(moveCursor, new Vector2(CursorSize / 2f, CursorSize / 2f), CursorMode.Auto);
+        else if (want == 1) Cursor.SetCursor(pencilCursor, PencilHotspot, CursorMode.Auto);
         else if (want == 2) Cursor.SetCursor(eraserCursor, new Vector2(CursorSize / 2f, CursorSize / 2f), CursorMode.Auto);
         else Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
     }
@@ -107,6 +114,52 @@ public class EraserButton : MonoBehaviour
         MakeSprites();
         if (pencilCursor == null) pencilCursor = Shrink(pencil.texture, CursorSize);
         if (eraserCursor == null) eraserCursor = Shrink(eraser.texture, CursorSize);
+        if (moveCursor == null) moveCursor = DrawMoveCursor();
+    }
+
+    // A white cross with an arrow head at each end and a dark outline, like the system's "move" pointer
+    static Texture2D DrawMoveCursor()
+    {
+        int n = CursorSize;
+        float c = (n - 1) / 2f;
+        bool[] inside = new bool[n * n];
+        for (int y = 0; y < n; y++)
+        {
+            for (int x = 0; x < n; x++)
+            {
+                float dx = Mathf.Abs(x - c), dy = Mathf.Abs(y - c);
+                // Shafts
+                bool shaft = (dy <= 1.5f && dx <= 10f) || (dx <= 1.5f && dy <= 10f);
+                // Arrow heads: triangles from 8 to 14 pixels out
+                bool headX = dx >= 8f && dx <= 13.5f && dy <= 13.5f - dx;
+                bool headY = dy >= 8f && dy <= 13.5f && dx <= 13.5f - dy;
+                inside[y * n + x] = shaft || headX || headY;
+            }
+        }
+        var pixels = new Color32[n * n];
+        for (int y = 0; y < n; y++)
+        {
+            for (int x = 0; x < n; x++)
+            {
+                if (inside[y * n + x])
+                {
+                    pixels[y * n + x] = new Color32(255, 255, 255, 255);
+                    continue;
+                }
+                bool edge = false;
+                for (int oy = -1; oy <= 1 && !edge; oy++)
+                    for (int ox = -1; ox <= 1 && !edge; ox++)
+                    {
+                        int px = x + ox, py = y + oy;
+                        if (px >= 0 && py >= 0 && px < n && py < n && inside[py * n + px]) edge = true;
+                    }
+                pixels[y * n + x] = edge ? new Color32(20, 30, 24, 255) : new Color32(0, 0, 0, 0);
+            }
+        }
+        var texture = new Texture2D(n, n, TextureFormat.RGBA32, false) { name = "Move cursor", filterMode = FilterMode.Bilinear };
+        texture.SetPixels32(pixels);
+        texture.Apply(false, false);
+        return texture;
     }
 
     // A smaller copy for the mouse pointer (each new pixel is the alpha-weighted mean of the pixels it covers)
