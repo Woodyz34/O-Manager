@@ -54,7 +54,7 @@ public class HostSettingsPopup : MonoBehaviour
         CourseUI.Place(viewport, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -120), new Vector2(840, 740));
         CourseUI.Column(list.gameObject, 10, new RectOffset(16, 32, 6, 12));
         // A scrollbar to drag, and a quicker wheel (2026-11-19: the list moved slowly, and the map behind scrolled too)
-        FastScroll.Add(scroll);
+        FastScroll.Add(scroll)?.OnLightCard();
 
         AddHeading(list, "Speed");
         AddSlider(list, "Race speed on the map", "How fast the race runs while you follow it on the map.",

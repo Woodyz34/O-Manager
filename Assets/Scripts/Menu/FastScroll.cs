@@ -17,6 +17,16 @@ public class FastScroll : MonoBehaviour
     bool besideList;
     float boost = 1f;
     float lastNotch = -10f;
+    Image trackImage, handleImage;
+
+    // For a list on a cream card (Lobby settings): a green handle on a light track, so the bar is easy to see
+    // (2026-11-19, the user: the cream handle was the same colour as the card)
+    public FastScroll OnLightCard()
+    {
+        if (trackImage != null) trackImage.color = new Color(0.12f, 0.24f, 0.17f, 0.14f);
+        if (handleImage != null) handleImage.color = new Color(0.16f, 0.42f, 0.27f, 1f);
+        return this;
+    }
 
     public static FastScroll Add(ScrollRect scroll)
     {
@@ -61,6 +71,7 @@ public class FastScroll : MonoBehaviour
         Sprite round = listImage != null ? listImage.sprite : null;
 
         Image track = barObject.AddComponent<Image>();
+        trackImage = track;
         Style(track, round, new Color(0.12f, 0.24f, 0.17f, 0.42f));
 
         RectTransform area = NewRect("Sliding area", bar);
@@ -73,6 +84,7 @@ public class FastScroll : MonoBehaviour
         handle.offsetMax = Vector2.zero;
         Image handleImage = handle.gameObject.AddComponent<Image>();
         Style(handleImage, round, new Color(0.984f, 0.957f, 0.855f, 0.9f));
+        this.handleImage = handleImage;
 
         Scrollbar scrollbar = barObject.AddComponent<Scrollbar>();
         scrollbar.direction = Scrollbar.Direction.BottomToTop;
