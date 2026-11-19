@@ -54,7 +54,7 @@ public static class PrivateMaps
         public long until;                // unix seconds
     }
 
-    static string BorrowedRoot => Path.Combine(Application.persistentDataPath, "Borrowed");
+    static string BorrowedRoot => Path.Combine(Application.persistentDataPath, LocalPrefs.Key("Borrowed"));   // a ParrelSync clone has its own
 
     static long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 

@@ -968,6 +968,7 @@ public class AgentMovement : NetworkBehaviour
         if (pathfindingManager.speedGrid2D == null)
         {
             Debug.Log("speedGrid  är null");
+            return Vector2Int.zero;
         }
         int rows = pathfindingManager.speedGrid2D.GetLength(0);
         int cols = pathfindingManager.speedGrid2D.GetLength(1);
@@ -996,6 +997,7 @@ public class AgentMovement : NetworkBehaviour
         {
             pathfindingManager = FindObjectOfType<PathfindingManager>();
         }
+        if (pathfindingManager == null || pathfindingManager.speedGrid2D == null || pathfindingManager.controlPoints == null || pathfindingManager.controlPoints.Count < 2) return;
         Debug.Log("controlPoints " + pathfindingManager.controlPoints[0].position + " " + pathfindingManager.controlPoints[1].position);
         CamController.FocusOnSegment(WorldToGridPositionCentered(pathfindingManager.controlPoints[0].position), WorldToGridPositionCentered(pathfindingManager.controlPoints[1].position));
         Debug.Log("startView has been done");
