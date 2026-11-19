@@ -58,6 +58,9 @@ public static class CompetitionFlow
         sceneLoadedAt = Time.unscaledTime;
     }
 
+    // How long this competition has been played, in real seconds, up to the results (the prize money, 2026-11-19)
+    public static float PlayedSeconds => Mathf.Max(0f, (ResultsShown ? resultsShownAt : Time.unscaledTime) - sceneLoadedAt);
+
     static bool InCompetition()
     {
         return ActiveScene.Name != "Lobby";
@@ -388,16 +391,39 @@ public static class CompetitionFlow
     }
 }
 
-// How much money a competition pays. More runners means more money for a good placing.
+// How much money a competition pays (2026-11-19, the user's new economy: some players earned money fast with
+// courses that were over in seconds).
+//  - Time played: 10 kr for every 30 seconds from the start to the results, nothing under 30 seconds, at most 2000 kr.
+//  - Place: 50 kr for every runner beaten, 50 more for the winner.
+//  - Nothing at all without reaching the finish (or after leaving).
+//  - The imposter gets no place money in the top third, then more and more steeply the further back it comes, and
+//    an extra boost for coming last without being found.
 public static class CompetitionRewards
 {
-    public const int DidNotFinish = 10;
-    public const int FinishBase = 50;
+    public const int DidNotFinish = 0;
+    public const int PerHalfMinute = 10;
+    public const float MinPlayedSeconds = 30f;
+    public const int MaxForTime = 2000;
     public const int PerRunnerBeaten = 50;
     public const int WinnerBonus = 50;
     public const int CorrectGuess = 150;
     public const int ImposterEscapeBase = 100;
     public const int ImposterEscapePerRunner = 50;
+    public const int ImposterPlaceStep = 50;
+
+    // The base money for the time played (only for those who finished)
+    public static int ForTime(float seconds)
+    {
+        if (seconds < MinPlayedSeconds) return 0;
+        return Mathf.Min(MaxForTime, Mathf.FloorToInt(seconds / 30f) * PerHalfMinute);
+    }
+
+    public static string TimeLabel(float seconds)
+    {
+        int minutes = Mathf.FloorToInt(seconds / 60f);
+        return seconds < MinPlayedSeconds ? "Played under 30 s"
+            : "Played " + (minutes > 0 ? minutes + " min " : "") + Mathf.FloorToInt(seconds % 60f) + " s";
+    }
 
     public static int ForPlace(int place, int runners, bool finished)
     {
@@ -405,7 +431,7 @@ public static class CompetitionRewards
         {
             return DidNotFinish;
         }
-        int reward = FinishBase + PerRunnerBeaten * Mathf.Max(0, runners - place);
+        int reward = PerRunnerBeaten * Mathf.Max(0, runners - place);
         if (place == 1 && runners >= 2)
         {
             reward += WinnerBonus;
@@ -413,10 +439,24 @@ public static class CompetitionRewards
         return reward;
     }
 
-    // The imposter wants to finish last, so their placing is counted from the back
+    // The imposter's top places that pay nothing: the top third (1 of 3, 2 of 6, 3 of 8 or 9)
+    public static int ImposterFreePlaces(int runners) => Mathf.CeilToInt(runners / 3f);
+
+    // The imposter wants to finish last: nothing in the top third, then 50, 140, 260, 400, 560 ... kr for every place
+    // further back (9 runners: 4th 50 kr, last 740 kr)
     public static int ForImposterPlace(int place, int runners, bool finished)
     {
-        return ForPlace(runners - place + 1, runners, finished);
+        if (!finished) return 0;
+        int back = place - ImposterFreePlaces(runners);
+        if (back <= 0) return 0;
+        return Mathf.RoundToInt(ImposterPlaceStep * Mathf.Pow(back, 1.5f) / 10f) * 10;
+    }
+
+    // Last and not found: a boost that grows with the number of runners
+    public static int ForImposterLastUnseen(int place, int runners, bool finished, bool caught)
+    {
+        if (!finished || caught || runners < 3 || place != runners) return 0;
+        return PerRunnerBeaten * (runners - 1);
     }
 
     public static int ForImposterEscape(int otherRunners)
