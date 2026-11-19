@@ -406,7 +406,7 @@ public static class CompetitionRewards
     public const float MinPlayedSeconds = 30f;
     public const int MaxForTime = 2000;
     public const int PerRunnerBeaten = 50;
-    public const int WinnerBonus = 50;
+
     public const int CorrectGuess = 150;
     public const int ImposterEscapeBase = 100;
     public const int ImposterEscapePerRunner = 50;
@@ -426,16 +426,15 @@ public static class CompetitionRewards
             : "Played " + (minutes > 0 ? minutes + " min " : "") + Mathf.FloorToInt(seconds % 60f) + " s";
     }
 
-    // 50 kr for every runner beaten, and 50 more for beating everyone. A tie beats nobody (2026-11-19, the user: two
+    // 50 kr for every runner beaten, and nothing extra for the win (2026-11-19, the user: winning against one player gives
+    // +50, not +100). A tie beats nobody (2026-11-19, the user: two
     // players who both score 0 in the route choice game, or both stop at once, should not both get money for a win),
     // so it is the number of runners strictly behind that counts, not the place.
     public static int ForBeaten(int beaten, int runners, bool finished)
     {
         if (!finished) return DidNotFinish;
         beaten = Mathf.Clamp(beaten, 0, Mathf.Max(0, runners - 1));
-        int reward = PerRunnerBeaten * beaten;
-        if (runners >= 2 && beaten == runners - 1) reward += WinnerBonus;
-        return reward;
+        return PerRunnerBeaten * beaten;
     }
 
     // The runners strictly behind me in a race: slower, or not at the finish
