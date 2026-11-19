@@ -136,6 +136,15 @@ public class RunSession : MonoBehaviour
             return;
         }
         data = WithHills(data, RunSettings.Hills);
+        // The knolls and hollows the mapper drew with contours and form lines, which the 10 m height grid rounds away
+        loadingCard.Set("Reading the contours", 0.06f);
+        byte[] linesJson = TvWorldData.LinesJson(mapDef);
+        TvWorldData.Data plain = data;
+        TvHeights detailed = plain.heights;
+        try { detailed = await Task.Run(() => RunContours.Detailed(mapDef.id, plain.heights, linesJson)); }
+        catch (Exception e) { Debug.LogWarning("RunSession: contours: " + e); }
+        if (this == null) return;
+        data = new TvWorldData.Data { mapId = plain.mapId, layer = plain.layer, heights = detailed, look = plain.look, speeds = plain.speeds };
         loadingCard.Set("Reading the terrain", 0.08f);
         try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds)); }
         catch (Exception e)

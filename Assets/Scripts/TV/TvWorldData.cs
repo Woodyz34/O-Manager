@@ -27,6 +27,13 @@ public static class TvWorldData
         cached = null;
     }
 
+    // The map's lines with their symbol names (lines.json in the package), or null. Main thread.
+    public static byte[] LinesJson(MapDefinition map)
+    {
+        string root = Root(map);
+        return root == null ? null : MapPackages.LoadBytes(root + "lines", ".json");
+    }
+
     static string Root(MapDefinition map)
     {
         string grid = map != null ? map.gridName : null;
