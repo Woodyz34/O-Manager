@@ -9,5 +9,5 @@ window.OM_CONFIG = {
   linuxAssetName: "O-Manager-Linux.tar.gz",  // Linux
   // Visitor statistics with GoatCounter (no cookies). Put your site code here, e.g. "o-manager" for
   // o-manager.goatcounter.com. Empty = no statistics. See website/README.md.
-  goatcounter: ""
+  goatcounter: "o-manager"
 };
