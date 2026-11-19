@@ -278,10 +278,13 @@ def analyse_group(runners, merge_bad_legs=False):
 def national_team(club):
     """A national team entered as a club ("Team Fin", "Team Spain" at O-Ringen or a junior championship):
     the country code (FIN, ESP), else None. "Team Jizerky" is a real club and stays one."""
-    m = re.fullmatch(r"(?i)\s*(?:national\s+team|team|landslaget?)\s+(.+?)\s*", club or "")
-    if not m:
+    c = (club or "").strip()
+    m = (re.fullmatch(r"(?i)(?:national\s+team|team|landslaget?)\s+(.+?)", c)
+         or re.fullmatch(r"(?i)(.+?)\s+national\s+team", c))
+    # A plain country name as club ("Australia", "China" at O-Ringen) is a national team too
+    word = (m.group(1) if m else c).strip().upper()
+    if not word:
         return None
-    word = m.group(1).strip().upper()
     if word in COUNTRIES:
         return word
     for code, name in COUNTRIES.items():
@@ -306,6 +309,10 @@ def load_races():
                 team = national_team(r.get("club"))
                 if team:
                     r["country"], r["club"], r["national_team"] = team, None, True
+                elif re.match(r"(?i)team\s", r.get("club") or ""):
+                    # No real club starts with "Team" (the user, 2026-11-19): a team that is not a
+                    # country ("Team Jizerky") is no club either
+                    r["club"] = None
         races.append(race)
     return races
 
