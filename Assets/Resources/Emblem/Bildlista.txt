@@ -1,5 +1,5 @@
 Bilder till löparkorten: flaggor, klubbmärken och profilbilder
-Uppdaterad 2026-11-14 av eventor/compute_points.py. Listan skrivs om varje gång poängen räknas.
+Uppdaterad 2026-11-19 av eventor/compute_points.py. Listan skrivs om varje gång poängen räknas.
 
 Lägg flaggor i Emblem/Flaggor och klubbmärken i Emblem/Klubbar, med namnen nedan.
 Riktiga profilbilder läggs i Resources/Profilbilder och heter som löparen, t.ex. Tove Alexandersson.jpg.
@@ -15,11 +15,11 @@ FLAGGOR (28 av 28 har bild)
 Saknar bild:
 
 Har bild:
-  Sweden.png   (743 kort)
+  Sweden.png   (739 kort)
   Norway.png   (57 kort)
+  Finland.png   (25 kort)
   Denmark.png   (24 kort)
   Switzerland.png   (22 kort)
-  Finland.png   (21 kort)
   Czechia.png   (16 kort)
   France.png   (14 kort)
   Hungary.png   (11 kort)
@@ -49,7 +49,6 @@ KLUBBAR (129 av 188 har bild)
 
 Saknar bild:
   OK Kullingshof.png   (6 kort)
-  Team Fin.png   (4 kort)
   Uddevalla OK.png   (4 kort)
   Andrarums IF.png   (3 kort)
   Kalevan Rasti.png   (3 kort)
@@ -96,14 +95,15 @@ Saknar bild:
   OK Rodhen.png   (1 kort)
   OK Sorø.png   (1 kort)
   OK Älgen.png   (1 kort)
+  Paimion Rasti.png   (1 kort)
   Sarpsborg OL.png   (1 kort)
   Silkeborg OK.png   (1 kort)
   Skarpnäcks OL.png   (1 kort)
   Skånes.png   (1 kort)
   Søllerød OK.png   (1 kort)
-  Team Spain.png   (1 kort)
   Tjällmo-Godegårds OK.png   (1 kort)
   Trollhättans SOK.png   (1 kort)
+  Ue Vic.png   (1 kort)
   Vimmerby OK.png   (1 kort)
   Årsunda IF.png   (1 kort)
   Örkelljunga FK.png   (1 kort)
@@ -179,6 +179,7 @@ Har bild:
   OK Renen.png   (4 kort)
   Boxholm-Mjölby OL.png   (3 kort)
   Bækkelagets SK.png   (3 kort)
+  Espoon Suunta.png   (3 kort)
   Halmstad OK.png   (3 kort)
   IF Hagen.png   (3 kort)
   Karlskrona SOK.png   (3 kort)
@@ -188,7 +189,6 @@ Har bild:
   Skattkärrs SOK.png   (3 kort)
   Turun Suunnistajat.png   (3 kort)
   Eds SK.png   (2 kort)
-  Espoon Suunta.png   (2 kort)
   FK Friskus-Varberg.png   (2 kort)
   Gränna-Bygdens OK.png   (2 kort)
   Hagaby GoIF Örebro.png   (2 kort)
@@ -213,6 +213,7 @@ Har bild:
   Strängnäs-Malmby OL.png   (2 kort)
   Tampereen Pyrintö.png   (2 kort)
   Turun Metsänkävijät.png   (2 kort)
+  Vehkalahden Veikot.png   (2 kort)
   Ystads OK.png   (2 kort)
   Östersunds OK.png   (2 kort)
   Anderstorps OK.png   (1 kort)
@@ -234,7 +235,6 @@ Har bild:
   SOL Tranås.png   (1 kort)
   Sjövalla FK.png   (1 kort)
   Tyrving IL.png   (1 kort)
-  Vehkalahden Veikot.png   (1 kort)
   Vänersborgs SK.png   (1 kort)
   Waxholms OK.png   (1 kort)
   Östergöt.png   (1 kort)
