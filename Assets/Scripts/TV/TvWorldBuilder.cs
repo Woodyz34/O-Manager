@@ -202,6 +202,9 @@ public class TvWorldBuilder
     // Tiles the finished world is cut into for drawing: 10 x 10 of 22 m
     const int DrawTiles = 10;
     TvMesh groundMesh, rockMesh, thingMesh, wireMesh;
+    // The cliff faces: drawn with the ground's grain (named "Ground ..."), so they look like the rock of the ground
+    // round them, not like smooth grey slabs (2026-11-19, Anders)
+    TvMesh cliffMesh;
     TvMesh[] treeMeshes, tuftMeshes;
     // A piece of the run-yourself world: the trees as they are drawn far away, and the young trees of the thickets
     TvMesh treeFarMesh, thicketMesh;
@@ -333,6 +336,7 @@ public class TvWorldBuilder
 
         groundMesh = new TvMesh { name = "Ground", castShadows = false };
         rockMesh = new TvMesh { name = "Rocks" };
+        cliffMesh = new TvMesh { name = "Ground cliffs" };
         thingMesh = new TvMesh { name = "Things" };
         wireMesh = new TvMesh { name = "Wires", castShadows = false };
         waterMesh = new TvMesh { name = "Water", castShadows = false };
@@ -366,6 +370,7 @@ public class TvWorldBuilder
         // Everything in small tiles, so only what the TV camera looks at is drawn (see TvMesh.SplitIntoTiles)
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { groundMesh }, "Ground", false, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { rockMesh }, "Rocks", true, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { cliffMesh }, "Ground cliffs", true, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { thingMesh }, "Things", true, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { waterMesh }, "Water", false, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { wireMesh }, "Wires", false, R, DrawTiles));
@@ -405,6 +410,7 @@ public class TvWorldBuilder
         for (int i = 0; i < clear.Length; i++) clear[i] = 99f;
         groundMesh = new TvMesh { name = "Ground", castShadows = false, group = TvMesh.Near };
         rockMesh = new TvMesh { name = "Rocks" };
+        cliffMesh = new TvMesh { name = "Ground cliffs" };
         thingMesh = new TvMesh { name = "Things" };
         wireMesh = new TvMesh { name = "Wires", castShadows = false };
         waterMesh = new TvMesh { name = "Water", castShadows = false };
@@ -436,6 +442,7 @@ public class TvWorldBuilder
         Keep(GroundFar());
         Keep(waterMesh);
         Keep(rockMesh);
+        Keep(cliffMesh);
         Keep(thingMesh);
         Keep(wireMesh);
         Keep(treeMeshes[0]);
@@ -583,8 +590,7 @@ public class TvWorldBuilder
             float[] c = line.xz;
             switch (line.kind)
             {
-                // An impassable cliff is too high to jump down (3.5 m); a passable one about a metre, so it
-                // can be jumped down and climbed up (2026-11-19, Anders)
+                // As high as the ground makes them (the drop is no longer used: 2026-11-19, Anders)
                 case WorldLineKind.Cliff: Cliff(c, 3.5f, true); break;
                 case WorldLineKind.SmallCliff: Cliff(c, 1.2f, true); break;
                 case WorldLineKind.EarthBank: Cliff(c, 1.0f, false); break;
@@ -680,26 +686,31 @@ public class TvWorldBuilder
                 best[k] = (d, (px - qx) * nx + (pz - qz) * nz, qx, qz, nx, nz);
             });
         }
-        // The height grid (10 m) already has the cliff's height as a smooth slope across it. The slope is gathered
-        // into the step: the ground above is lifted to the height a few metres above the cliff and the ground below
-        // lowered to the height a few metres below, so the foot is flat ground and the cliff rises from it
-        // (2026-11-19, Anders: the old drop dug a trench at the foot of a cliff that rises from flat ground).
-        // Where the grid has less height than the map's cliff, the rest is shared half up, half down.
-        const float Reach = 6f;
+        // The map's heights already have the cliff's height as a slope across it (the contours bunch up there). The
+        // slope is gathered into a step: the ground just above is kept flat at the height a few metres above the
+        // edge, and the ground below is lowered to the height a few metres below, so the foot is flat and the cliff
+        // rises straight from it. The cliff is only as high as the ground says: nothing is lifted above the ground
+        // round it, so the top never sticks up (2026-11-19, Anders: cliffs of a fixed height stood up above the
+        // hill they sit in and bent the contours; let the ground decide their size).
+        const float Reach = 6f, TopReach = 3f;
         foreach (var pair in best)
         {
             float d = pair.Value.d, side = pair.Value.side;
             if (d > Reach + 1f) continue;
             float qx = pair.Value.qx, qz = pair.Value.qz, nx = pair.Value.nx, nz = pair.Value.nz;
-            float top = BaseHeight(qx - nx * Reach, qz - nz * Reach), foot = BaseHeight(qx + nx * Reach, qz + nz * Reach);
-            float extra = Math.Min(drop, Math.Max(0f, drop - (top - foot))) * 0.5f;
-            float high = top + extra, low = Math.Min(foot, top) - extra;
+            float high = BaseHeight(qx - nx * TopReach, qz - nz * TopReach), foot = BaseHeight(qx + nx * Reach, qz + nz * Reach);
+            float low = Math.Min(foot, high);
             // A rock cliff drops at once (a vertical face is built on it, CliffFaces); an earth bank slopes
             float down = rocky ? Sm(-0.25f, 0.45f, side) : Sm(-0.5f, 0.9f, side);
             float want = high + (low - high) * down;
             int k = pair.Key;
             float here = BaseHeight(k % N - R, k / N - R);
-            F[k] += (want - here) * (1f - Sm(Reach - 2f, Reach + 1f, d));
+            // Above the edge only the strip next to it is made flat; below, the whole slope down to the foot
+            float reach = side < 0f ? TopReach : Reach;
+            // Past the ends of the line the step fades out, so a cliff does not wrap round its own end
+            float beyond = (float)Math.Sqrt(Math.Max(0f, d * d - side * side));
+            float weight = (1f - Sm(reach - 1.5f, reach + 1f, d)) * (1f - Sm(0.5f, 3f, beyond));
+            F[k] += (want - here) * weight;
             float face = Sm(-0.8f, 0.2f, side) * (1f - Sm(1.3f, 2.6f, d));
             if (rocky) rock[pair.Key] = Math.Max(rock[pair.Key], face);
             else soil[pair.Key] = Math.Max(soil[pair.Key], face * 0.8f);
@@ -1298,7 +1309,8 @@ public class TvWorldBuilder
                     float jag = (TvRandom.Noise((px + ox) * 1.7f, (pz + oz) * 1.7f) - 0.5f) * 0.35f;
                     float fx = px + nx * (0.15f + jag), fz = pz + nz * (0.15f + jag);
                     float top = H(px - nx * 0.7f, pz - nz * 0.7f) + 0.1f, foot = H(px + nx * 1.1f, pz + nz * 1.1f) - 0.35f;
-                    if (top < foot + 0.5f) top = foot + 0.5f;
+                    // A low cliff: the face reaches further into the ground below, never up above the top
+                    if (top < foot + 0.5f) foot = top - 0.5f;
                     float lean = (TvRandom.Noise((px + ox) * 0.9f + 7f, (pz + oz) * 0.9f) - 0.5f) * 0.5f;
                     int v0 = -1;
                     for (int r = 0; r <= Rows; r++)
@@ -1312,26 +1324,26 @@ public class TvWorldBuilder
                         TvColor col = Rock.Lerp(RockDark, Math.Max(0f, Math.Min(1f, patch * 1.3f - 0.15f)));
                         if (h < 0.3f) col = col.Lerp(LichenRock, (0.3f - h) * 1.6f * TvRandom.Noise((px + ox) * 0.8f, (pz + oz) * 0.8f + 11f));
                         if (h > 0.75f) col = col.Lerp(RockDark, (h - 0.75f) * 2.4f);
-                        int v = rockMesh.Vertex(fx + nx * out0, y, fz + nz * out0, nx + lean * nz + bulge * 0.8f * nx, 0.15f - bulge * 0.3f, nz - lean * nx + bulge * 0.8f * nz, col);
+                        int v = cliffMesh.Vertex(fx + nx * out0, y, fz + nz * out0, nx + lean * nz + bulge * 0.8f * nx, 0.15f - bulge * 0.3f, nz - lean * nx + bulge * 0.8f * nz, col);
                         if (r == 0) v0 = v;
                     }
                     if (k > 0)
                     {
                         // Front faces must run clockwise seen from the low side
-                        float ux = fx - (rockMesh.positions[first * 3]), uz = fz - (rockMesh.positions[first * 3 + 2]);
+                        float ux = fx - (cliffMesh.positions[first * 3]), uz = fz - (cliffMesh.positions[first * 3 + 2]);
                         bool flip = (ux * nz - uz * nx) < 0f;
                         for (int r = 0; r < Rows; r++)
                         {
                             int a2 = first + r, b2 = first + r + 1, c2 = v0 + r, d2 = v0 + r + 1;   // a2, c2: upper; b2, d2: lower
                             if (flip)
                             {
-                                rockMesh.triangles.Add(a2); rockMesh.triangles.Add(c2); rockMesh.triangles.Add(b2);
-                                rockMesh.triangles.Add(c2); rockMesh.triangles.Add(d2); rockMesh.triangles.Add(b2);
+                                cliffMesh.triangles.Add(a2); cliffMesh.triangles.Add(c2); cliffMesh.triangles.Add(b2);
+                                cliffMesh.triangles.Add(c2); cliffMesh.triangles.Add(d2); cliffMesh.triangles.Add(b2);
                             }
                             else
                             {
-                                rockMesh.triangles.Add(a2); rockMesh.triangles.Add(b2); rockMesh.triangles.Add(c2);
-                                rockMesh.triangles.Add(c2); rockMesh.triangles.Add(b2); rockMesh.triangles.Add(d2);
+                                cliffMesh.triangles.Add(a2); cliffMesh.triangles.Add(b2); cliffMesh.triangles.Add(c2);
+                                cliffMesh.triangles.Add(c2); cliffMesh.triangles.Add(b2); cliffMesh.triangles.Add(d2);
                             }
                         }
                     }
