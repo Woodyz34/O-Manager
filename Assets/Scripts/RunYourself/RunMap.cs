@@ -148,14 +148,12 @@ public class RunMap : MonoBehaviour
         hand.SetParent(parent, false);
         float side = right ? 1f : -1f;
         hand.localPosition = HandSpot(right);
-        Color skin = new Color32(0xe0, 0xb1, 0x8f, 255), skinDark = new Color32(0xc8, 0x96, 0x74, 255);
+        Color skin = new Color32(0xe0, 0xb1, 0x8f, 255);
         Color sleeve = new Color32(0x24, 0x3b, 0x2c, 255), band = new Color32(0xe8, 0x74, 0x2a, 255);
 
-        // The fingers behind the sheet, reaching in from the edge
-        for (int i = 0; i < 4; i++)
-            Part(capsule, skinDark, hand, new Vector3(-side * 0.012f, 0.02f - i * 0.0145f, 0.009f), new Vector3(0.0125f, 0.026f, 0.0115f), Quaternion.Euler(0f, 0f, side * 80f));
+        // The fingers are behind the sheet and not seen: only the thumb shows on the front (2026-11-19, Anders)
         // The palm and the wrist outside the edge, the arm going down and out of sight
-        Part(cube, skin, hand, new Vector3(side * 0.038f, -0.008f, 0.014f), new Vector3(0.045f, 0.072f, 0.022f), Quaternion.Euler(0f, side * -20f, side * 8f));
+        Part(cube, skin, hand, new Vector3(side * 0.042f, -0.008f, 0.016f), new Vector3(0.04f, 0.072f, 0.022f), Quaternion.Euler(0f, 0f, side * 8f));
         Part(cube, band, hand, new Vector3(side * 0.05f, -0.065f, 0.02f), new Vector3(0.056f, 0.012f, 0.036f), Quaternion.Euler(0f, side * -20f, side * 14f));
         Part(cube, sleeve, hand, new Vector3(side * 0.058f, -0.12f, 0.025f), new Vector3(0.06f, 0.1f, 0.04f), Quaternion.Euler(0f, side * -20f, side * 14f));
         // The thumb on the front of the sheet, along the edge, pointing up
@@ -185,6 +183,9 @@ public class RunMap : MonoBehaviour
         rect.localPosition = new Vector3(-side * 0.03f, 0.012f, -0.024f);
         rect.localRotation = Quaternion.Euler(0f, 0f, side * 6f);
 
+        // Always drawn last and over everything in the hand, the map and the thumb included
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = 10;
         RawImage plate = Picture("Baseplate", rect, RunCompassArt.Baseplate());
         CourseUI.Stretch(plate.rectTransform);
         RawImage capsuleFace = Picture("Capsule", rect, RunCompassArt.Capsule());
@@ -194,12 +195,24 @@ public class RunMap : MonoBehaviour
         CourseUI.Place(needle, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(9f, 46f));
     }
 
+    static Material onTop;
+
+    // The UI material without the depth test, so the compass is never cut by the sheet or the thumb
+    static Material OnTop()
+    {
+        if (onTop != null) return onTop;
+        onTop = new Material(Canvas.GetDefaultCanvasMaterial()) { name = "Compass on top" };
+        onTop.SetInt("unity_GUIZTestMode", (int)UnityEngine.Rendering.CompareFunction.Always);
+        return onTop;
+    }
+
     static RawImage Picture(string name, Transform parent, Texture2D texture)
     {
         RawImage image = new GameObject(name).AddComponent<RawImage>();
         image.transform.SetParent(parent, false);
         image.texture = texture;
         image.raycastTarget = false;
+        image.material = OnTop();
         return image;
     }
 

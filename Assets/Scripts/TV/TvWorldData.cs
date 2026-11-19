@@ -27,6 +27,33 @@ public static class TvWorldData
         cached = null;
     }
 
+    // The map's points with their symbol names (points.json in the package), or null. Main thread.
+    public static byte[] PointsJson(MapDefinition map)
+    {
+        string root = Root(map);
+        return root == null ? null : MapPackages.LoadBytes(root + "points", ".json");
+    }
+
+    // The map's contour interval in metres (map.json), 5 when not known. Main thread.
+    public static float ContourInterval(MapDefinition map)
+    {
+        string root = Root(map);
+        byte[] json = root == null ? null : MapPackages.LoadBytes(root + "map", ".json");
+        try
+        {
+            MapPackageInfo info = json != null ? JsonUtility.FromJson<MapPackageInfo>(System.Text.Encoding.UTF8.GetString(json)) : null;
+            return info != null && info.contourInterval > 0.5f ? info.contourInterval : 5f;
+        }
+        catch (Exception) { return 5f; }
+    }
+
+    // The map's lines with their symbol names (lines.json in the package), or null. Main thread.
+    public static byte[] LinesJson(MapDefinition map)
+    {
+        string root = Root(map);
+        return root == null ? null : MapPackages.LoadBytes(root + "lines", ".json");
+    }
+
     static string Root(MapDefinition map)
     {
         string grid = map != null ? map.gridName : null;

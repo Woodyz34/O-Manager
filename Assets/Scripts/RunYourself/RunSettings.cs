@@ -57,9 +57,9 @@ public static class RunSettings
         return Quality.Medium;
     }
 
-    // How much higher the hills are than on the map: the 10 m height grid rounds off small knolls and slopes, and
-    // every contour should be seen and felt (2026-11-19, Anders: always twice, not a setting)
-    public const float Hills = 2f;
+    // How much higher the hills are than on the map. 2026-11-19, Anders: twice was far too high, back to the real
+    // heights; small knolls are made clear from the contours instead (RunContours).
+    public const float Hills = 1f;
 
     // ---- Sound levels (2026-11-19, Anders: good sounds but a bit loud; one slider per kind and one for all, 50 % to
     // start with so they can go both up and down) ----

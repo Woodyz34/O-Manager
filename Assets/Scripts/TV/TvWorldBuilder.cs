@@ -562,7 +562,7 @@ public class TvWorldBuilder
         {
             switch (p.kind)
             {
-                case WorldPointKind.Knoll: Bump(p.x, p.z, 1.3f, 9f); break;
+                case WorldPointKind.Knoll: Bump(p.x, p.z, 1.6f, 9f); break;   // clear to see (Anders, 2026-11-19)
                 case WorldPointKind.LongKnoll:
                 {
                     float a = p.angle * 0.0174533f, dx = (float)Math.Cos(a) * 2.2f, dz = (float)Math.Sin(a) * 2.2f;
@@ -583,10 +583,10 @@ public class TvWorldBuilder
             float[] c = line.xz;
             switch (line.kind)
             {
-                // An impassable cliff is far too high to jump down (4 m); a passable one about a metre and a half, so it
+                // An impassable cliff is too high to jump down (3.5 m); a passable one about a metre, so it
                 // can be jumped down and climbed up (2026-11-19, Anders)
-                case WorldLineKind.Cliff: Cliff(c, 4f, true); break;
-                case WorldLineKind.SmallCliff: Cliff(c, 1.5f, true); break;
+                case WorldLineKind.Cliff: Cliff(c, 3.5f, true); break;
+                case WorldLineKind.SmallCliff: Cliff(c, 1.2f, true); break;
                 case WorldLineKind.EarthBank: Cliff(c, 1.0f, false); break;
                 case WorldLineKind.EarthWall: Groove(c, 0.6f, 1.6f, 0.5f, false); break;
                 case WorldLineKind.Gully: Groove(c, -0.9f, 2.6f, 0.5f, false); break;
