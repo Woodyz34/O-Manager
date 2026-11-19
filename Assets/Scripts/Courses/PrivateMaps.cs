@@ -325,7 +325,7 @@ public static class PrivateMaps
     public static string StartProblem(CourseData course)
     {
         MapDefinition map = course != null ? MapDefinition.FindExact(course.mapId) : null;
-        if (!IsMine(map)) return null;
+        if (!IsMine(map)) return OthersMissing(map);
         NetworkPlayer local = NetworkPlayer.Local;
         int waiting = 0, total = 0, progress = 0;
         foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
@@ -341,6 +341,25 @@ public static class PrivateMaps
         return waiting == 1 && total == 1
             ? $"Waiting for the other player to get your private map ({progress} %) ..."
             : $"Waiting for {waiting} of {total} players to get your private map ({progress / waiting} %) ...";
+    }
+
+    // A map that is not private (2026-11-19: a map the host had just imported, and the race started before the others
+    // had it, so it broke for them): every player says when the map is on their computer (privateMapReady)
+    static string OthersMissing(MapDefinition map)
+    {
+        if (map == null) return null;
+        NetworkPlayer local = NetworkPlayer.Local;
+        int waiting = 0, total = 0;
+        foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        {
+            if (player == local || player.Object == null || !player.Object.IsValid) continue;
+            total++;
+            if (player.privateMapReady.ToString() != map.id) waiting++;
+        }
+        if (waiting == 0) return null;
+        return waiting == 1 && total == 1
+            ? "Waiting for the other player to get the map " + map.displayName + " ..."
+            : $"Waiting for {waiting} of {total} players to get the map {map.displayName} ...";
     }
 
     // ---- Throwing the copies away ----
