@@ -182,12 +182,8 @@ public static class RouteChoiceGame
     // in seconds pays nothing)
     public static int TookPart => CompetitionRewards.ForTime(CompetitionFlow.PlayedSeconds);
 
-    public static int ForPlace(int place, int players)
-    {
-        int reward = CompetitionRewards.PerRunnerBeaten * Mathf.Max(0, players - place);
-        if (place == 1 && players >= 2) reward += CompetitionRewards.WinnerBonus;
-        return reward;
-    }
+    // Only the players with a strictly lower score count as beaten: a tie beats nobody (2026-11-19)
+    public static int ForBeaten(int beaten, int players) => CompetitionRewards.ForBeaten(beaten, players, true);
 }
 
 // The questions, the answers and the results, on the map with a panel to the left
@@ -215,6 +211,7 @@ public class RouteChoiceView : MonoBehaviour
     bool paid;
     int lastPlace;     // the place among the others the last time the standings were looked at (0 = unknown)
     int lastPlayers;
+    int lastBeaten;    // the players with a lower score than yours the last time the standings were looked at
 
     GameObject panel;
     TextMeshProUGUI heading;
@@ -921,6 +918,8 @@ public class RouteChoiceView : MonoBehaviour
             if (!p.Object.HasStateAuthority) continue;
             lastPlace = PlaceOf(p, players);
             lastPlayers = players.Count;
+            lastBeaten = 0;
+            foreach (NetworkPlayer other in players) if (other.choiceScore < p.choiceScore) lastBeaten++;
         }
         return players;
     }
@@ -974,7 +973,7 @@ public class RouteChoiceView : MonoBehaviour
         paidTookPart = finished ? RouteChoiceGame.TookPart : 0;
         paidPlace = finished ? place : 0;
         paidPlaceOf = players;
-        paidForPlace = finished && place > 0 ? RouteChoiceGame.ForPlace(place, players) : 0;
+        paidForPlace = finished && place > 0 ? RouteChoiceGame.ForBeaten(lastBeaten, players) : 0;
         if (Money.Instance != null)
         {
             balanceBefore = Money.Instance.GetMoney();

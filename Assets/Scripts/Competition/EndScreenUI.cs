@@ -429,7 +429,7 @@ public class EndScreenUI : MonoBehaviour
         if (amImposter && secretTaskMode)
         {
             // Without a task, the imposter simply races: a normal place, plus money for getting away
-            total += AddLine(placeLabel, CompetitionRewards.ForPlace(me.place, runners, me.finished));
+            total += AddLine(placeLabel, CompetitionRewards.ForBeaten(CompetitionRewards.Beaten(me, standings), runners, me.finished));
             if (votersCount > 0)
             {
                 total += AddLine(caught ? "Caught by the others" : "Got away with it",
@@ -450,7 +450,7 @@ public class EndScreenUI : MonoBehaviour
         }
         else
         {
-            total += AddLine(placeLabel, CompetitionRewards.ForPlace(me.place, runners, me.finished));
+            total += AddLine(placeLabel, CompetitionRewards.ForBeaten(CompetitionRewards.Beaten(me, standings), runners, me.finished));
             if (imposterMode)
             {
                 NetworkPlayer local = NetworkPlayer.Local;
