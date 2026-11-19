@@ -172,6 +172,7 @@ public static class CourseThumbnail
                         Vector2 side = Vector2.Perpendicular((poly[k + 1] - poly[k]).normalized) * width * 1.4f;
                         DrawLine(texture, poly[k] + side, poly[k + 1] + side, width * 0.6f, purple);
                         DrawLine(texture, poly[k] - side, poly[k + 1] - side, width * 0.6f, purple);
+                        DrawLine(texture, poly[k], poly[k + 1], width * 0.5f, new Color32(25, 25, 25, 255));   // the path across
                     }
                     continue;
                 }

@@ -207,7 +207,49 @@ public class ForbiddenAreaRenderer : MonoBehaviour
             line.positionCount = points.Count;
             for (int k = 0; k < points.Count; k++) line.SetPosition(k, Flat(points[k], -1.12f));
         }
+        AddBridgePath(corners, half);
         if (showHandles) foreach (Vector3 corner in corners) AddHandle(corner, false);
+    }
+
+    // A black dashed path down the middle of a bridge, like a path on the map, so it reads as a way across
+    // (2026-11-19, the user: a temporary bridge or logs laid over the water on a training)
+    void AddBridgePath(List<Vector3> corners, float half)
+    {
+        float dash = half * 1.1f, gap = half * 0.45f;
+        Color ink = new Color(0.1f, 0.1f, 0.1f, 1f);
+        int made = 0;
+        float carried = 0f;   // how far into the current dash or gap the last segment ended
+        bool on = true;
+        for (int k = 0; k + 1 < corners.Count && made < 200; k++)
+        {
+            Vector2 a = corners[k], b = corners[k + 1];
+            float length = Vector2.Distance(a, b);
+            if (length < 1e-5f) continue;
+            Vector2 dir = (b - a) / length;
+            float at = 0f;
+            while (at < length && made < 200)
+            {
+                float piece = (on ? dash : gap) - carried;
+                float end = Mathf.Min(length, at + piece);
+                if (on && end - at > 1e-5f)
+                {
+                    LineRenderer line = NewLine("Bridge path", false, borderMeters * 0.9f);
+                    line.startColor = line.endColor = ink;
+                    line.numCapVertices = 0;
+                    line.positionCount = 2;
+                    line.SetPosition(0, Flat(a + dir * at, -1.13f));
+                    line.SetPosition(1, Flat(a + dir * end, -1.13f));
+                    made++;
+                }
+                carried += end - at;
+                at = end;
+                if (carried >= (on ? dash : gap) - 1e-5f)
+                {
+                    carried = 0f;
+                    on = !on;
+                }
+            }
+        }
     }
 
     // A small square on a corner that can be dragged; the first corner of an area being drawn is larger,
