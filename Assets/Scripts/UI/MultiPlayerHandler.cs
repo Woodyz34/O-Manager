@@ -130,6 +130,7 @@ public class MultiPlayerHandler : MonoBehaviour
         PlayerPrefs.SetString(LocalPrefs.Key("LobbyName"), sessionName);
         PlayerPrefs.Save();
         networkRunnerHandler.CreateGame(sessionName, "Lobby");
+        GameAnalytics.Record("lobby_created");
 
         HideAllPanels();
 
