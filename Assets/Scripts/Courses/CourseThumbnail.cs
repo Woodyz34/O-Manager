@@ -164,6 +164,17 @@ public static class CourseThumbnail
                     Vector2 uv = background.WorldToUV(map.ToWorld(point));
                     return new Vector2((uv.x - area.xMin) / area.width * texture.width, (uv.y - area.yMin) / area.height * texture.height);
                 });
+                if (zone.bridge)
+                {
+                    // A bridge the runners may cross on: two thin purple lines, one on each side
+                    for (int k = 0; k + 1 < poly.Count; k++)
+                    {
+                        Vector2 side = Vector2.Perpendicular((poly[k + 1] - poly[k]).normalized) * width * 1.4f;
+                        DrawLine(texture, poly[k] + side, poly[k + 1] + side, width * 0.6f, purple);
+                        DrawLine(texture, poly[k] - side, poly[k + 1] - side, width * 0.6f, purple);
+                    }
+                    continue;
+                }
                 if (zone.line)
                 {
                     // An uncrossable boundary: a thick purple line
