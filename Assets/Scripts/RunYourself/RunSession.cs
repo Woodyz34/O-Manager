@@ -287,7 +287,9 @@ public class RunSession : MonoBehaviour
             Canvas c = r.GetComponent<Canvas>();
             if (c == null || !c.enabled || own.Contains(c) || c.renderMode == RenderMode.WorldSpace) continue;
             if (c.name == "Toast") continue;   // a short message in the corner, not a window
-            if (c.sortingOrder >= 200) return true;
+            // The canvas of a closed window (the Esc menu keeps its canvas and hides only its card) does not count:
+            // something must be shown on it
+            if (c.sortingOrder >= 200 && c.GetComponentInChildren<Graphic>(false) != null) return true;
         }
         return false;
     }
@@ -539,6 +541,13 @@ public class RunSession : MonoBehaviour
                 if (!r.enabled) continue;
                 r.enabled = false;
                 hiddenRenderers.Add(r);
+            }
+            // and so would their name tags
+            foreach (Canvas c in p.GetComponentsInChildren<Canvas>(true))
+            {
+                if (!c.enabled) continue;
+                c.enabled = false;
+                hiddenCanvases.Add(c);
             }
         }
         HideCanvases();

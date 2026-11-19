@@ -170,6 +170,7 @@ public class RunMap : MonoBehaviour
         compass = new GameObject("Thumb compass").transform;
         compass.SetParent(hand, false);
         compass.localPosition = new Vector3(-side * 0.012f, 0.012f, -0.03f);
+        compass.localScale = Vector3.one * 0.8f;
         Part(cube, new Color(0.82f, 0.86f, 0.88f), compass, new Vector3(0f, 0.01f, 0.004f), new Vector3(0.044f, 0.07f, 0.004f), Quaternion.identity);
         Part(cube, new Color(0.9f, 0.2f, 0.15f), compass, new Vector3(0f, 0.04f, 0f), new Vector3(0.006f, 0.014f, 0.003f), Quaternion.identity);
         // The capsule: a dark ring, a pale face
