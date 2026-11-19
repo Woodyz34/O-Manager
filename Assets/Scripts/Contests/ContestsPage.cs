@@ -50,8 +50,20 @@ public class ContestsPage : MonoBehaviour
         open.Reload();
     }
 
-    void OnEnable() { Money.Changed += ShowMoney; }
-    void OnDisable() { Money.Changed -= ShowMoney; }
+    void OnEnable() { Money.Changed += ShowMoney; PrizePacks.Changed += ShowPacks; }
+    void OnDisable() { Money.Changed -= ShowMoney; PrizePacks.Changed -= ShowPacks; }
+
+    Button packsButton;
+
+    // "Open prize packs (2)" in the header while packs won in contests wait to be opened
+    void ShowPacks()
+    {
+        if (packsButton == null) return;
+        int count = PrizePacks.Count;
+        packsButton.gameObject.SetActive(count > 0);
+        TextMeshProUGUI label = packsButton.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (label != null) label.text = "Open prize packs (" + count + ")";
+    }
 
     void OnDestroy()
     {
@@ -123,6 +135,11 @@ public class ContestsPage : MonoBehaviour
         nameField.text = PlayerName;
         HoverTip.Add(nameField, "The name the others see next to your result.");
 
+        packsButton = CourseUI.Button("Packs", head.transform, "Open prize packs", CourseUI.ButtonKind.Primary, () => PrizePacks.OpenAll(), 22);
+        CourseUI.Place((RectTransform)packsButton.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-32, 14), new Vector2(380, 54));
+        HoverTip.Add(packsButton, "Runner packs you won in the contests.");
+        ShowPacks();
+
         cards = CourseUI.Rect("Cards", page);
         CourseUI.Place(cards, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -260), new Vector2(1820, 720));
         HorizontalLayoutGroup row = CourseUI.Row(cards.gameObject, 26, new RectOffset(0, 0, 0, 0));
@@ -144,7 +161,7 @@ public class ContestsPage : MonoBehaviour
 
     void Update()
     {
-        if (popup == null && Input.GetKeyDown(KeyCode.Escape) && FindObjectOfType<ContestReplay>() == null) Close();
+        if (popup == null && Input.GetKeyDown(KeyCode.Escape) && FindObjectOfType<ContestReplay>() == null && FindObjectOfType<PackOpening>() == null) Close();
     }
 
     // ---- Loading ----
@@ -188,15 +205,29 @@ public class ContestsPage : MonoBehaviour
         claimedThisSession = true;
         if (paid.Count == 0) return;
         int total = 0;
+        int packs = 0;
         List<string> lines = new List<string>();
         foreach (ContestPaid p in paid)
         {
             total += p.prize;
             string what = DescribeId(p.id);
-            lines.Add(p.finished ? what + ": " + CompetitionFlow.Ordinal(p.place) + " of " + p.of + "  <b>+" + Kr(p.prize) + "</b>" : what + ": did not finish");
+            if (!p.finished)
+            {
+                lines.Add(what + ": did not finish");
+                continue;
+            }
+            List<string> won = new List<string>();
+            if (p.packs != null)
+            {
+                foreach (string kind in p.packs) won.Add(PrizePacks.Name(kind));
+                packs += p.packs.Count;
+                PrizePacks.Add(p.packs);
+            }
+            if (p.prize > 0) won.Add(Kr(p.prize));
+            lines.Add(what + ": " + CompetitionFlow.Ordinal(p.place) + " of " + p.of + "  <b>+" + string.Join(" + ", won) + "</b>");
         }
         if (total > 0 && Money.Instance != null) Money.Instance.AddMoney(total);
-        ShowPrizePopup(lines, total);
+        ShowPrizePopup(lines, total, packs);
     }
 
     // "Weekly route choice game · Forest (week 47)"
@@ -286,6 +317,8 @@ public class ContestsPage : MonoBehaviour
         CourseUI.Size(rules, 76);
         TextMeshProUGUI prizes = CourseUI.Text("Prizes", card.transform, PrizeText(c), 19, CourseUI.Ink);
         prizes.richText = true;
+        prizes.raycastTarget = true;
+        HoverTip.Add(prizes, PacksTip(c));
         CourseUI.Size(prizes, 78);
 
         string state;
@@ -308,13 +341,34 @@ public class ContestsPage : MonoBehaviour
         }
     }
 
+    // "Prizes: 1st Weekly pack, 2nd Daily pack + Runner pack, 3rd Daily pack, 4th-6th 250 kr+, everyone who finishes 200 kr."
     static string PrizeText(ContestInfo c)
     {
         if (!ContestCloud.PrizeRules.TryGetValue(c.span, out ContestPrizeRules rules) || rules.top == null || rules.top.Length < 3) return "";
-        float growth = 1f + rules.growth * Mathf.Max(0, c.entries - 3) / (float)(rules.top[0] + rules.top[1] + rules.top[2]);
-        int First(int i) => Mathf.RoundToInt(rules.top[i] * growth / 5f) * 5;
-        return "Prizes now: 1st <b>" + Kr(First(0)) + "</b>, 2nd " + Kr(First(1)) + ", 3rd " + Kr(First(2)) + ", 4th-6th "
-               + Kr(rules.next[rules.next.Length - 1]) + "+, everyone who finishes " + Kr(rules.tookPart) + ". Top 3 grow with every player.";
+        int pot = rules.top[0] + rules.top[1] + rules.top[2];
+        float growth = pot > 0 ? 1f + rules.growth * Mathf.Max(0, c.entries - 3) / (float)pot : 1f;
+        bool grows = false;
+        string Place(int i)
+        {
+            List<string> parts = new List<string>();
+            if (rules.packs != null && i < rules.packs.Length && rules.packs[i] != null)
+                foreach (string kind in rules.packs[i]) parts.Add(PrizePacks.Name(kind));
+            if (rules.top[i] > 0)
+            {
+                parts.Add(Kr(Mathf.RoundToInt(rules.top[i] * growth / 5f) * 5));
+                grows |= rules.growth > 0;
+            }
+            return parts.Count > 0 ? string.Join(" + ", parts) : "-";
+        }
+        string text = "Prizes: 1st <b>" + Place(0) + "</b>, 2nd " + Place(1) + ", 3rd " + Place(2) + ", 4th-6th "
+               + Kr(rules.next[rules.next.Length - 1]) + "+, everyone who finishes " + Kr(rules.tookPart) + ".";
+        return grows ? text + " The money grows with every player." : text;
+    }
+
+    static string PacksTip(ContestInfo c)
+    {
+        return "Weekly pack: " + PrizePacks.Odds(PrizePacks.Weekly) + ".\nDaily pack: " + PrizePacks.Odds(PrizePacks.Daily)
+               + ".\nRunner pack: the shop's pack.\nPacks only hold runners you do not have yet.";
     }
 
     // ---- Starting ----
@@ -414,8 +468,14 @@ public class ContestsPage : MonoBehaviour
             CourseUI.Place(who.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(90, 0), new Vector2(520, 50));
             TextMeshProUGUI res = CourseUI.Text("Result", row.transform, result, 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
             CourseUI.Place(res.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(620, 0), new Vector2(180, 50));
-            TextMeshProUGUI prize = CourseUI.Text("Prize", row.transform, Kr(r.prize), 22, CourseUI.Forest, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
-            CourseUI.Place(prize.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(820, 0), new Vector2(170, 50));
+            List<string> won = new List<string>();
+            if (r.packs != null) foreach (string kind in r.packs) won.Add(PrizePacks.Name(kind));
+            if (r.prize > 0) won.Add(Kr(r.prize));
+            TextMeshProUGUI prize = CourseUI.Text("Prize", row.transform, string.Join(" + ", won), 20, CourseUI.Forest, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+            prize.enableAutoSizing = true;
+            prize.fontSizeMin = 14;
+            prize.fontSizeMax = 20;
+            CourseUI.Place(prize.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(800, 0), new Vector2(210, 50));
         }
 
         // The top three and you, on the map
@@ -499,7 +559,7 @@ public class ContestsPage : MonoBehaviour
     }
 
     // The prize money that was just paid, over whatever screen is showing
-    static void ShowPrizePopup(List<string> lines, int total)
+    static void ShowPrizePopup(List<string> lines, int total, int packs)
     {
         GameObject go = new GameObject("Contest prizes", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         Canvas canvas = go.GetComponent<Canvas>();
@@ -512,11 +572,26 @@ public class ContestsPage : MonoBehaviour
         card.color = CourseUI.CardSolid;
         float height = 260 + 40 * lines.Count;
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, Mathf.Min(900, height)));
-        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, total > 0 ? "Contest prize money: +" + Kr(total) : "Contest results", 38, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+        string heading = packs > 0 ? "You won " + (packs == 1 ? "a runner pack" : packs + " runner packs") + (total > 0 ? " and " + Kr(total) : "") + "!"
+                         : total > 0 ? "Contest prize money: +" + Kr(total) : "Contest results";
+        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, heading, 38, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Place(title.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(940, 56));
         TextMeshProUGUI text = CourseUI.Text("Lines", card.transform, string.Join("\n", lines), 24, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.Top);
         text.richText = true;
         CourseUI.Stretch(text.rectTransform, 40, 40, 100, 110);
+        if (packs > 0)
+        {
+            Button open = CourseUI.Button("Open", card.transform, packs == 1 ? "Open it now" : "Open them now", CourseUI.ButtonKind.Primary, () =>
+            {
+                Destroy(go);
+                PrizePacks.OpenAll();
+            }, 28);
+            CourseUI.Place((RectTransform)open.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(-150, 30), new Vector2(280, 66));
+            Button later = CourseUI.Button("Later", card.transform, "Later", CourseUI.ButtonKind.Light, () => Destroy(go), 26);
+            CourseUI.Place((RectTransform)later.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(150, 30), new Vector2(240, 66));
+            HoverTip.Add(later, "They wait on the contests page (Open prize packs).");
+            return;
+        }
         Button ok = CourseUI.Button("OK", card.transform, "Nice!", CourseUI.ButtonKind.Primary, () => Destroy(go), 28);
         CourseUI.Place((RectTransform)ok.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(260, 66));
     }

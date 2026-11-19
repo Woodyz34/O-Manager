@@ -105,7 +105,12 @@ public static class PackShop
 
     static CardData Draw()
     {
-        List<CardData> cards = Available();
+        return DrawFrom(Available());
+    }
+
+    // A runner from these by the shop's odds (Weight); also used for the normal pack won in a contest (PrizePacks)
+    public static CardData DrawFrom(List<CardData> cards)
+    {
         float total = 0f;
         foreach (CardData card in cards)
         {

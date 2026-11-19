@@ -47,6 +47,7 @@ public class ContestRow
     public int seconds;
     public int place;
     public int prize;
+    public List<string> packs;   // runner packs won (PrizePacks): "weekly", "daily", "normal"
     public bool me;
 }
 
@@ -56,12 +57,14 @@ public class ContestPaid
     public int place;
     public int of;
     public int prize;
+    public List<string> packs;
     public bool finished;
 }
 
 public class ContestPrizeRules
 {
     public int[] top;
+    public string[][] packs;
     public int[] next;
     public int tookPart;
     public int growth;

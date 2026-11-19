@@ -36,7 +36,7 @@
 //   submit     { id, score, seconds, replay }   my result (after start, once)
 //   board      { id }            the leaderboard: only after my own run, or when the contest is over
 //   replays    { id, players }   replays of up to 6 players (comma separated ids), same rule as board
-//   claim                        the prize money of contests that are over and not paid yet (paid once)
+//   claim                        the prizes (money and packs) of contests that are over and not paid yet (paid once)
 
 const { DataApi } = require("@unity-services/cloud-save-1.4");
 
@@ -50,11 +50,15 @@ const CLEAN_DAYS = 28;             // how far back clean-up looks (in case nobod
 const KEEP_DAYS = 30;              // the leaderboard (names and results) is kept this long for late prize claims
 const CLEANED_KEEP = 400;
 
-// Prize money (kr). The top three's prizes grow with every player: the pot (sum of the top three) gets
-// GROWTH more for each player after the first three, shared out in the same proportions.
+// Prizes (2026-11-19, the user): runner packs for the best, money for the rest.
+//   top      money (kr) for places 1-3; it grows with every player: their sum (the pot) gets GROWTH more for each
+//            player after the first three, shared out in the same proportions
+//   packs    runner packs for places 1-3: "weekly" (Elite 15 %, Gold 35 %, Silver 50 %), "daily" (Elite 5 %,
+//            Gold 25 %, Silver 70 %), "normal" (the shop's pack). The odds are in the game (PrizePacks.cs).
+//   next     money for places 4-6, tookPart for everyone else who finished. A tie shares the place and its prize.
 const PRIZES = {
-  w: { top: [1000, 700, 500], next: [300, 275, 250], tookPart: 200, growth: 50 },
-  d: { top: [700, 500, 300], next: [150, 130, 115], tookPart: 100, growth: 25 }
+  w: { top: [0, 0, 0], packs: [["weekly"], ["daily", "normal"], ["daily"]], next: [300, 275, 250], tookPart: 200, growth: 0 },
+  d: { top: [0, 500, 300], packs: [["daily"], [], []], next: [150, 130, 115], tookPart: 100, growth: 25 }
 };
 
 module.exports = async ({ params, context, logger }) => {
@@ -249,8 +253,11 @@ function standings(id, board) {
   }
   const rules = PRIZES[id[0]];
   const pot = rules.top[0] + rules.top[1] + rules.top[2];
-  const growth = 1 + rules.growth * Math.max(0, list.length - 3) / pot;
-  for (const row of list) row.prize = prize(rules, row.place, growth);
+  const growth = pot > 0 ? 1 + rules.growth * Math.max(0, list.length - 3) / pot : 1;
+  for (const row of list) {
+    row.prize = prize(rules, row.place, growth);
+    row.packs = row.place <= 3 ? rules.packs[row.place - 1] : [];
+  }
   return list;
 }
 
@@ -261,7 +268,7 @@ function prize(rules, place, growth) {
 }
 
 function publicRows(list, me) {
-  return list.map(r => ({ playerId: r.playerId, name: r.name, score: r.score, seconds: r.seconds, place: r.place, prize: r.prize, me: r.playerId === me }));
+  return list.map(r => ({ playerId: r.playerId, name: r.name, score: r.score, seconds: r.seconds, place: r.place, prize: r.prize, packs: r.packs, me: r.playerId === me }));
 }
 
 // ---- Actions ----
@@ -499,7 +506,7 @@ async function claim(api, context, me, now, logger) {
     changed = true;
     if (gone) continue;
     const row = list.find(r => r.playerId === me);
-    paid.push({ id: h.id, place: row ? row.place : 0, of: list.length, prize: row ? row.prize : 0, finished: !!row });
+    paid.push({ id: h.id, place: row ? row.place : 0, of: list.length, prize: row ? row.prize : 0, packs: row ? row.packs : [], finished: !!row });
   }
   if (changed) await saveHistory(api, context, me, history);
   return { paid };
