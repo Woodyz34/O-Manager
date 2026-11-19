@@ -20,11 +20,12 @@ public static class RaceGreen
         MapDefinition map = CourseLoader.LoadedMap;
         if (course == null || map == null || map.gridName != gridName) return;
         bool sprintRace = course.IsSprint();
-        if (sprintRace == map.IsSprint) return;   // the grid already means what the race means
-
         int rows = speed.GetLength(0), cols = speed.GetLength(1);
-        byte[] kinds = SoftGround.Kinds(map);
+        byte[] kinds = map.IsSprint || sprintRace != map.IsSprint ? SoftGround.Kinds(map) : null;
         if (kinds == null || kinds.Length != rows * cols) return;
+
+        if (map.IsSprint) OpenShallowWater(map, speed, kinds, rows, cols);
+        if (sprintRace == map.IsSprint) return;   // the grid already means what the race means
 
         int changed = 0;
         if (sprintRace)
@@ -52,6 +53,27 @@ public static class RaceGreen
                 changed++;
             }
         Debug.Log("RaceGreen: forest race on a sprint map, opened " + changed + " cells of dark green at speed " + open.ToString("0.00"));
+    }
+
+    // Shallow water (302) with a blue edge may be waded through, also on a sprint map (2026-11-19, the user: water with
+    // a blue edge is OK to cross, water with a black edge is not). Sprint maps imported before this closed it. Water
+    // with a black bank line keeps the line's cells closed, so it still can not be entered.
+    public const float ShallowWaterSpeed = 0.4f;
+
+    static void OpenShallowWater(MapDefinition map, float[,] speed, byte[] kinds, int rows, int cols)
+    {
+        HashSet<Vector2Int> lineCells = null;
+        int changed = 0;
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                if (kinds[r * cols + c] != GroundKind.ShallowWater || speed[r, c] > 0f) continue;
+                if (lineCells == null) lineCells = Passages.LineCells(map, map.gridSize < 5f);
+                if (lineCells.Contains(new Vector2Int(c, r))) continue;
+                speed[r, c] = ShallowWaterSpeed;
+                changed++;
+            }
+        if (changed > 0) Debug.Log("RaceGreen: opened " + changed + " cells of shallow water on a sprint map");
     }
 
     // Forest dark green with the map's sliders (the same rule a forest map's import uses)

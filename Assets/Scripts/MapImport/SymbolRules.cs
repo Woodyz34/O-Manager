@@ -131,7 +131,7 @@ namespace MapImport
                 switch (m)
                 {
                     case 301: return Blocked();                                           // uncrossable water
-                    case 302: return Ground(sprint ? 0f : 0.5f, sprint);                   // shallow water
+                    case 302: return Ground(sprint ? 0.4f : 0.5f, sprint);                 // shallow water: may be waded (blue edge; a black edge is a line of its own)
                     case 307: return Blocked();                                           // uncrossable marsh
                     case 308: return Ground(0.8f, sprint);                                // marsh
                     case 310: return Ground(0.9f, sprint);                                // indistinct marsh
