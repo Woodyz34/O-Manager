@@ -211,7 +211,7 @@ public class RunTerrain
 
     // True when the step from a to b goes over something a runner jumps (a stone wall, a fence, a fallen trunk), or
     // through an impassable cliff, fence or wall (then blocked is true)
-    // A small cliff (smallCliff true) is a rock face of under 2 m: a runner can jump down it but not run up it
+    // A small cliff (smallCliff true) is a passable rock face of about 1.5 m: a runner jumps down it or climbs up it
     public bool Crosses(double ae, double an, double be, double bn, out float height, out bool blocked, out bool smallCliff)
     {
         height = 0f;

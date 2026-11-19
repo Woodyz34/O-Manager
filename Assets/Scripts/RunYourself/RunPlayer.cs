@@ -154,18 +154,24 @@ public class RunPlayer : MonoBehaviour
             {
                 if (smallCliff)
                 {
-                    // Down a small cliff: a jump down and a hard landing. Up it: no way.
+                    // A passable cliff: down it is a jump and a hard landing (fast, you may fall), up it is a slow
+                    // climb, safer than going down (2026-11-19, Anders)
                     float drop = world.GroundY(e, n) - world.GroundY(ne + moveDirX * 0.8, nn + moveDirZ * 0.8);
                     if (drop > 0.6f)
                     {
                         Jolt += 1.4f;
-                        speed *= 0.6f;
                         sounds.Land(ground.surface);
+                        if (speed > ForestSpeed * 0.7f && random.NextDouble() < 0.2 + 0.3 * fatigue)
+                        {
+                            Fall(0.9f);
+                            break;
+                        }
+                        speed *= 0.6f;
                     }
-                    else
+                    else if (drop < -0.6f)
                     {
-                        speed *= 0.3f;
-                        break;
+                        Jolt += 0.5f;
+                        speed = Mathf.Min(speed, ForestSpeed * 0.2f);
                     }
                 }
                 if (wall)

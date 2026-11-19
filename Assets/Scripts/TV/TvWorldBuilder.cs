@@ -583,8 +583,10 @@ public class TvWorldBuilder
             float[] c = line.xz;
             switch (line.kind)
             {
-                case WorldLineKind.Cliff: Cliff(c, 3.2f, true); break;
-                case WorldLineKind.SmallCliff: Cliff(c, 1.7f, true); break;
+                // An impassable cliff is far too high to jump down; a passable one about a metre and a half, so it
+                // can be jumped down and climbed up (2026-11-19, Anders)
+                case WorldLineKind.Cliff: Cliff(c, 5f, true); break;
+                case WorldLineKind.SmallCliff: Cliff(c, 1.5f, true); break;
                 case WorldLineKind.EarthBank: Cliff(c, 1.0f, false); break;
                 case WorldLineKind.EarthWall: Groove(c, 0.6f, 1.6f, 0.5f, false); break;
                 case WorldLineKind.Gully: Groove(c, -0.9f, 2.6f, 0.5f, false); break;

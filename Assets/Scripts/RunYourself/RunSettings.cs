@@ -57,16 +57,9 @@ public static class RunSettings
         return Quality.Medium;
     }
 
-    // How much higher the hills are than on the map (2026-11-19, Anders: the ground looked flatter than the contours
-    // say; the 10 m height grid rounds off small knolls and slopes). Taken from the next race.
-    public static readonly float[] HillChoices = { 1f, 1.5f, 2f };
-    const string HillsKey = "RunYourself.Hills";
-
-    public static float Hills
-    {
-        get => Mathf.Clamp(PlayerPrefs.GetFloat(LocalPrefs.Key(HillsKey), 1.5f), 1f, 2f);
-        set => PlayerPrefs.SetFloat(LocalPrefs.Key(HillsKey), value);
-    }
+    // How much higher the hills are than on the map: the 10 m height grid rounds off small knolls and slopes, and
+    // every contour should be seen and felt (2026-11-19, Anders: always twice, not a setting)
+    public const float Hills = 2f;
 
     // ---- Sound levels (2026-11-19, Anders: good sounds but a bit loud; one slider per kind and one for all, 50 % to
     // start with so they can go both up and down) ----
@@ -177,10 +170,6 @@ public static class RunSettings
         Slider mouse = CourseUI.SliderControl("Mouse", left, 0.3f, 6f, MouseSpeed, false, v => MouseSpeed = v);
         CourseUI.Size(mouse, 40);
 
-        int hillIndex = 1;
-        for (int i = 0; i < HillChoices.Length; i++) if (Mathf.Approximately(HillChoices[i], Hills)) hillIndex = i;
-        Chips(right, "Hills", new[] { "As on the map", "1.5 x higher", "2 x higher" }, hillIndex, i => { Hills = HillChoices[i]; changed?.Invoke(); },
-            "The height grid of the map rounds off small knolls and slopes. Higher hills make them easier to see and feel.");
         for (int k = 0; k < SoundNames.Length; k++)
         {
             Sound kind = (Sound)k;
