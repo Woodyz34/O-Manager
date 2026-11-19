@@ -102,7 +102,7 @@ public static class ExtraModes
             case ExtraMode.RouteAnalysis: return "Route analysis";
             case ExtraMode.RouteChoice: return "Route choice game";
             case ExtraMode.RunYourself: return "Run it yourself (3D)";
-            case ExtraMode.RunMass: return "Run it yourself: mass start (3D)";
+            case ExtraMode.RunMass: return "Run it yourself (3D), mass start";
             default: return mode.ToString();
         }
     }
@@ -117,8 +117,8 @@ public static class ExtraModes
             case ExtraMode.MoveControl: return "Everyone may move controls up to 100 m while drawing. Good routes can turn bad.";
             case ExtraMode.RouteAnalysis: return "Nobody runs: everyone draws the whole course the way they would run it, then you compare the route choices. Played on its own.";
             case ExtraMode.RouteChoice: return "Nobody runs: on each leg, pick the fastest of 2 to 4 routes. Points for right answers, more the quicker you are. Played on its own.";
-            case ExtraMode.RunYourself: return "Be the runner: run the course yourself in 3D with the map in your hand. Online everyone runs in their own forest; compare the times and routes afterwards. Forest courses only. Played on its own.";
-            case ExtraMode.RunMass: return "Run it yourself in 3D, all starting together in the same forest: you see the others run and read their maps, and you can bump into each other. Forest courses only. Played on its own.";
+            case ExtraMode.RunYourself: return "Be the runner: run the course yourself in 3D with the map in your hand. Individual start online: everyone runs in their own forest; compare the times and routes afterwards. Forest courses only.";
+            case ExtraMode.RunMass: return "Run it yourself in 3D, all starting together in the same forest: you see the others run and read their maps, and you can bump into each other. Forest courses only.";
             default: return "";
         }
     }

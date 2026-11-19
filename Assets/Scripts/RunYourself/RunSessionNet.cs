@@ -20,6 +20,8 @@ public partial class RunSession
         public float yaw;
         public bool placed;
         public RelayTrack track;
+        public float finishedFor = -1f;   // seconds since this runner came in (mass start)
+        public Vector2 leave;             // the way it walks off after the finish
     }
 
     readonly Dictionary<NetworkPlayer, Remote> remotes = new Dictionary<NetworkPlayer, Remote>();
@@ -102,6 +104,11 @@ public partial class RunSession
         {
             if (r.player == null || r.player.Object == null || !r.player.Object.IsValid) continue;
             if ((r.player.run3dFlags & FlagReady) == 0) continue;
+            if (Mass && r.figure != null && r.placed && r.player.raceFinished)
+            {
+                PoseFinished(r, dt);
+                continue;
+            }
             Vector2 at = r.player.run3dAt;
             if (!r.placed) { r.shown = at; r.yaw = r.player.run3dYaw; r.placed = true; }
             Vector2 before = r.shown;
@@ -127,6 +134,42 @@ public partial class RunSession
             float far = Vector2.Distance(r.shown, new Vector2((float)player.e, (float)player.n));
             r.figure.SetVisible(far < world.ViewDistance);
         }
+    }
+
+    // Mass start: a runner who is in punches the finish, stands bent over getting the breath back, walks off and is
+    // gone after about 9 s, so nobody can see that a runner stands waiting at the finish (2026-11-19, Anders)
+    void PoseFinished(Remote r, float dt)
+    {
+        if (r.finishedFor < 0f)
+        {
+            r.finishedFor = 0f;
+            float away = (r.yaw + (r.player.Object.StateAuthority.PlayerId % 2 == 0 ? 75f : -75f)) * Mathf.Deg2Rad;
+            r.leave = new Vector2(Mathf.Sin(away), Mathf.Cos(away));
+        }
+        r.finishedFor += dt;
+        float t = r.finishedFor;
+        if (t > 9f)
+        {
+            r.figure.SetVisible(false);
+            return;
+        }
+        Vector2 before = r.shown;
+        bool walking = t > 4f;
+        if (walking) r.shown += r.leave * 1.4f * dt;
+        float wantYaw = walking ? Mathf.Atan2(r.leave.x, r.leave.y) * Mathf.Rad2Deg : r.yaw;
+        r.yaw = Mathf.MoveTowardsAngle(r.yaw, wantYaw, 120f * dt);
+        float rad = r.yaw * Mathf.Deg2Rad;
+        r.figure.forward = new Vector3(Mathf.Sin(rad), 0f, Mathf.Cos(rad));
+        float ground = world.GroundY(r.shown.x, r.shown.y);
+        Vector3 at3 = world.ToScene(r.shown.x, r.shown.y, ground);
+        world.Flag(world.FlagCount - 1, out double fe, out double fn);
+        Vector3 unit = world.ToScene(fe, fn, world.GroundY(fe, fn) + 0.9f);
+        r.figure.readMode = 0;
+        r.figure.tired = Mathf.MoveTowards(r.figure.tired, t > 0.8f && !walking ? 1f : 0f, dt * 2.5f);
+        r.figure.walk = Mathf.MoveTowards(r.figure.walk, walking ? 1f : 0f, dt * 2f);
+        r.figure.Pose(at3.x, at3.y, at3.z, Vector2.Distance(before, r.shown), unit, t < 0.8f ? 1f : 0f, dt);
+        float far = Vector2.Distance(r.shown, new Vector2((float)player.e, (float)player.n));
+        r.figure.SetVisible(far < world.ViewDistance);
     }
 
     Remote MakeRemote(NetworkPlayer p)
@@ -162,9 +205,9 @@ public partial class RunSession
     }
 
     // A GPS point for everyone else too, on this runner's race clock (everyone started together)
-    void SampleOthers()
+    void SampleOthers(float raceSeconds)
     {
-        float t = player.raceSeconds / PackRunning.GameSecondsPerSecond;
+        float t = raceSeconds / PackRunning.GameSecondsPerSecond;
         foreach (Remote r in remotes.Values)
         {
             if (r.player == null || r.player.Object == null || !r.player.Object.IsValid || !r.placed) continue;

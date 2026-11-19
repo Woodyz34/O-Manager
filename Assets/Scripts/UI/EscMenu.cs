@@ -545,12 +545,7 @@ public class EscMenu : MonoBehaviour
         Button resume = CourseUI.Button("Resume", card.transform, "Resume", CourseUI.ButtonKind.Primary, Close, 28);
         CourseUI.Size(resume, 68);
 
-        Button settingsMenu = CourseUI.Button("Settings", card.transform, "Settings", CourseUI.ButtonKind.Light, () =>
-        {
-            // Run it yourself has its own settings (graphics, game speed, map hand, sound)
-            if (RunSession.Active != null) { Close(); RunSettings.Open(); }
-            else ShowPage(LobbySettingsShown ? settingsCard : personalCard);
-        }, 26);
+        Button settingsMenu = CourseUI.Button("Settings", card.transform, "Settings", CourseUI.ButtonKind.Light, () => ShowPage(LobbySettingsShown ? settingsCard : personalCard), 26);
         CourseUI.Size(settingsMenu, 68);
         HoverTip.Add(settingsMenu, "The lobby's settings (race speed, TV, bears, control moves) and your own (sound, screen, keys).");
 
@@ -615,7 +610,9 @@ public class EscMenu : MonoBehaviour
         settingsButton = CourseUI.Button("Lobby settings", choice.transform, "Lobby settings", CourseUI.ButtonKind.Light, () =>
         {
             Close();
-            HostSettingsPopup.Open();
+            // Run it yourself has its own settings (graphics, game speed, map hand, sound)
+            if (RunSession.Active != null) RunSettings.Open();
+            else HostSettingsPopup.Open();
         }, 28);
         CourseUI.Size(settingsButton, 76);
         HoverTip.Add(settingsButton, "Race speed, TV controls, bears and control moves. Only the host can change them, also during the race; everyone else can look.");

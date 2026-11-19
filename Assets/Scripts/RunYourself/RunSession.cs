@@ -108,7 +108,39 @@ public partial class RunSession : MonoBehaviour
     void Start()
     {
         if (IndividualRace.Active != null) IndividualRace.Active.ManualStats = true;
+        RouteAnalysis.RealTimer = TimeRoute;
         Load();
+    }
+
+    // The computer's route in the statistics, timed as this 3D runner would run it (2026-11-19, Anders: the computer
+    // was far quicker than a good run, because it was timed with the 2D runner's speeds): the same ground speeds,
+    // slopes and top speed as the runner, every 2 m along the line, at full speed (the computer doesn't read the map)
+    float TimeRoute(List<Vector3> line)
+    {
+        if (terrain == null || mapDef == null || line == null || line.Count < 2) return 0f;
+        double seconds = 0;
+        CoursePoint a = mapDef.FromWorld(line[0]);
+        for (int i = 1; i < line.Count; i++)
+        {
+            CoursePoint b = mapDef.FromWorld(line[i]);
+            double de = b.e - a.e, dn = b.n - a.n;
+            double length = Math.Sqrt(de * de + dn * dn);
+            int steps = Mathf.Max(1, (int)Math.Ceiling(length / 2.0));
+            double step = length / steps;
+            double ux = de / Math.Max(1e-6, length), uz = dn / Math.Max(1e-6, length);
+            for (int s = 0; s < steps; s++)
+            {
+                double f = (s + 0.5) / steps;
+                double e = a.e + de * f, n = a.n + dn * f;
+                RunTerrain.Ground g = terrain.At(e, n);
+                float rise = terrain.MapHeight(e + ux * 3.0, n + uz * 3.0) - terrain.MapHeight(e - ux * 3.0, n - uz * 3.0);
+                float gradient = Mathf.Clamp(rise / 6f / RunSettings.Hills, -1.2f, 1.2f);
+                float speed = RunPlayer.ForestSpeed * (g.blocked ? 0.05f : Mathf.Max(0.05f, g.speed)) * RunPlayer.SlopeFactor(gradient, g.rough);
+                seconds += step / Mathf.Max(0.05f, speed);
+            }
+            a = b;
+        }
+        return (float)seconds;
     }
 
     async void Load()
@@ -328,6 +360,16 @@ public partial class RunSession : MonoBehaviour
                 Sample();
             }
         }
+        else if (phase == Phase.Finished)
+        {
+            // In, but the others still run: their GPS tracks go on (the race clock keeps going for them)
+            gameSeconds += dt;
+            if (gameSeconds >= nextSample)
+            {
+                nextSample = gameSeconds + SampleEvery;
+                SampleOthers(gameSeconds * player.gameSpeed);
+            }
+        }
 
         player.Tick(dt);
         handMap.Tick(dt, phase == Phase.Running && !menuOpen);
@@ -377,7 +419,7 @@ public partial class RunSession : MonoBehaviour
     // GPS points stamped with the race clock in replay seconds, like every other competition's replay
     void Sample()
     {
-        SampleOthers();
+        SampleOthers(player.raceSeconds);
         track.times.Add(player.raceSeconds / PackRunning.GameSecondsPerSecond);
         track.positions.Add(mapDef.ToWorld(new CoursePoint(player.e, player.n)));
     }
@@ -682,6 +724,7 @@ public partial class RunSession : MonoBehaviour
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
         if (Active == this) Active = null;
+        RouteAnalysis.RealTimer = null;
         if (loadingCard != null) loadingCard.Close();
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
