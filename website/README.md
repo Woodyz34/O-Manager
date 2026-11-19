@@ -57,3 +57,27 @@ till bakgrundsvideon. `Docs/website_contours.py` gör höjdkurvorna i bakgrunden
 
 Webbläsare sparar bilderna i 7 dagar. Byter du en bild men behåller filnamnet, öka siffran i `?v=2`
 efter bildadresserna i `index.html` (sök och ersätt `?v=2` med `?v=3`), annars ser besökare den gamla bilden.
+
+## Statistik: besök, klick, nedladdningar och spelare
+Tre ställen att titta på, alla gratis och utan kakor på hemsidan.
+
+**1. Besök och klick på hemsidan (GoatCounter)**
+1. Gå till https://www.goatcounter.com/signup, välj ett kodnamn (t.ex. `o-manager`) och skapa kontot.
+2. Öppna `website/config.js` och skriv koden mellan citattecknen på raden `goatcounter: ""`. Spara och pusha. Sidan bygger om sig själv.
+3. Logga in på `https://<kod>.goatcounter.com`. Där ser du besökare per dag och timme, länder, var de kom ifrån
+   och "Pages" > klick på Ladda ner-knappen (`download-win`, `download-mac`, `download-linux`).
+   Siffran "just nu" visar hur många som är på sidan.
+
+**2. Nedladdningar (GitHub)**
+Öppna `https://o-manager.se/stats.html` (finns inte i Google). Den hämtar antalet nedladdningar per version och fil
+direkt från GitHub. Spelets egna uppdateringar räknas också.
+
+**3. Spelarna (Unity Analytics)**
+1. Unity: Window > Package Manager > Unity Registry > **Analytics** > Install (om den inte redan står i listan).
+2. https://cloud.unity.com > ditt projekt > **Analytics** > Get started / Enable (gratis).
+3. Därefter visar **Analytics > Dashboards** nya spelare, aktiva spelare per dag, sessionslängd och när på dygnet de spelar.
+   Egna händelser (Analytics > Event Explorer): `game_opened`, `lobby_created`, `lobby_joined`, `race_started`,
+   `race_finished`, `single_player_started`, `pack_opened`.
+4. Hur många som är online samtidigt står i Photons dashboard: https://dashboard.photonengine.com > ditt Fusion-program.
+
+Spelet frågar inte, men spelaren kan stänga av statistiken i Esc-menyn (**Usage statistics**). Inga namn eller mejl skickas.

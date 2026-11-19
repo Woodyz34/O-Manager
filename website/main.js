@@ -297,6 +297,21 @@
     $("newsList").innerHTML = '<p class="sec-lead">' + (lang() === "sv" ? "Nyheterna kunde inte laddas just nu." : "News could not be loaded right now.") + "</p>";
   });
 
+  /* ---------- Visitor statistics: GoatCounter, no cookies (only when OM_CONFIG.goatcounter is set) ---------- */
+  var gc = (window.OM_CONFIG || {}).goatcounter;
+  if (gc) {
+    window.goatcounter = { allow_local: false };
+    var gs = document.createElement("script");
+    gs.async = true;
+    gs.src = "https://gc.zgo.at/count.js";
+    gs.setAttribute("data-goatcounter", "https://" + gc + ".goatcounter.com/count");
+    document.head.appendChild(gs);
+  }
+  // Counts a click as an "event" (shows under Pages with the event mark)
+  function count(path, title) {
+    try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: path, title: title, event: true }); } catch (e) {}
+  }
+
   /* ---------- Download: always the newest GitHub release, for the visitor's computer ---------- */
   var cfg = window.OM_CONFIG || {}, release = null, releaseState = "loading";
   var repoUrl = "https://github.com/" + cfg.releasesRepo + "/releases";
@@ -342,6 +357,7 @@
   });
   $("dlBtn").addEventListener("click", function (e) {
     if ($("dlBtn").getAttribute("href") === "#download") e.preventDefault();
+    else count("download-" + os, "Download " + osNames[os]);
   });
   renderDownload();
   if (cfg.releasesRepo) {

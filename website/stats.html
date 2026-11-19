@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>O-Manager statistik</title>
+<style>
+  :root { --bg:#f6f1e4; --card:#fffdf6; --ink:#1f3a2a; --muted:#6b7a6e; --accent:#e8751a; --line:#e2dac3; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14201a; --card:#1c2b23; --ink:#e9efe6; --muted:#9fb0a4; --line:#2b3d33; } }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:32px 16px 64px }
+  h1 { font-size:28px; margin:0 0 4px } p.sub { color:var(--muted); margin:0 0 24px }
+  .big { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:24px }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px }
+  .tile b { display:block; font-size:34px; color:var(--accent); line-height:1.1 } .tile span { color:var(--muted); font-size:14px }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden }
+  th,td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line) } th { font-size:13px; color:var(--muted); font-weight:600 }
+  td.n,th.n { text-align:right; font-variant-numeric:tabular-nums } tr:last-child td { border-bottom:0 }
+  .links a { color:var(--accent); margin-right:16px } .note { color:var(--muted); font-size:14px; margin-top:20px }
+</style>
+</head>
+<body>
+<main>
+  <h1>Nedladdningar</h1>
+  <p class="sub">Hämtas direkt från GitHub när sidan öppnas. Räknar varje gång en fil laddas ner, även spelets egna uppdateringar.</p>
+  <div class="big">
+    <div class="tile"><b id="tTotal">–</b><span>nedladdningar totalt</span></div>
+    <div class="tile"><b id="tLatest">–</b><span id="tLatestL">senaste versionen</span></div>
+    <div class="tile"><b id="tReleases">–</b><span>versioner</span></div>
+  </div>
+  <table>
+    <thead><tr><th>Version</th><th>Släppt</th><th>Fil</th><th class="n">Nedladdningar</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="4">Laddar...</td></tr></tbody>
+  </table>
+  <p class="note">Räknaren följer med GitHub och går bara upp. En uppdatering som spelet gör själv räknas också, så siffran är fler än antalet nya spelare.</p>
+  <p class="links note"><a href="index.html">Till hemsidan</a><a id="gcLink" href="#" hidden>Besök på hemsidan (GoatCounter)</a></p>
+</main>
+<script src="config.js"></script>
+<script>
+(function () {
+  var cfg = window.OM_CONFIG || {};
+  if (cfg.goatcounter) { var a = document.getElementById("gcLink"); a.href = "https://" + cfg.goatcounter + ".goatcounter.com"; a.hidden = false; }
+  fetch("https://api.github.com/repos/" + cfg.releasesRepo + "/releases?per_page=100", { headers: { Accept: "application/vnd.github+json" } })
+    .then(function (r) { if (!r.ok) throw r; return r.json(); })
+    .then(function (list) {
+      var total = 0, rows = [];
+      list.forEach(function (rel) {
+        (rel.assets || []).forEach(function (a) {
+          total += a.download_count;
+          rows.push("<tr><td>" + rel.tag_name + "</td><td>" + (rel.published_at || "").slice(0, 10) + "</td><td>" + a.name + "</td><td class='n'>" + a.download_count + "</td></tr>");
+        });
+      });
+      document.getElementById("tTotal").textContent = total;
+      document.getElementById("tReleases").textContent = list.length;
+      if (list[0]) {
+        var l = 0; (list[0].assets || []).forEach(function (a) { l += a.download_count; });
+        document.getElementById("tLatest").textContent = l;
+        document.getElementById("tLatestL").textContent = "senaste versionen (" + list[0].tag_name + ")";
+      }
+      document.getElementById("rows").innerHTML = rows.join("") || "<tr><td colspan='4'>Inga nedladdningar än.</td></tr>";
+    })
+    .catch(function () { document.getElementById("rows").innerHTML = "<tr><td colspan='4'>Kunde inte hämta siffrorna just nu. Försök igen om en stund.</td></tr>"; });
+})();
+</script>
+</body>
+</html>

@@ -6,5 +6,8 @@ window.OM_CONFIG = {
   // Keep the same names every time: the game's own updater looks for them too.
   assetName: "O-Manager-Setup.exe",          // Windows
   macAssetName: "O-Manager-Mac.zip",         // Mac (Intel and Apple silicon)
-  linuxAssetName: "O-Manager-Linux.tar.gz"   // Linux
+  linuxAssetName: "O-Manager-Linux.tar.gz",  // Linux
+  // Visitor statistics with GoatCounter (no cookies). Put your site code here, e.g. "o-manager" for
+  // o-manager.goatcounter.com. Empty = no statistics. See website/README.md.
+  goatcounter: ""
 };
