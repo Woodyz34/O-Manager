@@ -137,11 +137,16 @@ public class RunSession : MonoBehaviour
         }
         data = WithHills(data, RunSettings.Hills);
         // The knolls and hollows the mapper drew with contours and form lines, which the 10 m height grid rounds away
-        loadingCard.Set("Reading the contours", 0.06f);
-        byte[] linesJson = TvWorldData.LinesJson(mapDef);
+        loadingCard.Set("Shaping the ground from the contours (the first time on a map takes a little while)", 0.06f);
+        byte[] linesJson = TvWorldData.LinesJson(mapDef), pointsJson = TvWorldData.PointsJson(mapDef);
+        float interval = TvWorldData.ContourInterval(mapDef);
+        string mapId = mapDef.id;
+        // The ground from the contours is kept on disk; a new version of the map's lines (an import) gets a new file
+        string cacheFile = System.IO.Path.Combine(Application.persistentDataPath, "RunHeights",
+            Safe(mapId) + "-" + (linesJson != null ? linesJson.Length : 0) + "-" + (pointsJson != null ? pointsJson.Length : 0) + "-v1.bytes");
         TvWorldData.Data plain = data;
         TvHeights detailed = plain.heights;
-        try { detailed = await Task.Run(() => RunContours.Detailed(mapDef.id, plain.heights, linesJson)); }
+        try { detailed = await Task.Run(() => RunContours.Detailed(mapId, plain.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile)); }
         catch (Exception e) { Debug.LogWarning("RunSession: contours: " + e); }
         if (this == null) return;
         data = new TvWorldData.Data { mapId = plain.mapId, layer = plain.layer, heights = detailed, look = plain.look, speeds = plain.speeds };
@@ -205,6 +210,13 @@ public class RunSession : MonoBehaviour
         float light = 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
         Color.RGBToHSV(c, out _, out float saturation, out _);
         return light > 0.8f || (light > 0.6f && saturation < 0.25f) ? CourseUI.Accent : c;
+    }
+
+    static string Safe(string name)
+    {
+        var b = new System.Text.StringBuilder();
+        foreach (char ch in name ?? "map") b.Append(char.IsLetterOrDigit(ch) || ch == '-' || ch == '_' ? ch : '_');
+        return b.ToString();
     }
 
     static string Hint() => "W A S D: run    Mouse: look    Space: jump    Left mouse: map up/down    F4: speed and ground\n"
