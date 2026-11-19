@@ -23,7 +23,7 @@ public class ContestsPage : MonoBehaviour
         claimedThisSession = false;
     }
 
-    bool weekly = true;
+    bool weekly = false;   // Today first (2026-11-19, the user)
     List<ContestInfo> contests;
     string error;
     bool busy;
@@ -104,10 +104,10 @@ public class ContestsPage : MonoBehaviour
         CourseUI.Place(head.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -34), new Vector2(1180, 200));
         TextMeshProUGUI title = CourseUI.Text("Title", head.transform, "Contests", 44, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32, -18), new Vector2(400, 60));
-        weekTab = CourseUI.Button("Week", head.transform, "This week", CourseUI.ButtonKind.Primary, () => { weekly = true; Fill(); }, 24);
-        CourseUI.Place((RectTransform)weekTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32, -90), new Vector2(200, 58));
-        dayTab = CourseUI.Button("Day", head.transform, "Today", CourseUI.ButtonKind.Light, () => { weekly = false; Fill(); }, 24);
-        CourseUI.Place((RectTransform)dayTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(246, -90), new Vector2(200, 58));
+        dayTab = CourseUI.Button("Day", head.transform, "Today", CourseUI.ButtonKind.Primary, () => { weekly = false; Fill(); }, 24);
+        CourseUI.Place((RectTransform)dayTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32, -90), new Vector2(200, 58));
+        weekTab = CourseUI.Button("Week", head.transform, "This week", CourseUI.ButtonKind.Light, () => { weekly = true; Fill(); }, 24);
+        CourseUI.Place((RectTransform)weekTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(246, -90), new Vector2(200, 58));
         info = CourseUI.Text("Info", head.transform, "", 20, CourseUI.InkMuted);
         info.richText = true;
         CourseUI.Place(info.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(32, 6), new Vector2(720, 44));
@@ -276,8 +276,8 @@ public class ContestsPage : MonoBehaviour
         }
         else
         {
-            // The course stays a surprise until you run it
-            TextMeshProUGUI hidden = CourseUI.Text("Hidden", frame.transform, course != null ? "AI course\n" + CourseFilter.Facts(course) : "AI course\nlaid when the first player starts", 22, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.Center);
+            // The course stays a secret until you run it, so nobody gets to study it first (2026-11-19, the user)
+            TextMeshProUGUI hidden = CourseUI.Text("Hidden", frame.transform, "Random map and AI course\nshown when you start", 22, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.Center);
             CourseUI.Stretch(hidden.rectTransform, 16, 16, 16, 16);
         }
 

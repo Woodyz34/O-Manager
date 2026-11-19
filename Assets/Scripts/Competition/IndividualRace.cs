@@ -150,6 +150,13 @@ public class IndividualRace : MonoBehaviour, IRaceStats
     public void HostContinue()
     {
         if (!CompetitionFlow.LocalIsHost()) return;
+        // A weekly or daily contest has no results page or race money: its leaderboard and prizes are on the
+        // contests page (2026-11-19, the user)
+        if (ContestRun.Active != null)
+        {
+            CompetitionFlow.HostReturnToLobby();
+            return;
+        }
         FinalResultsAllowed = true;
         CompetitionFlow.HostShowResults();
     }

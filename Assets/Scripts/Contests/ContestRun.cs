@@ -49,7 +49,7 @@ public static class ContestRun
     // "Physics 100, speed 100, technique 37" for the races; the route choice game times its routes with a speed-100 runner
     public static string RunnerText(ContestInfo c)
     {
-        if (c.RouteChoice) return "Routes timed with a speed 100 runner. Most points wins.";
+        if (c.RouteChoice) return "Pick the fastest route on every leg. Most points wins.";
         int technique = c.Sprint ? 100 : c.technique;
         return "Everyone runs with physics 100, speed 100, technique " + technique + ". Fastest time wins.";
     }
@@ -63,25 +63,40 @@ public static class ContestRun
 
     public static ExtraMode ModesFor(ContestInfo c) => c.RouteChoice ? ExtraMode.RouteChoice : ExtraMode.None;
 
-    // How the contest's AI course is laid: the same settings and seed for everyone, so it is a fair course whoever lays it
+    // How the contest's AI course is laid (2026-11-19, the user): a random length and number of controls, drawn from the
+    // contest's seed so it is the same whoever lays it. Forest: middle 4-6 km or long 8-12 km, half and half. Sprint:
+    // 1.7-2.7 km.
     static CourseGenerator.Settings SettingsFor(ContestInfo c)
     {
-        CourseGenerator.Settings s = new CourseGenerator.Settings { seed = (int)(c.seed & 0x7fffffff) };
+        System.Random random = new System.Random((int)(c.seed & 0x7fffffff));
+        CourseGenerator.Settings s = new CourseGenerator.Settings { seed = random.Next() };
+        float averageLeg;
         if (c.Sprint)
         {
             s.kind = CourseGenerator.Kind.Sprint;
             s.barriers = true;
-            if (c.RouteChoice) { s.lengthKm = c.Weekly ? 3f : 2f; s.controls = c.Weekly ? 16 : 11; }
-            else { s.lengthKm = c.Weekly ? 2.5f : 1.8f; s.controls = c.Weekly ? 14 : 10; }
+            s.lengthKm = Range(random, 1.7f, 2.7f);
+            averageLeg = Range(random, 140f, 220f);
+        }
+        else if (random.NextDouble() < 0.5)
+        {
+            s.kind = CourseGenerator.Kind.Middle;
+            s.lengthKm = Range(random, 4f, 6f);
+            averageLeg = Range(random, 350f, 550f);
         }
         else
         {
-            s.kind = CourseGenerator.Kind.Middle;
-            if (c.RouteChoice) { s.lengthKm = c.Weekly ? 5f : 3.5f; s.controls = c.Weekly ? 12 : 9; }
-            else { s.lengthKm = c.Weekly ? 4f : 3f; s.controls = c.Weekly ? 10 : 8; }
+            s.kind = CourseGenerator.Kind.Long;
+            s.lengthKm = Range(random, 8f, 12f);
+            averageLeg = Range(random, 650f, 950f);
         }
+        s.lengthKm = Mathf.Round(s.lengthKm * 10f) / 10f;
+        int controls = Mathf.RoundToInt(s.lengthKm * 1000f / averageLeg) - 1;
+        s.controls = Mathf.Clamp(controls, CourseGenerator.MinControlsFor(s.kind, s.lengthKm), CourseGenerator.MaxControlsFor(s.kind, s.lengthKm));
         return s;
     }
+
+    static float Range(System.Random random, float min, float max) => min + (float)random.NextDouble() * (max - min);
 
     // The maps built into the game for this contest (never imported or shared maps: everyone must have it)
     static List<MapDefinition> MapsFor(ContestInfo c)
@@ -136,16 +151,29 @@ public static class ContestRun
             try { result = await Task.Run(() => CourseGenerator.Generate(map, grid, settings)); }
             catch (Exception e) { last = e; continue; }
             if (result == null || result.course == null) { last = new Exception(result != null ? result.error : "no course"); continue; }
-            CourseData course = result.course;
-            course.id = "contest-" + c.id;
-            course.name = SpanName(c) + " " + Title(c);
-            course.author = "O-Manager";
-            course.authorId = "";
-            course.builtIn = false;
-            course.createdAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            return JsonConvert.SerializeObject(course);
+            return Finish(c, result.course);
+        }
+        // No map could take a course that long: a middle distance course on the contest's map instead
+        if (!c.Sprint)
+        {
+            MapDefinition map = maps[(int)(seed % maps.Count)];
+            MapGrid grid = MapGrid.Load(map.gridName);
+            CourseGenerator.Settings settings = new CourseGenerator.Settings { kind = CourseGenerator.Kind.Middle, lengthKm = 4f, controls = 10, seed = (int)(seed & 0x7fffffff), progress = progress };
+            CourseGenerator.Result result = await Task.Run(() => CourseGenerator.Generate(map, grid, settings));
+            if (result != null && result.course != null) return Finish(c, result.course);
         }
         throw new ContestException("Could not lay the contest course: " + (last != null ? last.Message : "no map fits"));
+    }
+
+    static string Finish(ContestInfo c, CourseData course)
+    {
+        course.id = "contest-" + c.id;
+        course.name = SpanName(c) + " " + Title(c);
+        course.author = "O-Manager";
+        course.authorId = "";
+        course.builtIn = false;
+        course.createdAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return JsonConvert.SerializeObject(course);
     }
 
     // ---- Starting ----
@@ -211,12 +239,10 @@ public static class ContestRun
         PlayerPrefs.Save();
         try
         {
-            List<ContestRow> rows = await ContestCloud.SubmitAsync(c.id, score, seconds, replay);
+            await ContestCloud.SubmitAsync(c.id, score, seconds, replay);
             PlayerPrefs.DeleteKey(LocalPrefs.Key(UnsentKey));
             PlayerPrefs.Save();
-            ContestRow mine = rows.Find(r => r.me);
-            string result = mine != null ? CompetitionFlow.Ordinal(mine.place) + " of " + rows.Count + " so far" : "saved";
-            UIToast.Show(SpanName(c) + ": your result is in, " + result + ". See the leaderboard on the contests page.", 8f, CourseUI.Forest);
+            // No message here: it covered the button on the statistics screen, and the contests page shows the result
         }
         catch (Exception e)
         {
