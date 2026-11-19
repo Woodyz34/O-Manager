@@ -298,7 +298,8 @@ public class LobbySettingsUI : MonoBehaviour
         {
             // A map that is not private (2026-11-19): ready once this computer has it. A map the host has just imported
             // reaches the others through the shared maps, which are looked for again while it is missing.
-            if (MapDefinition.FindExact(course.mapId) != null) readyId = course.mapId;
+            MapDefinition have = MapDefinition.FindExact(course.mapId);
+            if (have != null && MapPackages.GridExists(have.gridName)) readyId = course.mapId;
             else
             {
                 SharedMaps.RefreshForLobby();

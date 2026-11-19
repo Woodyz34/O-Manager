@@ -57,6 +57,14 @@ public class PathfindingManager : MonoBehaviour
     {
         spriteAligner = GetComponent<SpriteAlignerAuto>();
         objectSpawner = GetComponent<GeoJsonSpawner>();
+        // The map's grid could not be read on this computer (missing or broken map files): say so instead of a
+        // string of errors further on
+        if (speedGrid2D == null || gridData == null)
+        {
+            Debug.LogError("PathfindingManager: the map " + jsonFileName + " could not be loaded on this computer");
+            UIToast.Show("This map could not be loaded on this computer. Press Esc to leave the race.", 10f);
+            return;
+        }
         if (multiplayer)
         {
             // en for loop som skapar alla agents.
