@@ -193,6 +193,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public float relayProgress { get; set; }
     [Networked] public NetworkBool relayRunning { get; set; }
     [Networked] public NetworkBool relayMistake { get; set; }   // the runner is making a mistake right now, shown on the map of a TV production
+    [Networked] public NetworkBool relayLost { get; set; }      // the runner is off the plan right now (no TV punch); relayMistake only once it is a real mistake
     // TV production of a relay with TV controls (TvDirector): what the host puts on TV. 0 = nothing (the race runs at
     // full pace), else TvDirector's number of the TV shot. Everyone slows the race down while something is on.
     [Networked] public int tvShot { get; set; }
@@ -280,6 +281,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             relayLeg = -1;
             relayRunning = false;
             relayMistake = false;
+            relayLost = false;
             tvShot = 0;
             return;
         }
@@ -290,8 +292,30 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         relayRunning = agentMovement.canRunNextSegment && !agentMovement.hasFinished && !agentMovement.relayHold
             && !agentMovement.WaitingForAllPlayersToReachKontroll && !agentMovement.WaitingForAllPlayersToDraw
             && drawer != null && !drawer.timeToDraw;
-        relayMistake = relayRunning && agentMovement.IsMissing;
+        bool lost = relayRunning && agentMovement.IsLost;
+        relayLost = lost;
+        relayMistake = MistakeWorthShowing(lost);
         tvShot = TvDirector.Active != null ? TvDirector.Active.ShotToSend : 0;
+    }
+
+    // The "Mistake" label on the map (2026-11-19): only for a real mistake, not every small turn the wrong way that is
+    // put right a second later. The runner must have been off the plan for 3 seconds on the screen and 20 seconds of
+    // race time, and the label goes as soon as the runner knows where it is again.
+    float lostSinceReal = -1f, lostSinceRace;
+
+    bool MistakeWorthShowing(bool lost)
+    {
+        if (!lost)
+        {
+            lostSinceReal = -1f;
+            return false;
+        }
+        if (lostSinceReal < 0f)
+        {
+            lostSinceReal = Time.unscaledTime;
+            lostSinceRace = Time.time;
+        }
+        return Time.unscaledTime - lostSinceReal >= 3f && (Time.time - lostSinceRace) * PackRunning.GameSecondsPerSecond >= 20f;
     }
 
     // The point index in the team's route (0 = start) as common controls: the last common point passed plus the part of

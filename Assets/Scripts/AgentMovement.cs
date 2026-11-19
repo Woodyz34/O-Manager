@@ -103,6 +103,8 @@ public class AgentMovement : NetworkBehaviour
     // Game modes: the runner stands still for a moment (scared by a bear). The clock keeps running.
     [HideInInspector] public bool modeHold = false;
     public bool IsMissing => isAngleMissing || isDrawMissing || isMissingControl || (forestMistakes != null && forestMistakes.Active);
+    // Off the plan for real (not just working out a new path after reading in): the runner does not know where it is
+    public bool IsLost => isAngleMissing || isDrawMissing || isMissingControl || (forestMistakes != null && forestMistakes.BlocksPunch);
 
     // Forest mistakes (Mistakes/ForestMistakes.cs): direction errors, parallel errors and reading in on the map
     [HideInInspector] public ForestMistakes forestMistakes;

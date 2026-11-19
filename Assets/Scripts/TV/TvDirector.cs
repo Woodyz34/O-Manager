@@ -156,7 +156,7 @@ public class TvDirector : MonoBehaviour
     {
         // A runner who is making a mistake does not punch, even near the control on the right leg (2026-11-19: a runner
         // lost near a TV control punched it on TV and then went on making the mistake)
-        if (!spot.start && runner is NetworkPlayer lost && lost.relayMistake) return false;
+        if (!spot.start && runner is NetworkPlayer lost && lost.relayLost) return false;
         if (spot.start || spot.controlIndex < 0) return true;
         int to = runner.RelayControl;
         return to == spot.controlIndex || to == spot.controlIndex + 1;
