@@ -1,14 +1,47 @@
 # O-Manager
 
-Unity 6.3 (6000.3.25f1) 2D orienteering manager game: A* runners on real maps, Photon Fusion multiplayer, runner cards and packs, course builder, relays.
+**O-Manager is an orienteering game.** You don't run yourself: you are the manager. You read a real orienteering map, draw the route your runner should take between the controls, and then watch your runner try to follow it against the clock, alone or against friends online.
 
-## Open the project
-1. Clone the repo.
-2. Open the folder in Unity Hub with Unity 6000.3.25f1. The first open rebuilds `Library/`, which takes a while.
+Website and download: **[o-manager.se](https://o-manager.se)**
 
-## Folders
-- `Assets/` the game (scripts in `Assets/Scripts`)
-- `Packages/`, `ProjectSettings/` Unity configuration
-- `Docs/` design notes
+![A race in progress: the runner follows the drawn route between the controls](website/assets/img/race-l.webp)
 
-The Eventor statistics script will live in its own folder here. The Eventor API key is never committed; it is stored as a GitHub Actions secret.
+## How a race works
+
+1. **Pick a map and a course.** The maps are real orienteering maps. Courses are set by players in the course builder, or by the game's own course setter.
+2. **Pick a runner card.** Every runner has a physical rating, a technique rating and a sprint speed.
+3. **Draw your route choice.** Straight through the forest, round on the path, over the hill or along the marsh: the line you draw is the route your runner takes.
+4. **Watch the race.** The runner's speed depends on the terrain under their feet (paths, open land, thick green forest, marsh, stony ground), the slope, fatigue and the runner's own stats. Weaker technique means more mistakes: the runner can lose contact with the map, drift off the route and has to relocate.
+
+![Drawing the route to the next control](website/assets/img/route-l.webp)
+
+## What's in the game
+
+- **Multiplayer** for friends in an online lobby, and single player against your own best times.
+- **Relays** with forked courses, chasing starts and a stats screen with a replay after every leg.
+- **Live TV production of relays**: the map becomes a 3D forest at chosen controls, and the race slows down to real running pace while the cameras film the runners punching, with split times on screen.
+- **Game modes** that can be combined: hide a bear that scares the other runners, move one of their controls, an imposter mode where one player secretly works against the others, and a route choice game where you compare your route with the fastest one.
+- **Route analysis** after the race: everyone's routes and split times side by side.
+- **Runner cards and packs.** Earn money in races, open packs with a reveal animation, and build your collection in My Runners. The ratings are computed from real race results.
+- **Course builder** for your own courses, with out-of-bounds areas, forks for relays and an AI course setter that can make a course in any part of a map.
+- **Map import** from OCAD and OpenOrienteering Mapper files: the game reads the map symbols and builds a terrain grid that tells how fast it is to run in every few metres of the map, for both forest and sprint maps.
+
+| | |
+| --- | --- |
+| ![Live TV camera at a control in the 3D forest](website/assets/img/tvcontrol-l.webp) | ![The finish of a relay leg on TV](website/assets/img/tvfinish-l.webp) |
+| ![The pack shop](website/assets/img/shop-l.webp) | ![My Runners collection](website/assets/img/runners-l.webp) |
+| ![The course builder](website/assets/img/builder-l.webp) | ![The route choice game on a sprint map](website/assets/img/rcsprint-l.webp) |
+| ![The multiplayer lobby](website/assets/img/lobby-l.webp) | ![Results after a race](website/assets/img/finished-l.webp) |
+
+## Built with
+
+- **Unity 6** and **C#**, 2D with a 3D view for the TV production.
+- **Photon Fusion** for online multiplayer (shared mode, synced race clock, game settings chosen by the host).
+- **A\* pathfinding** on a terrain grid with direction-dependent slope costs, used both for the runners and for checking the drawn routes.
+- **Map import pipeline** that reads OCAD/OMAP symbol sets (forest and sprint standards) and turns them into speed grids, ground types for the runners' map reading, passages through fences and walls, tunnels and bridges, and a 3D world for the TV cameras.
+- **Simulated orienteering**: fatigue, terrain and slope models, and realistic mistakes that depend on how hard the map is to read.
+- **Runner ratings** computed in Python from real race results, with times normalized between races.
+- **Unity Cloud Save** for shared courses and maps.
+- A self-updating installer for Windows, macOS and Linux, and a static website.
+
+O-Manager is a hobby project by Anders Skoglund.
