@@ -11,9 +11,11 @@ public static class RunnerCards
     // Set 2026-11-09 for the 80/20 overall (978 runners in packs): Elite about the top 10 %, Gold the next 15 %,
     // Silver the next 25 %, Bronze the rest. With speed in the overall (2026-11-14) the same limits give almost the
     // same shares (Elite 10.8 %, Gold and up 24.9 %, Silver and up 50.6 %), so they are kept.
-    public const int EliteFrom = 88;
-    public const int GoldFrom = 82;
-    public const int SilverFrom = 73;
+    // Fixed limits since 2026-11-19 (the user): Elite 90+, Gold 80+, Silver 70+, Bronze below (978 runners: 45 Elite,
+    // 149 Gold, 166 Silver, 618 Bronze)
+    public const int EliteFrom = 90;
+    public const int GoldFrom = 80;
+    public const int SilverFrom = 70;
 
     // Running counts four times as much as technique (user's choice 2026-11-09). One point of speed costs about
     // 1.8 s per control at speed 75, one point of technique 0.3 s: 6 to 8 times as much. Since 2026-11-14 (user's
