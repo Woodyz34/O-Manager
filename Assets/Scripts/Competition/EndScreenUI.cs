@@ -420,6 +420,12 @@ public class EndScreenUI : MonoBehaviour
             : "Did not finish";
 
         int total = 0;
+        // The base money for the time played, for everyone who reached the finish (2026-11-19)
+        if (me.finished)
+        {
+            float played = CompetitionFlow.PlayedSeconds;
+            total += AddLine(CompetitionRewards.TimeLabel(played), CompetitionRewards.ForTime(played));
+        }
         if (amImposter && secretTaskMode)
         {
             // Without a task, the imposter simply races: a normal place, plus money for getting away
@@ -432,13 +438,15 @@ public class EndScreenUI : MonoBehaviour
         }
         else if (amImposter)
         {
-            total += AddLine(me.finished ? placeLabel + ", counted from the back" : placeLabel,
-                CompetitionRewards.ForImposterPlace(me.place, runners, me.finished));
+            int forPlace = CompetitionRewards.ForImposterPlace(me.place, runners, me.finished);
+            total += AddLine(me.finished && forPlace == 0 ? placeLabel + ", too far up for an imposter" : placeLabel, forPlace);
             if (votersCount > 0)
             {
                 total += AddLine(caught ? "Caught by the others" : "Got away with it",
                     caught ? 0 : CompetitionRewards.ForImposterEscape(votersCount));
             }
+            int lastUnseen = CompetitionRewards.ForImposterLastUnseen(me.place, runners, me.finished, caught);
+            if (lastUnseen > 0) total += AddLine("Last, and nobody saw it", lastUnseen);
         }
         else
         {

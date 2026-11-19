@@ -178,7 +178,9 @@ public static class RouteChoiceGame
 
     // ---- Prize money ----
     // Everyone who takes part gets a little, and a good place among the others gives more (as in a race)
-    public const int TookPart = CompetitionRewards.FinishBase;
+    // (2026-11-19: money for the time played instead of a fixed 50 kr, so a course without route choices that is over
+    // in seconds pays nothing)
+    public static int TookPart => CompetitionRewards.ForTime(CompetitionFlow.PlayedSeconds);
 
     public static int ForPlace(int place, int players)
     {
@@ -949,7 +951,7 @@ public class RouteChoiceView : MonoBehaviour
         {
             info.text = "Waiting for " + string.Join(", ", waiting) + " to finish. The prize money is handed out when everyone is done.";
             AddStandings(players);
-            TextMeshProUGUI note = CourseUI.Text("Note", body, "Everyone gets " + RouteChoiceGame.TookPart + " kr for taking part, and more for a good place among the others.", 20, CourseUI.InkMuted);
+            TextMeshProUGUI note = CourseUI.Text("Note", body, "Everyone who plays to the end gets " + CompetitionRewards.PerHalfMinute + " kr for every 30 seconds played, and more for a good place among the others.", 20, CourseUI.InkMuted);
             CourseUI.Size(note, 60);
             return;
         }
@@ -969,7 +971,7 @@ public class RouteChoiceView : MonoBehaviour
     {
         if (paid) return;
         paid = true;
-        paidTookPart = RouteChoiceGame.TookPart;
+        paidTookPart = finished ? RouteChoiceGame.TookPart : 0;
         paidPlace = finished ? place : 0;
         paidPlaceOf = players;
         paidForPlace = finished && place > 0 ? RouteChoiceGame.ForPlace(place, players) : 0;
@@ -1000,7 +1002,7 @@ public class RouteChoiceView : MonoBehaviour
 
         List<CanvasGroup> lines = new List<CanvasGroup>();
         float y = -70f;
-        lines.Add(PrizeLine(card.transform, ref y, "Took part", "+" + paidTookPart + " kr"));
+        lines.Add(PrizeLine(card.transform, ref y, "Time played", "+" + paidTookPart + " kr"));
         if (paidPlace > 0) lines.Add(PrizeLine(card.transform, ref y, CompetitionFlow.Ordinal(paidPlace) + " place of " + paidPlaceOf, "+" + paidForPlace + " kr"));
 
         int total = paidTookPart + paidForPlace;
