@@ -92,12 +92,8 @@ public static class LobbyVisit
         LobbyChat.AttachButton(chat);
         HoverTip.Add(chat, "Chat with the others in the lobby.");
 
-        // The host's lobby settings (2026-11-19), left of the money in the top right corner, the same shape as the money
-        Button settings = CourseUI.Button("Lobby settings", go.transform, "Lobby settings", CourseUI.ButtonKind.Light, HostSettingsPopup.Open, 24);
-        RectTransform settingsRect = settings.GetComponent<RectTransform>();
-        CourseUI.Place(settingsRect, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48 - 260, -48), new Vector2(230, 58));
-        settings.gameObject.AddComponent<BesideMoney>();
-        HoverTip.Add(settings, "Race speed, TV controls in relays, bears and control moves per leg. The host changes them; everyone else can look.");
+        // The lobby settings are in the Esc menu, under Settings (2026-11-19, the user: the button covered the long
+        // lobby summary at the top)
     }
 
     // Keeps the Lobby settings button just left of the money pill, as high and as round as it (the pill grows with
