@@ -120,6 +120,12 @@ public class ForestMistakes
     // Called every frame after the runner has moved
     public void Tick(Vector3 fromWorld, Vector3 toWorld)
     {
+        // While on the plan: remember it, so the runner can find its way back onto it after a mistake
+        if (mode == Mode.Route && !waitingForPath && busy == null && agent.path != null && agent.path.Count > 1)
+        {
+            plan = agent.path;
+            planIndex = Mathf.Clamp(agent.currentTargetIndex, 0, plan.Count - 1);
+        }
         if (!Enabled() || waitingForPath || busy != null) return;
         float d = Vector2.Distance(fromWorld, toWorld) * Mpu;
         if (d <= 0f) return;
@@ -743,8 +749,61 @@ public class ForestMistakes
         Log("vet var den är");
         U = 8f; sinceFix = 0f; sureTravel = travel;
         // A few slower seconds ("now I see, I'm over here") while turning the right way
-        if (mode != Mode.Route) Run(SlowThen(3.5f, ToControl));
-        else ToControl();
+        if (mode != Mode.Route) Run(SlowThen(3.5f, BackOnPlan));
+        else BackOnPlan();
+    }
+
+    // The planned route of this stretch (the drawn line), and how far along it the runner was when it went wrong
+    List<Vector2Int> plan;
+    int planIndex;
+
+    // Knows where it is again (2026-11-19, user's wish): not the fastest way to the control from here, which can be a
+    // whole new route choice, but the quickest way back onto its own route, cutting in ahead rather than running back,
+    // and then on along its own route. Off the plan the ground is slower, so a metre there costs a little more.
+    void BackOnPlan()
+    {
+        mode = Mode.Route;
+        List<Vector2Int> own = plan;
+        plan = null;
+        if (own == null || own.Count < 2)
+        {
+            PathTo(Control);
+            return;
+        }
+        float cellMetres = agent.pathfindingManager.cellSize * Mpu;
+        Vector2Int end = own[own.Count - 1];
+        Vector2Int controlCell = agent.WorldToGridPositionCentered(agent.CurrentControlPosition);
+        // Only a plan that goes to the control the runner is heading for
+        if (Vector2Int.Distance(end, controlCell) * cellMetres > 25f)
+        {
+            PathTo(Control);
+            return;
+        }
+        Vector2Int here = agent.WorldToGridPositionCentered(agent.transform.position);
+        // The route left from every point to its end, in metres
+        float[] left = new float[own.Count];
+        for (int i = own.Count - 2; i >= 0; i--) left[i] = left[i + 1] + Vector2Int.Distance(own[i], own[i + 1]) * cellMetres;
+        const float OffPlan = 1.35f;
+        int best = own.Count - 1;
+        float bestCost = float.MaxValue;
+        for (int i = Mathf.Clamp(planIndex, 0, own.Count - 1); i < own.Count; i++)
+        {
+            float cost = Vector2Int.Distance(here, own[i]) * cellMetres * OffPlan + left[i];
+            if (cost < bestCost)
+            {
+                bestCost = cost;
+                best = i;
+            }
+        }
+        // Almost at the end of the plan anyway: straight to the control
+        if (left[best] < 15f)
+        {
+            PathTo(Control);
+            return;
+        }
+        List<Vector2Int> tail = own.GetRange(best + 1, own.Count - best - 1);
+        Log("tillbaka in på sitt vägval, " + Mathf.RoundToInt(left[best]) + " m före kontrollen");
+        PathTo((Vector2)agent.GridToWorldPosition(own[best]) * Mpu, false, tail);
     }
 
     void ToControl()
@@ -762,7 +821,7 @@ public class ForestMistakes
     }
 
     // ---------------- paths and pauses
-    void PathTo(Vector2 targetMetres, bool setExpect = false)
+    void PathTo(Vector2 targetMetres, bool setExpect = false, List<Vector2Int> then = null)
     {
         Vector2Int start = agent.WorldToGridPositionCentered(agent.transform.position);
         Vector2Int goal = NearestOpen(agent.WorldToGridPositionCentered(targetMetres / Mpu));
@@ -784,6 +843,8 @@ public class ForestMistakes
                 for (int i = 1; i < result.Count; i++) len += Vector2Int.Distance(result[i], result[i - 1]);
                 expect = len * agent.pathfindingManager.cellSize * Mpu;
             }
+            // Back onto the own route: then on along it to the control
+            if (then != null && then.Count > 0) result.AddRange(then);
             agent.SetMistakePath(result);
         }));
     }
