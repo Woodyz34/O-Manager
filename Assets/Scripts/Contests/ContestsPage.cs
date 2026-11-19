@@ -388,7 +388,9 @@ public class ContestsPage : MonoBehaviour
         catch (Exception e) { UIToast.Show(e.Message); return; }
         if (this == null) return;
 
-        GameObject sheet = PopupFrame(ContestRun.SpanName(c) + ": " + ContestRun.Title(c), 1100, 900);
+        // As tall as the rows need, so the button sits just under the last row even with one runner (2026-11-19, the user)
+        float height = Mathf.Clamp(140 + 120 + rows.Count * 58f, 420f, 900f);
+        GameObject sheet = PopupFrame(ContestRun.SpanName(c) + ": " + ContestRun.Title(c), 1100, height);
         Transform body = sheet.transform.GetChild(0);
         TextMeshProUGUI note = CourseUI.Text("Note", body, rows.Count + (rows.Count == 1 ? " runner" : " runners")
             + ". Prize money is paid when the contest is over; it can still change as more players run.", 20, CourseUI.InkMuted);

@@ -242,7 +242,17 @@ public static class ContestRun
         public string replay;
     }
 
-    static async void Send(ContestInfo c, int score, int seconds, string replay)
+    // The result on its way to the cloud. The contests page waits for it before it reads the leaderboard: without
+    // that, going back to the page right after the finish read the board before the result had arrived, and you
+    // were not on it (2026-11-19, the user).
+    public static Task Sending { get; private set; } = Task.CompletedTask;
+
+    static void Send(ContestInfo c, int score, int seconds, string replay)
+    {
+        Sending = SendNow(c, score, seconds, replay);
+    }
+
+    static async Task SendNow(ContestInfo c, int score, int seconds, string replay)
     {
         // Kept until it has arrived, so a lost connection does not lose the run
         Unsent unsent = new Unsent { id = c.id, score = score, seconds = seconds, replay = replay };
@@ -265,6 +275,8 @@ public static class ContestRun
     // A result that did not arrive last time; true when there was one and it is in now
     public static async Task<bool> SendUnsentAsync()
     {
+        try { await Sending; }
+        catch (Exception) { }
         string json = PlayerPrefs.GetString(LocalPrefs.Key(UnsentKey), "");
         if (string.IsNullOrEmpty(json)) return false;
         Unsent unsent;
