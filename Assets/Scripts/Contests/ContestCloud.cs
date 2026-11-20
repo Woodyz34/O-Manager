@@ -50,6 +50,7 @@ public class ContestRow
     public int place;
     public int prize;
     public List<string> packs;   // runner packs won (PrizePacks): "weekly", "daily", "normal"
+    public bool dnf;             // started but never handed in a result
     public bool me;
 }
 
