@@ -39,9 +39,14 @@ public class RunTerrain
     // Bridges and tunnels of a town (TvTown): a way over water and through houses, fences and walls
     const WorldLineKind BridgeKind = (WorldLineKind)250, TunnelKind = (WorldLineKind)251;
 
-    public RunTerrain(WorldLayer layer, TvHeights heights, TerrainSpeeds speeds, TvTown town = null)
+    // The 2D race's own grid: on a sprint map it says where the runner may go; everywhere the course's out-of-bounds
+    // areas and barriers close the ground (2026-11-20). Null when the scene has none.
+    readonly TvPassable passable;
+
+    public RunTerrain(WorldLayer layer, TvHeights heights, TerrainSpeeds speeds, TvTown town = null, TvPassable passable = null)
     {
         this.layer = layer;
+        this.passable = passable;
         this.heights = heights;
         this.speeds = speeds ?? new TerrainSpeeds();
         maxE = layer.minE + layer.cols * layer.cell;
@@ -132,6 +137,28 @@ public class RunTerrain
             default: g.speed = forest; g.rough = 1f; g.surface = Surface.Forest; break;
         }
         if (g.speed <= 0.02f) g.blocked = true;
+        if (passable != null)
+        {
+            if (passable.sprint)
+            {
+                // A town: closed exactly where the 2D race is closed. Where the map is open but the 3D world has a
+                // house, water or a garden (a passage the 2D game opens), the runner runs on paving.
+                bool closed = passable.Closed(e, n);
+                if (g.blocked && !closed)
+                {
+                    g.speed = speeds.Ground(TerrainKind.Paved, 1.5f);
+                    g.rough = 0.3f;
+                    g.surface = Surface.Paved;
+                }
+                g.blocked = closed;
+                if (closed) return g;
+            }
+            else if (passable.Purple(e, n))
+            {
+                g.blocked = true;
+                return g;
+            }
+        }
         if ((cell & WorldCell.Marsh) != 0)
         {
             g.speed *= speeds.Ground(TerrainKind.Marsh, 0.8f) / Math.Max(0.05f, forest);

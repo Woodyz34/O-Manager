@@ -12,6 +12,9 @@ public class RelayTrack
     public readonly List<float> times = new List<float>();     // real seconds since the leg started
     public readonly List<Vector3> positions = new List<Vector3>();
     public Transform look;     // the runner's own dot, copied for the replay (null for test ghosts)
+    // A plain round dot in the track's own colour instead of a copy of the runner's look (run it yourself, 2026-11-20,
+    // Anders: the copied circle came out white and at its forest size on a sprint map)
+    public bool plainDot;
 }
 
 // Records where every runner on the leg is, a few times a second, from the moment the leg starts until the statistics come up
@@ -81,7 +84,7 @@ public class RelayReplayRecorder : MonoBehaviour
 
     static RelayTrack WithoutStops(RelayTrack track)
     {
-        RelayTrack smooth = new RelayTrack { label = track.label, isLocal = track.isLocal, color = track.color, look = track.look };
+        RelayTrack smooth = new RelayTrack { label = track.label, isLocal = track.isLocal, color = track.color, look = track.look, plainDot = track.plainDot };
         smooth.positions.AddRange(track.positions);
         int n = track.times.Count;
         if (n == 0) return smooth;
@@ -271,7 +274,7 @@ public class RelayReplayView : MonoBehaviour
             line.useWorldSpace = true;
             lines.Add(line);
 
-            GameObject marker = track.look != null ? CopyLook(track.look) : null;
+            GameObject marker = track.plainDot ? PlainDot(track, dotSize * 1.3f) : track.look != null ? CopyLook(track.look) : null;
             if (marker == null)
             {
                 marker = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -310,6 +313,35 @@ public class RelayReplayView : MonoBehaviour
         HideRealRunners();
         BuildBar();
         Apply();
+    }
+
+    // A round dot in the track's colour with a dark ring round it, the size the replay draws every runner at least
+    GameObject PlainDot(RelayTrack track, float diameter)
+    {
+        RunnerMarker look = track.look != null ? track.look.GetComponentInChildren<RunnerMarker>(true) : null;
+        Sprite round = look != null && look.circle != null ? look.circle.sprite : null;
+        if (round == null) return null;
+        Sprite ringSprite = look.ring != null ? look.ring.sprite : null;
+        GameObject root = new GameObject("Look");
+        float size = Mathf.Max(0.0001f, round.bounds.size.x);
+        root.transform.localScale = Vector3.one * (diameter / size);
+        SpriteRenderer dot = new GameObject("Dot").AddComponent<SpriteRenderer>();
+        dot.transform.SetParent(root.transform, false);
+        dot.sprite = round;
+        dot.sharedMaterial = material;
+        dot.color = new Color(track.color.r, track.color.g, track.color.b, 1f);
+        dot.sortingOrder = 41;
+        if (ringSprite != null)
+        {
+            SpriteRenderer ring = new GameObject("Ring").AddComponent<SpriteRenderer>();
+            ring.transform.SetParent(root.transform, false);
+            ring.transform.localScale = Vector3.one * (size * 1.08f / Mathf.Max(0.0001f, ringSprite.bounds.size.x));
+            ring.sprite = ringSprite;
+            ring.sharedMaterial = material;
+            ring.color = new Color(0.12f, 0.16f, 0.13f, 1f);
+            ring.sortingOrder = 42;
+        }
+        return root;
     }
 
     // A copy of how the runner looks on the map (its dot and rings), in its own colour

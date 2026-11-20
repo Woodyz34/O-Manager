@@ -53,7 +53,7 @@ public partial class TvWorldBuilder
                     xz[i + 1] = (float)(xy[i + 1] - input.centerN);
                     lo = Math.Min(lo, xz[i]); hi = Math.Max(hi, xz[i]); lo2 = Math.Min(lo2, xz[i + 1]); hi2 = Math.Max(hi2, xz[i + 1]);
                 }
-                if (hi < -R - 30 || lo > R + 30 || hi2 < -R - 30 || lo2 > R + 30) continue;
+                if (hi < -R - 100 || lo > R + 100 || hi2 < -R - 100 || lo2 > R + 100) continue;   // as far as Buildings looks
                 townLines.Add((kind, xz, widths != null && s < widths.Count ? widths[s] : 0f));
             }
         }
@@ -132,7 +132,8 @@ public partial class TvWorldBuilder
             // A passage through the house: the cells along a tunnel line are left open, with the house over them
             if (TownLineDist(x, z, 2) < 1.8f) { arch.Add((x, z)); continue; }
             pts.Add((x, z));
-            if (!input.chunkDetail && Inside(x, z, 0f)) world.solids.Add(new TvSolid { x = x, z = z, r = layer.cell * 0.75f });
+            // The run-yourself world stops the runner by the race's own grid (TvPassable), exactly at the walls
+            if (!input.chunkDetail && input.passable == null && Inside(x, z, 0f)) world.solids.Add(new TvSolid { x = x, z = z, r = layer.cell * 0.75f });
         }
         foreach (var a in arch)
         {
@@ -152,7 +153,14 @@ public partial class TvWorldBuilder
             if (arch.Count == 0) { PlaceHouse(pts, isChurch ? TvCityShapes.Kind.Church : TvCityShapes.Kind.TownHall); return; }
         }
         // After a passage is cut out, the parts on each side are houses of their own
-        foreach (var part in Parts(pts)) SplitHouses(part, 0);
+        // The houses get the map's own outline (TvTownHouses): cut first, then built together so they meet exactly
+        blockHouses = new List<(List<(float x, float z)> pts, TvCityShapes.Kind kind)>();
+        try
+        {
+            foreach (var part in Parts(pts)) SplitHouses(part, 0);
+            BuildBlockHouses(blockHouses);
+        }
+        finally { blockHouses = null; }
     }
 
     // The joined parts of a set of cells
@@ -290,6 +298,7 @@ public partial class TvWorldBuilder
 
     void PlaceHouse(List<(float x, float z)> pts, TvCityShapes.Kind kind, Fit f)
     {
+        if (blockHouses != null) { blockHouses.Add((pts, kind)); return; }
         if (!Inside(f.cx, f.cz, 0f)) return;
         float len = Math.Max(f.len, 4f), wid = Math.Max(f.wid, 3.5f), area = len * wid;
         int hx = (int)Math.Floor((f.cx + ox) * 0.5f), hz = (int)Math.Floor((f.cz + oz) * 0.5f);
@@ -488,8 +497,10 @@ public partial class TvWorldBuilder
                     }
                 }
 
+                // Nothing that stands in the way in a lane narrower than 5 m (2026-11-20, Anders got stuck in a passage)
+                bool roomy = across >= 5f;
                 // At the street's edge: lamps, benches, bins, parked cars
-                if (min >= 0.6f && min < 1.6f)
+                if (min >= 0.6f && min < 1.6f && roomy)
                 {
                     if (h < 0.4f && FarFrom(x, z, 12f, 0) && Free(x, z, 1f))
                     {
@@ -528,7 +539,7 @@ public partial class TvWorldBuilder
                     }
                 }
                 // By a house wall: bicycles, café tables, flowers
-                if (wall && min < 2.6f)
+                if (wall && min < 2.6f && roomy)
                 {
                     if (min < 1.3f && h > 0.4f && h < 0.5f && FarFrom(x, z, 4f, 4) && Free(x, z, 1f))
                     {

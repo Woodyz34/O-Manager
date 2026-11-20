@@ -29,6 +29,8 @@ public class RunWorld : MonoBehaviour
 
     public RunTerrain terrain;
     public TvWorldData.Data data;
+    TvPassable passable;                // the 2D race's grid: no house where it is open (a town)
+    CourseData course;                  // its out-of-bounds areas and barriers are put up as taped fences
     public double anchorE, anchorN;     // the map point at Origin
     public float baseHeight;            // the map height at Origin
     RunSettings.Look look;
@@ -90,10 +92,12 @@ public class RunWorld : MonoBehaviour
 
     // ---- Setting up ----
 
-    public static RunWorld Create(TvWorldData.Data data, RunTerrain terrain, CoursePoint start, List<CoursePoint> flags)
+    public static RunWorld Create(TvWorldData.Data data, RunTerrain terrain, CoursePoint start, List<CoursePoint> flags, TvPassable passable = null, CourseData course = null)
     {
         RunWorld world = new GameObject("Run world").AddComponent<RunWorld>();
         world.data = data;
+        world.passable = passable;
+        world.course = course;
         world.terrain = terrain;
         // Whole metres, so every computer cuts the map the same way
         world.anchorE = Math.Floor(start.e);
@@ -108,7 +112,103 @@ public class RunWorld : MonoBehaviour
             world.flagN[i] = flags[i].n;
         }
         world.Make();
+        world.BuildTape();
         return world;
+    }
+
+    // ---- The course's out-of-bounds areas and barriers: taped fences (2026-11-20, Anders) ----
+    // Red and white tape on thin posts round every out-of-bounds area and along every uncrossable boundary, as at a
+    // real sprint race, so they are seen; the runner is kept out by the 2D race's grid (TvPassable, RunTerrain).
+
+    Mesh tapeMesh;
+
+    void BuildTape()
+    {
+        if (course == null || course.forbidden == null) return;
+        var v = new List<Vector3>();
+        var nrm = new List<Vector3>();
+        var col = new List<Color32>();
+        var tri = new List<int>();
+        Color32 red = new Color32(214, 38, 32, 255), white = new Color32(246, 244, 238, 255), post = new Color32(70, 74, 70, 255);
+        float Y(double e, double n) => terrain.MapHeight(e, n) - baseHeight;
+
+        void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color32 colour)
+        {
+            Vector3 normal = Vector3.Cross(b - a, d - a).normalized;
+            // Both sides
+            for (int side = 0; side < 2; side++)
+            {
+                int k = v.Count;
+                v.Add(a); v.Add(b); v.Add(c); v.Add(d);
+                Vector3 nn = side == 0 ? normal : -normal;
+                for (int q = 0; q < 4; q++) { nrm.Add(nn); col.Add(colour); }
+                if (side == 0) { tri.Add(k); tri.Add(k + 1); tri.Add(k + 2); tri.Add(k); tri.Add(k + 2); tri.Add(k + 3); }
+                else { tri.Add(k); tri.Add(k + 2); tri.Add(k + 1); tri.Add(k); tri.Add(k + 3); tri.Add(k + 2); }
+            }
+        }
+
+        void Post(double e, double n)
+        {
+            float y = Y(e, n);
+            const float W = 0.035f, Top = 1.05f;
+            Vector3 c = ToScene(e, n, 0f);
+            Vector3 lo = new Vector3(0f, y - 0.4f, 0f), hi = new Vector3(0f, y + Top, 0f);
+            Vector3[] corner = { new Vector3(-W, 0, -W), new Vector3(W, 0, -W), new Vector3(W, 0, W), new Vector3(-W, 0, W) };
+            for (int s = 0; s < 4; s++)
+            {
+                Vector3 a = corner[s], b = corner[(s + 1) % 4];
+                int k = v.Count;
+                v.Add(c + a + lo); v.Add(c + b + lo); v.Add(c + b + hi); v.Add(c + a + hi);
+                Vector3 nn = Vector3.Cross(b - a, Vector3.up).normalized;
+                for (int q = 0; q < 4; q++) { nrm.Add(-nn); col.Add(post); }
+                tri.Add(k); tri.Add(k + 2); tri.Add(k + 1); tri.Add(k); tri.Add(k + 3); tri.Add(k + 2);
+            }
+        }
+
+        foreach (ForbiddenArea area in course.forbidden)
+        {
+            if (area == null || !area.IsValid || area.bridge) continue;
+            int count = area.corners.Count, sides = area.line ? count - 1 : count;
+            for (int s = 0; s < sides; s++)
+            {
+                CoursePoint a = area.corners[s], b = area.corners[(s + 1) % count];
+                double de = b.e - a.e, dn = b.n - a.n, length = Math.Sqrt(de * de + dn * dn);
+                if (length < 0.05) continue;
+                // Posts about every 3 m; the tape in stripes of 0.5 m, red and white
+                int posts = Math.Max(1, (int)Math.Ceiling(length / 3.0));
+                for (int p = 0; p < posts; p++) Post(a.e + de * p / posts, a.n + dn * p / posts);
+                int stripes = Math.Max(1, (int)Math.Round(length / 0.5));
+                for (int k = 0; k < stripes; k++)
+                {
+                    double e0 = a.e + de * k / stripes, n0 = a.n + dn * k / stripes, e1 = a.e + de * (k + 1) / stripes, n1 = a.n + dn * (k + 1) / stripes;
+                    float y0 = Y(e0, n0), y1 = Y(e1, n1);
+                    Color32 c = k % 2 == 0 ? red : white;
+                    foreach (float h in new[] { 0.95f, 0.55f })
+                    {
+                        Vector3 p0 = ToScene(e0, n0, y0 + h), p1 = ToScene(e1, n1, y1 + h);
+                        Quad(p0, p1, p1 + Vector3.up * 0.07f, p0 + Vector3.up * 0.07f, c);
+                    }
+                }
+                if (area.line || s == sides - 1) Post(b.e, b.n);
+            }
+        }
+        if (v.Count == 0) return;
+        tapeMesh = new Mesh { name = "Out of bounds tape" };
+        if (v.Count > 65000) tapeMesh.indexFormat = IndexFormat.UInt32;
+        tapeMesh.SetVertices(v);
+        tapeMesh.SetNormals(nrm);
+        tapeMesh.SetColors(col);
+        tapeMesh.SetTriangles(tri, 0);
+        tapeMesh.RecalculateBounds();
+        var go = new GameObject("Out of bounds tape");
+        go.transform.SetParent(transform, false);
+        go.AddComponent<MeshFilter>().sharedMesh = tapeMesh;
+        var r = go.AddComponent<MeshRenderer>();
+        r.sharedMaterial = plainMaterial;
+        r.shadowCastingMode = ShadowCastingMode.Off;
+        r.receiveShadows = look.shadows > 0;
+        r.lightProbeUsage = LightProbeUsage.Off;
+        r.reflectionProbeUsage = ReflectionProbeUsage.Off;
     }
 
     void Make()
@@ -176,6 +276,7 @@ public class RunWorld : MonoBehaviour
         if (plainMaterial != null) Destroy(plainMaterial);
         if (groundMaterial != null) Destroy(groundMaterial);
         if (pavedMaterial != null) Destroy(pavedMaterial);
+        if (tapeMesh != null) Destroy(tapeMesh);
     }
 
     // ---- Map points and the scene ----
@@ -381,6 +482,7 @@ public class RunWorld : MonoBehaviour
             baseHeight = baseHeight,
             seed = 1,
             town = data.town,
+            passable = passable,
             // The houses in full detail only on the High 3D quality; the others draw the leaner ones close by too
             townRich = look.undergrowth > 0.15f
         };
