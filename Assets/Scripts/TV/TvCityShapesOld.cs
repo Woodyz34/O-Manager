@@ -75,7 +75,7 @@ public static partial class TvCityShapes
             b.Box(-hl - 0.03f, plinth, -hw - 0.03f, hl + 0.03f, plinth + dh, hw + 0.03f, dado);
             // Age: a grey shadow under the eaves, damp stains near the foot, patches where the whitewash fell off
             b.Box(-hl - 0.015f, top - 0.6f, -hw - 0.015f, hl + 0.015f, top, hw + 0.015f, wall.Shade(0.9f));
-            for (int face = 0; face < 4; face++)
+            for (int face = 0; face < 4 && !TvShapeBuilder.Lean; face++)
             {
                 float along = face < 2 ? hl : hw;
                 int n = 2 + (int)(along / 3f);
@@ -91,7 +91,11 @@ public static partial class TvCityShapes
             }
         }
         // Granite corners: long and short blocks in turn up the whole wall
-        if (quoins)
+        if (quoins && TvShapeBuilder.Lean)
+            foreach (float su in new[] { -1f, 1f })
+                foreach (float sv in new[] { -1f, 1f })
+                    b.Box(su > 0 ? hl - 0.4f : -hl - 0.05f, plinth, sv > 0 ? hw - 0.4f : -hw - 0.05f, su > 0 ? hl + 0.05f : -hl + 0.4f, top - 0.2f, sv > 0 ? hw + 0.05f : -hw + 0.4f, Granite);
+        else if (quoins)
             foreach (float su in new[] { -1f, 1f })
                 foreach (float sv in new[] { -1f, 1f })
                     for (int k = 0; plinth + k * 0.45f < top - 0.2f; k++)
@@ -172,7 +176,7 @@ public static partial class TvCityShapes
         TvColor tiles = RoofTiles[(look * 3 + 1) % RoofTiles.Length];
         float rise = Math.Min(hw * 0.42f, 2.3f), over = 0.55f;
         HipRoof(b, hl, hw, top, rise, over, tiles);
-        TileRows(b, hl, hw, top, rise, over, tiles);
+        if (!TvShapeBuilder.Lean) TileRows(b, hl, hw, top, rise, over, tiles);
         if (grand)
         {
             // A clock gable over the middle of the front, with a little bell
@@ -214,10 +218,10 @@ public static partial class TvCityShapes
             {
                 float c = u + s * (w / 2f + 0.17f + w / 4f + 0.02f);
                 FaceBox(b, face, hl, hw, c - w / 4f, y - 0.05f, c + w / 4f, y + h + 0.05f, 0.03f, 0.08f, shutter.Value);
-                for (float sy = y + 0.12f; sy < y + h; sy += 0.18f)
+                for (float sy = y + 0.12f; sy < y + h && !TvShapeBuilder.Lean; sy += 0.18f)
                     FaceBox(b, face, hl, hw, c - w / 4f + 0.04f, sy, c + w / 4f - 0.04f, sy + 0.04f, 0.08f, 0.095f, shutter.Value.Shade(0.75f));
             }
-        if (bars)
+        if (bars && !TvShapeBuilder.Lean)
             for (float bu = u - w / 2f + 0.12f; bu < u + w / 2f - 0.05f; bu += 0.14f)
                 FaceBox(b, face, hl, hw, bu - 0.015f, y, bu + 0.015f, y + h, 0.12f, 0.15f, Iron);
     }
@@ -229,6 +233,12 @@ public static partial class TvCityShapes
         foreach (float s in new[] { -1f, 1f })
             FaceBox(b, face, hl, hw, u + s * (w / 2f - 0.15f) - 0.06f, y - 0.4f, u + s * (w / 2f - 0.15f) + 0.06f, y - 0.12f, 0f, deep * 0.7f, Granite.Shade(0.9f));
         FaceBox(b, face, hl, hw, u - w / 2f, y + 0.92f, u + w / 2f, y + 0.97f, deep - 0.05f, deep, Iron);
+        if (TvShapeBuilder.Lean)
+        {
+            // Away from the runner the bars are one dark railing
+            FaceBox(b, face, hl, hw, u - w / 2f, y, u + w / 2f, y + 0.92f, deep - 0.04f, deep - 0.015f, Iron.Lerp(Granite, 0.3f));
+            return;
+        }
         for (float bu = u - w / 2f + 0.03f; bu <= u + w / 2f; bu += 0.13f)
             FaceBox(b, face, hl, hw, bu - 0.012f, y, bu + 0.012f, y + 0.95f, deep - 0.04f, deep - 0.015f, Iron);
         foreach (float s in new[] { -1f, 1f })
@@ -414,6 +424,62 @@ public static partial class TvCityShapes
         var b = new TvShapeBuilder(random);
         for (int s = 0; s < steps; s++)
             b.Box(-w / 2f, -0.6f, -s * 0.45f - 0.45f, w / 2f, 0.16f * (s + 1), -s * 0.45f, Granite.Lerp(GraniteDark, (s * 37 % 10) / 25f));
+        return b.Done();
+    }
+
+    // ---- Far away: the same houses in a few boxes (the run-yourself town draws these past the near distance) ----
+
+    // A house as a box with its roof and a dark band of windows per floor, in about the colours of the full one
+    public static TvShape Lod(TvRandom random, Kind kind, float len, float wid, int floors, int look, Style style, float plinth)
+    {
+        var b = new TvShapeBuilder(random);
+        float hl = len / 2f, hw = wid / 2f, top, rise;
+        TvColor wall, roof;
+        bool flat = false;
+        if (style == Style.OldStone)
+        {
+            bool bare = kind != Kind.TownHall && look % 7 == 5;
+            wall = kind == Kind.Church ? Limewash[0] : bare ? Rubble : Limewash[look % Limewash.Length];
+            roof = RoofTiles[(look * 3 + 1) % RoofTiles.Length];
+            top = plinth + (kind == Kind.TownHall ? 3.6f * 3 : 2.9f * Math.Max(1, Math.Min(floors, 4))) + 0.25f;
+            rise = Math.Min(hw * 0.42f, 2.3f);
+        }
+        else
+        {
+            switch (kind)
+            {
+                case Kind.Apartments:
+                    wall = new[] { TvColor.Hex("#9a5a42"), TvColor.Hex("#e2d6b8"), TvColor.Hex("#c7a06a"), TvColor.Hex("#b9cbd2"), TvColor.Hex("#e7c26a"), TvColor.Hex("#c98d78") }[look % 6];
+                    roof = TvColor.Hex("#5a5c5c"); top = plinth + 2.9f * floors + 0.3f; rise = 0f; flat = true; break;
+                case Kind.Villa:
+                    wall = new[] { TvColor.Hex("#8f3426"), TvColor.Hex("#e0c27a"), TvColor.Hex("#dfe3e0"), TvColor.Hex("#9cc0d8"), TvColor.Hex("#a9c49a"), TvColor.Hex("#e9d9a6") }[look % 6];
+                    roof = Roofs[(look * 7 + 1) % Roofs.Length]; top = plinth + (len > 11f ? 5.2f : 2.7f); rise = hw * 0.75f; break;
+                case Kind.Hall:
+                    wall = look % 2 == 0 ? TvColor.Hex("#c9c6bc") : TvColor.Hex("#b45a3c"); roof = TvColor.Hex("#4e5254"); top = plinth + 7f; rise = 0f; flat = true; break;
+                default:
+                    wall = Facades[look % Facades.Length]; roof = Roofs[(look * 11 + 1) % Roofs.Length];
+                    top = plinth + 3.6f + 3.1f * (Math.Max(1, floors) - 1); rise = Math.Min(hw * 0.75f, 4.5f); break;
+            }
+        }
+        b.Box(-hl, -0.6f, -hw, hl, top, hw, wall);
+        int bands = Math.Max(1, (int)((top - plinth) / 3f));
+        for (int f = 0; f < bands; f++)
+        {
+            float y = plinth + 0.9f + f * (top - plinth) / bands;
+            b.Box(-hl + 0.5f, y, -hw - 0.04f, hl - 0.5f, y + 1.2f, hw + 0.04f, wall.Lerp(Glass, 0.6f));
+        }
+        if (flat) b.Box(-hl - 0.1f, top, -hw - 0.1f, hl + 0.1f, top + 0.4f, hw + 0.1f, roof);
+        else HipRoof(b, hl, hw, top, Math.Max(0.5f, rise), 0.3f, roof);
+        return b.Done();
+    }
+
+    // A few clay pots with flowers, as they stand by doors and on steps in the old town
+    public static TvShape PotCluster(TvRandom random, int look)
+    {
+        var b = new TvShapeBuilder(random);
+        Pot(b, 0, 0f, 0f, 0f, 0f, 0f, 0.22f, Geranium);
+        Pot(b, 0, 0f, 0f, 0.45f, 0f, 0.1f, 0.16f, Flowers[look % Flowers.Length]);
+        if (look % 2 == 0) Pot(b, 0, 0f, 0f, 0.2f, 0f, 0.5f, 0.28f, Leaf);
         return b.Done();
     }
 }

@@ -156,17 +156,16 @@ public partial class RunSession : MonoBehaviour
 
         HideTwoD();
         BuildHud();
-        loadingCard = UIProgressCard.Show("Building the forest of " + mapDef.name + "...");
+        loadingCard = UIProgressCard.Show((mapDef.IsSprint ? "Building the town of " : "Building the forest of ") + mapDef.name + "...");
         loadingCard.Set("Reading the map", 0.02f);
 
         TvWorldData.Data data = null;
-        try { data = await TvWorldData.LoadAsync(mapDef); }
+        try { data = await TvWorldData.LoadAsync(mapDef, true); }
         catch (Exception e) { Debug.LogWarning("RunSession: " + e); }
         if (this == null) return;
         if (data == null || data.layer == null)
         {
-            Fail(mapDef.IsSprint ? "Sprint maps can't be run in 3D yet. Choose a forest course."
-                                 : "This map has no 3D world. Import it again (OCAD or OOM) to run it yourself.");
+            Fail("This map has no 3D world. Import it again (OCAD or OOM) to run it yourself.");
             return;
         }
         data = WithHills(data, RunSettings.Hills);
@@ -183,9 +182,9 @@ public partial class RunSession : MonoBehaviour
         try { detailed = await Task.Run(() => RunContours.Detailed(mapId, plain.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile)); }
         catch (Exception e) { Debug.LogWarning("RunSession: contours: " + e); }
         if (this == null) return;
-        data = new TvWorldData.Data { mapId = plain.mapId, layer = plain.layer, heights = detailed, look = plain.look, speeds = plain.speeds };
+        data = new TvWorldData.Data { mapId = plain.mapId, layer = plain.layer, heights = detailed, look = plain.look, speeds = plain.speeds, town = plain.town };
         loadingCard.Set("Reading the terrain", 0.08f);
-        try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds)); }
+        try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds, data.town)); }
         catch (Exception e)
         {
             Debug.LogWarning("RunSession: " + e);
@@ -271,7 +270,7 @@ public partial class RunSession : MonoBehaviour
         float mean = (float)(sum / source.h.Length);
         TvHeights higher = new TvHeights { cell = source.cell, minx = source.minx, miny = source.miny, rows = source.rows, cols = source.cols, h = new float[source.h.Length] };
         for (int i = 0; i < source.h.Length; i++) higher.h[i] = mean + (source.h[i] - mean) * scale;
-        return new TvWorldData.Data { mapId = data.mapId, layer = data.layer, heights = higher, look = data.look, speeds = data.speeds };
+        return new TvWorldData.Data { mapId = data.mapId, layer = data.layer, heights = higher, look = data.look, speeds = data.speeds, town = data.town };
     }
 
     // A spot near the start where the runner can stand

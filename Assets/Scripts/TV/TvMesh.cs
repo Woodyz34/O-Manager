@@ -244,6 +244,7 @@ public class TvShapeBuilder
     public void Blob(float r, float sx, float sy, float sz, float ox, float oy, float oz, float jitter, int detail, bool flat,
                      TvColor color, TvColor? top = null, float y0 = 0f, float y1 = 1f)
     {
+        if (Lean && r * Math.Max(sx, Math.Max(sy, sz)) < 0.2f) return;
         float[] sv = detail > 0 ? ico1V : IcoV;
         int[] sf = detail > 0 ? ico1F : IcoF;
         int count = sv.Length / 3;
@@ -376,20 +377,36 @@ public class TvShapeBuilder
     }
 
     // A box from (x0, y0, z0) to (x1, y1, z1)
+    // Lean: the houses of a run-yourself town a little away from the runner. Small bits (glazing bars, flower heads,
+    // letters) are left out and boxes get no bottom. Set on the thread that builds them, round the build.
+    [ThreadStatic] public static bool Lean;
+
     public void Box(float x0, float y0, float z0, float x1, float y1, float z1, TvColor color)
     {
+        if (Lean && Math.Abs(x1 - x0) < 0.28f && Math.Abs(y1 - y0) < 0.28f && Math.Abs(z1 - z0) < 0.28f) return;
         float cx = (x0 + x1) / 2f, cy = (y0 + y1) / 2f, cz = (z0 + z1) / 2f;
+        // Each side is 4 corners shared by its two triangles
         void Quad(float ax, float ay, float az, float bx, float by, float bz, float qx, float qy, float qz, float dx, float dy, float dz)
         {
-            FlatTri(ax, ay, az, bx, by, bz, qx, qy, qz, cx, cy, cz, color, color, color);
-            FlatTri(ax, ay, az, qx, qy, qz, dx, dy, dz, cx, cy, cz, color, color, color);
+            float ux = bx - ax, uy = by - ay, uz = bz - az, vx = qx - ax, vy = qy - ay, vz = qz - az;
+            float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+            float ox = (ax + qx) / 2f - cx, oy = (ay + qy) / 2f - cy, oz = (az + qz) / 2f - cz;
+            bool flip = nx * ox + ny * oy + nz * oz < 0f;
+            if (flip) { nx = -nx; ny = -ny; nz = -nz; }
+            float len = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            if (len < 1e-9f) return;
+            nx /= len; ny /= len; nz /= len;
+            int a = V(ax, ay, az, nx, ny, nz, color), b = V(bx, by, bz, nx, ny, nz, color);
+            int q = V(qx, qy, qz, nx, ny, nz, color), d = V(dx, dy, dz, nx, ny, nz, color);
+            if (flip) { t.Add(a); t.Add(q); t.Add(b); t.Add(a); t.Add(d); t.Add(q); }
+            else { t.Add(a); t.Add(b); t.Add(q); t.Add(a); t.Add(q); t.Add(d); }
         }
         Quad(x0, y0, z0, x1, y0, z0, x1, y1, z0, x0, y1, z0);
         Quad(x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1);
         Quad(x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0);
         Quad(x1, y0, z0, x1, y0, z1, x1, y1, z1, x1, y1, z0);
         Quad(x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1);
-        Quad(x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1);
+        if (!Lean) Quad(x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1);
     }
 
     // One flat triangle with its own colours, facing away from (cx, cy, cz)

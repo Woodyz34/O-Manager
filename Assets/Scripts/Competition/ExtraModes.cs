@@ -171,8 +171,8 @@ public static class ExtraModes
         if ((modes & RunModes) != 0)
         {
             MapDefinition map = MapDefinition.FindExact(course.mapId);
-            if (course.IsSprint() || (map != null && map.IsSprint)) return "\"Run it yourself\" only works on forest courses for now. Choose a forest course.";
-            if (map != null && !TvWorldData.HasWorld(map)) return "This map has no 3D world. Import it again (OCAD or OOM) to run it yourself.";
+            // Sprint maps too since 2026-11-20: they are built as a town (TvTown)
+            if (map != null && !TvWorldData.HasWorld(map, true)) return "This map has no 3D world. Import it again (OCAD or OOM) to run it yourself.";
         }
         if (course.IsSprint())
         {
@@ -188,7 +188,6 @@ public static class ExtraModes
         if (course == null) return null;
         if ((mode & IndividualOnly) != 0 && course.IsRelay()) return "You can't have this game mode on a relay";
         if ((mode & ForestOnly) != 0 && course.IsSprint()) return "You can't have this game mode on sprint";
-        if ((mode & RunModes) != 0 && course.IsSprint()) return "Run it yourself works on forest courses only, for now";
         return null;
     }
 

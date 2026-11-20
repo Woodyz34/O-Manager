@@ -94,6 +94,8 @@ public class TvWorldInput
     public List<float> flags;           // the course's controls in this piece: x, z (metres from its centre) for each
     public List<TvSolid> baseSolids;    // chunkDetail: the stones and trunks the piece itself has (nothing grows in them)
     public float undergrowthShare = 1f; // chunkDetail: how much undergrowth (the player's 3D quality)
+    public TvTown town;                 // a sprint map in the run-yourself game mode: build it as a town (TvWorldBuilderTown.cs)
+    public bool townRich = true;        // chunkDetail in a town: the houses in full detail (not on the Low 3D quality)
 }
 
 // Something a runner cannot run through: a stone, a tree trunk, a pole
@@ -112,6 +114,8 @@ public class TvWorld
     public float[] ground;              // size * size heights, [j * size + i], i east and j north
     public readonly List<TvMesh> meshes = new List<TvMesh>();
     public readonly List<TvSolid> solids = new List<TvSolid>();
+    // A town's people (RunYourself/RunPeople.cs animates them): x, z, yaw, kind, look, walk length for each
+    public readonly List<float> people = new List<float>();
     // Fallen trunks, stone walls and fences a runner jumps over rather than going round: ax, az, bx, bz, height for each
     public readonly List<float> logs = new List<float>();
 
@@ -179,7 +183,7 @@ public class TvWorld
     }
 }
 
-public class TvWorldBuilder
+public partial class TvWorldBuilder
 {
     readonly TvWorldInput input;
     readonly WorldLayer layer;
@@ -430,14 +434,22 @@ public class TvWorldBuilder
             Undergrowth();
             Keep(tuftMeshes[0]);
             Keep(thicketMesh);
+            // A town's houses in full detail, right round the runner
+            if (input.town != null && input.townRich)
+            {
+                Buildings();
+                Keep(townMesh);
+            }
             return;
         }
         Ground();
         Waters();
         Stones();
         Structures();
+        if (input.town != null) TownStreets();
         Flags();
         Trees();
+        if (input.town != null) KeepTown();
         Keep(groundMesh);
         Keep(GroundFar());
         Keep(waterMesh);
@@ -619,10 +631,14 @@ public class TvWorldBuilder
                 else if (MarshPool(i - R - 0.5f, j - R - 0.5f, (cell & WorldCell.Marsh) != 0, bog[j * N + i])) F[j * N + i] -= 0.3f;
             }
         }
+        if (input.town != null) TownHeights();
     }
 
     // The map's heights with a little roughness, before knolls, cliffs and ditches
-    float Plain(float x, float z) => BaseHeight(x, z) - baseHeight + (TvRandom.Patches((x + ox) * 0.35f + 31f, (z + oz) * 0.35f + 17f) - 0.5f) * 0.22f;
+    float Plain(float x, float z) => BaseHeight(x, z) - baseHeight + (TvRandom.Patches((x + ox) * 0.35f + 31f, (z + oz) * 0.35f + 17f) - 0.5f) * 0.22f
+                                     * (input.town != null && Smooth(CellAt(x, z)) ? 0.12f : 1f);
+    // Streets, squares and houses of a town are smooth
+    static bool Smooth(byte cell) { int b = cell & WorldCell.BaseMask; return b == WorldCell.Paved || b == WorldCell.Building; }
 
     void Bump(float x, float z, float height, float spread)
     {
@@ -803,6 +819,7 @@ public class TvWorldBuilder
     void Ground()
     {
         GroundLook floor = ForestFloor();
+        if (input.town != null) pavedCorner = new bool[N * N];
         for (int j = 0; j < N; j++)
         {
             for (int i = 0; i < N; i++)
@@ -811,7 +828,8 @@ public class TvWorldBuilder
                 float x = i - R, z = j - R;
                 // The 2 m cells' edges are made ragged, so the ground does not show squares
                 float ax = x + ox, az = z + oz;
-                byte cell = CellAt(x + (TvRandom.Noise(ax * 0.4f, az * 0.4f) - 0.5f) * 3f, z + (TvRandom.Noise(ax * 0.4f + 9f, az * 0.4f) - 0.5f) * 3f);
+                float ragged = input.town != null ? 0.9f : 3f;    // a town's edges are straight
+                byte cell = CellAt(x + (TvRandom.Noise(ax * 0.4f, az * 0.4f) - 0.5f) * ragged, z + (TvRandom.Noise(ax * 0.4f + 9f, az * 0.4f) - 0.5f) * ragged);
                 int kind = Base(cell);
                 float f = TvRandom.Patches(ax * 0.12f, az * 0.12f), f2 = TvRandom.Noise(ax * 0.9f, az * 0.9f);
                 TvColor c;
@@ -827,7 +845,11 @@ public class TvWorldBuilder
                     case WorldCell.Water: c = Water.Lerp(WaterDeep, f); hard = true; break;
                     case WorldCell.BareRock: c = Rock.Lerp(LichenRock, f2 * 0.6f); hard = true; break;
                     case WorldCell.Sand: c = SandColor.Shade(0.94f + f2 * 0.1f); break;
-                    case WorldCell.Paved: case WorldCell.Building: c = Paved.Shade(0.95f + f2 * 0.08f); hard = true; break;
+                    case WorldCell.Paved: case WorldCell.Building:
+                        c = (input.town == null ? Paved : TownPaved(ax, az)).Shade(0.95f + f2 * 0.08f);
+                        hard = true;
+                        if (pavedCorner != null) pavedCorner[k] = true;
+                        break;
                     case WorldCell.Plot: c = Plot.Lerp(OpenGreen, f); break;
                     default:
                         c = floor.a.Lerp(floor.b, Sm(0.35f, 0.7f, f)).Lerp(floor.c, Sm(0.55f, 0.8f, TvRandom.Noise(ax * 0.2f + 40f, az * 0.2f)) * 0.7f);
@@ -1436,9 +1458,10 @@ public class TvWorldBuilder
                 case WorldLineKind.HighWall:
                     Along(c, 1.2f, (x, z, yaw, len) =>
                     {
-                        // Unity turns clockwise round y for a positive angle seen from above; the mesh copy turns the same way
-                        thingMesh.Add(wallPiece, x, H(x, z) - 0.1f, z, len + 0.05f, 1.9f, 1f, yaw, Rr(0.94f, 1.04f));
-                        thingMesh.Add(wallCap, x, H(x, z) + 1.78f, z, len + 0.05f, 1f, 1f, yaw);
+                        // The mesh copy turns its x axis to (cos, -sin) of the angle given, so the line's own angle goes in
+                        // negated (2026-11-20: walls on slanting lines stood across the line)
+                        thingMesh.Add(wallPiece, x, H(x, z) - 0.1f, z, len + 0.05f, 1.9f, 1f, -yaw, Rr(0.94f, 1.04f));
+                        thingMesh.Add(wallCap, x, H(x, z) + 1.78f, z, len + 0.05f, 1f, 1f, -yaw);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.55f });
                     });
                     break;
@@ -1706,7 +1729,8 @@ public class TvWorldBuilder
     void Buildings()
     {
         // A piece looks a little past its edge, so a house across the edge is one house, built by the piece its middle is in
-        int reach = chunk ? R + 40 : R;
+        // (a town looks further: its blocks are cut into houses, and each piece must cut a block the same way)
+        int reach = chunk ? R + (input.town != null ? 90 : 40) : R;
         double e0 = Math.Floor((input.centerE - reach - layer.minE) / layer.cell), n0 = Math.Floor((input.centerN - reach - layer.minN) / layer.cell);
         int cells = (int)(2 * reach / layer.cell) + 2;
         var isHouse = new bool[cells * cells];
@@ -1739,13 +1763,14 @@ public class TvWorldBuilder
                     if (isHouse[nk] && !seen[nk]) { seen[nk] = true; todo.Push(nk); }
                 }
             }
-            if (chunk)
+            if (chunk && input.town == null)
             {
                 float mx = 0f, mz = 0f;
                 foreach (int k in group) { mx += CellX(k % cells); mz += CellZ(k / cells); }
                 if (!Inside(mx / group.Count, mz / group.Count, 0f)) continue;
             }
-            House(group, cells, CellX, CellZ);
+            if (input.town != null) TownBlock(group, cells, CellX, CellZ, e0, n0);
+            else House(group, cells, CellX, CellZ);
         }
     }
 

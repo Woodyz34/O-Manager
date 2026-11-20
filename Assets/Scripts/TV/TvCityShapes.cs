@@ -471,7 +471,7 @@ public static partial class TvCityShapes
         foreach (float su in new[] { -1f, 1f })
             foreach (float sv in new[] { -1f, 1f })
             {
-                if (look % 3 == 1)
+                if (look % 3 == 1 || TvShapeBuilder.Lean)
                     b.Box(su * hl - 0.3f, plinth + 0.45f, sv * hw - 0.3f, su * hl + 0.06f * su + (su > 0 ? 0f : 0.3f), top, sv * hw + 0.06f * sv + (sv > 0 ? 0f : 0.3f), band);
                 else
                     for (float y = plinth + ground; y < top - 0.4f; y += 0.62f)

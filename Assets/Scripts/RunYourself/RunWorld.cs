@@ -33,7 +33,8 @@ public class RunWorld : MonoBehaviour
     public float baseHeight;            // the map height at Origin
     RunSettings.Look look;
 
-    Material plainMaterial, groundMaterial;
+    Material plainMaterial, groundMaterial, pavedMaterial;
+    RunPeople people;
     Light sun;
     float savedShadowDistance;
     int savedCascades;
@@ -61,6 +62,8 @@ public class RunWorld : MonoBehaviour
         public bool detailBuilding;
         public float dist;
         public bool nearOn;
+        public readonly List<Renderer> lean = new List<Renderer>();   // a town's leaner houses, hidden under the full ones
+        public bool leanHidden, peopleOn;
     }
 
     class Done
@@ -115,8 +118,19 @@ public class RunWorld : MonoBehaviour
         groundMaterial = TvWorldView.NewMaterial(Color.white);
         groundMaterial.SetTexture("_DetailTex", TvWorldView.Grain());
         groundMaterial.SetFloat("_Detail", 1f);
-        foreach (Material m in new[] { plainMaterial, groundMaterial })
+        if (data.town != null)
         {
+            // A town's streets and squares: asphalt, or cobbles in the old stone town
+            pavedMaterial = TvWorldView.NewMaterial(Color.white);
+            bool cobbles = data.town.style == TvCityShapes.Style.OldStone;
+            pavedMaterial.SetTexture("_DetailTex", cobbles ? RunPeople.Cobbles() : RunPeople.Asphalt());
+            pavedMaterial.SetFloat("_Detail", cobbles ? 0.9f : 0.75f);
+            people = gameObject.AddComponent<RunPeople>();
+            people.Init(plainMaterial, look.shadows > 0);
+        }
+        foreach (Material m in new[] { plainMaterial, groundMaterial, pavedMaterial })
+        {
+            if (m == null) continue;
             // The fog thickens towards the view distance, where the world ends
             m.SetFloat("_FogStart", look.view * 0.3f);
             m.SetFloat("_FogEnd", look.view * 0.96f);
@@ -161,6 +175,7 @@ public class RunWorld : MonoBehaviour
         pieces.Clear();
         if (plainMaterial != null) Destroy(plainMaterial);
         if (groundMaterial != null) Destroy(groundMaterial);
+        if (pavedMaterial != null) Destroy(pavedMaterial);
     }
 
     // ---- Map points and the scene ----
@@ -229,6 +244,7 @@ public class RunWorld : MonoBehaviour
         playerE = e;
         playerN = n;
         hasPlayer = true;
+        if (people != null) people.SetPlayer(ToScene(e, n, 0f));
     }
 
     // Share of the pieces within reach that are built and handed over (for the loading bar)
@@ -304,6 +320,18 @@ public class RunWorld : MonoBehaviour
                     p.nearOn = nearOn;
                     foreach (Renderer r in p.near) r.enabled = nearOn;
                     foreach (Renderer r in p.far) r.enabled = !nearOn;
+                    if (p.leanHidden) foreach (Renderer r in p.lean) r.enabled = false;
+                }
+                // A town's people walk and watch only round the runner
+                if (people != null)
+                {
+                    bool want = p.dist < look.near + 30f && p.world != null && p.world.people.Count > 0;
+                    if (want != p.peopleOn)
+                    {
+                        p.peopleOn = want;
+                        if (want) people.Spawn(pair.Key, p.root.transform, p.world);
+                        else people.Despawn(pair.Key);
+                    }
                 }
             }
         }
@@ -351,7 +379,10 @@ public class RunWorld : MonoBehaviour
             anchorE = anchorE,
             anchorN = anchorN,
             baseHeight = baseHeight,
-            seed = 1
+            seed = 1,
+            town = data.town,
+            // The houses in full detail only on the High 3D quality; the others draw the leaner ones close by too
+            townRich = look.undergrowth > 0.15f
         };
     }
 
@@ -455,7 +486,8 @@ public class RunWorld : MonoBehaviour
         go.transform.SetParent(parent, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         var r = go.AddComponent<MeshRenderer>();
-        r.sharedMaterial = source.name.StartsWith("Ground", StringComparison.Ordinal) ? groundMaterial : plainMaterial;
+        r.sharedMaterial = source.name == "Ground paved" && pavedMaterial != null ? pavedMaterial
+            : source.name.StartsWith("Ground", StringComparison.Ordinal) ? groundMaterial : plainMaterial;
         r.shadowCastingMode = source.castShadows && look.shadows > 0 ? ShadowCastingMode.On : ShadowCastingMode.Off;
         r.receiveShadows = look.shadows > 0;
         r.lightProbeUsage = LightProbeUsage.Off;
@@ -474,6 +506,7 @@ public class RunWorld : MonoBehaviour
         {
             Renderer r = AddMesh(p.root.transform, m, p.meshes);
             if (m.group == TvMesh.Near) { p.near.Add(r); r.enabled = p.nearOn; }
+            if (m.name == "Town houses") p.lean.Add(r);
             else if (m.group == TvMesh.Far) { p.far.Add(r); r.enabled = !p.nearOn; }
         }
         // The solids, in metres from Origin
@@ -501,7 +534,16 @@ public class RunWorld : MonoBehaviour
         if (p.dist > look.detail + 16f) return;   // the runner has moved on meanwhile
         p.detail = new GameObject("Detail");
         p.detail.transform.SetParent(p.root.transform, false);
-        foreach (TvWorldView.MeshArrays m in arrays) AddMesh(p.detail.transform, m, p.detailMeshes);
+        foreach (TvWorldView.MeshArrays m in arrays)
+        {
+            AddMesh(p.detail.transform, m, p.detailMeshes);
+            // The full houses stand where the leaner ones were
+            if (m.name == "Town houses full")
+            {
+                p.leanHidden = true;
+                foreach (Renderer r in p.lean) r.enabled = false;
+            }
+        }
     }
 
     void DropDetail(Piece p)
@@ -510,12 +552,20 @@ public class RunWorld : MonoBehaviour
         p.detailMeshes.Clear();
         if (p.detail != null) Destroy(p.detail);
         p.detail = null;
+        if (p.leanHidden)
+        {
+            p.leanHidden = false;
+            foreach (Renderer r in p.lean) if (r != null) r.enabled = p.nearOn;
+        }
     }
 
     void Drop(Piece p)
     {
         p.gone = true;
+        if (p.peopleOn && people != null) people.Despawn(Key(p.ix, p.iz));
+        p.peopleOn = false;
         DropDetail(p);
+        p.lean.Clear();
         foreach (Mesh m in p.meshes) if (m != null) Destroy(m);
         p.meshes.Clear();
         if (p.root != null) Destroy(p.root);

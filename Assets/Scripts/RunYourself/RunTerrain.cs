@@ -36,7 +36,10 @@ public class RunTerrain
         public float ax, az, bx, bz;     // metres from the layer's lower left corner
     }
 
-    public RunTerrain(WorldLayer layer, TvHeights heights, TerrainSpeeds speeds)
+    // Bridges and tunnels of a town (TvTown): a way over water and through houses, fences and walls
+    const WorldLineKind BridgeKind = (WorldLineKind)250, TunnelKind = (WorldLineKind)251;
+
+    public RunTerrain(WorldLayer layer, TvHeights heights, TerrainSpeeds speeds, TvTown town = null)
     {
         this.layer = layer;
         this.heights = heights;
@@ -46,9 +49,16 @@ public class RunTerrain
         bucketCols = Math.Max(1, (int)Math.Ceiling(layer.cols * layer.cell / Bucket));
         bucketRows = Math.Max(1, (int)Math.Ceiling(layer.rows * layer.cell / Bucket));
         buckets = new List<int>[bucketCols * bucketRows];
+        var all = new List<(WorldLineKind kind, float[] xy)>();
         foreach (WorldLine line in layer.lines)
+            if (line.xy != null && Matters(line.kind)) all.Add((line.kind, line.xy));
+        if (town != null)
         {
-            if (line.xy == null || !Matters(line.kind)) continue;
+            foreach (float[] xy in town.bridges) all.Add((BridgeKind, xy));
+            foreach (float[] xy in town.tunnels) all.Add((TunnelKind, xy));
+        }
+        foreach (var line in all)
+        {
             for (int i = 0; i + 3 < line.xy.Length; i += 2)
             {
                 var p = new Piece
@@ -177,6 +187,18 @@ public class RunTerrain
                     break;
             }
         }
+        // On a bridge or in a tunnel: a hard, quick way, whatever is under or round it
+        foreach (int index in near)
+        {
+            Piece p = pieces[index];
+            if (p.kind != BridgeKind && p.kind != TunnelKind) continue;
+            if (Dist(x, z, p) > 1.4f) continue;
+            g.blocked = false;
+            g.speed = Math.Max(g.speed, speeds.Ground(TerrainKind.Paved, 1.5f));
+            g.rough = 0.3f;
+            g.surface = Surface.Paved;
+            break;
+        }
         return g;
     }
 
@@ -203,6 +225,11 @@ public class RunTerrain
         foreach (int index in near)
         {
             Piece p = pieces[index];
+            if ((p.kind == BridgeKind || p.kind == TunnelKind) && Dist(x, z, p) < 1.4f) return false;
+        }
+        foreach (int index in near)
+        {
+            Piece p = pieces[index];
             if ((p.kind == WorldLineKind.Cliff || p.kind == WorldLineKind.HighFence || p.kind == WorldLineKind.HighWall) && Dist(x, z, p) < reach + 0.15f)
                 return true;
         }
@@ -221,6 +248,12 @@ public class RunTerrain
         List<int> near = BucketAt((ax + bx) / 2f, (az + bz) / 2f);
         if (near == null) return false;
         bool any = false;
+        // Through a tunnel or over a bridge nothing is in the way
+        foreach (int index in near)
+        {
+            Piece p = pieces[index];
+            if ((p.kind == BridgeKind || p.kind == TunnelKind) && Dist((ax + bx) / 2f, (az + bz) / 2f, p) < 1.6f) return false;
+        }
         foreach (int index in near)
         {
             Piece p = pieces[index];

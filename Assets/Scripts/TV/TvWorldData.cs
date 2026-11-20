@@ -7,7 +7,7 @@ using UnityEngine;
 // What the 3D view of a TV control is built from: the map package's world layer (world.bytes, written by the map
 // import), the heights of its grid and the terrain look in map.json. Maps imported on this computer before the world
 // layer existed get it made from the map file kept in their folder the first time it is needed.
-// Sprint maps get no TV controls yet.
+// Sprint maps get no TV controls yet; the run-yourself game mode builds them as a town (TvTown).
 public static class TvWorldData
 {
     public class Data
@@ -17,6 +17,7 @@ public static class TvWorldData
         public TvHeights heights;
         public TerrainLook look;
         public TerrainSpeeds speeds;     // the map's terrain sliders (run-yourself game mode); never null
+        public TvTown town;              // sprint maps in the run-yourself game mode: the town; null on forest maps
     }
 
     static Data cached;
@@ -80,10 +81,11 @@ public static class TvWorldData
         }
     }
 
-    // True when a TV control can be shown on the map
-    public static bool HasWorld(MapDefinition map)
+    // True when a TV control can be shown on the map. town: a sprint map counts too (the run-yourself game mode
+    // builds it as a town; TV controls are for forest maps only).
+    public static bool HasWorld(MapDefinition map, bool town = false)
     {
-        if (map == null || map.IsSprint) return false;
+        if (map == null || (map.IsSprint && !town)) return false;
         if (cached != null && cached.mapId == map.id) return true;
         string root = Root(map);
         if (root == null) return false;
@@ -99,15 +101,17 @@ public static class TvWorldData
     }
 
     // Reads (or makes) the map's world data. Call on the main thread; the heavy part runs in the background.
-    public static async Task<Data> LoadAsync(MapDefinition map)
+    public static async Task<Data> LoadAsync(MapDefinition map, bool town = false)
     {
-        if (map == null || map.IsSprint) return null;
+        if (map == null || (map.IsSprint && !town)) return null;
+        bool sprint = map.IsSprint;
         string root = Root(map);
         if (root == null) return null;
         bool known = cached != null && cached.mapId == map.id;
         byte[] world = known ? null : MapPackages.LoadBytes(root + "world", ".bytes");
         byte[] grid = known ? null : MapPackages.LoadBytes(map.gridName, ".bytes");
         byte[] json = MapPackages.LoadBytes(root + "map", ".json");
+        byte[] linesJson = sprint && !(known && cached.town != null) ? MapPackages.LoadBytes(root + "lines", ".json") : null;
         TerrainLook look = null;
         MapPackageInfo info = null;
         try
@@ -121,7 +125,20 @@ public static class TvWorldData
         }
         // The look is read every time, since it can be changed in Edit map without building the map again
         TerrainSpeeds speeds = info?.terrain ?? new TerrainSpeeds();
-        if (known) return new Data { mapId = map.id, layer = cached.layer, heights = cached.heights, look = (look ?? new TerrainLook()).Safe(), speeds = speeds };
+        if (known && (!sprint || cached.town != null))
+        {
+            TerrainLook now = (look ?? new TerrainLook()).Safe();
+            return new Data { mapId = map.id, layer = cached.layer, heights = cached.heights, look = now, speeds = speeds, town = sprint ? cached.town.WithLook(now) : null };
+        }
+        if (known)
+        {
+            // A forest-only read before: the town is still to be worked out
+            WorldLayer had = cached.layer;
+            TerrainLook now = (look ?? new TerrainLook()).Safe();
+            TvTown made = await Task.Run(() => TvTown.Make(had, linesJson, now));
+            cached.town = made;
+            return new Data { mapId = map.id, layer = had, heights = cached.heights, look = now, speeds = speeds, town = made };
+        }
         string source = world == null ? LocalSource(map, out _) : null;
         string folder = map.folder;
         if (world == null && source == null)
@@ -150,7 +167,8 @@ public static class TvWorldData
                 try { File.WriteAllBytes(Path.Combine(folder, "world.bytes"), layer.ToBytes()); }
                 catch (Exception) { }
             }
-            return new Data { mapId = map.id, layer = layer, heights = TvHeights.Read(grid), look = (look ?? new TerrainLook()).Safe(), speeds = speeds };
+            TerrainLook safe = (look ?? new TerrainLook()).Safe();
+            return new Data { mapId = map.id, layer = layer, heights = TvHeights.Read(grid), look = safe, speeds = speeds, town = sprint ? TvTown.Make(layer, linesJson, safe) : null };
         });
         cached = data;
         return data;
