@@ -42,6 +42,8 @@ public class RunTerrain
     // The course setter's uncrossable boundaries and bridges (ForbiddenArea), and the stairs of a town
     const WorldLineKind CourseLineKind = (WorldLineKind)252, CourseBridgeKind = (WorldLineKind)253, TownStairsKind = (WorldLineKind)254;
 
+    // The 2D race's own grid: on a sprint map it says where the runner may go (2026-11-20). Null when the scene has none.
+    readonly TvPassable passable;
     // A sprint map (a town) imported before the Impassable cell: its dark green (ISSprOM 410) is impassable
     readonly bool oldSprintGreen;
     // The course setter's out-of-bounds areas, in metres from the layer's lower left corner
@@ -51,9 +53,11 @@ public class RunTerrain
     static bool IsStairs(WorldLineKind k) => k == WorldLineKind.Stairs || k == TownStairsKind;
 
     // forbidden: the course's out-of-bounds areas, uncrossable boundaries and bridges (the same ones the 2D runners keep to)
-    public RunTerrain(WorldLayer layer, TvHeights heights, TerrainSpeeds speeds, TvTown town = null, List<ForbiddenArea> forbidden = null)
+    public RunTerrain(WorldLayer layer, TvHeights heights, TerrainSpeeds speeds, TvTown town = null, List<ForbiddenArea> forbidden = null,
+                      TvPassable passable = null)
     {
         this.layer = layer;
+        this.passable = passable;
         this.heights = heights;
         this.speeds = speeds ?? new TerrainSpeeds();
         // A sprint map's world layer from before 2026-11-20 has no Impassable cells: its dark green is ISSprOM 410
@@ -181,6 +185,20 @@ public class RunTerrain
             default: g.speed = forest; g.rough = 1f; g.surface = Surface.Forest; break;
         }
         if (g.speed <= 0.02f) g.blocked = true;
+        if (passable != null && passable.sprint)
+        {
+            // A town: closed exactly where the 2D race is closed. Where the map is open but the 3D world has a
+            // house, water or a garden (a passage the 2D game opens), the runner runs on paving.
+            bool closed = passable.Closed(e, n);
+            if (g.blocked && !closed)
+            {
+                g.speed = speeds.Ground(TerrainKind.Paved, 1.5f);
+                g.rough = 0.3f;
+                g.surface = Surface.Paved;
+            }
+            g.blocked = closed;
+            if (closed) return g;
+        }
         if (outOfBounds.Count > 0)
         {
             float ox = (float)(e - layer.minE), oz = (float)(n - layer.minN);

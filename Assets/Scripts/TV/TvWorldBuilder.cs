@@ -95,6 +95,7 @@ public class TvWorldInput
     public List<TvSolid> baseSolids;    // chunkDetail: the stones and trunks the piece itself has (nothing grows in them)
     public float undergrowthShare = 1f; // chunkDetail: how much undergrowth (the player's 3D quality)
     public TvTown town;                 // a sprint map in the run-yourself game mode: build it as a town (TvWorldBuilderTown.cs)
+    public TvPassable passable;         // the town: the 2D race's grid; no house stands where it lets a runner through
     public bool townRich = true;        // chunkDetail in a town: the houses in full detail (not on the Low 3D quality)
 }
 
@@ -1733,6 +1734,10 @@ public partial class TvWorldBuilder
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.7f });
                     break;
                 case WorldPointKind.WaterHole: thingMesh.Add(poolShape, x, y + 0.12f, z, 1.5f, 1f, 1.5f, 0f); break;
+                case WorldPointKind.Feature:
+                case WorldPointKind.ManMade:
+                    OddThing(x, y, z);
+                    break;
                 case WorldPointKind.RootStock:
                 {
                     // The root plate of a fallen tree, standing on edge
@@ -1761,12 +1766,17 @@ public partial class TvWorldBuilder
         double e0 = Math.Floor((input.centerE - reach - layer.minE) / layer.cell), n0 = Math.Floor((input.centerN - reach - layer.minN) / layer.cell);
         int cells = (int)(2 * reach / layer.cell) + 2;
         var isHouse = new bool[cells * cells];
+        if (input.town != null) TownLines();
+        // A town: no house where the 2D race lets a runner through, except over a passage through a house (a tunnel)
+        bool Open(float x, float z) => input.passable != null && input.passable.NoHouse(input.centerE + x, input.centerN + z)
+                                       && !(input.town != null && TownLineDist(x, z, 2) < 1.8f);
         float CellX(int i) => (float)(layer.minE + (e0 + i + 0.5) * layer.cell - input.centerE);
         float CellZ(int j) => (float)(layer.minN + (n0 + j + 0.5) * layer.cell - input.centerN);
         for (int j = 0; j < cells; j++)
             for (int i = 0; i < cells; i++)
                 isHouse[j * cells + i] = Base(layer.At(input.centerE + CellX(i), input.centerN + CellZ(j))) == WorldCell.Building
-                                         && (chunk || Inside(CellX(i), CellZ(j), 2f));
+                                         && (chunk || Inside(CellX(i), CellZ(j), 2f))
+                                         && !Open(CellX(i), CellZ(j));
 
         var seen = new bool[cells * cells];
         var group = new List<int>();

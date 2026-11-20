@@ -24,6 +24,42 @@ public static partial class TvCityShapes
     static readonly TvColor[] RoofTiles =
         { TvColor.Hex("#b85a3a"), TvColor.Hex("#a24c32"), TvColor.Hex("#c76a44"), TvColor.Hex("#9a5238"), TvColor.Hex("#b4663f") };
 
+    // The colours of one house of a town block built from the map's own outline (TvTownHouses.cs): its wall, the band at
+    // the foot of the wall, the frames, the door, the roof and the shop awnings
+    public struct Palette
+    {
+        public TvColor wall, foot, band, trim, door, roof, awning, glass, shop;
+        public TvColor? shutter;
+    }
+
+    public static Palette PaletteOf(int look, Style style, Kind kind)
+    {
+        var p = new Palette { glass = Glass, shop = GlassShop };
+        if (style == Style.OldStone)
+        {
+            p.wall = look % 11 == 5 ? Rubble : Limewash[look % Limewash.Length];
+            p.foot = Dados[(look * 5 + 1) % Dados.Length];
+            p.band = p.wall.Shade(0.9f);
+            p.trim = Granite;
+            p.door = OldWood[(look * 3 + 2) % OldWood.Length];
+            p.roof = RoofTiles[(look * 3 + 1) % RoofTiles.Length];
+            p.awning = Awnings[(look * 3 + 1) % Awnings.Length];
+            p.shutter = look % 3 == 0 ? OldWood[(look + 3) % OldWood.Length] : (TvColor?)null;
+            return p;
+        }
+        p.wall = Facades[look % Facades.Length];
+        if (kind == Kind.Apartments) p.wall = p.wall.Lerp(White, 0.35f);
+        if (kind == Kind.Hall) p.wall = look % 2 == 0 ? TvColor.Hex("#a9a49a") : TvColor.Hex("#8e5a44");
+        p.foot = Plinth;
+        p.band = p.wall.Lerp(White, 0.55f);
+        p.trim = Trims[(look * 5 + 2) % Trims.Length];
+        p.door = Doors[(look * 7 + 3) % Doors.Length];
+        p.roof = Roofs[(look * 11 + 1) % Roofs.Length];
+        p.awning = Awnings[(look * 3 + 1) % Awnings.Length];
+        p.shutter = look % 4 == 3 ? Doors[(look + 2) % Doors.Length].Shade(0.9f) : (TvColor?)null;
+        return p;
+    }
+
     // A building in the given style; the Swedish town is the one above
     public static TvShape Building(TvRandom random, Kind kind, float len, float wid, int floors, int look, Style style, float plinth = 0.25f)
     {

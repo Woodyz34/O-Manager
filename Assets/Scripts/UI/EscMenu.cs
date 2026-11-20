@@ -152,7 +152,7 @@ public class EscMenu : MonoBehaviour
             }
             else if (personalCard != null && personalCard.activeSelf)
             {
-                ShowPage(LobbySettingsShown ? settingsCard : mainCard);
+                ShowPage(settingsCard);
             }
             else if (settingsCard != null && settingsCard.activeSelf)
             {
@@ -246,14 +246,10 @@ public class EscMenu : MonoBehaviour
         bool host = inCompetition && CompetitionFlow.IsHostRunner(runner);
 
         endButton.gameObject.SetActive(host);
-        // Lobby settings only in a multiplayer game (2026-11-19, Anders); in single player the run-yourself race has its
-        // own 3D settings instead
-        bool runYourself = RunSession.Active != null;
+        // Lobby settings only in a multiplayer game (2026-11-19, Anders). The 3D settings are always under Settings
+        // (2026-11-20, Anders: not on the single player page)
         if (settingsButton != null)
-        {
-            settingsButton.gameObject.SetActive(runner != null && ActiveScene.Name != "MainMenu" && (!single || runYourself));
-            CourseUI.SetButtonText(settingsButton, runYourself ? "3D settings" : "Lobby settings");
-        }
+            settingsButton.gameObject.SetActive(runner != null && ActiveScene.Name != "MainMenu" && !single);
         if (host)
         {
             bool confirming = Time.unscaledTime < endConfirmUntil;
@@ -437,9 +433,6 @@ public class EscMenu : MonoBehaviour
         }
     }
 
-    // Outside a lobby or race there are no lobby settings, so Settings goes straight to your own
-    bool LobbySettingsShown => settingsButton != null && settingsButton.gameObject.activeSelf;
-
     void ShowPage(GameObject page)
     {
         if (page == null) return;
@@ -545,9 +538,9 @@ public class EscMenu : MonoBehaviour
         Button resume = CourseUI.Button("Resume", card.transform, "Resume", CourseUI.ButtonKind.Primary, Close, 28);
         CourseUI.Size(resume, 68);
 
-        Button settingsMenu = CourseUI.Button("Settings", card.transform, "Settings", CourseUI.ButtonKind.Light, () => ShowPage(LobbySettingsShown ? settingsCard : personalCard), 26);
+        Button settingsMenu = CourseUI.Button("Settings", card.transform, "Settings", CourseUI.ButtonKind.Light, () => ShowPage(settingsCard), 26);
         CourseUI.Size(settingsMenu, 68);
-        HoverTip.Add(settingsMenu, "The lobby's settings (race speed, TV, bears, control moves) and your own (sound, screen, keys).");
+        HoverTip.Add(settingsMenu, "The lobby's settings (race speed, TV, bears, control moves), the 3D settings and your own (sound, screen, keys).");
 
         endButton = CourseUI.Button("End competition", card.transform, "End competition for everyone", CourseUI.ButtonKind.Danger, OnEndCompetition, 26);
         CourseUI.Size(endButton, 68);
@@ -566,7 +559,7 @@ public class EscMenu : MonoBehaviour
         personalCard = personal.gameObject;
         Transform mine = personal.transform;
 
-        // Volume: a label and the value on one line, the slider under it
+        // Volume of every sound in the game: a label and the value on one line, the slider under it
         RectTransform volumeRow = CourseUI.Rect("Volume row", mine);
         CourseUI.Row(volumeRow.gameObject, 12, new RectOffset(4, 4, 6, 0));
         CourseUI.Size(volumeRow, 40);
@@ -577,6 +570,11 @@ public class EscMenu : MonoBehaviour
 
         volumeSlider = CourseUI.SliderControl("Volume", mine, 0, 100, 100, true, OnVolumeChanged);
         CourseUI.Size(volumeSlider, 40);
+
+        // The sounds of "Run it yourself" one by one, and how quickly the mouse turns the head there (2026-11-20,
+        // Anders: one sound section here for everything, not in the 3D settings)
+        RunSettings.SoundRows(mine);
+        RunSettings.MouseRow(mine);
 
         // Display: fullscreen or a window (F11 / Alt+Enter switch too)
         TextMeshProUGUI displayLabel = CourseUI.Text("Display label", mine, "Display", 28, CourseUI.Ink, FontStyles.Bold);
@@ -599,7 +597,7 @@ public class EscMenu : MonoBehaviour
 
         Button keys = CourseUI.Button("Key bindings", mine, "Key bindings", CourseUI.ButtonKind.Light, () => ShowKeysPage(true), 26);
         CourseUI.Size(keys, 68);
-        Button personalBack = CourseUI.Button("Back", mine, "Back", CourseUI.ButtonKind.Primary, () => ShowPage(LobbySettingsShown ? settingsCard : mainCard), 26);
+        Button personalBack = CourseUI.Button("Back", mine, "Back", CourseUI.ButtonKind.Primary, () => ShowPage(settingsCard), 26);
         CourseUI.Size(personalBack, 68);
 
         // Settings: the choice between the lobby's settings and your own
@@ -610,15 +608,20 @@ public class EscMenu : MonoBehaviour
         settingsButton = CourseUI.Button("Lobby settings", choice.transform, "Lobby settings", CourseUI.ButtonKind.Light, () =>
         {
             Close();
-            // Run it yourself has its own settings (graphics, game speed, map hand, sound)
-            if (RunSession.Active != null) RunSettings.Open();
-            else HostSettingsPopup.Open();
+            HostSettingsPopup.Open();
         }, 28);
         CourseUI.Size(settingsButton, 76);
         HoverTip.Add(settingsButton, "Race speed, TV controls, bears and control moves. Only the host can change them, also during the race; everyone else can look.");
+        Button threeD = CourseUI.Button("3D settings", choice.transform, "3D settings", CourseUI.ButtonKind.Light, () =>
+        {
+            Close();
+            RunSettings.Open();
+        }, 28);
+        CourseUI.Size(threeD, 76);
+        HoverTip.Add(threeD, "For \"Run it yourself\" (3D): graphics, game speed, man or woman, and the hand that holds the map.");
         Button yours = CourseUI.Button("Your settings", choice.transform, "Your settings", CourseUI.ButtonKind.Light, () => ShowPage(personalCard), 28);
         CourseUI.Size(yours, 76);
-        HoverTip.Add(yours, "Sound, fullscreen or window, usage statistics and key bindings.");
+        HoverTip.Add(yours, "Sound, mouse look, fullscreen or window, usage statistics and key bindings.");
         Button choiceBack = CourseUI.Button("Back", choice.transform, "Back", CourseUI.ButtonKind.Primary, () => ShowPage(mainCard), 26);
         CourseUI.Size(choiceBack, 68);
 

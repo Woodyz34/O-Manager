@@ -184,8 +184,10 @@ public partial class RunSession : MonoBehaviour
         if (this == null) return;
         data = new TvWorldData.Data { mapId = plain.mapId, layer = plain.layer, heights = detailed, look = plain.look, speeds = plain.speeds, town = plain.town };
         loadingCard.Set("Reading the terrain", 0.08f);
+        passable = Passable(mapDef);
+        TvPassable gate = passable;
         List<ForbiddenArea> forbidden = course.forbidden;
-        try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds, data.town, forbidden)); }
+        try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds, data.town, forbidden, gate)); }
         catch (Exception e)
         {
             Debug.LogWarning("RunSession: " + e);
@@ -198,7 +200,7 @@ public partial class RunSession : MonoBehaviour
         flags.RemoveAt(0);
         // A control by a fence or a wall stands on the side the course setter chose (PunchSides), so it is punched from there
         for (int i = 0; i < flags.Count; i++) flags[i] = PunchSides.FlagPoint(course, flags[i]);
-        world = RunWorld.Create(data, terrain, points[0], flags);
+        world = RunWorld.Create(data, terrain, points[0], flags, passable, course);
         world.transform.SetParent(transform, true);
         world.Loading = true;
 
@@ -241,6 +243,23 @@ public partial class RunSession : MonoBehaviour
         lastBeep = 99;
         bigText.text = "";
         hintText.text = Hint();
+    }
+
+    TvPassable passable;
+
+    // The 2D race's grid (with the course's out-of-bounds areas and barriers in it), so the 3D world closes where the
+    // race does (2026-11-20). Null when the scene has no grid for this map.
+    static TvPassable Passable(MapDefinition map)
+    {
+        PathfindingManager manager = FindAnyObjectByType<PathfindingManager>();
+        if (manager == null || manager.speedGrid2D == null || map == null) return null;
+        float[,] speed = manager.speedGrid2D;
+        if (speed.GetLength(0) != map.rows || speed.GetLength(1) != map.cols)
+        {
+            Debug.LogWarning("RunSession: the scene's grid is not this map's (" + speed.GetLength(0) + "x" + speed.GetLength(1) + ")");
+            return null;
+        }
+        return new TvPassable(speed, ForbiddenAreas.CompetitionCells, map.minx, map.miny, map.maxx, map.maxy, map.IsSprint);
     }
 
     // The player's colour for the GPS line, never white or near white (2026-11-19, Anders: white cannot be seen on the map)

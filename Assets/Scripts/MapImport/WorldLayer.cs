@@ -24,7 +24,10 @@ namespace MapImport
     public enum WorldPointKind : byte
     {
         None = 0, Boulder, LargeBoulder, BoulderCluster, BoulderField, StonyGround, Knoll, LongKnoll, Depression, Pit,
-        RockyPit, Cairn, BigTree, Bush, Spring, Well, WaterHole, Tower, SmallTower, FodderRack, Feature, RootStock
+        RockyPit, Cairn, BigTree, Bush, Spring, Well, WaterHole, Tower, SmallTower, FodderRack, Feature, RootStock,
+        // Since 2026-11-20 the X of a man-made feature (530, 531) apart from the brown landform X (115); Feature is what
+        // older packages have for all three
+        ManMade, Landform
     }
 
     public enum WorldLineKind : byte
@@ -242,7 +245,8 @@ namespace MapImport
                 case 525: return WorldPointKind.SmallTower;
                 case 526: return WorldPointKind.Cairn;
                 case 527: return WorldPointKind.FodderRack;
-                case 115: case 530: case 531: return WorldPointKind.Feature;
+                case 115: return WorldPointKind.Landform;
+                case 530: case 531: return WorldPointKind.ManMade;
             }
             return WorldPointKind.None;
         }

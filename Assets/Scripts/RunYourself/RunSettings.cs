@@ -65,7 +65,6 @@ public static class RunSettings
     // start with so they can go both up and down) ----
 
     public enum Sound { All = 0, Steps = 1, Breathing = 2, Voice = 3, Beeps = 4 }
-    static readonly string[] SoundNames = { "All sounds", "Footsteps", "Breathing", "Voice (falls, landings)", "Beeps (start, controls, finish)" };
     static readonly float[] cachedVolume = { -1f, -1f, -1f, -1f, -1f };
 
     public static float Volume(Sound kind)
@@ -82,8 +81,53 @@ public static class RunSettings
     }
 
     // What a sound of this kind is multiplied by: 0.6 of the first version's level at 50 % (it was too loud), up to
-    // 1.2 times it at 100 %, times the "all sounds" share the same way
-    public static float Gain(Sound kind) => 0.6f * (2f * Volume(kind)) * (2f * Volume(Sound.All));
+    // 1.2 times it at 100 %. The game's volume (Esc > Settings > Your settings) turns every sound up or down on top.
+    // (2026-11-20, Anders: no "all sounds" of its own for 3D; one sound section in the Esc menu for everything.)
+    public static float Gain(Sound kind) => 0.6f * (2f * Volume(kind));
+
+    // The sliders for the 3D sounds, for the Esc menu's "Your settings": a name, the share, and the slider on one line
+    public static void SoundRows(Transform parent)
+    {
+        foreach (Sound kind in new[] { Sound.Steps, Sound.Voice, Sound.Beeps })
+        {
+            Sound k = kind;
+            RectTransform row = CourseUI.Rect(kind + " row", parent);
+            CourseUI.Row(row.gameObject, 12, new RectOffset(4, 4, 0, 0)).childAlignment = TextAnchor.MiddleLeft;
+            CourseUI.Size(row, 40);
+            TextMeshProUGUI label = CourseUI.Text("Label", row, ShortNames[(int)kind], 22, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            CourseUI.Size(label, -1, 150);
+            TextMeshProUGUI value = CourseUI.Text("Value", row, "", 22, CourseUI.Accent, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+            CourseUI.Size(value, -1, 70);
+            System.Action show = () => value.text = Mathf.RoundToInt(Volume(k) * 100f) + "%";
+            show();
+            Slider slider = CourseUI.SliderControl(kind + " volume", row, 0f, 1f, Volume(kind), false, v => { SetVolume(k, v); show(); });
+            CourseUI.Size(slider, -1, -1, 1);
+            HoverTip.Add(row, SoundTips[(int)kind]);
+            value.transform.SetAsLastSibling();
+        }
+    }
+
+    static readonly string[] ShortNames = { "All", "Footsteps", "Breathing", "Voice", "Beeps" };
+    static readonly string[] SoundTips =
+    {
+        "", "Your footsteps in \"Run it yourself\" (3D).", "", "Your groans and landings when you fall or jump in \"Run it yourself\" (3D).",
+        "The beeps at the start, at the controls and at the finish in \"Run it yourself\" (3D)."
+    };
+
+    // The mouse speed for turning the head in "Run it yourself", for the Esc menu's "Your settings"
+    public static void MouseRow(Transform parent)
+    {
+        RectTransform row = CourseUI.Rect("Mouse row", parent);
+        CourseUI.Row(row.gameObject, 12, new RectOffset(4, 4, 0, 0)).childAlignment = TextAnchor.MiddleLeft;
+        CourseUI.Size(row, 40);
+        TextMeshProUGUI label = CourseUI.Text("Label", row, "Mouse look", 22, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+        CourseUI.Size(label, -1, 150);
+        Slider slider = CourseUI.SliderControl("Mouse", row, 0.3f, 6f, MouseSpeed, false, v => MouseSpeed = v);
+        CourseUI.Size(slider, -1, -1, 1);
+        RectTransform pad = CourseUI.Rect("Pad", row);
+        CourseUI.Size(pad, -1, 70);
+        HoverTip.Add(row, "How quickly the mouse turns your head when you look round in \"Run it yourself\" (3D).");
+    }
 
     public static string QualityName(Quality q) => q == Quality.Low ? "Low" : q == Quality.High ? "High" : "Medium";
 
@@ -115,7 +159,7 @@ public static class RunSettings
         }
     }
 
-    // ---- The settings window (single player page: "3D settings") ----
+    // ---- The settings window (Esc > Settings > 3D settings) ----
 
     static GameObject open;
 
@@ -133,55 +177,29 @@ public static class RunSettings
         Image dim = CourseUI.Panel("Dim", open.transform, new Color(0f, 0f, 0f, 0.45f), false);
         CourseUI.Stretch(dim.rectTransform);
         Image card = CourseUI.CardPanel("Card", open.transform);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1500, 840));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820, 790));
         card.gameObject.AddComponent<ClickCatcher>();
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "3D settings", 40, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 52);
         TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, RunSession.Active != null
-            ? "Mouse speed and sounds count at once; the rest from your next race. Saved on this computer."
+            ? "These count from your next race. Saved on this computer."
             : "For \"Run it yourself\". Saved on this computer.", 21, CourseUI.InkMuted);
         CourseUI.Size(hint, 30);
 
-        // Two columns: the race on the left, hills and sounds on the right
-        RectTransform columns = CourseUI.Rect("Columns", card.transform);
-        CourseUI.Row(columns.gameObject, 40, new RectOffset(0, 0, 0, 0)).childForceExpandHeight = false;
-        CourseUI.Size(columns, 610);
-        RectTransform left = CourseUI.Rect("Left", columns), right = CourseUI.Rect("Right", columns);
-        foreach (RectTransform column in new[] { left, right })
-        {
-            CourseUI.Column(column.gameObject, 10, new RectOffset(0, 0, 0, 0));
-            CourseUI.Size(column, -1, -1, 1f);
-        }
-
+        Transform left = card.transform;
         Chips(left, "Graphics", new[] { "Low", "Medium", "High" }, (int)Level, i => { Level = (Quality)i; changed?.Invoke(); },
             "Low: shorter view, no shadows, little undergrowth. For weak computers. High: long view and soft shadows.");
         int speedIndex = 1;   // 4 x
         for (int i = 0; i < Speeds.Length; i++) if (Mathf.Approximately(Speeds[i], GameSpeed)) speedIndex = i;
         Chips(left, "Game speed", new[] { "3 x real life", "4 x real life", "5 x real life" }, speedIndex, i => { GameSpeed = Speeds[i]; changed?.Invoke(); },
-            "How much quicker than real life you run. The race time shown is still the real-life time.");
+            "How much quicker than real life you run when you play alone (online everyone runs at 4 x). The race time shown is still the real-life time.");
         Chips(left, "Your runner", new[] { "Man", "Woman" }, Woman ? 1 : 0, i => { Woman = i == 1; changed?.Invoke(); },
-            "Your breathing and your groans when you fall.");
+            "Your groans when you fall.");
         Chips(left, "Map hand", new[] { "Left hand", "Right hand" }, RightHand ? 1 : 0, i => { RightHand = i == 1; changed?.Invoke(); },
             "The hand that holds the map and the thumb compass.");
-
-        TextMeshProUGUI mouseLabel = CourseUI.Text("Mouse label", left, "Mouse speed", 24, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Size(mouseLabel, 32);
-        Slider mouse = CourseUI.SliderControl("Mouse", left, 0.3f, 6f, MouseSpeed, false, v => MouseSpeed = v);
-        CourseUI.Size(mouse, 40);
-
-        for (int k = 0; k < SoundNames.Length; k++)
-        {
-            Sound kind = (Sound)k;
-            if (kind == Sound.Breathing) continue;   // no breathing sounds for now
-            TextMeshProUGUI label = CourseUI.Text(SoundNames[k] + " label", right, "", 22, CourseUI.Ink, k == 0 ? FontStyles.Bold : FontStyles.Normal);
-            label.richText = true;
-            CourseUI.Size(label, 28);
-            System.Action show = () => label.text = SoundNames[(int)kind] + "  <color=#7A8A7F>" + Mathf.RoundToInt(Volume(kind) * 100f) + " %</color>";
-            show();
-            Slider slider = CourseUI.SliderControl(kind + " volume", right, 0f, 1f, Volume(kind), false, v => { SetVolume(kind, v); show(); });
-            CourseUI.Size(slider, 34);
-        }
+        TextMeshProUGUI more = CourseUI.Text("More", card.transform, "Sounds and mouse speed: Esc > Settings > Your settings.", 19, CourseUI.InkMuted);
+        CourseUI.Size(more, 30);
 
         Button done = CourseUI.Button("Done", card.transform, "Done", CourseUI.ButtonKind.Primary, () => Object.Destroy(open), 24);
         CourseUI.Size(done, 58);

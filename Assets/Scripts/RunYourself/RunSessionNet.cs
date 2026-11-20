@@ -269,6 +269,7 @@ public partial class RunSession
         {
             track.color = ColourOf(local, 0);
             track.look = local.transform;
+            track.plainDot = true;
             string name = local.nickName.ToString();
             if (!string.IsNullOrWhiteSpace(name)) track.label = name;
         }
@@ -277,6 +278,7 @@ public partial class RunSession
         {
             if (r.track.positions.Count == 0) continue;
             if (r.player != null) r.track.look = r.player.transform;
+            r.track.plainDot = true;
             list.Add(r.track);
         }
         return list;

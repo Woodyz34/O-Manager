@@ -256,6 +256,8 @@ public static class ForbiddenAreas
     {
         CourseData course = CourseLoader.Loaded;
         MapDefinition map = CourseLoader.LoadedMap;
+        // Never the last race's cells on a course without any (2026-11-20)
+        if (manager != null && manager.speedGrid2D != null) CompetitionCells.Clear();
         if (manager == null || manager.speedGrid2D == null || map == null || !Any(course)) return;
         string gridName = manager.jsonFileName ?? "";
         if (gridName.EndsWith(".json")) gridName = gridName.Substring(0, gridName.Length - 5);
