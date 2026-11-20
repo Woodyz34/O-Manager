@@ -132,7 +132,10 @@ public partial class TvWorldBuilder
             var pts = new List<(float x, float z)>(keys.Count);
             foreach (int key in keys) pts.Add((x0 + key % (W + 1) * c, z0 + key / (W + 1) * c));
             bool loop = keys[0] == keys[keys.Count - 1] && !Node(keys[0]);
-            pts = loop ? StraightenLoop(pts, c * 0.76f) : Straighten(pts, c * 0.76f);
+            // In the run-yourself world a little tighter to the map's cells, so a wall never stands far out in a street
+            // or a passage the race lets the runner through
+            float tol = input.passable != null ? c * 0.5f : c * 0.76f;
+            pts = loop ? StraightenLoop(pts, tol) : Straighten(pts, tol);
             chainOf.Add((pts, left, right, keys[0], keys[keys.Count - 1]));
         }
         // From the nodes first, then the loops that have none
@@ -238,6 +241,12 @@ public partial class TvWorldBuilder
             {
                 BuildHouse(o, outlines, townMesh, 1);
                 BuildHouse(o, outlines, townFarMesh, 0);
+                // The outside walls, for the run-yourself runner to stop at (2026-11-20, Anders: up close the houses
+                // went see-through: the runner stood inside a wall that reaches past the race's closed cells)
+                if (input.passable != null)
+                    foreach (var ring in o.rings)
+                        foreach (var sg in ring)
+                            if (sg.other == 0) world.AddWall(sg.ax, sg.az, sg.bx, sg.bz);
             }
             townPlaced.Add((o.cx, o.cz, 0f, -1));
         }

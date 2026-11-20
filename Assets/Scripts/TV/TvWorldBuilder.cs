@@ -120,6 +120,14 @@ public class TvWorld
     // Fallen trunks, stone walls and fences a runner jumps over rather than going round: ax, az, bx, bz, height for each
     public readonly List<float> logs = new List<float>();
 
+    // The outside walls of a town's houses (run yourself): ax, az, bx, bz for each; the runner keeps its reach from them
+    public readonly List<float> walls = new List<float>();
+
+    public void AddWall(float ax, float az, float bx, float bz)
+    {
+        walls.Add(ax); walls.Add(az); walls.Add(bx); walls.Add(bz);
+    }
+
     public void AddHurdle(float ax, float az, float bx, float bz, float height)
     {
         logs.Add(ax); logs.Add(az); logs.Add(bx); logs.Add(bz); logs.Add(height);
@@ -321,7 +329,8 @@ public partial class TvWorldBuilder
 
     List<(WorldLineKind kind, float[] xz)> lines;
     List<(WorldPointKind kind, float x, float z, float angle)> points;
-    readonly List<(float x, float z, float dx, float dz, float[] xz)> cliffs = new List<(float, float, float, float, float[])>();
+    // A rock cliff's line and which side is the low one: +1 right of the line as drawn, -1 left
+    readonly List<(float side, float[] xz)> cliffs = new List<(float, float[])>();
 
     TvWorld Build()
     {
@@ -693,31 +702,30 @@ public partial class TvWorldBuilder
     // A cliff is a step in the ground: the side the ground falls towards drops, and the face shows bare rock
     void Cliff(float[] c, float drop, bool rocky)
     {
-        int mid = (c.Length / 4) * 2;
-        float mx = c[mid], mz = c[mid + 1];
-        float dx = -(BaseHeight(mx + 4f, mz) - BaseHeight(mx - 4f, mz)), dz = -(BaseHeight(mx, mz + 4f) - BaseHeight(mx, mz - 4f));
-        if (dx * dx + dz * dz < 0.0004f)
+        // Which side is low, from the map's heights 5 m either side of the whole line (2026-11-20, Anders: a cliff
+        // faced the wrong way; it was decided by the slope at the line's middle alone, and one direction for the
+        // whole line turned a curved cliff's other end round). Level ground: the right side, as the map draws it.
+        float vote = 0f, total = 0f;
+        for (int q = 0; q + 3 < c.Length; q += 2)
         {
-            // Flat ground: the lower side is to the right of the line as it was drawn
-            int a = Math.Max(0, mid - 2);
-            dx = c[a + 3] - c[a + 1];
-            dz = -(c[a + 2] - c[a]);
+            float sx = c[q + 2] - c[q], sz = c[q + 3] - c[q + 1], l = (float)Math.Sqrt(sx * sx + sz * sz);
+            if (l < 1e-4f) continue;
+            float rx = sz / l, rz = -sx / l, px = (c[q] + c[q + 2]) / 2f, pz = (c[q + 1] + c[q + 3]) / 2f;
+            vote += l * (BaseHeight(px - rx * 5f, pz - rz * 5f) - BaseHeight(px + rx * 5f, pz + rz * 5f));
+            total += l;
         }
-        float len = (float)Math.Sqrt(dx * dx + dz * dz);
-        if (len < 1e-6f) return;
-        dx /= len;
-        dz /= len;
-        if (rocky) cliffs.Add((mx, mz, dx, dz, c));
+        if (total < 1e-3f) return;
+        float lowSide = vote < -0.02f * total ? -1f : 1f;
+        if (rocky) cliffs.Add((lowSide, c));
 
         var best = new Dictionary<int, (float d, float side, float qx, float qz, float nx, float nz)>();
         for (int q = 0; q + 3 < c.Length; q += 2)
         {
             float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
-            float nx = -(bz - az), nz = bx - ax, nl = (float)Math.Sqrt(nx * nx + nz * nz);
+            float nx = bz - az, nz = -(bx - ax), nl = (float)Math.Sqrt(nx * nx + nz * nz);
             if (nl < 1e-6f) continue;
-            nx /= nl;
-            nz /= nl;
-            if (nx * dx + nz * dz < 0f) { nx = -nx; nz = -nz; }
+            nx *= lowSide / nl;
+            nz *= lowSide / nl;
             ForNear(ax, az, bx, bz, 10f, (k, d, qx, qz) =>
             {
                 if (best.TryGetValue(k, out var known) && known.d <= d) return;
@@ -1319,10 +1327,13 @@ public partial class TvWorldBuilder
             for (int q = 0; q + 3 < c.Length; q += 2)
             {
                 float len = (float)Math.Sqrt((c[q + 2] - c[q]) * (c[q + 2] - c[q]) + (c[q + 3] - c[q + 1]) * (c[q + 3] - c[q + 1]));
+                if (len < 1e-4f) continue;
+                // Out on the low side of this stretch of the line
+                float lx = cliff.side * (c[q + 3] - c[q + 1]) / len, lz = -cliff.side * (c[q + 2] - c[q]) / len;
                 for (float t = 0f; t < len; t += 1.3f)
                 {
                     float f = t / len, d = Rr(1.4f, 3.4f);
-                    AddRock(Lerp(c[q], c[q + 2], f) + cliff.dx * d, Lerp(c[q + 1], c[q + 3], f) + cliff.dz * d, Rr(0.2f, 0.6f), 0.08f, false, Rr(0.8f, 1f));
+                    AddRock(Lerp(c[q], c[q + 2], f) + lx * d, Lerp(c[q + 1], c[q + 3], f) + lz * d, Rr(0.2f, 0.6f), 0.08f, false, Rr(0.8f, 1f));
                 }
             }
         }
@@ -1343,8 +1354,7 @@ public partial class TvWorldBuilder
                 if (len < 0.05f) continue;
                 if (!Inside((ax + bx) / 2f, (az + bz) / 2f, chunk ? 0f : 2f)) continue;
                 // The low side, as the drop was made
-                float nx = -sz / len, nz = sx / len;
-                if (nx * cliff.dx + nz * cliff.dz < 0f) { nx = -nx; nz = -nz; }
+                float nx = cliff.side * sz / len, nz = -cliff.side * sx / len;
                 int steps = Math.Max(1, (int)Math.Ceiling(len / 0.7f));
                 int first = -1;
                 const int Rows = 4;   // the face in bands, each bulging a little its own way, so it is not one flat slab
@@ -1466,6 +1476,55 @@ public partial class TvWorldBuilder
         }
     }
 
+    // Like Along, but a post at both ends of the line and at every bend (2026-11-20, Anders: a fence stopped short of
+    // the house wall; the posts stood half a step in from the ends)
+    // own: the post is this piece's to build; the posts just over the edge come too (own false), so the rails reach
+    // across to the next piece's first post
+    void AlongPosts(float[] c, float step, Action<float, float, bool> each)
+    {
+        for (int q = 0; q + 3 < c.Length; q += 2)
+        {
+            float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
+            float len = (float)Math.Sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
+            if (len < 0.05f) continue;
+            int pieces = Math.Max(1, (int)Math.Round(len / step));
+            for (int i = q == 0 ? 0 : 1; i <= pieces; i++)
+            {
+                float f = i / (float)pieces;
+                float x = Lerp(ax, bx, f), z = Lerp(az, bz, f);
+                bool own = Inside(x, z, 1.5f);
+                if (own || (chunk && x >= -R - 4f && x < R + 4f && z >= -R - 4f && z < R + 4f)) each(x, z, own);
+            }
+        }
+    }
+
+    // A fence that ends by a house reaches right to its wall: an end within 1.5 m of a house is carried on into it
+    float[] ToHouse(float[] c)
+    {
+        if (input.town == null || c.Length < 4) return c;
+        float[] r = null;
+        for (int end = 0; end < 2; end++)
+        {
+            int a = end == 0 ? 0 : c.Length - 2, b = end == 0 ? 2 : c.Length - 4;
+            float dx = c[a] - c[b], dz = c[a + 1] - c[b + 1], len = (float)Math.Sqrt(dx * dx + dz * dz);
+            if (len < 0.05f) continue;
+            dx /= len; dz /= len;
+            for (float s = 0f; s <= 1.5f; s += 0.25f)
+            {
+                if (Base(CellAt(c[a] + dx * s, c[a + 1] + dz * s)) != WorldCell.Building) continue;
+                // Well into the house (a stepped corner of the map is cut straight, so the wall may stand back from
+                // the cells), but never out of the other side of it
+                float into = s + 1.6f;
+                while (into > s + 0.3f && Base(CellAt(c[a] + dx * into, c[a + 1] + dz * into)) != WorldCell.Building) into -= 0.25f;
+                if (r == null) r = (float[])c.Clone();
+                r[a] = c[a] + dx * into;
+                r[a + 1] = c[a + 1] + dz * into;
+                break;
+            }
+        }
+        return r ?? c;
+    }
+
     void Structures()
     {
         TvColor stone = TvColor.Hex("#7e7b74"), wood = TvColor.Hex("#6a5a48"), pole = TvColor.Hex("#4e4033"), wire = TvColor.Hex("#2b2b2b"),
@@ -1551,9 +1610,11 @@ public partial class TvWorldBuilder
                     // Weathered grey posts with two split rails; a ruined fence leans, misses posts and has a rail left here and there
                     bool ruined = line.kind == WorldLineKind.RuinedFence;
                     float lastX = float.NaN, lastY = 0f, lastZ = 0f;
-                    Along(c, 2.4f, (x, z, yaw, len) =>
+                    AlongPosts(ToHouse(c), 2.4f, (x, z, own) =>
                     {
                         float y = H(x, z);
+                        // A post over the piece's edge is the next piece's: only where the rail to the first post here starts
+                        if (!own) { lastX = ruined ? float.NaN : x; lastY = y; lastZ = z; return; }
                         if (ruined && random.Value() < 0.3f) { lastX = float.NaN; return; }
                         float lean = ruined ? Rr(0.05f, 0.4f) : Rr(0f, 0.04f), la = Rr(0f, 6.283f);
                         float topX = x + (float)Math.Cos(la) * lean, topZ = z + (float)Math.Sin(la) * lean;
@@ -1573,9 +1634,10 @@ public partial class TvWorldBuilder
                 {
                     // A game fence: tall wooden posts with wire mesh; the mesh is only drawn where it can be seen
                     float lastX = float.NaN, lastY = 0f, lastZ = 0f;
-                    Along(c, 3f, (x, z, yaw, len) =>
+                    AlongPosts(ToHouse(c), 3f, (x, z, own) =>
                     {
                         float y = H(x, z);
+                        if (!own) { lastX = x; lastY = y; lastZ = z; return; }
                         Bar(thingMesh, x, y - 0.2f, z, x, y + 2.1f, z, 0.07f, 0.06f, 5, grey.Shade(Rr(0.85f, 1.05f)));
                         if (!float.IsNaN(lastX) && (x - lastX) * (x - lastX) + (z - lastZ) * (z - lastZ) < 25f)
                         {

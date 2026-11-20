@@ -132,7 +132,7 @@ public static class SharedMaps
     }
 
     // A map built into the game is no longer shared: built-in maps are the non-local ones in MapDefinition.All
-    static bool IsBuiltIn(string id) => MapDefinition.All.Exists(m => m.id == id && !m.isLocal);
+    static bool IsBuiltIn(string id) => MapDefinition.All.Exists(m => m.id == id && (!m.isLocal || m.replacesBuiltIn));
 
     // ---- Listing (called by CloudCourses with every player the course query returns) ----
 

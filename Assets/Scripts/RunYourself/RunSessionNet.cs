@@ -200,7 +200,7 @@ public partial class RunSession
         Color color = ColourOf(p, remotes.Count + 1);
         string name = p.nickName.ToString();
         if (string.IsNullOrWhiteSpace(name)) name = "Player " + p.Object.StateAuthority.PlayerId;
-        var r = new Remote { player = p, track = new RelayTrack { label = name, isLocal = false, color = color } };
+        var r = new Remote { player = p, track = new RelayTrack { label = name, isLocal = false, color = color, runnerClock = true } };
         if (Mass && world != null) r.figure = new TvStickFigure(world.transform, name, color, p.Object.StateAuthority.PlayerId * 7919 + 13);
         return r;
     }

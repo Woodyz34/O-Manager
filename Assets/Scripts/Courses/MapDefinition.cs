@@ -61,6 +61,9 @@ public class MapDefinition : ScriptableObject
     // The folder of a map imported on this computer
     [NonSerialized] public string folder;
 
+    // This player's own copy of a map that is also built into the game (it is used instead of the built-in one here)
+    [NonSerialized] public bool replacesBuiltIn;
+
     // Imported on this computer by this player: they can change its name, who may use it, the club and the map edge
     public bool CanEdit => isLocal && !isBorrowed && !isSharedCopy && !string.IsNullOrEmpty(folder);
 
@@ -134,10 +137,19 @@ public class MapDefinition : ScriptableObject
             if (all == null)
             {
                 all = new List<MapDefinition>(Resources.LoadAll<MapDefinition>("MapDefs"));
-                // Maps imported on this computer, unless the same map is already built into the game
+                // Maps imported on this computer, unless the same map is already built into the game. A map this
+                // player imported and sent in keeps their own copy even once it is built in (2026-11-20, Anders: a map
+                // built into the game could no longer be edited), so they can change it and build it again; on this
+                // computer their copy is the one used.
                 foreach (MapDefinition local in MapPackages.LoadLocal())
                 {
-                    if (!all.Exists(m => m.id == local.id)) all.Add(local);
+                    int same = all.FindIndex(m => m.id == local.id);
+                    if (same < 0) all.Add(local);
+                    else if (local.CanEdit && !local.isPrivate)
+                    {
+                        local.replacesBuiltIn = true;
+                        all[same] = local;
+                    }
                 }
                 all.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
             }

@@ -236,7 +236,7 @@ public partial class RunSession : MonoBehaviour
         handMap.transform.SetParent(transform, true);
         EnsureListener();
 
-        track = new RelayTrack { label = RunnerName, isLocal = true, color = TrackColour() };
+        track = new RelayTrack { label = RunnerName, isLocal = true, color = TrackColour(), runnerClock = true };
         phase = Online ? Phase.Waiting : Phase.Countdown;
         waitingSince = Time.unscaledTime;
         countdown = 5.2f;
@@ -259,7 +259,9 @@ public partial class RunSession : MonoBehaviour
             Debug.LogWarning("RunSession: the scene's grid is not this map's (" + speed.GetLength(0) + "x" + speed.GetLength(1) + ")");
             return null;
         }
-        return new TvPassable(speed, ForbiddenAreas.CompetitionCells, map.minx, map.miny, map.maxx, map.maxy, map.IsSprint);
+        byte[] kinds = map.gridName != null && map.gridName.EndsWith("grid")
+            ? MapPackages.LoadBytes(map.gridName.Substring(0, map.gridName.Length - 4) + "kinds", ".bytes") : null;
+        return new TvPassable(speed, ForbiddenAreas.CompetitionCells, map.minx, map.miny, map.maxx, map.maxy, map.IsSprint, kinds);
     }
 
     // The player's colour for the GPS line, never white or near white (2026-11-19, Anders: white cannot be seen on the map)
