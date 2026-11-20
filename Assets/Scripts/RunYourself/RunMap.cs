@@ -177,14 +177,17 @@ public class RunMap : MonoBehaviour
         RectTransform rect = (RectTransform)compass;
         rect.SetParent(hand, false);
         rect.sizeDelta = new Vector2(RunCompassArt.PlateW, RunCompassArt.PlateH);   // mm
-        rect.localScale = Vector3.one * 0.001f;
-        // On the thumb (2026-11-19, Anders: a thumb compass, worn on the thumb): along the thumb, the strap round the
-        // middle of it and the point reaching past its tip, in front of it so the thumb shows through the clear plate
+        // The picture's own millimetre origin (the thumb's middle) is the pivot
+        rect.pivot = new Vector2(RunCompassArt.OriginX / RunCompassArt.PlateW, RunCompassArt.OriginY / RunCompassArt.PlateH);
+        // Drawn for the left thumb, the plate reaching in over the map; the right thumb wears the mirror image
+        rect.localScale = new Vector3(side < 0f ? 0.001f : -0.001f, 0.001f, 0.001f);
+        // On the thumb (2026-11-20, Anders' photo of a real one): the strap over the end of the thumb, the capsule
+        // just past its tip, in front of it so the thumb shows through the clear plate
         const float tilt = 12f;                                         // as the thumb leans
-        float strapToMiddle = (RunCompassArt.PlateH * 0.5f - (RunCompassArt.StrapFrom + RunCompassArt.StrapTo) * 0.5f) * 0.001f;
-        Vector3 along = Quaternion.Euler(0f, 0f, side * tilt) * Vector3.up;
-        rect.localPosition = new Vector3(-side * 0.004f, -0.004f, -0.024f) + along * strapToMiddle;
-        rect.localRotation = Quaternion.Euler(0f, 0f, side * tilt);
+        Quaternion turn = Quaternion.Euler(0f, 0f, side * tilt);
+        Vector3 along = turn * Vector3.up, across = turn * Vector3.right * -side;
+        rect.localPosition = new Vector3(-side * 0.004f, -0.006f, -0.024f) + along * 0.005f + across * (-RunCompassArt.CapsuleX * 0.001f);
+        rect.localRotation = turn;
 
         // Always drawn last and over everything in the hand, the map and the thumb included
         canvas.overrideSorting = true;
@@ -193,10 +196,11 @@ public class RunMap : MonoBehaviour
         CourseUI.Stretch(plate.rectTransform);
         RawImage capsuleFace = Picture("Capsule", rect, RunCompassArt.Capsule());
         float d = RunCompassArt.CapsuleD;
-        CourseUI.Place(capsuleFace.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2(0f, RunCompassArt.CapsuleY), new Vector2(d, d));
+        CourseUI.Place(capsuleFace.rectTransform, new Vector2(0f, 0f), new Vector2(0.5f, 0.5f),
+            new Vector2(RunCompassArt.OriginX + RunCompassArt.CapsuleX, RunCompassArt.OriginY + RunCompassArt.CapsuleY), new Vector2(d, d));
         RawImage arrow = Picture("Needle", capsuleFace.rectTransform, RunCompassArt.Needle());
         needle = arrow.rectTransform;
-        CourseUI.Place(needle, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(d * 9f / 50f, d * 46f / 50f));
+        CourseUI.Place(needle, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(7f, 28f));
     }
 
     static Material onTop;
