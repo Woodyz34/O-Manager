@@ -17,6 +17,16 @@ public class TvPassable
     readonly double minx, miny, spanX, spanY;
     readonly int rows, cols;
     public readonly bool sprint;
+    // What the map has in every cell (GroundKind, the package's kinds.bytes), or null: where the map has a canopy or
+    // a passage under a house (ISSprOM 522, light grey), the 3D world puts a roof (2026-11-20, Anders: a passage under
+    // a shopping centre was open sky with trees in it)
+    readonly byte[] kinds;
+
+    public TvPassable(float[,] speed, HashSet<int> purple, double minx, double miny, double maxx, double maxy, bool sprint, byte[] kinds)
+        : this(speed, purple, minx, miny, maxx, maxy, sprint)
+    {
+        if (kinds != null && kinds.Length == rows * cols) this.kinds = kinds;
+    }
 
     public TvPassable(float[,] speed, HashSet<int> purple, double minx, double miny, double maxx, double maxy, bool sprint)
     {
@@ -38,6 +48,24 @@ public class TvPassable
         j = (int)Math.Floor((e - minx) / spanX * (cols - 1) + 0.5);
         i = (int)Math.Floor((n - miny) / spanY * (rows - 1) + 0.5);
         return i >= 0 && j >= 0 && i < rows && j < cols;
+    }
+
+    // Metres between two cell centres
+    public double CellSize => spanX / Math.Max(1, cols - 1);
+
+    // Under a canopy or a passage under a house on the map
+    public bool Canopy(double e, double n) => kinds != null && Cell(e, n, out int i, out int j) && kinds[i * cols + j] == MapImport.GroundKind.Canopy;
+
+    // The centres of the canopy cells in a box (map metres), with their row and column
+    public void CanopyCells(double e0, double n0, double e1, double n1, List<(int i, int j, double e, double n)> into)
+    {
+        if (kinds == null) return;
+        int j0 = Math.Max(0, (int)Math.Floor((e0 - minx) / spanX * (cols - 1))), j1 = Math.Min(cols - 1, (int)Math.Ceiling((e1 - minx) / spanX * (cols - 1)));
+        int i0 = Math.Max(0, (int)Math.Floor((n0 - miny) / spanY * (rows - 1))), i1 = Math.Min(rows - 1, (int)Math.Ceiling((n1 - miny) / spanY * (rows - 1)));
+        for (int i = i0; i <= i1; i++)
+            for (int j = j0; j <= j1; j++)
+                if (kinds[i * cols + j] == MapImport.GroundKind.Canopy)
+                    into.Add((i, j, minx + j * spanX / (cols - 1), miny + i * spanY / (rows - 1)));
     }
 
     // A purple cell: inside an out-of-bounds area or on an uncrossable boundary the course setter drew

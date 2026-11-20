@@ -58,6 +58,7 @@ public class RunWorld : MonoBehaviour
         public readonly List<Mesh> meshes = new List<Mesh>();
         public TvWorld world;
         public float[] solids;              // x, z, r for each, in metres from Origin
+        public float[] walls;               // ax, az, bx, bz for each house wall, in metres from Origin
         public List<int> flags;             // which flags stand in it, in the order given to the builder
         public bool ready, building, gone;
         public GameObject detail;
@@ -347,8 +348,43 @@ public class RunWorld : MonoBehaviour
     {
         float x = (float)(e - anchorE), z = (float)(n - anchorN);
         int ix = (int)Math.Floor(x / PieceSize), iz = (int)Math.Floor(z / PieceSize);
+        float wr = reach + 0.15f;
         for (int pass = 0; pass < 2; pass++)
         {
+            // A house is built by the piece its middle is in, so a long one reaches two pieces away
+            for (int dz = -2; dz <= 2; dz++)
+            {
+                for (int dx = -2; dx <= 2; dx++)
+                {
+                    if (!pieces.TryGetValue(Key(ix + dx, iz + dz), out Piece p)) continue;
+                    // The house walls: kept at reach and a little more (the plinth stands out), on whichever side the runner is
+                    float[] w = p.walls;
+                    if (w != null)
+                        for (int i = 0; i + 3 < w.Length; i += 4)
+                        {
+                            float ax = w[i], az = w[i + 1], bx = w[i + 2], bz = w[i + 3];
+                            if (x < Mathf.Min(ax, bx) - wr || x > Mathf.Max(ax, bx) + wr
+                                || z < Mathf.Min(az, bz) - wr || z > Mathf.Max(az, bz) + wr) continue;
+                            float sx = bx - ax, sz = bz - az, len2 = sx * sx + sz * sz;
+                            float t = len2 > 1e-6f ? Mathf.Clamp01(((x - ax) * sx + (z - az) * sz) / len2) : 0f;
+                            float qx = x - (ax + sx * t), qz = z - (az + sz * t), d2 = qx * qx + qz * qz;
+                            if (d2 >= wr * wr) continue;
+                            float d = Mathf.Sqrt(d2);
+                            if (d < 0.001f)
+                            {
+                                // On the wall: out to the outside (the wall turns left round the house, so right of it)
+                                float l = Mathf.Sqrt(len2);
+                                if (l < 1e-4f) continue;
+                                qx = sz / l; qz = -sx / l; d = 0f;
+                                x += qx * wr;
+                                z += qz * wr;
+                                continue;
+                            }
+                            x += qx / d * (wr - d);
+                            z += qz / d * (wr - d);
+                        }
+                }
+            }
             for (int dz = -1; dz <= 1; dz++)
             {
                 for (int dx = -1; dx <= 1; dx++)
@@ -664,6 +700,15 @@ public class RunWorld : MonoBehaviour
             p.solids[i * 3] = list[i].x + ox;
             p.solids[i * 3 + 1] = list[i].z + oz;
             p.solids[i * 3 + 2] = list[i].r;
+        }
+        List<float> walls = p.world.walls;
+        p.walls = new float[walls.Count];
+        for (int i = 0; i + 3 < walls.Count; i += 4)
+        {
+            p.walls[i] = walls[i] + ox;
+            p.walls[i + 1] = walls[i + 1] + oz;
+            p.walls[i + 2] = walls[i + 2] + ox;
+            p.walls[i + 3] = walls[i + 3] + oz;
         }
         // Where the flags really stand (beside the stone or knoll they mark)
         for (int i = 0; i < p.flags.Count && i * 2 + 1 < p.world.flagSpots.Count; i++)

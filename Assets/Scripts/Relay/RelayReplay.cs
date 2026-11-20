@@ -15,6 +15,9 @@ public class RelayTrack
     // A plain round dot in the track's own colour instead of a copy of the runner's look (run it yourself, 2026-11-20,
     // Anders: the copied circle came out white and at its forest size on a sprint map)
     public bool plainDot;
+    // The times are the runner's own race clock (game seconds / GameSecondsPerSecond), the same clock the split times
+    // are punched on, so route analysis can cut the legs at the punches (2026-11-20)
+    public bool runnerClock;
 }
 
 // Records where every runner on the leg is, a few times a second, from the moment the leg starts until the statistics come up
@@ -84,7 +87,7 @@ public class RelayReplayRecorder : MonoBehaviour
 
     static RelayTrack WithoutStops(RelayTrack track)
     {
-        RelayTrack smooth = new RelayTrack { label = track.label, isLocal = track.isLocal, color = track.color, look = track.look, plainDot = track.plainDot };
+        RelayTrack smooth = new RelayTrack { label = track.label, isLocal = track.isLocal, color = track.color, look = track.look, plainDot = track.plainDot, runnerClock = true };
         smooth.positions.AddRange(track.positions);
         int n = track.times.Count;
         if (n == 0) return smooth;
