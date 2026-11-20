@@ -40,7 +40,8 @@ namespace MapImport
         // 2 (2026-11-20): ISOM 2017-2 / ISSprOM 2019-2 check: hedges (410.1, 411), 513.1 wall, stairs, canopies,
         // 707 marked route (not a barrier), 708 out-of-bounds boundary, 710 crossing, green minimum-width lines.
         // 3 (2026-11-20): stairs as quick as a road going up, 0.6 going down (GroundKind.Stairs, StairsSlopes).
-        public const int RulesVersion = 3;
+        // 4 (2026-11-20): contour heights: hilltops no longer turned into hollows (ContourHeights), the grid's heights change.
+        public const int RulesVersion = 4;
 
         // Stairs: up (and on the flat) as quick as a road (Anders, 2026-11-20: running up stairs is quick), down slowly.
         // Which way is down is worked out from the heights when the grid is loaded (StairsSlopes).
