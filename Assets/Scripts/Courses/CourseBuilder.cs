@@ -60,6 +60,7 @@ public class CourseBuilder : MonoBehaviour
     {
         public List<List<Vector3>> branches = new List<List<Vector3>>();
         public List<int> legs = new List<int>();   // the legs the course setter chose for it (one branch per leg)
+        public int home = -1;                      // the leg it was laid on: only there can its controls be changed (2026-11-20)
     }
 
     readonly List<EditCourse> courses = new List<EditCourse> { new EditCourse() };
@@ -705,7 +706,11 @@ public class CourseBuilder : MonoBehaviour
         {
             switch (hover.kind)
             {
-                case HoverKind.Mark: BeginDrag(hover.mark, mouseWorld, true); break;
+                case HoverKind.Mark:
+                    if (hover.mark.type == MarkType.BranchControl && ForkLocked(hover.mark.fork))
+                        SetStatus(LockedText(hover.mark.fork) + " Right-click one of its controls to take it off this leg.", true);
+                    else BeginDrag(hover.mark, mouseWorld, true);
+                    break;
                 case HoverKind.Fork: UseFork(hover.fork); break;
                 case HoverKind.Insert: InsertOnLine(hover, mouseWorld); break;
                 case HoverKind.None: break;
@@ -780,6 +785,8 @@ public class CourseBuilder : MonoBehaviour
         bool found = false;
         foreach (var line in ownLines)
         {
+            // A fork laid on another leg can't get controls here
+            if (line.spot.fork >= 0 && ForkLocked(line.spot.fork)) continue;
             Vector2 a = line.from, b = line.to;
             float length = Vector2.Distance(a, b);
             if (length < clear * 2f) continue;
@@ -813,12 +820,17 @@ public class CourseBuilder : MonoBehaviour
         Color accent = CourseUI.Accent;
         EditCourse course = Cur;
 
-        if (hover.kind == HoverKind.Mark)
+        if (hover.kind == HoverKind.Mark && hover.mark.type == MarkType.BranchControl && ForkLocked(hover.mark.fork))
+        {
+            drawn.Add(Ring(hover.mark, CourseRenderer.ShadowPurple));
+            tip = MarkName(hover.mark) + ": " + LockedText(hover.mark.fork) + "\nRight-click to take the fork off this leg (it stays faded, click it to put it back)";
+        }
+        else if (hover.kind == HoverKind.Mark)
         {
             drawn.Add(Ring(hover.mark, accent));
             string also = relay && hover.mark.type != MarkType.BranchControl ? LegsText(LinksAt(hover.mark.position)) : "";
             tip = MarkName(hover.mark) + ": drag to move, right-click to remove"
-                + (IsLastControl(hover.mark) ? "\nPress F to make it the finish" : "") + (also.Length > 0 ? "\nSame control on " + also + ": it moves there too (hold Alt for this leg only)" : "");
+                + (IsLastControl(hover.mark) ? "\nPress F to make it the finish" : "") + (also.Length > 0 ? "\nSame control on " + also + ": hold Alt while dragging to move it there too" : "");
         }
         else if (hover.kind == HoverKind.Fork)
         {
@@ -903,6 +915,7 @@ public class CourseBuilder : MonoBehaviour
             else if (hover.kind == HoverKind.Shared)
             {
                 string legsHere = LegsText(LinksAt(hover.point));
+                if (legsHere.Length == 0 && IsGhost(hover.point)) legsHere = "the one you removed from this leg";
                 tip = "Clicks into place: the same " + (hover.mark.kind == CourseRenderer.MarkKind.Start ? "start" : hover.mark.kind == CourseRenderer.MarkKind.Finish ? "finish" : "control")
                     + " as " + (legsHere.Length > 0 ? legsHere : "another leg");
             }
@@ -1011,10 +1024,11 @@ public class CourseBuilder : MonoBehaviour
         dragMoved = false;
         dragUndo = pushUndo;
         if (pushUndo) PushUndo();
-        // A control that other legs have too is moved on all of them, unless Alt is held
-        bool alone = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+        // A control only moves on this leg; with Alt held it moves on every leg that has the same control (2026-11-20,
+        // the user: working on leg 2 must never change leg 1 by mistake. Before, it moved everywhere unless Alt was held.)
+        bool everywhere = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
         dragLinks.Clear();
-        if (!alone && mark.type != MarkType.BranchControl) dragLinks.AddRange(LinksAt(mark.position));
+        if (everywhere && mark.type != MarkType.BranchControl) dragLinks.AddRange(LinksAt(mark.position));
         // The other legs' controls it can click onto (not the ones that move with it)
         dragSnaps.Clear();
         foreach (Mark shadow in shadows)
@@ -1198,7 +1212,7 @@ public class CourseBuilder : MonoBehaviour
         }
         foreach (EditFork fork in forks)
         {
-            EditFork copy = new EditFork { legs = new List<int>(fork.legs) };
+            EditFork copy = new EditFork { legs = new List<int>(fork.legs), home = fork.home };
             foreach (List<Vector3> branch in fork.branches) copy.branches.Add(new List<Vector3>(branch));
             snapshot.forks.Add(copy);
         }
@@ -1627,8 +1641,9 @@ public class CourseBuilder : MonoBehaviour
         if (!gone)
         {
             Vector3 from = moveType == MarkType.Start ? course.start.Value : moveType == MarkType.Finish ? course.finish.Value : course.items[moveItem].point;
-            bool alone = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
-            List<(EditCourse course, int slot)> links = alone ? new List<(EditCourse, int)>() : LinksAt(from);
+            // Only on this leg, unless Alt is held (2026-11-20)
+            bool everywhere = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+            List<(EditCourse course, int slot)> links = everywhere ? LinksAt(from) : new List<(EditCourse, int)>();
             PushUndo();
             SetMarkPosition(new Mark { type = moveType.Value, item = moveItem }, world);
             MoveLinks(links, world);
@@ -1665,6 +1680,7 @@ public class CourseBuilder : MonoBehaviour
             return;
         }
         PushUndo();
+        DropGhost(world);
         Tool placed = tool;
         switch (tool)
         {
@@ -1749,9 +1765,15 @@ public class CourseBuilder : MonoBehaviour
 
     void RemoveMark(Mark mark)
     {
+        if (mark.type == MarkType.BranchControl && ForkLocked(mark.fork))
+        {
+            TakeForkOff(mark.fork);
+            return;
+        }
         PushUndo();
         insertAfter = null;
         EditCourse course = Cur;
+        if (mark.type != MarkType.Start && mark.type != MarkType.Finish) KeepGhost(course, mark.position);
         switch (mark.type)
         {
             case MarkType.Start: course.start = null; break;
@@ -1916,6 +1938,15 @@ public class CourseBuilder : MonoBehaviour
             }
             AddSharedShadow(entry, entryIsStart ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control, faded, drawn);
             AddSharedShadow(exit, exitIsFinish ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control, faded, drawn);
+        }
+        // Controls removed from this leg, to click back in place
+        if (removedGhosts.TryGetValue(course, out List<Vector3> ghosts))
+        {
+            foreach (Vector3 ghost in ghosts)
+            {
+                if (marks.Exists(m => Same(m.position, ghost))) continue;
+                AddSharedShadow(ghost, CourseRenderer.MarkKind.Control, FaintPurple, drawn);
+            }
         }
         if (!showOtherLegs) return;
         List<EditCourse> seen = new List<EditCourse> { course };
@@ -2085,6 +2116,77 @@ public class CourseBuilder : MonoBehaviour
             }
         }
         return false;
+    }
+
+    // ---- A fork belongs to the leg it was laid on (2026-11-20) ----
+    // The branches of a fork are the same on every leg that runs it, so a change to them is a change on all those legs.
+    // The user: working on leg 2 must never change leg 1. So the controls of a fork can only be moved, added or removed
+    // on its home leg (the leg it was laid on). On the other legs it is shown, and a right-click on one of its controls
+    // takes the fork off that leg only: it stays faded on the map, and a click puts it back where it was.
+
+    // The leg where fork f can be changed: the leg it was laid on, else the first leg that has it (-1: no leg has it)
+    int HomeLeg(int f)
+    {
+        if (f < 0 || f >= forks.Count) return -1;
+        List<int> having = LegsWithFork(f);
+        int home = forks[f].home;
+        if (having.Contains(home)) return home;
+        return having.Count > 0 ? having[0] : -1;
+    }
+
+    // True when fork f can't be changed on the leg being laid (it belongs to another leg)
+    bool ForkLocked(int f)
+    {
+        if (!relay || f < 0 || f >= forks.Count) return false;
+        int home = HomeLeg(f);
+        return home >= 0 && home != selectedLeg && !LegsWithCourse(Cur).Contains(home);
+    }
+
+    string LockedText(int f) => "Fork " + (f + 1) + " is laid on leg " + (HomeLeg(f) + 1) + ", so it can only be changed there.";
+
+    // Fork f is taken off this leg only: the leg goes straight from the control before it to the control after it
+    void TakeForkOff(int f)
+    {
+        EditCourse course = Cur;
+        if (!course.items.Exists(item => item.fork == f)) return;
+        PushUndo();
+        if (tool == Tool.Branch && branchFork == f) SetTool(Tool.Control);
+        course = OwnCourse(selectedLeg);
+        course.items.RemoveAll(item => item.fork == f);
+        foreach (int leg in LegsWithCourse(course)) forks[f].legs.Remove(leg);
+        if (forks[f].home == selectedLeg) forks[f].home = -1;
+        insertAfter = null;
+        errorPoint = null;
+        bool elsewhere = LegsWithFork(f).Count > 0;
+        SetStatus("Fork " + (f + 1) + " is off leg " + (selectedLeg + 1) + " now." + (elsewhere
+            ? " It stays faded on the map: click one of its controls to put it back. Ctrl+Z undoes."
+            : " Ctrl+Z undoes."), false);
+        Redraw();
+    }
+
+    // Controls taken off a leg are kept faded on it for a while, so they can be clicked back in place (2026-11-20)
+    readonly Dictionary<EditCourse, List<Vector3>> removedGhosts = new Dictionary<EditCourse, List<Vector3>>();
+    const int MaxGhosts = 40;
+
+    void KeepGhost(EditCourse course, Vector3 point)
+    {
+        if (!relay) return;
+        if (!removedGhosts.TryGetValue(course, out List<Vector3> list))
+        {
+            list = new List<Vector3>();
+            removedGhosts[course] = list;
+        }
+        list.RemoveAll(p => Same(p, point));
+        list.Add(point);
+        if (list.Count > MaxGhosts) list.RemoveAt(0);
+    }
+
+    bool IsGhost(Vector3 point) => removedGhosts.TryGetValue(Cur, out List<Vector3> list) && list.Exists(p => Same(p, point));
+
+    // A control was laid at this spot: it is no longer a removed one
+    void DropGhost(Vector3 point)
+    {
+        if (removedGhosts.TryGetValue(Cur, out List<Vector3> list)) list.RemoveAll(p => Same(p, point));
     }
 
     // ---- The fork pop-up ----
@@ -2321,6 +2423,7 @@ public class CourseBuilder : MonoBehaviour
         fork.legs.AddRange(chosen);
         foreach (int leg in LegsWithCourse(course)) if (!fork.legs.Contains(leg)) fork.legs.Add(leg);
         fork.legs.Sort();
+        fork.home = selectedLeg;
         forks.Add(fork);
         int f = forks.Count - 1;
         course.items.Insert(Mathf.Clamp(after + 1, 0, course.items.Count), new EditItem { fork = f });
@@ -2457,6 +2560,11 @@ public class CourseBuilder : MonoBehaviour
     void BeginForkDrawing(int f, bool firstRound)
     {
         if (f < 0 || f >= forks.Count) return;
+        if (ForkLocked(f))
+        {
+            SetStatus(LockedText(f), true);
+            return;
+        }
         EditFork fork = forks[f];
         branchFork = f;
         forkFirstRound = firstRound;
@@ -2478,6 +2586,11 @@ public class CourseBuilder : MonoBehaviour
     // "+ Control" on a branch in the list: more controls on that branch only
     void StartBranch(int f, int b)
     {
+        if (ForkLocked(f))
+        {
+            SetStatus(LockedText(f), true);
+            return;
+        }
         branchFork = f;
         branchIndex = b;
         forkFirstRound = false;
@@ -2659,6 +2772,35 @@ public class CourseBuilder : MonoBehaviour
             SetStatus("This leg already has fork " + (f + 1) + ".", true);
             return;
         }
+        // Back where it was: the leg still has the control (or start) where the fork starts
+        int at = -2;
+        if (entryIsStart && course.start.HasValue && Same(course.start.Value, entry)) at = -1;
+        else at = course.items.FindIndex(item => item.fork < 0 && Same(item.point, entry));
+        if (at >= -1 && at + 1 < course.items.Count && course.items[at + 1].fork >= 0) at = -2;
+        if (at >= -1)
+        {
+            if (ControlCount(course) + forks[f].branches.ConvertAll(branch => branch.Count).Sum() + 1 > CourseData.MaxControls)
+            {
+                SetStatus("A course can have at most " + CourseData.MaxControls + " controls, and the fork does not fit.", true);
+                return;
+            }
+            PushUndo();
+            course = OwnCourse(selectedLeg);
+            course.items.Insert(at + 1, new EditItem { fork = f });
+            int next = at + 2;
+            bool meets = next < course.items.Count ? course.items[next].fork < 0 && Same(course.items[next].point, exit)
+                : course.finish.HasValue && exitIsFinish && Same(course.finish.Value, exit);
+            if (!meets && !exitIsFinish) course.items.Insert(next, new EditItem { point = exit });
+            else if (!meets && exitIsFinish && next >= course.items.Count) course.finish = exit;
+            foreach (int leg in LegsWithCourse(course)) if (!forks[f].legs.Contains(leg)) forks[f].legs.Add(leg);
+            forks[f].legs.Sort();
+            insertAfter = null;
+            errorPoint = null;
+            string warning = forkEveryVariant && PlannedLegs(f).Count > forks[f].branches.Count ? " It now has more legs than branches: press Edit on the fork to pick its legs again." : "";
+            SetStatus("Fork " + (f + 1) + " is back on leg " + (selectedLeg + 1) + "." + warning + " Ctrl+Z takes it off again.", false);
+            Redraw();
+            return;
+        }
         if (entryIsStart && course.items.Count > 0)
         {
             SetStatus("Fork " + (f + 1) + " starts at the start, so it has to be the first thing on the leg. Remove this leg's controls first, or hold Shift to lay a new control here.", true);
@@ -2805,7 +2947,7 @@ public class CourseBuilder : MonoBehaviour
         CopyCourseInto(from, course, leg);
         if (course.items.Count > 0)
             statusAfterSelect = "Leg " + (leg + 1) + " starts as a copy of leg " + (source + 1) + (forkSource >= 0 ? ", which has fork " + (forkSource + 1) : "")
-                                + ". Change what you like, or use \"Copy a leg\".";
+                                + ". Change what you like, or use \"Copy a leg\" (it can also copy only the forks).";
         return true;
     }
 
@@ -2815,6 +2957,12 @@ public class CourseBuilder : MonoBehaviour
         if (!relay || copyLegButton == null) return;
         List<string> labels = new List<string> { "Empty: start over" };
         List<int> sources = new List<int> { -1 };
+        List<int> forksHere = ForksForLeg(selectedLeg);
+        if (forksHere.Count > 0)
+        {
+            labels.Add("Only the forks: " + (forksHere.Count == 1 ? "fork " : "forks ") + string.Join(", ", forksHere.ConvertAll(f => (f + 1).ToString())));
+            sources.Add(-2);
+        }
         for (int leg = 0; leg < legs; leg++)
         {
             if (leg == selectedLeg) continue;
@@ -2828,8 +2976,81 @@ public class CourseBuilder : MonoBehaviour
         });
     }
 
+    // The forks this leg should run that are laid on another leg, in the order they come on their courses
+    List<int> ForksForLeg(int leg)
+    {
+        List<(int fork, float order)> found = new List<(int, float)>();
+        for (int f = 0; f < forks.Count; f++)
+        {
+            if (!PlannedLegs(f).Contains(leg) && !forks[f].legs.Contains(leg)) continue;
+            if (!FindForkSource(f, out _, out _, out _, out _, out int sourceLeg)) continue;
+            EditCourse source = courses[legCourse[sourceLeg]];
+            int at = source.items.FindIndex(item => item.fork == f);
+            found.Add((f, at / (float)Mathf.Max(1, source.items.Count)));
+        }
+        found.Sort((a, b) => a.order.CompareTo(b.order));
+        return found.ConvertAll(x => x.fork);
+    }
+
+    // "Only the forks" (2026-11-20, the user: copy the forks this leg runs but lay the rest of the leg myself): the leg
+    // gets each of its forks with the control before and after it, and keeps (or gets) the start and finish
+    void CopyForksOnly()
+    {
+        List<int> chosen = ForksForLeg(selectedLeg);
+        if (chosen.Count == 0) return;
+        // Where each fork lies, found before this leg's controls are cleared (the leg itself may be where one lies)
+        var found = new List<(int f, Vector3 entry, Vector3 exit, bool entryIsStart, bool exitIsFinish, Vector3? start, Vector3? finish)>();
+        foreach (int f in chosen)
+        {
+            if (!FindForkSource(f, out Vector3 entry, out Vector3 exit, out bool entryIsStart, out bool exitIsFinish, out int sourceLeg)) continue;
+            EditCourse source = courses[legCourse[sourceLeg]];
+            found.Add((f, entry, exit, entryIsStart, exitIsFinish, source.start, source.finish));
+        }
+        PushUndo();
+        if (tool == Tool.Branch) StopForkDrawing();
+        EditCourse own = OwnCourse(selectedLeg);
+        Vector3? start = own.start, finish = own.finish;
+        own.items.Clear();
+        int taken = 0;
+        foreach (var (f, entry, exit, entryIsStart, exitIsFinish, sourceStart, sourceFinish) in found)
+        {
+            if (!start.HasValue) start = sourceStart;
+            if (!finish.HasValue) finish = sourceFinish;
+            if (entryIsStart)
+            {
+                if (own.items.Count > 0) continue;   // a fork from the start has to come first
+                start = entry;
+            }
+            else
+            {
+                Vector3? last = own.items.Count == 0 ? start : own.items[own.items.Count - 1].fork < 0 ? own.items[own.items.Count - 1].point : (Vector3?)null;
+                if (!last.HasValue || !Same(last.Value, entry)) own.items.Add(new EditItem { point = entry });
+            }
+            own.items.Add(new EditItem { fork = f });
+            if (exitIsFinish) finish = exit;
+            else own.items.Add(new EditItem { point = exit });
+            foreach (int leg in LegsWithCourse(own)) if (!forks[f].legs.Contains(leg)) forks[f].legs.Add(leg);
+            forks[f].legs.Sort();
+            taken++;
+        }
+        own.start = start;
+        own.finish = finish;
+        checkLegs.Remove(selectedLeg);
+        insertAfter = null;
+        errorPoint = null;
+        SetTool(own.start.HasValue ? Tool.Control : Tool.Start);
+        SetStatus("Leg " + (selectedLeg + 1) + " has only its " + (taken == 1 ? "fork" : taken + " forks") + " now, with the controls before and after."
+                  + " Click a control in the list to add your own controls after it.", false);
+        Redraw();
+    }
+
     void CopyLeg(int source)
     {
+        if (source == -2)
+        {
+            CopyForksOnly();
+            return;
+        }
         PushUndo();
         if (tool == Tool.Branch) StopForkDrawing();
         EditCourse own = OwnCourse(selectedLeg);
@@ -2995,6 +3216,7 @@ public class CourseBuilder : MonoBehaviour
         punchSides.Clear();
         courses.Clear();
         forks.Clear();
+        removedGhosts.Clear();
         legCourse.Clear();
         legSex.Clear();
         checkLegs.Clear();
@@ -3408,6 +3630,7 @@ public class CourseBuilder : MonoBehaviour
         courses.Clear();
         legCourse.Clear();
         forks.Clear();
+        removedGhosts.Clear();
         if (course.forbidden != null)
         {
             foreach (ForbiddenArea area in course.forbidden)
@@ -3934,12 +4157,13 @@ public class CourseBuilder : MonoBehaviour
                 bool last = index == course.items.Count - 1;
                 bool forkAfter = !last && course.items[index + 1].fork < 0;
                 var buttons = new List<(string label, CourseUI.ButtonKind kind, UnityEngine.Events.UnityAction action)>();
-                // The TV button always shows (2026-11-20, the user: it must be clear that this is where a TV control is made)
-                if (relay) buttons.Add(("TV", item.tv ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light, () => ToggleTv(item, null)));
                 if (relay && forkAfter) buttons.Add(("Fork", CourseUI.ButtonKind.Secondary, () => OpenForkDialog(-1, index)));
                 if (last) buttons.Add(("Finish", CourseUI.ButtonKind.Light, () => MakeFinish(index)));
                 buttons.Add(("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Control, index, controlName)));
-                buttons.Add(("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.items.RemoveAt(index); Redraw(); }));
+                buttons.Add(("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); KeepGhost(course, item.point); course.items.RemoveAt(index); Redraw(); }));
+                // The TV button always shows, last in the row, so it stays in the same place when the other buttons
+                // come up on hover (2026-11-20, the user: a quick click on it hit Remove)
+                if (relay) buttons.Add(("TV", item.tv ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light, () => ToggleTv(item, null)));
                 AddRowAt(item.point, text, 34, rowColor, bad ? FontStyles.Bold : FontStyles.Normal, 6, buttons.ToArray());
                 if (relay && item.tv) AddTvRow(item.point);
                 previous = item.point;
@@ -3949,10 +4173,22 @@ public class CourseBuilder : MonoBehaviour
             int f = item.fork;
             EditFork fork = forks[f];
             List<int> forkLegs = PlannedLegs(f);
-            AddRowWith(null, "<b>Fork " + (f + 1) + "</b>  <color=#5B7563>" + fork.branches.Count + " branches, " + LegList(forkLegs) + "</color>", 36, CourseUI.Ink, FontStyles.Normal, 6, true,
-                ("Edit", CourseUI.ButtonKind.Secondary, () => OpenForkDialog(f, null)),
-                ("Draw", CourseUI.ButtonKind.Light, () => BeginForkDrawing(f, false)),
-                ("Delete", CourseUI.ButtonKind.Light, () => DeleteFork(f)));
+            bool locked = ForkLocked(f);
+            int home = HomeLeg(f);
+            if (locked)
+            {
+                // Laid on another leg: shown here, changed there
+                AddRowWith(null, "<b>Fork " + (f + 1) + "</b>  <color=#5B7563>" + fork.branches.Count + " branches, laid on leg " + (home + 1) + "</color>", 36, CourseUI.Ink, FontStyles.Normal, 6, true,
+                    ("Go to leg " + (home + 1), CourseUI.ButtonKind.Secondary, () => SelectLeg(home)),
+                    ("Take off", CourseUI.ButtonKind.Light, () => TakeForkOff(f)));
+            }
+            else
+            {
+                AddRowWith(null, "<b>Fork " + (f + 1) + "</b>  <color=#5B7563>" + fork.branches.Count + " branches, " + LegList(forkLegs) + "</color>", 36, CourseUI.Ink, FontStyles.Normal, 6, true,
+                    ("Edit", CourseUI.ButtonKind.Secondary, () => OpenForkDialog(f, null)),
+                    ("Draw", CourseUI.ButtonKind.Light, () => BeginForkDrawing(f, false)),
+                    ("Delete", CourseUI.ButtonKind.Light, () => DeleteFork(f)));
+            }
             if (forkEveryVariant && fork.branches.Count != forkLegs.Count)
             {
                 string warning = fork.branches.Count > forkLegs.Count
@@ -3968,6 +4204,11 @@ public class CourseBuilder : MonoBehaviour
                 string text = CourseData.BranchLetter(b) + ":  " + (names.Count > 0 ? string.Join(", ", names) : "<i>straight on</i>");
                 bool active = tool == Tool.Branch && branchFork == f && branchIndex == b;
                 Vector3? focus = fork.branches[b].Count > 0 ? fork.branches[b][0] : (Vector3?)null;
+                if (locked)
+                {
+                    AddRowWith(focus, "<color=#5B7563>" + text + "</color>", 30, CourseUI.Ink, FontStyles.Normal, 26, true);
+                    continue;
+                }
                 AddRowWith(focus, text, 30, active ? CourseUI.Accent : CourseUI.Ink, active ? FontStyles.Bold : FontStyles.Normal, 26, true,
                     ("+ Control", CourseUI.ButtonKind.Light, () => StartBranch(f, branch)),
                     ("Remove", CourseUI.ButtonKind.Light, () => RemoveBranch(f, branch)));
@@ -3977,9 +4218,9 @@ public class CourseBuilder : MonoBehaviour
         if (course.finish.HasValue)
         {
             var buttons = new List<(string label, CourseUI.ButtonKind kind, UnityEngine.Events.UnityAction action)>();
-            if (relay) buttons.Add(("TV", course.finishTv ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light, () => ToggleTv(null, course)));
             buttons.Add(("Move", CourseUI.ButtonKind.Light, () => StartMove(MarkType.Finish, -1, "The finish")));
             buttons.Add(("Remove", CourseUI.ButtonKind.Light, () => { PushUndo(); course.finish = null; Redraw(); }));
+            if (relay) buttons.Add(("TV", course.finishTv ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light, () => ToggleTv(null, course)));
             AddRowAt(course.finish.Value, "Finish" + Meters(previous, course.finish.Value), 34, MovingColor(MarkType.Finish, -1), FontStyles.Normal, 6, buttons.ToArray());
             if (relay && course.finishTv) AddTvRow(course.finish.Value);
         }
@@ -4096,8 +4337,11 @@ public class CourseBuilder : MonoBehaviour
         foreach (var button in buttons)
         {
             Button made = CourseUI.Button(button.label, row, button.label, button.kind, button.action, 15);
-            float width = button.label.Length <= 2 ? 44 : 10 * button.label.Length + 22;
+            // Wide enough for the whole word (2026-11-20: "TV" showed as "T" and "Remove" as "Remov")
+            float width = button.label.Length <= 2 ? 50 : 9 * button.label.Length + 24;
             CourseUI.Size(made, height - 4, width);
+            TextMeshProUGUI buttonText = made.GetComponentInChildren<TextMeshProUGUI>();
+            if (buttonText != null) CourseUI.Stretch(buttonText.rectTransform, 6, 6, 0, 0);
             if (hoverButtons && button.label != "TV") hover.hoverOnly.Add(made.gameObject);
         }
     }
