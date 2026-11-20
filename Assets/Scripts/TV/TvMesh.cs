@@ -364,6 +364,38 @@ public class TvShapeBuilder
         }
     }
 
+    // A round limb from a to b, radius r0 at a and r1 at b, round shading, open ends (a ball at each joint closes
+    // them): arms and legs of the town's people
+    public void Limb(float ax, float ay, float az, float bx, float by, float bz, float r0, float r1, int sides, TvColor c0, TvColor? c1 = null)
+    {
+        float dx = bx - ax, dy = by - ay, dz = bz - az, len = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-5f) return;
+        dx /= len; dy /= len; dz /= len;
+        float ux, uy, uz;
+        if (Math.Abs(dy) < 0.9f) { ux = dz; uy = 0f; uz = -dx; }
+        else { ux = 1f; uy = 0f; uz = 0f; }
+        float ul = (float)Math.Sqrt(ux * ux + uy * uy + uz * uz);
+        ux /= ul; uy /= ul; uz /= ul;
+        float vx = dy * uz - dz * uy, vy = dz * ux - dx * uz, vz = dx * uy - dy * ux;
+        TvColor top = c1 ?? c0;
+        int first = p.Count / 3;
+        for (int i = 0; i <= sides; i++)
+        {
+            float a = i / (float)sides * 6.2831853f, ca = (float)Math.Cos(a), sa = (float)Math.Sin(a);
+            float nx = ux * ca + vx * sa, ny = uy * ca + vy * sa, nz = uz * ca + vz * sa;
+            V(ax + nx * r0, ay + ny * r0, az + nz * r0, nx, ny, nz, c0);
+            V(bx + nx * r1, by + ny * r1, bz + nz * r1, nx, ny, nz, top);
+        }
+        float wx = uy * vz - uz * vy, wy = uz * vx - ux * vz, wz = ux * vy - uy * vx;
+        bool flip = wx * dx + wy * dy + wz * dz > 0f;
+        for (int i = 0; i < sides; i++)
+        {
+            int a = first + i * 2, b = a + 1, q = a + 2, d = a + 3;
+            if (flip) { t.Add(a); t.Add(q); t.Add(b); t.Add(q); t.Add(d); t.Add(b); }
+            else { t.Add(a); t.Add(b); t.Add(q); t.Add(q); t.Add(b); t.Add(d); }
+        }
+    }
+
     // A cone standing on y (a layer of spruce branches, a tuft of grass), flat facets
     public void Cone(float r, float h, float y, int sides, TvColor color, float ox = 0f, float oz = 0f)
     {

@@ -6,9 +6,10 @@ using UnityEngine.Rendering;
 // The people of a town in the run-yourself game mode (sprint maps, 2026-11-20, Anders: people who watch, sit and walk
 // with fun animations). TvWorldBuilderTown puts them out (TvWorld.people); those sitting on benches are part of the
 // street and never move. Here, for the pieces round the runner only:
-//  - watchers stand by the street; when the runner comes within 25 m they turn to follow, within 12 m they cheer
-//    with their arms up and bounce on their toes (children jump);
-//  - walkers stroll back and forth along the street, their legs swinging.
+//  - watchers stand by the street, shifting their weight and looking about, some at their phones; when the runner
+//    comes within 25 m they turn to follow, within 12 m they cheer with their arms up, clap or wave (children jump);
+//  - walkers stroll back and forth along the street, their steps in time with the ground they cover.
+// The bodies, faces and animations are TvCityShapes.Figure / Animate (TV/TvPeople.cs).
 // Nothing is moved further than 70 m from the runner. Each pose is one small shared mesh; a person is one renderer.
 public class RunPeople : MonoBehaviour
 {
@@ -31,8 +32,6 @@ public class RunPeople : MonoBehaviour
         public int kind, look, shown = -1;
     }
 
-    enum Pose { Stand, Cheer, Child, WalkA, WalkB }
-
     public void Init(Material material, bool shadows)
     {
         this.material = material;
@@ -45,35 +44,16 @@ public class RunPeople : MonoBehaviour
         hasPlayer = true;
     }
 
-    Mesh MeshFor(Pose pose, int look)
+    // One mesh per person look, animation and frame, made when first needed
+    Mesh MeshFor(TvCityShapes.Act act, int frame, int look, bool child)
     {
-        int key = (int)pose * 64 + look;
+        int key = (((int)act * TvCityShapes.Frames + frame) * 64 + look) * 2 + (child ? 1 : 0);
         if (meshes.TryGetValue(key, out Mesh mesh)) return mesh;
-        var random = new TvRandom(key * 13 + 5);
-        TvShape shape;
-        switch (pose)
-        {
-            case Pose.Cheer: shape = TvCityShapes.Person(random, TvCityShapes.Pose.Cheer, look); break;
-            case Pose.Child: shape = TvCityShapes.Person(random, TvCityShapes.Pose.Child, look); break;
-            case Pose.WalkA: shape = TvCityShapes.Person(random, TvCityShapes.Pose.Walk, look); break;
-            case Pose.WalkB: shape = Mirror(TvCityShapes.Person(random, TvCityShapes.Pose.Walk, look)); break;
-            default: shape = TvCityShapes.Person(random, TvCityShapes.Pose.Stand, look); break;
-        }
+        TvShape shape = TvCityShapes.Figure(new TvRandom(look * 13 + 5), look, child, TvCityShapes.Animate(act, frame, look));
         mesh = TvWorldView.ToMesh(shape, "Person");
         mesh.UploadMeshData(true);
         meshes[key] = mesh;
         return mesh;
-    }
-
-    // The walking pose with the other leg forward: mirrored left to right, the triangles turned so they still face out
-    static TvShape Mirror(TvShape s)
-    {
-        var p = (float[])s.positions.Clone();
-        var n = (float[])s.normals.Clone();
-        for (int i = 0; i < p.Length; i += 3) { p[i] = -p[i]; n[i] = -n[i]; }
-        var t = (int[])s.triangles.Clone();
-        for (int i = 0; i + 2 < t.Length; i += 3) { int a = t[i + 1]; t[i + 1] = t[i + 2]; t[i + 2] = a; }
-        return new TvShape { positions = p, normals = n, colors = s.colors, triangles = t };
     }
 
     public void Spawn(long key, Transform root, TvWorld world)
@@ -105,7 +85,7 @@ public class RunPeople : MonoBehaviour
             r.lightProbeUsage = LightProbeUsage.Off;
             r.reflectionProbeUsage = ReflectionProbeUsage.Off;
             r.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
-            Show(person, person.kind == 1 ? Pose.WalkA : person.kind == 2 ? Pose.Child : Pose.Stand);
+            Show(person, person.kind == 1 ? TvCityShapes.Act.Walk : TvCityShapes.Act.Idle, 0);
             Place(person, person.home, person.yaw, 0f);
             list.Add(person);
         }
@@ -119,12 +99,15 @@ public class RunPeople : MonoBehaviour
         byPiece.Remove(key);
     }
 
-    void Show(Person p, Pose pose)
+    void Show(Person p, TvCityShapes.Act act, int frame)
     {
-        if (p.shown == (int)pose) return;
-        p.shown = (int)pose;
-        p.filter.sharedMesh = MeshFor(pose, p.look);
+        int shown = (int)act * TvCityShapes.Frames + frame;
+        if (p.shown == shown) return;
+        p.shown = shown;
+        p.filter.sharedMesh = MeshFor(act, frame, p.look, p.kind == 2);
     }
+
+    static int Frame(float cycles) => ((int)(cycles * TvCityShapes.Frames) % TvCityShapes.Frames + TvCityShapes.Frames) % TvCityShapes.Frames;
 
     void Place(Person p, Vector3 at, float yaw, float lift)
     {
@@ -151,39 +134,54 @@ public class RunPeople : MonoBehaviour
         }
     }
 
-    // Standing by the street: turn to the runner, cheer when close
+    // Standing by the street: looking about (or at a phone); turning to follow the runner within 25 m; cheering,
+    // clapping or waving within 12 m (each by their own look); children jump up and down
     void Watch(Person p, float time, float dt, float dx, float dz, float d2)
     {
         float want = p.yaw + Mathf.Sin(time * 0.4f + p.phase) * 0.25f;
         if (d2 < TurnReach * TurnReach) want = Mathf.Atan2(-dx, -dz);
         p.turned = Mathf.LerpAngle(p.turned * Mathf.Rad2Deg, want * Mathf.Rad2Deg, Mathf.Clamp01(dt * 4f)) * Mathf.Deg2Rad;
-        bool cheer = d2 < CheerReach * CheerReach;
+        bool close = d2 < CheerReach * CheerReach;
         float lift = 0f;
-        if (p.kind == 2)
+        if (!close)
         {
-            Show(p, Pose.Child);
-            if (cheer) lift = Mathf.Abs(Mathf.Sin(time * 7f + p.phase)) * 0.3f;
+            // A slow loop of about five seconds
+            Show(p, p.look % 4 == 3 && p.kind != 2 ? TvCityShapes.Act.Phone : TvCityShapes.Act.Idle, Frame(time * 0.2f + p.phase));
+        }
+        else if (p.kind == 2)
+        {
+            float cyc = time * 1.4f + p.phase;
+            Show(p, TvCityShapes.Act.Jump, Frame(cyc));
+            lift = 0.3f * Mathf.Max(0f, Mathf.Cos(cyc * 2f * Mathf.PI));
         }
         else
         {
-            Show(p, cheer ? Pose.Cheer : Pose.Stand);
-            if (cheer) lift = Mathf.Abs(Mathf.Sin(time * 8.5f + p.phase)) * 0.1f;
+            switch (p.look % 3)
+            {
+                case 0:
+                    float cyc = time * 1.2f + p.phase;
+                    Show(p, TvCityShapes.Act.Cheer, Frame(cyc));
+                    lift = Mathf.Abs(Mathf.Sin(cyc * 2f * Mathf.PI)) * 0.07f;
+                    break;
+                case 1: Show(p, TvCityShapes.Act.Clap, Frame(time * 1.1f + p.phase)); break;
+                default: Show(p, TvCityShapes.Act.Wave, Frame(time * 1.0f + p.phase)); break;
+            }
         }
         Place(p, p.home, p.turned, lift);
     }
 
-    // Back and forth along the street at an easy pace
+    // Back and forth along the street at an easy pace, the steps in time with the ground covered
     void Walk(Person p, float time)
     {
-        const float Pace = 1.3f;
-        float len = Mathf.Max(1f, p.len), cycle = (time * Pace + p.phase) % (2f * len);
+        const float Pace = 1.3f, Stride = 1.35f;   // metres a second; metres a full step cycle (two steps)
+        float len = Mathf.Max(1f, p.len), walked = time * Pace + p.phase, cycle = walked % (2f * len);
         bool back = cycle > len;
         float s = (back ? 2f * len - cycle : cycle) - len / 2f;
         // Facing: local -z along the street, the other way on the way back
         float fx = -Mathf.Sin(p.yaw), fz = -Mathf.Cos(p.yaw);
         Vector3 at = p.home + new Vector3(fx, 0f, fz) * s;
-        Show(p, ((int)(time * 3.2f + p.phase) & 1) == 0 ? Pose.WalkA : Pose.WalkB);
-        Place(p, at, back ? p.yaw + Mathf.PI : p.yaw, Mathf.Abs(Mathf.Sin(time * Mathf.PI * 3.2f)) * 0.03f);
+        Show(p, TvCityShapes.Act.Walk, Frame(walked / Stride));
+        Place(p, at, back ? p.yaw + Mathf.PI : p.yaw, 0f);
     }
 
     void OnDestroy()

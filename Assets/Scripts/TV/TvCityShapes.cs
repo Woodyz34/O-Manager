@@ -800,69 +800,18 @@ public static partial class TvCityShapes
 
     public enum Pose { Stand, Cheer, Sit, Walk, Child }
 
-    // A person in a pose, facing -z, standing on y = 0 (sitting: on a seat 0.47 m up). look picks the clothes.
+    // A person in a pose, facing -z, standing on y = 0 (sitting: on a seat 0.47 m up). look picks the person.
+    // The jointed figure of TvPeople.cs in one frame of an animation.
     public static TvShape Person(TvRandom random, Pose pose, int look)
     {
-        var b = new TvShapeBuilder(random);
-        TvColor top = Clothes[look % Clothes.Length], legs = Trousers[(look / 3) % Trousers.Length];
-        TvColor hair = Hair[(look / 2) % Hair.Length], skin = look % 7 == 3 ? SkinDark : Skin;
-        float s = pose == Pose.Child ? 0.62f : 1f;
-        float hip = 0.88f * s, shoulder = 1.42f * s, head = 1.6f * s;
-        bool sit = pose == Pose.Sit;
-        if (sit) { hip = 0.5f; shoulder = 1.05f; head = 1.23f; }
-        // Legs
-        foreach (float x in new[] { -0.1f * s, 0.1f * s })
+        switch (pose)
         {
-            if (sit)
-            {
-                Beam(b, x, hip, 0.05f, x, hip + 0.02f, -0.4f, 0.14f, 0.14f, legs);
-                Beam(b, x, hip, -0.4f, x, 0.05f, -0.45f, 0.12f, 0.12f, legs);
-                b.Box(x - 0.06f, 0f, -0.58f, x + 0.06f, 0.08f, -0.38f, Shoe);
-            }
-            else
-            {
-                float step = pose == Pose.Walk ? (x < 0f ? 0.22f : -0.18f) : 0f;
-                Beam(b, x, hip, 0f, x, 0.06f, -step, 0.14f * s, 0.14f * s, legs);
-                b.Box(x - 0.06f * s, 0f, -step - 0.16f * s, x + 0.06f * s, 0.08f * s, -step + 0.06f * s, Shoe);
-            }
+            case Pose.Cheer: return Figure(random, look, false, Animate(Act.Cheer, 1, look));
+            case Pose.Sit: return Figure(random, look, false, Animate(Act.Sit, 0, look));
+            case Pose.Walk: return Figure(random, look, false, Animate(Act.Walk, 2, look));
+            case Pose.Child: return Figure(random, look, true, Animate(Act.Idle, 0, look));
+            default: return Figure(random, look, false, Animate(Act.Idle, 0, look));
         }
-        // Body and head
-        Beam(b, 0f, hip - 0.05f * s, 0f, 0f, shoulder, 0f, 0.36f * s, 0.22f * s, top);
-        b.Blob(0.17f * s, 1.25f, 0.55f, 0.8f, 0f, shoulder - 0.02f * s, 0f, 0f, 0, false, top);
-        b.Tube(0.05f * s, 0.05f * s, 0.1f * s, shoulder, 6, skin);
-        b.Blob(0.115f * s, 0.9f, 1.05f, 0.95f, 0f, head, 0f, 0.05f, 1, false, skin);
-        b.Blob(0.12f * s, 0.95f, 0.75f, 1f, 0f, head + 0.045f * s, 0.025f * s, 0.05f, 0, false, hair);
-        if (look % 5 == 2)
-        {
-            // A cap in a bright colour
-            TvColor cap = Clothes[(look + 4) % Clothes.Length];
-            b.Blob(0.125f * s, 1f, 0.6f, 1f, 0f, head + 0.07f * s, 0.01f, 0f, 0, false, cap);
-            b.Box(-0.08f * s, head + 0.06f * s, -0.22f * s, 0.08f * s, head + 0.085f * s, -0.06f * s, cap);
-        }
-        // Arms
-        foreach (float side in new[] { -1f, 1f })
-        {
-            float sx = side * 0.22f * s;
-            float hx, hy, hz;
-            switch (pose)
-            {
-                case Pose.Cheer: hx = side * 0.38f * s; hy = shoulder + 0.55f * s; hz = -0.1f * s; break;
-                case Pose.Sit: hx = side * 0.2f; hy = hip + 0.12f; hz = -0.32f; break;
-                case Pose.Walk: hx = side * 0.26f * s; hy = hip + 0.02f; hz = side * 0.15f * s; break;
-                default: hx = side * 0.27f * s; hy = hip - 0.02f * s; hz = 0f; break;
-            }
-            float ex = (sx + hx) / 2f + side * 0.04f * s, ey = (shoulder + hy) / 2f, ez = hz * 0.5f + (pose == Pose.Sit ? 0.06f : 0f);
-            Beam(b, sx, shoulder - 0.04f * s, 0f, ex, ey, ez, 0.1f * s, 0.1f * s, top);
-            Beam(b, ex, ey, ez, hx, hy, hz, 0.085f * s, 0.085f * s, pose == Pose.Cheer ? skin : top);
-            b.Blob(0.05f * s, 1f, 1f, 1f, hx, hy, hz, 0f, 0, false, skin);
-            // Some who cheer wave a little Swedish flag
-            if (pose == Pose.Cheer && side > 0f && look % 2 == 0)
-            {
-                Beam(b, hx, hy - 0.05f, hz, hx, hy + 0.45f, hz, 0.02f, 0.02f, Wood);
-                SwedishFlag(b, hx, hy + 0.45f, hz, 0.4f, 0f);
-            }
-        }
-        return b.Done();
     }
 
     // A dog on a lead's length, facing -z
