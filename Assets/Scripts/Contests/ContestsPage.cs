@@ -46,6 +46,10 @@ public class ContestsPage : MonoBehaviour
     Button weekTab, dayTab;
     TMP_InputField nameField;
     GameObject popup;
+    GameObject loadingBox;
+    RectTransform[] spinnerDots;
+    Image[] spinnerImages;
+    TextMeshProUGUI loadingText;
 
     public static bool IsOpen => open != null;
 
@@ -201,6 +205,49 @@ public class ContestsPage : MonoBehaviour
         CourseUI.Place(countText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -1046), new Vector2(700, 34));
         cardsScroll.onValueChanged.AddListener(_ => ShowScroll());
         ShowScroll();
+        BuildLoading(page);
+    }
+
+    // A centred loading card with a spinning ring, instead of a message card squeezed into the left of the card row
+    // (2026-11-20, the user: ugly)
+    void BuildLoading(Transform page)
+    {
+        Image box = CourseUI.CardPanel("Loading", page);
+        box.raycastTarget = false;
+        CourseUI.Place(box.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -70), new Vector2(720, 380));
+        loadingBox = box.gameObject;
+        const int dots = 12;
+        spinnerDots = new RectTransform[dots];
+        spinnerImages = new Image[dots];
+        for (int i = 0; i < dots; i++)
+        {
+            Image dot = CourseUI.Panel("Dot", box.transform, CourseUI.Accent);
+            dot.raycastTarget = false;
+            float angle = i * Mathf.PI * 2f / dots;
+            CourseUI.Place(dot.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(Mathf.Sin(angle) * 56f, 50f + Mathf.Cos(angle) * 56f), new Vector2(18, 18));
+            spinnerDots[i] = dot.rectTransform;
+            spinnerImages[i] = dot;
+        }
+        loadingText = CourseUI.Text("Text", box.transform, "Loading the contests", 34, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+        CourseUI.Place(loadingText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 100), new Vector2(660, 50));
+        TextMeshProUGUI sub = CourseUI.Text("Sub", box.transform, "Asking Unity Cloud for today's and this week's contests", 22, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
+        CourseUI.Place(sub.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 46), new Vector2(660, 40));
+        loadingBox.SetActive(false);
+    }
+
+    void AnimateLoading()
+    {
+        if (loadingBox == null || !loadingBox.activeSelf) return;
+        float t = Time.unscaledTime;
+        int head = Mathf.FloorToInt(t * 12f) % spinnerDots.Length;
+        for (int i = 0; i < spinnerDots.Length; i++)
+        {
+            int behind = (head - i + spinnerDots.Length) % spinnerDots.Length;
+            Color c = CourseUI.Accent;
+            c.a = Mathf.Lerp(1f, 0.15f, behind / (float)(spinnerDots.Length - 1));
+            spinnerImages[i].color = c;
+        }
+        loadingText.text = "Loading the contests" + new string('.', 1 + Mathf.FloorToInt(t * 2f) % 3);
     }
 
     void ShowMoney()
@@ -217,6 +264,7 @@ public class ContestsPage : MonoBehaviour
 
     void Update()
     {
+        AnimateLoading();
         if (popup == null && Input.GetKeyDown(KeyCode.Escape) && FindObjectOfType<ContestReplay>() == null && FindObjectOfType<PackOpening>() == null) Close();
     }
 
@@ -307,10 +355,16 @@ public class ContestsPage : MonoBehaviour
         cards.anchoredPosition = Vector2.zero;
         ShowScroll();
 
-        if (busy || contests == null)
+        if (loadingBox != null) loadingBox.SetActive(busy);
+        if (busy)
         {
-            info.text = busy ? "Loading the contests..." : "";
-            Message(busy ? "Loading the contests..." : "Could not load the contests.\n\n" + error, !busy);
+            info.text = "";
+            return;
+        }
+        if (contests == null)
+        {
+            info.text = "";
+            Message("Could not load the contests.\n\n" + error, true);
             return;
         }
         List<ContestInfo> shown = contests.FindAll(c => c.Weekly == weekly);
