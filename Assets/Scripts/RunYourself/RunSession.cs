@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using TMPro;
@@ -353,7 +353,11 @@ public partial class RunSession : MonoBehaviour
         else if (phase == Phase.Running)
         {
             gameSeconds += dt;
-            player.raceSeconds = gameSeconds * player.gameSpeed;
+            // Standing still reading the map: the clock goes as in real life (1 s is 1 s), so stopping to read costs
+            // what it would in a real race. Standing still without the map, and running, go at the game speed
+            // (2026-11-20, Anders). Alone only: online everyone shares one world and one clock.
+            bool readingStill = !Online && player.mapUp && player.speed < 0.05f && !player.Fallen;
+            player.raceSeconds += dt * (readingStill ? 1f : player.gameSpeed);
             if (gameSeconds >= nextSample)
             {
                 nextSample = gameSeconds + SampleEvery;
