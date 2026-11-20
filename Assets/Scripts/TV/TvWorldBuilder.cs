@@ -1466,6 +1466,22 @@ public partial class TvWorldBuilder
                     });
                     break;
                 }
+                case WorldLineKind.Stairs:
+                {
+                    // Stairs outside a town (a town draws its own from the map's lines): a stone step every 0.35 m, each
+                    // level at the ground's height there, so they climb with the hill
+                    if (input.town != null) break;
+                    TvShape step = Box(1f, 1f, 1f, TvColor.Hex("#9a968e")), cheek = Box(1f, 1f, 0.25f, TvColor.Hex("#7e7b74"));
+                    Along(c, 0.35f, (x, z, yaw, len) =>
+                    {
+                        float y = H(x, z) + 0.06f;
+                        thingMesh.Add(step, x, y - 0.5f, z, len + 0.02f, 0.5f, 1.6f, -yaw);
+                        float sx = (float)Math.Sin(yaw), cz = (float)Math.Cos(yaw);
+                        foreach (float s in new[] { -0.92f, 0.92f })
+                            thingMesh.Add(cheek, x - sx * s, y - 0.5f, z + cz * s, len + 0.02f, 0.75f, 1f, -yaw);
+                    });
+                    break;
+                }
                 case WorldLineKind.HighWall:
                     Along(c, 1.2f, (x, z, yaw, len) =>
                     {
