@@ -217,6 +217,23 @@ public static class SharedMaps
         }
     }
 
+    // In a lobby whose course is on a map this player does not have yet (the host just imported it): look for shared
+    // maps again, at most every 30 seconds, so the new one is downloaded and the race can start (2026-11-19)
+    static float lastRefresh = -1000f;
+    public static async void RefreshForLobby()
+    {
+        if (Busy || Time.realtimeSinceStartup - lastRefresh < 30f) return;
+        lastRefresh = Time.realtimeSinceStartup;
+        try
+        {
+            CourseLibrary.SetCommunity(await CloudCourses.FetchCommunityAsync());
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("SharedMaps: could not look for the lobby's map: " + e.Message);
+        }
+    }
+
     // ---- Downloading (everyone else) ----
 
     // Downloads and builds the shared maps this computer lacks, one at a time. Runs on the main thread (the heavy

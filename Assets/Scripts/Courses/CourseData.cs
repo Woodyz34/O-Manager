@@ -447,8 +447,10 @@ public class CourseData
         string sexes = relay ? CleanSexes(legSexes, legs) : null;
         if (sexes != null) sb.Append("|g").Append(sexes);
         // Areas in a "z" field, uncrossable boundary lines in a "y" field (versions before the lines skip it)
-        AppendForbidden(sb, false);
-        AppendForbidden(sb, true);
+        AppendForbidden(sb, false, false);
+        AppendForbidden(sb, true, false);
+        // Bridges in an "x" field (2026-11-19; older versions skip it)
+        AppendForbidden(sb, true, true);
         // TV controls in a "t" field: the first point in full, then steps
         if (tvControls != null && tvControls.Count > 0)
         {
@@ -496,15 +498,15 @@ public class CourseData
         return points;
     }
 
-    void AppendForbidden(StringBuilder sb, bool lines)
+    void AppendForbidden(StringBuilder sb, bool lines, bool bridges)
     {
-        if (forbidden == null || !forbidden.Exists(a => a != null && a.line == lines && a.IsValid)) return;
-        sb.Append(lines ? "|y" : "|z");
+        if (forbidden == null || !forbidden.Exists(a => a != null && a.line == lines && a.bridge == bridges && a.IsValid)) return;
+        sb.Append(bridges ? "|x" : lines ? "|y" : "|z");
         bool first = true;
         long lastE = 0, lastN = 0;
         foreach (ForbiddenArea area in forbidden)
         {
-            if (area == null || area.line != lines || !area.IsValid) continue;
+            if (area == null || area.line != lines || area.bridge != bridges || !area.IsValid) continue;
             int count = Math.Min(area.corners.Count, Digits.Length - 1);
             sb.Append(Digits[count]);
             for (int k = 0; k < count; k++)
@@ -528,7 +530,7 @@ public class CourseData
         }
     }
 
-    static List<ForbiddenArea> ReadForbidden(string text, bool lines)
+    static List<ForbiddenArea> ReadForbidden(string text, bool lines, bool bridges = false)
     {
         List<ForbiddenArea> areas = new List<ForbiddenArea>();
         int index = 1;   // after the "z" or "y"
@@ -538,7 +540,7 @@ public class CourseData
         {
             int count = Digits.IndexOf(text[index++]);
             if (count < 0) throw new FormatException("bad area");
-            ForbiddenArea area = new ForbiddenArea { line = lines };
+            ForbiddenArea area = new ForbiddenArea { line = lines, bridge = bridges };
             for (int k = 0; k < count; k++)
             {
                 if (first)
@@ -630,6 +632,7 @@ public class CourseData
             {
                 if (parts[p].StartsWith("z")) course.forbidden.AddRange(ReadForbidden(parts[p], false));
                 if (parts[p].StartsWith("y")) course.forbidden.AddRange(ReadForbidden(parts[p], true));
+                if (parts[p].StartsWith("x")) course.forbidden.AddRange(ReadForbidden(parts[p], true, true));
                 if (parts[p].StartsWith("t")) course.tvControls = ReadTvControls(parts[p]);
                 if (parts[p].StartsWith("g")) course.legSexes = parts[p].Substring(1);
             }

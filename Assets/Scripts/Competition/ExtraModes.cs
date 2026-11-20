@@ -17,11 +17,13 @@ public enum ExtraMode
     RouteAnalysis = 8,
     RouteChoice = 16,
     SecretTask = 32,
+    RunYourself = 64,     // the player runs the course in 3D, first person (RunSession); everyone in their own world
+    RunMass = 128,        // the same with a mass start: everyone in one world, seeing each other
 }
 
 public static class ExtraModes
 {
-    public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.SecretTask, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis, ExtraMode.RouteChoice };
+    public static readonly ExtraMode[] All = { ExtraMode.Imposter, ExtraMode.SecretTask, ExtraMode.Bears, ExtraMode.MoveControl, ExtraMode.RouteAnalysis, ExtraMode.RouteChoice, ExtraMode.RunYourself, ExtraMode.RunMass };
 
     // Every mode, for "show them all"
     public static ExtraMode AllMask
@@ -34,12 +36,23 @@ public static class ExtraModes
         }
     }
 
+    // The modes a multiplayer lobby offers: all of them (2026-11-19: Run it yourself online)
+    public static ExtraMode LobbyMask => AllMask & ~SinglePlayerOnly;
+    public const ExtraMode SinglePlayerOnly = ExtraMode.None;
+
+    // The two ways to run it yourself
+    public const ExtraMode RunModes = ExtraMode.RunYourself | ExtraMode.RunMass;
+
     // Modes that can be played alone in single player (2026-11-13). The imposter modes need someone to fool, a bear
     // you hid yourself is no surprise, and a control you moved yourself is no trick.
-    public const ExtraMode Solo = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+    public const ExtraMode Solo = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself;
 
     // Modes that cannot be combined with any other mode
-    public const ExtraMode Alone = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+    public const ExtraMode Alone = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself | ExtraMode.RunMass;
+
+    // Extras that go on top of a game mode (Normal, Imposter or Secret task), never a game mode of their own
+    // (2026-11-19: "Bears" alone looked like a mode without a base)
+    public const ExtraMode AddOns = ExtraMode.Bears | ExtraMode.MoveControl;
 
     // The two imposter modes both pick one imposter, so only one of them can be on
     public const ExtraMode ImposterKinds = ExtraMode.Imposter | ExtraMode.SecretTask;
@@ -66,10 +79,10 @@ public static class ExtraModes
     }
 
     // Modes where nobody picks a runner (everyone gets the same one), so the runner pool does not matter
-    public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+    public const ExtraMode NoRunners = ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself | ExtraMode.RunMass;
 
     // Modes that only work on individual courses, not relays
-    public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice;
+    public const ExtraMode IndividualOnly = ExtraMode.SecretTask | ExtraMode.MoveControl | ExtraMode.RouteAnalysis | ExtraMode.RouteChoice | ExtraMode.RunYourself | ExtraMode.RunMass;
 
     // Modes that only work in the forest, not on sprint courses. None since 2026-11-19: Bears and Move a control work
     // on sprint too (a moved control must be reachable, MoveControlMode.PlaceProblem)
@@ -88,6 +101,8 @@ public static class ExtraModes
             case ExtraMode.MoveControl: return "Move a control";
             case ExtraMode.RouteAnalysis: return "Route analysis";
             case ExtraMode.RouteChoice: return "Route choice game";
+            case ExtraMode.RunYourself: return "Run it yourself (3D)";
+            case ExtraMode.RunMass: return "Run it yourself (3D), mass start";
             default: return mode.ToString();
         }
     }
@@ -102,6 +117,8 @@ public static class ExtraModes
             case ExtraMode.MoveControl: return "Everyone may move controls up to 100 m while drawing. Good routes can turn bad.";
             case ExtraMode.RouteAnalysis: return "Nobody runs: everyone draws the whole course the way they would run it, then you compare the route choices. Played on its own.";
             case ExtraMode.RouteChoice: return "Nobody runs: on each leg, pick the fastest of 2 to 4 routes. Points for right answers, more the quicker you are. Played on its own.";
+            case ExtraMode.RunYourself: return "Be the runner: run the course yourself in 3D with the map in your hand. Individual start online: everyone runs in their own forest; compare the times and routes afterwards. Forest maps, and sprint maps as a town.";
+            case ExtraMode.RunMass: return "Run it yourself in 3D, all starting together in the same forest: you see the others run and read their maps, and you can bump into each other. Forest maps, and sprint maps as a town.";
             default: return "";
         }
     }
@@ -111,6 +128,7 @@ public static class ExtraModes
     {
         if (modes == ExtraMode.None) return "Normal: no extra game modes. Everyone just races to finish first.";
         List<string> lines = new List<string>();
+        if ((modes & ~AddOns) == ExtraMode.None) lines.Add("Normal: everyone races to finish first.");
         foreach (ExtraMode mode in All)
         {
             if ((modes & mode) != 0) lines.Add(Title(mode) + ": " + Description(mode));
@@ -119,10 +137,11 @@ public static class ExtraModes
     }
 
     // "Normal", or the modes that are on: "Imposter + Bears"
-    public static string Describe(ExtraMode modes)
+    public static string Describe(ExtraMode modes, bool withBase = true)
     {
         if (modes == ExtraMode.None) return "Normal";
         List<string> names = new List<string>();
+        if (withBase && (modes & ~AddOns) == ExtraMode.None) names.Add("Normal");   // "Normal + Bears"
         foreach (ExtraMode mode in All)
         {
             if ((modes & mode) != 0) names.Add(Title(mode));
@@ -135,6 +154,7 @@ public static class ExtraModes
     {
         if ((modes & mode) != 0) return modes & ~mode;
         if ((mode & Alone) != 0) return mode;
+        if ((mode & AddOns) != 0 && (modes & Alone) != 0) return modes;   // no extras on route analysis or route choice
         if ((mode & ImposterKinds) != 0) modes &= ~ImposterKinds;
         return (modes & ~Alone) | mode;
     }
@@ -146,12 +166,18 @@ public static class ExtraModes
         if (course.IsRelay())
         {
             ExtraMode notRelay = modes & IndividualOnly;
-            if (notRelay != ExtraMode.None) return "\"" + Describe(notRelay) + "\" only works on individual courses, not relays. Choose another course or game mode.";
+            if (notRelay != ExtraMode.None) return "\"" + Describe(notRelay, false) + "\" only works on individual courses, not relays. Choose another course or game mode.";
+        }
+        if ((modes & RunModes) != 0)
+        {
+            MapDefinition map = MapDefinition.FindExact(course.mapId);
+            // Sprint maps too since 2026-11-20: they are built as a town (TvTown)
+            if (map != null && !TvWorldData.HasWorld(map, true)) return "This map has no 3D world. Import it again (OCAD or OOM) to run it yourself.";
         }
         if (course.IsSprint())
         {
             ExtraMode notSprint = modes & ForestOnly;
-            if (notSprint != ExtraMode.None) return "\"" + Describe(notSprint) + "\" only works on forest courses, not sprint. Choose another course or game mode.";
+            if (notSprint != ExtraMode.None) return "\"" + Describe(notSprint, false) + "\" only works on forest courses, not sprint. Choose another course or game mode.";
         }
         return null;
     }

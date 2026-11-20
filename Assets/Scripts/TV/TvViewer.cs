@@ -470,7 +470,7 @@ public class TvViewer : MonoBehaviour
         if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) move.y -= dt;
         if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) move.x += dt;
         if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) move.x -= dt;
-        float zoom = overBar ? 0f : Input.mouseScrollDelta.y;
+        float zoom = overBar || HostSettingsPopup.IsOpen ? 0f : Input.mouseScrollDelta.y;
         view.FreeCamera(turn, move, zoom);
     }
 

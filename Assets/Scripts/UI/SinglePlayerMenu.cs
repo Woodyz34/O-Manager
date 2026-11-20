@@ -43,6 +43,7 @@ public class SinglePlayerMenu : MonoBehaviour
     MapSelectUI courseWindow;
     TextMeshProUGUI poolValue;
     TextMeshProUGUI modeValue;
+    GameObject runSettingsButton;     // "3D settings", only while Run it yourself is picked
     TextMeshProUGUI courseValue;
     TextMeshProUGUI poolInfo;
     RawImage coursePicture;
@@ -119,11 +120,7 @@ public class SinglePlayerMenu : MonoBehaviour
         CourseUI.Place((RectTransform)leave.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(48, -40), new Vector2(250, 66));
 
         // Top right: your money
-        Image moneyPill = CourseUI.Panel("Money pill", page, CourseUI.Card);
-        if (CourseUI.Skin != null && CourseUI.Skin.pill != null) moneyPill.sprite = CourseUI.Skin.pill;
-        CourseUI.Place(moneyPill.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48, -40), new Vector2(220, 66));
-        moneyText = CourseUI.Text("Amount", moneyPill.transform, "", 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
-        CourseUI.Stretch(moneyText.rectTransform, 12, 12, 0, 0);
+        Image moneyPill = MoneyLabel.CreatePill(page, new Vector2(-48, -40), out moneyText);
 
         // Top middle: what you will play, as in the lobby
         Image setup = CourseUI.CardPanel("Game setup card", page);
@@ -142,7 +139,7 @@ public class SinglePlayerMenu : MonoBehaviour
 
         // Left: the lobby's "Runner setup" card
         Image left = CourseUI.CardPanel("Runner setup", page);
-        CourseUI.Place(left.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(48, -170), new Vector2(460, 560));
+        CourseUI.Place(left.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(48, -170), new Vector2(460, 640));
         CourseUI.Column(left.gameObject, 14, new RectOffset(28, 28, 24, 24));
         TextMeshProUGUI setupTitle = CourseUI.Text("Title", left.transform, "Runner setup", 36, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(setupTitle, 48);
@@ -150,6 +147,9 @@ public class SinglePlayerMenu : MonoBehaviour
         SetupButton(left.transform, "Change course", OpenCourses, UIHints.ChangeCourse);
         SetupButton(left.transform, "Runner pool", OpenPools, UIHints.RunnerPool);
         SetupButton(left.transform, "Game mode", OpenModes, UIHints.GameMode);
+        runSettingsButton = SetupButton(left.transform, "3D settings", () => RunSettings.Open(),
+            "Graphics, game speed, man or woman and mouse speed for \"Run it yourself\".").gameObject;
+        runSettingsButton.SetActive(false);
         poolInfo = CourseUI.Text("Pool info", left.transform, "", 20, CourseUI.InkMuted);
         CourseUI.Size(poolInfo, 120);
 
@@ -205,11 +205,12 @@ public class SinglePlayerMenu : MonoBehaviour
         return value;
     }
 
-    static void SetupButton(Transform parent, string label, UnityEngine.Events.UnityAction click, string tip)
+    static Button SetupButton(Transform parent, string label, UnityEngine.Events.UnityAction click, string tip)
     {
         Button button = CourseUI.Button(label, parent, label, CourseUI.ButtonKind.Light, click, 26);
         CourseUI.Size(button, 66);
         HoverTip.Add(button, tip);
+        return button;
     }
 
     // The lobby's course window (MapSelectUI) with its tabs, search and AI course, built here in code
@@ -277,7 +278,7 @@ public class SinglePlayerMenu : MonoBehaviour
         if (startButton == null) return;
         CourseData course = Chosen;
         string problem = Problem();
-        string money = Money.Instance != null ? Money.Instance.GetMoney() + " kr" : "";
+        string money = Money.Instance != null ? MoneyLabel.Format(Money.Instance.GetMoney()) : "";
         string state = (course != null ? course.id + course.name : "") + "|" + pool + "|" + (int)modes + "|" + problem + "|" + starting
                        + "|" + GameModes.OwnedRunnerCount() + "|" + money;
         if (state == shownState) return;
@@ -288,6 +289,7 @@ public class SinglePlayerMenu : MonoBehaviour
         bool noRunners = (modes & ExtraModes.NoRunners) != 0;
         poolValue.text = noRunners ? "No runners" : GameModes.PoolName(pool);
         modeValue.text = ExtraModes.Describe(modes);
+        runSettingsButton.SetActive((modes & ExtraModes.RunModes) != 0);
         courseValue.text = course != null ? LobbySettingsUI.CourseTitle(course) : "Pick a course";
 
         int owned = GameModes.OwnedRunnerCount();
@@ -408,6 +410,10 @@ public class SinglePlayerMenu : MonoBehaviour
             SceneManager = sceneManager,
             ConnectionToken = GameManager.Instance.GetConnectionsToken()
         });
+        if (result.Ok)
+        {
+            GameAnalytics.Record("single_player_started", "terrain", CourseLibrary.Current != null && CourseLibrary.Current.IsSprint() ? "sprint" : "forest");
+        }
         if (!result.Ok)
         {
             Debug.LogError("SinglePlayerMenu: could not start: " + result.ShutdownReason);

@@ -176,6 +176,20 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int choiceAnswered { get; set; }
     [Networked] public int choiceQuestions { get; set; }
     [Networked] public NetworkBool choiceDone { get; set; }
+    // Run it yourself (3D, RunSession): where the runner is in the 3D world (map metres east, north), the way it
+    // faces (degrees from north), its real-life speed, and RunSession.Flag bits (map up, fallen, in the air, loaded)
+    [Networked] public Vector2 run3dAt { get; set; }
+    [Networked] public float run3dYaw { get; set; }
+    [Networked] public float run3dSpeed { get; set; }
+    [Networked] public int run3dFlags { get; set; }
+    // For watching a runner after the finish: the head's tilt (degrees, down positive), the leg the map shows and
+    // how far it is turned, and how many controls are punched in order (for "Leg 3 of 7")
+    [Networked] public float run3dPitch { get; set; }
+    [Networked] public int run3dMapLeg { get; set; }
+    [Networked] public float run3dMapTurn { get; set; }
+    [Networked] public Vector2 run3dMapAt { get; set; }     // the map point in the middle of the sheet (zoomed and dragged)
+    [Networked] public float run3dMapSize { get; set; }     // how far the map is zoomed out
+    [Networked] public int run3dPunched { get; set; }
     // Per leg (index 1 = start to control 1): the route picked and the points (RouteChoiceGame.WriteLeg / ReadLeg)
     [Networked, Capacity(52)] public NetworkArray<int> choiceLegs => default;
 
@@ -795,6 +809,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             return;
         }
 
+        // Run it yourself (3D): nobody picks a runner; the player is the runner
+        if (Object.HasStateAuthority && RunSession.On)
+        {
+            RunSession.Begin(this);
+            return;
+        }
+
         // "Open packs": first the packs, then the usual picking among the runners that came out of them
         if (Object.HasStateAuthority && RunnerRules.OpenPacksRound)
         {
@@ -934,6 +955,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             // A new competition starts: nobody has finished or guessed yet
             raceFinished = false;
+            run3dFlags = 0;
+            run3dPunched = 0;
             ClearRelayResults();
             hasGuessedImposter = false;
             imposterGuess = PlayerRef.None;
@@ -1285,11 +1308,21 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             // Route choice game: questions on the map, nobody draws or runs
             RouteChoiceGame.Start(agent);
         }
+        else if (RunSession.On)
+        {
+            // Run it yourself: the race is run in the 3D world; the 2D runner stands still
+            RunSession.StartRace(agent);
+        }
         else
         {
             drawer.timeToDraw = true;
         }
         Debug.Log($"{name}: Spelet startar nu!");
+        CourseData raced = CourseLibrary.CurrentOrDefault;
+        GameAnalytics.Record("race_started",
+            "mode", RelayRace.Active != null ? "relay" : RouteAnalysis.On ? "route_analysis" : RouteChoiceGame.On ? "route_choice" : "normal",
+            "terrain", raced != null && raced.IsSprint() ? "sprint" : "forest",
+            "players", FindObjectsOfType<NetworkPlayer>().Length);
     }
 
 

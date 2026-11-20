@@ -87,7 +87,8 @@ public class WaitingScreen : MonoBehaviour
         if (!waiting) return;
         // Same stats (Imposter, Secret task...): nobody picks a runner, so the ones not ready are still loading in, and
         // there is no runner to change to (2026-11-19)
-        bool noPicking = GameModes.SameStatsLegs != null;
+        // Run it yourself, Route analysis and the Route choice game have no runners to pick either
+        bool noPicking = GameModes.SameStatsLegs != null || (ExtraModes.Active & ExtraModes.NoRunners) != 0;
         sub.text = noPicking ? "The race starts when everyone is in." : "The race starts when everyone has chosen a runner.";
         if (changeButton.gameObject.activeSelf == noPicking) changeButton.gameObject.SetActive(!noPicking);
 

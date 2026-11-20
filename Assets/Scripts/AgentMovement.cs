@@ -726,7 +726,11 @@ public class AgentMovement : NetworkBehaviour
             dirVector.Normalize();
 
             // Hämta base speed från grid
-            float cellSpeed = pathfindingManager.speedGrid2D[lastGridCell.y, lastGridCell.x];
+            // (2026-11-19: an IndexOutOfRangeException here; a cell outside the grid, from a route made on another
+            // map or a moved control at the edge, is pulled back onto the grid instead of stopping the runner's Update)
+            float[,] speedGrid = pathfindingManager.speedGrid2D;
+            lastGridCell = new Vector2Int(Mathf.Clamp(lastGridCell.x, 0, speedGrid.GetLength(1) - 1), Mathf.Clamp(lastGridCell.y, 0, speedGrid.GetLength(0) - 1));
+            float cellSpeed = speedGrid[lastGridCell.y, lastGridCell.x];
             // Never stand still for good on a closed cell (speed 0) that slipped into the route: walk off it slowly
             if (cellSpeed <= 0.01f) cellSpeed = 0.2f;
             // Skala collidern efter cellSpeed2
@@ -741,7 +745,10 @@ public class AgentMovement : NetworkBehaviour
             string dirName = GetDirectionName(lastGridCell, nextGrid);
             float slopeFactor = 1f;
             if (pathfindingManager.slopeFactors != null && pathfindingManager.slopeFactors.TryGetValue(dirName, out float[,] slopeGrid))
-                slopeFactor = slopeGrid[lastGridCell.y, lastGridCell.x]; // OBS: from-cellen
+            {
+                if (lastGridCell.y < slopeGrid.GetLength(0) && lastGridCell.x < slopeGrid.GetLength(1))
+                    slopeFactor = slopeGrid[lastGridCell.y, lastGridCell.x]; // OBS: from-cellen
+            }
 
             // Uphill, downhill, too steep and the kind of ground are all in the slope factor now (TerrainSpeedModel)
 
@@ -961,6 +968,7 @@ public class AgentMovement : NetworkBehaviour
         if (pathfindingManager.speedGrid2D == null)
         {
             Debug.Log("speedGrid  är null");
+            return Vector2Int.zero;
         }
         int rows = pathfindingManager.speedGrid2D.GetLength(0);
         int cols = pathfindingManager.speedGrid2D.GetLength(1);
@@ -989,6 +997,7 @@ public class AgentMovement : NetworkBehaviour
         {
             pathfindingManager = FindObjectOfType<PathfindingManager>();
         }
+        if (pathfindingManager == null || pathfindingManager.speedGrid2D == null || pathfindingManager.controlPoints == null || pathfindingManager.controlPoints.Count < 2) return;
         Debug.Log("controlPoints " + pathfindingManager.controlPoints[0].position + " " + pathfindingManager.controlPoints[1].position);
         CamController.FocusOnSegment(WorldToGridPositionCentered(pathfindingManager.controlPoints[0].position), WorldToGridPositionCentered(pathfindingManager.controlPoints[1].position));
         Debug.Log("startView has been done");

@@ -112,7 +112,7 @@ public class ReturnToLobby : MonoBehaviour
             money = 500;
         }
 
-        BetMoneyGainedText.text = $"+{money}kr";
+        BetMoneyGainedText.text = "+" + MoneyLabel.Format(money);
 
         Money.Instance.AddMoney(money);
 

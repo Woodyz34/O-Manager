@@ -66,6 +66,10 @@ public class GameModeTools : MonoBehaviour
     public static bool TakesMouse => instance != null && (instance.tool != Tool.None || instance.clickFrame == Time.frameCount
         || instance.dragging >= 0 || instance.overBear >= 0);
 
+    // The mouse is over the player's own bear that can be moved, or drags it: the pointer turns into a move cross
+    // (EraserButton, which owns the mouse pointer)
+    public static bool OverOwnBear => instance != null && (instance.dragging >= 0 || instance.overBear >= 0);
+
     // Dragging one of the local player's own bears (2026-11-19), and the bear the mouse is over
     int dragging = -1, overBear = -1;
     Vector3 dragFrom;
@@ -337,7 +341,7 @@ public class GameModeTools : MonoBehaviour
             bearGhostSprite = bearGhost.AddComponent<SpriteRenderer>();
             bearGhostSprite.sprite = ModeBanner.BearSprite;
             bearGhostSprite.sortingOrder = 36;
-            bearGhost.transform.localScale = Vector3.one * BearMode.SizeMeters * U;
+            bearGhost.transform.localScale = Vector3.one * BearMode.DrawnMeters(BearMode.NextSize) * U;
         }
         bearGhost.SetActive(true);
         bearGhost.transform.localScale = Vector3.one * BearMode.DrawnMeters(BearMode.NextSize) * U;

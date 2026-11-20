@@ -19,7 +19,22 @@ public static class PackShop
     // The very first pack costs nothing, so a new player gets a runner to start with
     public static readonly bool FirstPackFree = true;
 
-    // How likely each runner of a tier is compared to the others. Higher means more common.
+    // The chance of each tier, in percent (2026-11-19, the user: fixed odds, and Elite harder to get: 1 % instead of
+    // about 2 %, the percent moved to Gold). Before, every runner had a weight and the odds followed how many runners of
+    // each tier there were. A tier the player has collected completely drops out, and the others share its part.
+    public static int Percent(RunnerTier tier)
+    {
+        switch (tier)
+        {
+            case RunnerTier.Elite: return 1;
+            case RunnerTier.Gold: return 5;
+            case RunnerTier.Silver: return 14;
+            default: return 80;
+        }
+    }
+
+    // How likely each runner of a tier is compared to the others, for the runners the game hands out itself (Same stats,
+    // RunnerRules). Packs use the fixed odds above.
     public static int Weight(RunnerTier tier)
     {
         switch (tier)
@@ -64,18 +79,16 @@ public static class PackShop
     // The chance, from 0 to 1, that a pack holds a runner of this tier
     public static float Chance(RunnerTier tier)
     {
+        return Chance(tier, Available());
+    }
+
+    static float Chance(RunnerTier tier, List<CardData> available)
+    {
+        bool[] has = new bool[4];
+        foreach (CardData card in available) has[(int)RunnerCards.Tier(card)] = true;
         float total = 0f;
-        float ofTier = 0f;
-        foreach (CardData card in Available())
-        {
-            RunnerTier cardTier = RunnerCards.Tier(card);
-            total += Weight(cardTier);
-            if (cardTier == tier)
-            {
-                ofTier += Weight(cardTier);
-            }
-        }
-        return total > 0f ? ofTier / total : 0f;
+        for (int i = 0; i < has.Length; i++) if (has[i]) total += Percent((RunnerTier)i);
+        return total > 0f && has[(int)tier] ? Percent(tier) / total : 0f;
     }
 
     // Picks the runner a pack will hold, without paying or adding anything yet. The pack is paid for and its runner
@@ -101,30 +114,31 @@ public static class PackShop
             Money.Instance.AddMoney(-result.paid);
         }
         result.isNew = RunnerCollection.AddFromPack(result.card.RunnerName);
+        GameAnalytics.Record("pack_opened", "tier", RunnerCards.Tier(result.card).ToString(), "paid", result.paid, "is_new", result.isNew);
     }
 
+    // First the tier, by the fixed odds; then any runner of that tier the player does not have yet
     static CardData Draw()
     {
         return DrawFrom(Available());
     }
 
-    // A runner from these by the shop's odds (Weight); also used for the normal pack won in a contest (PrizePacks)
+    // A runner from these by the shop's fixed tier odds; also used for the normal pack won in a contest (PrizePacks)
     public static CardData DrawFrom(List<CardData> cards)
     {
-        float total = 0f;
-        foreach (CardData card in cards)
+        float roll = Random.value;
+        RunnerTier picked = RunnerTier.Bronze;
+        bool found = false;
+        for (int i = (int)RunnerTier.Elite; i >= 0 && !found; i--)
         {
-            total += Weight(RunnerCards.Tier(card));
+            float chance = Chance((RunnerTier)i, cards);
+            if (chance <= 0f) continue;
+            picked = (RunnerTier)i;
+            roll -= chance;
+            if (roll <= 0f) found = true;
         }
-        float roll = Random.value * total;
-        foreach (CardData card in cards)
-        {
-            roll -= Weight(RunnerCards.Tier(card));
-            if (roll <= 0f)
-            {
-                return card;
-            }
-        }
-        return cards[cards.Count - 1];
+        List<CardData> ofTier = cards.FindAll(c => RunnerCards.Tier(c) == picked);
+        if (ofTier.Count == 0) ofTier = cards;
+        return ofTier[Random.Range(0, ofTier.Count)];
     }
 }

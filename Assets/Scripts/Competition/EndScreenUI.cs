@@ -271,7 +271,7 @@ public class EndScreenUI : MonoBehaviour
 
         voteTitleText.text = "Who was the imposter?";
         voteHintText.text = (secretTaskMode ? "One runner didn't know the task." : "One runner was trying to finish last.")
-            + " Guess right for +" + CompetitionRewards.CorrectGuess + " kr.";
+            + " Guess right for +" + MoneyLabel.Format(CompetitionRewards.CorrectGuess) + ".";
         foreach (Standing standing in standings)
         {
             if (standing.isLocal)
@@ -474,22 +474,22 @@ public class EndScreenUI : MonoBehaviour
         GameObject line = Instantiate(rewardLineTemplate, rewardLineParent);
         line.SetActive(true);
         Text(line, "Label").text = label;
-        Text(line, "Amount").text = "+" + amount + " kr";
+        Text(line, "Amount").text = "+" + MoneyLabel.Format(amount);
         return amount;
     }
 
     static string Balance()
     {
-        return Money.Instance != null ? Money.Instance.GetMoney() + " kr" : "";
+        return Money.Instance != null ? MoneyLabel.Format(Money.Instance.GetMoney()) : "";
     }
 
     IEnumerator CountUp(int total)
     {
         for (float t = 0f; t < 0.9f; t += Time.unscaledDeltaTime)
         {
-            rewardTotalText.text = "+" + Mathf.RoundToInt(Mathf.Lerp(0, total, t / 0.9f)) + " kr";
+            rewardTotalText.text = "+" + MoneyLabel.Format(Mathf.RoundToInt(Mathf.Lerp(0, total, t / 0.9f)));
             yield return null;
         }
-        rewardTotalText.text = "+" + total + " kr";
+        rewardTotalText.text = "+" + MoneyLabel.Format(total);
     }
 }

@@ -16,11 +16,16 @@ namespace MapImport
         public string forest = Mixed;
         // 0 = clean forest floor, 0.5 = normal, 1 = a lot of undergrowth
         public float undergrowth = 0.5f;
+        // Sprint maps: what the town looks like (2026-11-20, Anders): a Swedish town (plastered houses in many colours,
+        // asphalt) or an old stone town of southern Europe (cobbles, whitewashed stone houses, tiled roofs)
+        public string town = Swedish;
         // The player's own words about the terrain. Saved for later; the game does not read it yet.
         public string text = "";
 
         public const string Moss = "moss", Heather = "heather", Grass = "grass", Hard = "hard", Sand = "sand",
             Stone = "stone", Lichen = "lichen";
+        public const string Swedish = "swedish", OldStone = "oldstone";
+        public static readonly string[] Towns = { Swedish, OldStone };
         public const string Mixed = "mixed", Pine = "pine", Spruce = "spruce", Birch = "birch", Beech = "beech";
         public const int MaxTextLength = 400;
 
@@ -53,6 +58,15 @@ namespace MapImport
             }
         }
 
+        public static string TownName(string town)
+        {
+            switch (town)
+            {
+                case OldStone: return "Old stone town (southern Europe)";
+                default: return "Swedish town";
+            }
+        }
+
         public TerrainLook Copy() => (TerrainLook)MemberwiseClone();
 
         // Values a file or another player sent: anything unknown becomes the normal look
@@ -61,6 +75,7 @@ namespace MapImport
             var look = new TerrainLook();
             if (Array.IndexOf(Grounds, ground) >= 0) look.ground = ground;
             if (Array.IndexOf(Forests, forest) >= 0) look.forest = forest;
+            if (Array.IndexOf(Towns, town) >= 0) look.town = town;
             look.undergrowth = float.IsNaN(undergrowth) ? 0.5f : Math.Max(0f, Math.Min(1f, undergrowth));
             string t = text ?? "";
             look.text = t.Length > MaxTextLength ? t.Substring(0, MaxTextLength) : t;
@@ -72,14 +87,15 @@ namespace MapImport
         public bool SameAs(TerrainLook o)
         {
             if (o == null) o = new TerrainLook();
-            return (ground ?? Moss) == (o.ground ?? Moss) && (forest ?? Mixed) == (o.forest ?? Mixed)
+            return (ground ?? Moss) == (o.ground ?? Moss) && (forest ?? Mixed) == (o.forest ?? Mixed) && (town ?? Swedish) == (o.town ?? Swedish)
                    && Math.Abs(undergrowth - o.undergrowth) < 0.005f && (text ?? "") == (o.text ?? "");
         }
 
         public string Describe()
         {
             string amount = undergrowth < 0.25f ? "little undergrowth" : undergrowth > 0.75f ? "a lot of undergrowth" : "normal undergrowth";
-            return "Terrain look: " + ForestName(forest).ToLowerInvariant() + ", " + GroundName(ground).ToLowerInvariant() + ", " + amount + ".";
+            return "Terrain look: " + ForestName(forest).ToLowerInvariant() + ", " + GroundName(ground).ToLowerInvariant() + ", " + amount
+                   + ((town ?? Swedish) != Swedish ? ", " + TownName(town).ToLowerInvariant() : "") + ".";
         }
     }
 }

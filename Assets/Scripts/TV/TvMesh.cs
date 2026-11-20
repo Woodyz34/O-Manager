@@ -9,6 +9,9 @@ public class TvMesh
 {
     public string name;
     public bool castShadows = true;
+    // The run-yourself world (RunYourself/RunWorld.cs): drawn always, only near the runner, or only far from them
+    public const byte Always = 0, Near = 1, Far = 2;
+    public byte group = Always;
     public readonly List<float> positions = new List<float>();   // x, y, z
     public readonly List<float> normals = new List<float>();
     public readonly List<byte> colors = new List<byte>();        // r, g, b (sRGB)
@@ -241,6 +244,7 @@ public class TvShapeBuilder
     public void Blob(float r, float sx, float sy, float sz, float ox, float oy, float oz, float jitter, int detail, bool flat,
                      TvColor color, TvColor? top = null, float y0 = 0f, float y1 = 1f)
     {
+        if (Lean && r * Math.Max(sx, Math.Max(sy, sz)) < 0.2f) return;
         float[] sv = detail > 0 ? ico1V : IcoV;
         int[] sf = detail > 0 ? ico1F : IcoF;
         int count = sv.Length / 3;
@@ -360,6 +364,38 @@ public class TvShapeBuilder
         }
     }
 
+    // A round limb from a to b, radius r0 at a and r1 at b, round shading, open ends (a ball at each joint closes
+    // them): arms and legs of the town's people
+    public void Limb(float ax, float ay, float az, float bx, float by, float bz, float r0, float r1, int sides, TvColor c0, TvColor? c1 = null)
+    {
+        float dx = bx - ax, dy = by - ay, dz = bz - az, len = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-5f) return;
+        dx /= len; dy /= len; dz /= len;
+        float ux, uy, uz;
+        if (Math.Abs(dy) < 0.9f) { ux = dz; uy = 0f; uz = -dx; }
+        else { ux = 1f; uy = 0f; uz = 0f; }
+        float ul = (float)Math.Sqrt(ux * ux + uy * uy + uz * uz);
+        ux /= ul; uy /= ul; uz /= ul;
+        float vx = dy * uz - dz * uy, vy = dz * ux - dx * uz, vz = dx * uy - dy * ux;
+        TvColor top = c1 ?? c0;
+        int first = p.Count / 3;
+        for (int i = 0; i <= sides; i++)
+        {
+            float a = i / (float)sides * 6.2831853f, ca = (float)Math.Cos(a), sa = (float)Math.Sin(a);
+            float nx = ux * ca + vx * sa, ny = uy * ca + vy * sa, nz = uz * ca + vz * sa;
+            V(ax + nx * r0, ay + ny * r0, az + nz * r0, nx, ny, nz, c0);
+            V(bx + nx * r1, by + ny * r1, bz + nz * r1, nx, ny, nz, top);
+        }
+        float wx = uy * vz - uz * vy, wy = uz * vx - ux * vz, wz = ux * vy - uy * vx;
+        bool flip = wx * dx + wy * dy + wz * dz > 0f;
+        for (int i = 0; i < sides; i++)
+        {
+            int a = first + i * 2, b = a + 1, q = a + 2, d = a + 3;
+            if (flip) { t.Add(a); t.Add(q); t.Add(b); t.Add(q); t.Add(d); t.Add(b); }
+            else { t.Add(a); t.Add(b); t.Add(q); t.Add(q); t.Add(b); t.Add(d); }
+        }
+    }
+
     // A cone standing on y (a layer of spruce branches, a tuft of grass), flat facets
     public void Cone(float r, float h, float y, int sides, TvColor color, float ox = 0f, float oz = 0f)
     {
@@ -373,20 +409,39 @@ public class TvShapeBuilder
     }
 
     // A box from (x0, y0, z0) to (x1, y1, z1)
+    // Lean: the houses of a run-yourself town a little away from the runner. Small bits (glazing bars, flower heads,
+    // letters) are left out and boxes get no bottom. Set on the thread that builds them, round the build.
+    [ThreadStatic] public static bool Lean;
+
     public void Box(float x0, float y0, float z0, float x1, float y1, float z1, TvColor color)
     {
+        if (Lean && Math.Abs(x1 - x0) < 0.28f && Math.Abs(y1 - y0) < 0.28f && Math.Abs(z1 - z0) < 0.28f) return;
         float cx = (x0 + x1) / 2f, cy = (y0 + y1) / 2f, cz = (z0 + z1) / 2f;
+        // Each side is 4 corners shared by its two triangles
         void Quad(float ax, float ay, float az, float bx, float by, float bz, float qx, float qy, float qz, float dx, float dy, float dz)
         {
-            FlatTri(ax, ay, az, bx, by, bz, qx, qy, qz, cx, cy, cz, color, color, color);
-            FlatTri(ax, ay, az, qx, qy, qz, dx, dy, dz, cx, cy, cz, color, color, color);
+            float ux = bx - ax, uy = by - ay, uz = bz - az, vx = qx - ax, vy = qy - ay, vz = qz - az;
+            float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+            float ox = (ax + qx) / 2f - cx, oy = (ay + qy) / 2f - cy, oz = (az + qz) / 2f - cz;
+            bool flip = nx * ox + ny * oy + nz * oz < 0f;
+            if (flip) { nx = -nx; ny = -ny; nz = -nz; }
+            float len = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            if (len < 1e-9f) return;
+            nx /= len; ny /= len; nz /= len;
+            // Each side a shade of its own (a few per cent), so a house or a box is not one flat colour
+            float mx = (ax + qx) * 0.5f, my = (ay + qy) * 0.5f, mz = (az + qz) * 0.5f;
+            TvColor col = color.Shade(0.95f + 0.1f * TvRandom.Hash((int)(mx * 7.31f + mz * 3.17f), (int)(my * 5.71f + nx * 11f + nz * 13f)));
+            int a = V(ax, ay, az, nx, ny, nz, col), b = V(bx, by, bz, nx, ny, nz, col);
+            int q = V(qx, qy, qz, nx, ny, nz, col), d = V(dx, dy, dz, nx, ny, nz, col);
+            if (flip) { t.Add(a); t.Add(q); t.Add(b); t.Add(a); t.Add(d); t.Add(q); }
+            else { t.Add(a); t.Add(b); t.Add(q); t.Add(a); t.Add(q); t.Add(d); }
         }
         Quad(x0, y0, z0, x1, y0, z0, x1, y1, z0, x0, y1, z0);
         Quad(x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1);
         Quad(x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0);
         Quad(x1, y0, z0, x1, y0, z1, x1, y1, z1, x1, y1, z0);
         Quad(x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1);
-        Quad(x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1);
+        if (!Lean) Quad(x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1);
     }
 
     // One flat triangle with its own colours, facing away from (cx, cy, cz)
@@ -420,6 +475,16 @@ public class TvRandom
     }
 
     public float Range(float a, float b) => a + (b - a) * Value();
+
+    // Starts the numbers again from a place (whole metres) and a purpose, so the same place always gets the same
+    // numbers (the run-yourself world, built piece by piece)
+    public void Reseed(int i, int j, int salt)
+    {
+        uint h = (uint)i * 374761393u + (uint)j * 668265263u + (uint)salt * 2246822519u;
+        h = (h ^ (h >> 13)) * 1274126177u;
+        h ^= h >> 16;
+        state = h == 0 ? 1u : h;
+    }
 
     // Smooth noise over the plane, 0..1, the same for the same place
     public static float Noise(float x, float y)

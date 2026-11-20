@@ -153,14 +153,14 @@ public class CameraController : MonoBehaviour
 
         FocusOnNewStretchToDraw();
 
-        if (!following && !EscMenu.IsOpen && !TvViewer.BlocksMapInput && mapRenderer != null)
+        if (!following && !EscMenu.IsOpen && !HostSettingsPopup.IsOpen && !TvViewer.BlocksMapInput && mapRenderer != null)
         {
             PanCamera();
         }
         
         // The wheel belongs to the list under the mouse (the leaderboard, for one), not to the map behind it
         float wheel = Input.GetAxis("Mouse ScrollWheel");
-        if (wheel != 0f && !PointerOverUI() && !EscMenu.IsOpen && !TvViewer.BlocksMapInput && mapRenderer != null)
+        if (wheel != 0f && !PointerOverUI() && !EscMenu.IsOpen && !HostSettingsPopup.IsOpen && !TvViewer.BlocksMapInput && mapRenderer != null)
         {
             if (wheel > 0f) { ZoomIn(); }
             else { ZoomOut(); }

@@ -223,7 +223,7 @@ namespace MapImport
 
         // Weighted least squares for the levels: minimise sum w (level[b] - level[a] - diff)^2 with conjugate gradients.
         // (Plain sweeps converge far too slowly over a whole map and leave the map tilted.)
-        static void SolveLevels(double[] x, List<(int a, int b, int sa, int sb, double w)> edges, double[] diff, double[] weight)
+        internal static void SolveLevels(double[] x, List<(int a, int b, int sa, int sb, double w)> edges, double[] diff, double[] weight)
         {
             int n = x.Length;
             const double eps = 1e-6;   // ties every level weakly to 0 so the system has one answer
@@ -276,7 +276,7 @@ namespace MapImport
         }
 
         // Smooth fill between fixed cells: first on coarser grids, then refined
-        static void SolveLaplace(double[] z, bool[] isFixed, int rows, int cols)
+        internal static void SolveLaplace(double[] z, bool[] isFixed, int rows, int cols)
         {
             if (rows > 64 && cols > 64)
             {
@@ -342,7 +342,7 @@ namespace MapImport
             return true;
         }
 
-        static int Nearest(int[] ids, int C, int R, double px, double py, int reach)
+        internal static int Nearest(int[] ids, int C, int R, double px, double py, int reach)
         {
             int cx = (int)Math.Floor(px), cy = (int)Math.Floor(py);
             for (int r = 0; r <= reach; r++)
@@ -357,7 +357,7 @@ namespace MapImport
         }
 
         // +1 if the point is on the left of the polyline (at its nearest segment), -1 on the right
-        static int SideOf(double[] p, double x, double y)
+        internal static int SideOf(double[] p, double x, double y)
         {
             double best = double.MaxValue; int side = 0;
             for (int i = 0; i + 3 < p.Length; i += 2)

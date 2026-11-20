@@ -13,6 +13,7 @@ public static class HostSettings
         public bool tvStartEveryLeg;    // the start of every leg on TV (else only the first leg's start)
         public bool tvFinishEveryLeg;   // the finish of every leg on TV (else only the last leg's finish)
         public int tvFinishShown;       // how many runners the finish camera shows, the first ones in (0 = all)
+        public int tvStartShown;        // how many runners the start camera shows, the first ones off (0 = all)
         public int tvControlShown;      // how many runners every TV control shows, the first ones there (0 = all)
         public int tvShotPercent;       // how long every TV shot is, in percent of the 1.0.4 length
         public int tvSpeedTenths;       // how fast the runners run on TV, times real running pace, in tenths
@@ -28,6 +29,7 @@ public static class HostSettings
         tvStartEveryLeg = true,
         tvFinishEveryLeg = true,
         tvFinishShown = 0,
+        tvStartShown = 0,
         tvControlShown = 3,
         tvShotPercent = 50,
         tvSpeedTenths = 18,
@@ -115,6 +117,7 @@ public static class HostSettings
         sb.Append("ts").Append(v.tvStartEveryLeg ? 1 : 0).Append(';');
         sb.Append("tf").Append(v.tvFinishEveryLeg ? 1 : 0).Append(';');
         sb.Append("fn").Append(v.tvFinishShown).Append(';');
+        sb.Append("sn").Append(v.tvStartShown).Append(';');
         sb.Append("tn").Append(v.tvControlShown).Append(';');
         sb.Append("tl").Append(v.tvShotPercent).Append(';');
         sb.Append("tv").Append(v.tvSpeedTenths).Append(';');
@@ -139,6 +142,7 @@ public static class HostSettings
                 case "ts": v.tvStartEveryLeg = n != 0; break;
                 case "tf": v.tvFinishEveryLeg = n != 0; break;
                 case "fn": v.tvFinishShown = n; break;
+                case "sn": v.tvStartShown = n; break;
                 case "tn": v.tvControlShown = n; break;
                 case "tl": v.tvShotPercent = n; break;
                 case "tv": v.tvSpeedTenths = n; break;
@@ -153,6 +157,7 @@ public static class HostSettings
     static Values Clean(Values v)
     {
         v.tvFinishShown = Mathf.Clamp(v.tvFinishShown, 0, MaxShown);
+        v.tvStartShown = Mathf.Clamp(v.tvStartShown, 0, MaxShown);
         v.tvControlShown = Mathf.Clamp(v.tvControlShown, 0, MaxShown);
         v.tvShotPercent = Mathf.Clamp(v.tvShotPercent, MinShotPercent, MaxShotPercent);
         v.tvSpeedTenths = Mathf.Clamp(v.tvSpeedTenths, MinTvSpeed, MaxTvSpeed);
