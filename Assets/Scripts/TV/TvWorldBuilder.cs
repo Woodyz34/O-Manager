@@ -841,7 +841,7 @@ public partial class TvWorldBuilder
                     case WorldCell.RoughOpen: case WorldCell.RoughOpenTrees: c = Rough.Lerp(RoughGreen, f); break;
                     case WorldCell.LightGreen: c = LightGreen.Lerp(floor.a, f * 0.5f); break;
                     case WorldCell.Green: c = MidGreen; break;
-                    case WorldCell.DarkGreen: c = DarkGreen; break;
+                    case WorldCell.DarkGreen: case WorldCell.Impassable: c = DarkGreen; break;
                     case WorldCell.Cultivated: c = Field.Lerp(Field2, Sm(0.4f, 0.6f, TvRandom.Noise(ax * 0.05f, az * 0.6f))); break;
                     case WorldCell.Water: c = Water.Lerp(WaterDeep, f); hard = true; break;
                     case WorldCell.BareRock: c = Rock.Lerp(LichenRock, f2 * 0.6f); hard = true; break;
@@ -1456,6 +1456,33 @@ public partial class TvWorldBuilder
             float[] c = line.xz;
             switch (line.kind)
             {
+                case WorldLineKind.Hedge:
+                {
+                    // An impassable hedge (ISSprOM 410.1): a dense, clipped green wall about 1.8 m high
+                    TvShape hedge = Box(1f, 1f, 0.9f, TvColor.Hex("#2f5a2a"));
+                    Along(c, 1f, (x, z, yaw, len) =>
+                    {
+                        thingMesh.Add(hedge, x, H(x, z) - 0.1f, z, len + 0.1f, Rr(1.7f, 1.95f), Rr(0.95f, 1.1f), -yaw, Rr(0.9f, 1.05f));
+                        world.solids.Add(new TvSolid { x = x, z = z, r = 0.6f });
+                    });
+                    break;
+                }
+                case WorldLineKind.Stairs:
+                {
+                    // Stairs outside a town (a town draws its own from the map's lines): a stone step every 0.35 m, each
+                    // level at the ground's height there, so they climb with the hill
+                    if (input.town != null) break;
+                    TvShape step = Box(1f, 1f, 1f, TvColor.Hex("#9a968e")), cheek = Box(1f, 1f, 0.25f, TvColor.Hex("#7e7b74"));
+                    Along(c, 0.35f, (x, z, yaw, len) =>
+                    {
+                        float y = H(x, z) + 0.06f;
+                        thingMesh.Add(step, x, y - 0.5f, z, len + 0.02f, 0.5f, 1.6f, -yaw);
+                        float sx = (float)Math.Sin(yaw), cz = (float)Math.Cos(yaw);
+                        foreach (float s in new[] { -0.92f, 0.92f })
+                            thingMesh.Add(cheek, x - sx * s, y - 0.5f, z + cz * s, len + 0.02f, 0.75f, 1f, -yaw);
+                    });
+                    break;
+                }
                 case WorldLineKind.HighWall:
                     Along(c, 1.2f, (x, z, yaw, len) =>
                     {
@@ -2119,7 +2146,7 @@ public partial class TvWorldBuilder
                         break;
                     case WorldCell.LightGreen: p = 0.42f; tree = ThicketTree(false); s = Rr(0.28f, 0.62f); break;
                     case WorldCell.Green: p = 0.8f; tree = ThicketTree(true); s = Rr(0.2f, 0.45f); break;
-                    case WorldCell.DarkGreen: p = 0.95f; tree = ThicketTree(true); s = Rr(0.18f, 0.4f); break;
+                    case WorldCell.DarkGreen: case WorldCell.Impassable: p = 0.95f; tree = ThicketTree(true); s = Rr(0.18f, 0.4f); break;
                     case WorldCell.OpenTrees:
                     case WorldCell.RoughOpenTrees:
                         p = 0.035f;
@@ -2182,6 +2209,7 @@ public partial class TvWorldBuilder
                     case WorldCell.LightGreen: p = 0.22f; h = Rr(1.2f, 2.6f); break;
                     case WorldCell.Green: p = 0.55f; h = Rr(1.4f, 2.8f); break;
                     case WorldCell.DarkGreen: p = 0.85f; h = Rr(1.6f, 3.2f); break;
+                    case WorldCell.Impassable: p = 1f; h = Rr(2f, 3.4f); break;
                     default: continue;
                 }
                 if (random.Value() > p || Blocked(x, z, 0.8f)) continue;

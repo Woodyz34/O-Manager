@@ -17,6 +17,7 @@ public class RunTerrain
         public float rough;       // 0.3 on a road, 1 in white forest, up to 1.7 in a thicket or a boulder field
         public Surface surface;
         public bool blocked;      // nobody gets through: a lake, a house, a garden, impassable dark green, outside the map
+        public bool stairs;       // on stairs: quick up, slow down (RunPlayer.Speed)
     }
 
     readonly WorldLayer layer;
@@ -38,17 +39,29 @@ public class RunTerrain
 
     // Bridges and tunnels of a town (TvTown): a way over water and through houses, fences and walls
     const WorldLineKind BridgeKind = (WorldLineKind)250, TunnelKind = (WorldLineKind)251;
+    // The course setter's uncrossable boundaries and bridges (ForbiddenArea), and the stairs of a town
+    const WorldLineKind CourseLineKind = (WorldLineKind)252, CourseBridgeKind = (WorldLineKind)253, TownStairsKind = (WorldLineKind)254;
 
-    // The 2D race's own grid: on a sprint map it says where the runner may go; everywhere the course's out-of-bounds
-    // areas and barriers close the ground (2026-11-20). Null when the scene has none.
+    // The 2D race's own grid: on a sprint map it says where the runner may go (2026-11-20). Null when the scene has none.
     readonly TvPassable passable;
+    // A sprint map (a town) imported before the Impassable cell: its dark green (ISSprOM 410) is impassable
+    readonly bool oldSprintGreen;
+    // The course setter's out-of-bounds areas, in metres from the layer's lower left corner
+    readonly List<float[]> outOfBounds = new List<float[]>();
 
-    public RunTerrain(WorldLayer layer, TvHeights heights, TerrainSpeeds speeds, TvTown town = null, TvPassable passable = null)
+    static bool IsWay(WorldLineKind k) => k == BridgeKind || k == TunnelKind || k == CourseBridgeKind || k == WorldLineKind.Bridge;
+    static bool IsStairs(WorldLineKind k) => k == WorldLineKind.Stairs || k == TownStairsKind;
+
+    // forbidden: the course's out-of-bounds areas, uncrossable boundaries and bridges (the same ones the 2D runners keep to)
+    public RunTerrain(WorldLayer layer, TvHeights heights, TerrainSpeeds speeds, TvTown town = null, List<ForbiddenArea> forbidden = null,
+                      TvPassable passable = null)
     {
         this.layer = layer;
         this.passable = passable;
         this.heights = heights;
         this.speeds = speeds ?? new TerrainSpeeds();
+        // A sprint map's world layer from before 2026-11-20 has no Impassable cells: its dark green is ISSprOM 410
+        oldSprintGreen = town != null && layer.version < 2;
         maxE = layer.minE + layer.cols * layer.cell;
         maxN = layer.minN + layer.rows * layer.cell;
         bucketCols = Math.Max(1, (int)Math.Ceiling(layer.cols * layer.cell / Bucket));
@@ -61,6 +74,36 @@ public class RunTerrain
         {
             foreach (float[] xy in town.bridges) all.Add((BridgeKind, xy));
             foreach (float[] xy in town.tunnels) all.Add((TunnelKind, xy));
+            foreach (float[] xy in town.stairs) all.Add((TownStairsKind, xy));
+        }
+        if (forbidden != null)
+        {
+            foreach (ForbiddenArea area in forbidden)
+            {
+                if (area == null || !area.IsValid) continue;
+                var xy = new float[area.corners.Count * 2 + (area.line ? 0 : 2)];
+                for (int k = 0; k < area.corners.Count; k++)
+                {
+                    xy[2 * k] = (float)area.corners[k].e;
+                    xy[2 * k + 1] = (float)area.corners[k].n;
+                }
+                if (area.line)
+                {
+                    all.Add((area.bridge ? CourseBridgeKind : CourseLineKind, xy));
+                    continue;
+                }
+                // An area: its border is a line nobody crosses, and inside it is closed
+                xy[xy.Length - 2] = xy[0];
+                xy[xy.Length - 1] = xy[1];
+                all.Add((CourseLineKind, xy));
+                var local = new float[xy.Length];
+                for (int k = 0; k + 1 < xy.Length; k += 2)
+                {
+                    local[k] = (float)(xy[k] - layer.minE);
+                    local[k + 1] = (float)(xy[k + 1] - layer.minN);
+                }
+                outOfBounds.Add(local);
+            }
         }
         foreach (var line in all)
         {
@@ -93,6 +136,7 @@ public class RunTerrain
             case WorldLineKind.Stream: case WorldLineKind.SmallStream: case WorldLineKind.Ditch: case WorldLineKind.NarrowMarsh:
             case WorldLineKind.Cliff: case WorldLineKind.SmallCliff: case WorldLineKind.HighFence: case WorldLineKind.HighWall:
             case WorldLineKind.Wall: case WorldLineKind.RuinedWall: case WorldLineKind.Fence: case WorldLineKind.RuinedFence: case WorldLineKind.Log:
+            case WorldLineKind.Hedge: case WorldLineKind.Barrier: case WorldLineKind.Stairs: case WorldLineKind.Bridge:
                 return true;
             default:
                 return false;
@@ -126,7 +170,10 @@ public class RunTerrain
             case WorldCell.RoughOpenTrees: g.speed = speeds.Ground(TerrainKind.RoughOpen, 0.8f); g.rough = 1.25f; g.surface = Surface.Rough; break;
             case WorldCell.LightGreen: g.speed = speeds.Ground(TerrainKind.LightGreen, 0.7f); g.rough = 1.35f; g.surface = Surface.Thicket; break;
             case WorldCell.Green: g.speed = speeds.Ground(TerrainKind.MidGreen, 0.55f); g.rough = 1.55f; g.surface = Surface.Thicket; break;
-            case WorldCell.DarkGreen: g.speed = speeds.Ground(TerrainKind.DarkGreen, 0.35f); g.rough = 1.7f; g.surface = Surface.Thicket; break;
+            case WorldCell.DarkGreen:
+                g.speed = speeds.Ground(TerrainKind.DarkGreen, 0.35f); g.rough = 1.7f; g.surface = Surface.Thicket;
+                if (oldSprintGreen) g.blocked = true;   // ISSprOM 410: impassable vegetation (maps imported before the Impassable cell)
+                break;
             case WorldCell.Cultivated: g.speed = speeds.Ground(TerrainKind.Open, 1f); g.rough = 0.8f; g.surface = Surface.Open; break;
             case WorldCell.Water: g.blocked = true; g.surface = Surface.Water; break;
             case WorldCell.BareRock: g.speed = speeds.Ground(TerrainKind.Open, 1.15f); g.rough = 0.8f; g.surface = Surface.Rock; break;
@@ -134,29 +181,30 @@ public class RunTerrain
             case WorldCell.Paved: g.speed = speeds.Ground(TerrainKind.Paved, 1.5f); g.rough = 0.3f; g.surface = Surface.Paved; break;
             case WorldCell.Building: g.blocked = true; g.surface = Surface.Paved; break;
             case WorldCell.Plot: g.blocked = true; g.surface = Surface.Open; break;   // a private garden: out of bounds
+            case WorldCell.Impassable: g.blocked = true; g.rough = 1.7f; g.surface = Surface.Thicket; break;
             default: g.speed = forest; g.rough = 1f; g.surface = Surface.Forest; break;
         }
         if (g.speed <= 0.02f) g.blocked = true;
-        if (passable != null)
+        if (passable != null && passable.sprint)
         {
-            if (passable.sprint)
+            // A town: closed exactly where the 2D race is closed. Where the map is open but the 3D world has a
+            // house, water or a garden (a passage the 2D game opens), the runner runs on paving.
+            bool closed = passable.Closed(e, n);
+            if (g.blocked && !closed)
             {
-                // A town: closed exactly where the 2D race is closed. Where the map is open but the 3D world has a
-                // house, water or a garden (a passage the 2D game opens), the runner runs on paving.
-                bool closed = passable.Closed(e, n);
-                if (g.blocked && !closed)
-                {
-                    g.speed = speeds.Ground(TerrainKind.Paved, 1.5f);
-                    g.rough = 0.3f;
-                    g.surface = Surface.Paved;
-                }
-                g.blocked = closed;
-                if (closed) return g;
+                g.speed = speeds.Ground(TerrainKind.Paved, 1.5f);
+                g.rough = 0.3f;
+                g.surface = Surface.Paved;
             }
-            else if (passable.Purple(e, n))
+            g.blocked = closed;
+            if (closed) return g;
+        }
+        if (outOfBounds.Count > 0)
+        {
+            float ox = (float)(e - layer.minE), oz = (float)(n - layer.minN);
+            foreach (float[] poly in outOfBounds)
             {
-                g.blocked = true;
-                return g;
+                if (Inside(poly, ox, oz)) { g.blocked = true; break; }
             }
         }
         if ((cell & WorldCell.Marsh) != 0)
@@ -218,11 +266,23 @@ public class RunTerrain
         foreach (int index in near)
         {
             Piece p = pieces[index];
-            if (p.kind != BridgeKind && p.kind != TunnelKind) continue;
+            if (!IsWay(p.kind)) continue;
             if (Dist(x, z, p) > 1.4f) continue;
             g.blocked = false;
             g.speed = Math.Max(g.speed, speeds.Ground(TerrainKind.Paved, 1.5f));
             g.rough = 0.3f;
+            g.surface = Surface.Paved;
+            break;
+        }
+        // On stairs: up as quick as a road, down slowly (2026-11-20, Anders; RunPlayer.Speed slows the way down)
+        foreach (int index in near)
+        {
+            Piece p = pieces[index];
+            if (!IsStairs(p.kind) || Dist(x, z, p) > 1.2f) continue;
+            g.blocked = false;
+            g.speed = SymbolRules.StairsSpeed * forest;
+            g.stairs = true;
+            g.rough = 1.2f;
             g.surface = Surface.Paved;
             break;
         }
@@ -252,12 +312,12 @@ public class RunTerrain
         foreach (int index in near)
         {
             Piece p = pieces[index];
-            if ((p.kind == BridgeKind || p.kind == TunnelKind) && Dist(x, z, p) < 1.4f) return false;
+            if ((IsWay(p.kind) && Dist(x, z, p) < 1.4f) || (IsStairs(p.kind) && Dist(x, z, p) < 1.2f)) return false;
         }
         foreach (int index in near)
         {
             Piece p = pieces[index];
-            if ((p.kind == WorldLineKind.Cliff || p.kind == WorldLineKind.HighFence || p.kind == WorldLineKind.HighWall) && Dist(x, z, p) < reach + 0.15f)
+            if (Impassable(p.kind) && Dist(x, z, p) < reach + 0.15f)
                 return true;
         }
         return false;
@@ -275,11 +335,11 @@ public class RunTerrain
         List<int> near = BucketAt((ax + bx) / 2f, (az + bz) / 2f);
         if (near == null) return false;
         bool any = false;
-        // Through a tunnel or over a bridge nothing is in the way
+        // Through a tunnel, over a bridge or on stairs nothing is in the way
         foreach (int index in near)
         {
             Piece p = pieces[index];
-            if ((p.kind == BridgeKind || p.kind == TunnelKind) && Dist((ax + bx) / 2f, (az + bz) / 2f, p) < 1.6f) return false;
+            if ((IsWay(p.kind) || IsStairs(p.kind)) && Dist((ax + bx) / 2f, (az + bz) / 2f, p) < 1.6f) return false;
         }
         foreach (int index in near)
         {
@@ -292,7 +352,8 @@ public class RunTerrain
                 case WorldLineKind.Fence: h = 1f; break;
                 case WorldLineKind.RuinedFence: h = 0.6f; break;
                 case WorldLineKind.Log: h = 0.45f; break;
-                case WorldLineKind.Cliff: case WorldLineKind.HighFence: case WorldLineKind.HighWall: h = -1f; break;
+                case WorldLineKind.Cliff: case WorldLineKind.HighFence: case WorldLineKind.HighWall:
+                case WorldLineKind.Hedge: case WorldLineKind.Barrier: case CourseLineKind: h = -1f; break;
                 case WorldLineKind.SmallCliff: h = -2f; break;
                 default: continue;
             }
@@ -311,6 +372,24 @@ public class RunTerrain
         int i = (int)(x / Bucket), j = (int)(z / Bucket);
         if (i < 0 || j < 0 || i >= bucketCols || j >= bucketRows) return null;
         return buckets[j * bucketCols + i];
+    }
+
+    // Lines nobody gets over or through
+    static bool Impassable(WorldLineKind k) =>
+        k == WorldLineKind.Cliff || k == WorldLineKind.HighFence || k == WorldLineKind.HighWall || k == WorldLineKind.Hedge
+        || k == WorldLineKind.Barrier || k == CourseLineKind;
+
+    // Even-odd test: is (x, z) inside the closed ring xy (x0, z0, x1, z1, ...)?
+    static bool Inside(float[] xy, float x, float z)
+    {
+        bool inside = false;
+        int count = xy.Length / 2;
+        for (int i = 0, j = count - 1; i < count; j = i++)
+        {
+            float xi = xy[2 * i], zi = xy[2 * i + 1], xj = xy[2 * j], zj = xy[2 * j + 1];
+            if ((zi > z) != (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
+        }
+        return inside;
     }
 
     static float Dist(float px, float pz, Piece p)

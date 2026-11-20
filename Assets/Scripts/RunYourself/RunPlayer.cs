@@ -155,7 +155,7 @@ public class RunPlayer : MonoBehaviour
         if (wish)
         {
             float dirFactor = fwd > 0 ? (side != 0 ? 0.95f : 1f) : fwd < 0 ? 0.45f : 0.6f;
-            target = ForestSpeed * ground.speed * SlopeFactor(gradient, ground.rough) * dirFactor
+            target = ForestSpeed * GroundSpeed(ground, gradient) * dirFactor
                      * (mapUp ? 0.6f : 1f);   // reading the map: you can't run fast and read (Anders, 2026-11-19)
             if (stumbleTimer > 0f) target *= 0.4f;
         }
@@ -256,6 +256,14 @@ public class RunPlayer : MonoBehaviour
     // Speed compared with flat ground on a slope (positive = uphill). Uphill from the energy it costs (Minetti); downhill
     // a little quicker on a gentle slope, then slower the steeper it is, more so in rough ground, but never a crawl:
     // a steep clear-cut slope downhill is still run at more than half speed (2026-11-19, Anders' test).
+    // The ground's speed with the slope: on stairs as quick as a road going up, but slow going down
+    // (SymbolRules.StairsDownSpeed, whatever the slope; the same rule as the 2D grid's StairsSlopes)
+    public static float GroundSpeed(RunTerrain.Ground g, float gradient)
+    {
+        if (g.stairs && gradient < -0.008f) return g.speed * (MapImport.SymbolRules.StairsDownSpeed / MapImport.SymbolRules.StairsSpeed);
+        return g.speed * SlopeFactor(gradient, g.rough);
+    }
+
     public static float SlopeFactor(float gradient, float rough)
     {
         if (gradient >= 0f) return Mathf.Max(0.3f, TerrainSpeedModel.EnergyCost(0f) / TerrainSpeedModel.EnergyCost(Mathf.Min(gradient, 0.45f)));

@@ -135,7 +135,7 @@ public partial class RunSession : MonoBehaviour
                 RunTerrain.Ground g = terrain.At(e, n);
                 float rise = terrain.MapHeight(e + ux * 3.0, n + uz * 3.0) - terrain.MapHeight(e - ux * 3.0, n - uz * 3.0);
                 float gradient = Mathf.Clamp(rise / 6f / RunSettings.Hills, -1.2f, 1.2f);
-                float speed = RunPlayer.ForestSpeed * (g.blocked ? 0.05f : Mathf.Max(0.05f, g.speed)) * RunPlayer.SlopeFactor(gradient, g.rough);
+                float speed = RunPlayer.ForestSpeed * (g.blocked ? 0.05f : Mathf.Max(0.05f, RunPlayer.GroundSpeed(g, gradient)));
                 seconds += step / Mathf.Max(0.05f, speed);
             }
             a = b;
@@ -186,7 +186,8 @@ public partial class RunSession : MonoBehaviour
         loadingCard.Set("Reading the terrain", 0.08f);
         passable = Passable(mapDef);
         TvPassable gate = passable;
-        try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds, data.town, gate)); }
+        List<ForbiddenArea> forbidden = course.forbidden;
+        try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds, data.town, forbidden, gate)); }
         catch (Exception e)
         {
             Debug.LogWarning("RunSession: " + e);
@@ -197,6 +198,8 @@ public partial class RunSession : MonoBehaviour
 
         List<CoursePoint> flags = new List<CoursePoint>(points);
         flags.RemoveAt(0);
+        // A control by a fence or a wall stands on the side the course setter chose (PunchSides), so it is punched from there
+        for (int i = 0; i < flags.Count; i++) flags[i] = PunchSides.FlagPoint(course, flags[i]);
         world = RunWorld.Create(data, terrain, points[0], flags, passable, course);
         world.transform.SetParent(transform, true);
         world.Loading = true;
