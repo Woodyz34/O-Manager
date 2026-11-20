@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Rendering;
+using MapImport;
 
 // The whole map in 3D for the run-yourself game mode, built round the runner as they run.
 //
@@ -124,7 +125,6 @@ public class RunWorld : MonoBehaviour
 
     void BuildTape()
     {
-        if (course == null || course.forbidden == null) return;
         var v = new List<Vector3>();
         var nrm = new List<Vector3>();
         var col = new List<Color32>();
@@ -165,13 +165,14 @@ public class RunWorld : MonoBehaviour
             }
         }
 
-        foreach (ForbiddenArea area in course.forbidden)
+        // One taped line through the points (closed: back to the first)
+        void TapeLine(List<(double e, double n)> pts, bool closed)
         {
-            if (area == null || !area.IsValid || area.bridge) continue;
-            int count = area.corners.Count, sides = area.line ? count - 1 : count;
+            int count = pts.Count, sides = closed ? count : count - 1;
             for (int s = 0; s < sides; s++)
             {
-                CoursePoint a = area.corners[s], b = area.corners[(s + 1) % count];
+                var a = pts[s];
+                var b = pts[(s + 1) % count];
                 double de = b.e - a.e, dn = b.n - a.n, length = Math.Sqrt(de * de + dn * dn);
                 if (length < 0.05) continue;
                 // Posts about every 3 m; the tape in stripes of 0.5 m, red and white
@@ -189,7 +190,50 @@ public class RunWorld : MonoBehaviour
                         Quad(p0, p1, p1 + Vector3.up * 0.07f, p0 + Vector3.up * 0.07f, c);
                     }
                 }
-                if (area.line || s == sides - 1) Post(b.e, b.n);
+                if (!closed || s == sides - 1) Post(b.e, b.n);
+            }
+        }
+
+        if (course != null && course.forbidden != null)
+        {
+            foreach (ForbiddenArea area in course.forbidden)
+            {
+                if (area == null || !area.IsValid || area.bridge) continue;
+                var pts = new List<(double e, double n)>(area.corners.Count);
+                foreach (CoursePoint q in area.corners) pts.Add((q.e, q.n));
+                TapeLine(pts, !area.line);
+            }
+        }
+
+        // The map's own out-of-bounds areas (olive green, the purple hatching printed on the map; Plot cells) near the
+        // course (2026-11-20, Anders: they were invisible walls). Only where they meet ground a runner may be on.
+        WorldLayer layer = data != null ? data.layer : null;
+        if (layer != null && flagE.Length > 0)
+        {
+            double minE = anchorE, maxE = anchorE, minN = anchorN, maxN = anchorN;
+            for (int i = 0; i < flagE.Length; i++)
+            {
+                minE = Math.Min(minE, flagE[i]); maxE = Math.Max(maxE, flagE[i]);
+                minN = Math.Min(minN, flagN[i]); maxN = Math.Max(maxN, flagN[i]);
+            }
+            const double Margin = 150.0;
+            int i0 = (int)Math.Floor((minE - Margin - layer.minE) / layer.cell), i1 = (int)Math.Floor((maxE + Margin - layer.minE) / layer.cell);
+            int j0 = (int)Math.Floor((minN - Margin - layer.minN) / layer.cell), j1 = (int)Math.Floor((maxN + Margin - layer.minN) / layer.cell);
+            TvPassable gate = passable;
+            bool Plot(int i, int j) => (layer.cells[j * layer.cols + i] & WorldCell.BaseMask) == WorldCell.Plot;
+            bool Open(int i, int j)
+            {
+                int b = layer.cells[j * layer.cols + i] & WorldCell.BaseMask;
+                if (b == WorldCell.Plot) return false;
+                double e = layer.minE + (i + 0.5) * layer.cell, n = layer.minN + (j + 0.5) * layer.cell;
+                if (gate != null) return !gate.Closed(e, n);
+                return b != WorldCell.Building && b != WorldCell.Water && b != WorldCell.Impassable;
+            }
+            foreach (var line in TvOutlines.CellBorders(layer, i0, j0, i1, j1, Plot, Open))
+            {
+                bool closed = line.Count > 2 && line[0].e == line[line.Count - 1].e && line[0].n == line[line.Count - 1].n;
+                if (closed) line.RemoveAt(line.Count - 1);
+                TapeLine(line, closed);
             }
         }
         if (v.Count == 0) return;

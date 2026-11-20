@@ -431,7 +431,9 @@ public partial class TvWorldBuilder
         if (input.chunkDetail)
         {
             if (input.baseSolids != null) world.solids.AddRange(input.baseSolids);
+            int thicketSolids = world.solids.Count;
             Thickets();
+            OpenPassages(thicketSolids, world.solids.Count);
             Undergrowth();
             Keep(tuftMeshes[0]);
             Keep(thicketMesh);
@@ -446,10 +448,14 @@ public partial class TvWorldBuilder
         Ground();
         Waters();
         Stones();
+        int lineSolids = world.solids.Count;
         Structures();
+        OpenPassages(lineSolids, world.solids.Count);
         if (input.town != null) TownStreets();
         Flags();
+        int treeSolids = world.solids.Count;
         Trees();
+        OpenPassages(treeSolids, world.solids.Count);
         if (input.town != null) KeepTown();
         Keep(groundMesh);
         Keep(GroundFar());
@@ -460,6 +466,22 @@ public partial class TvWorldBuilder
         Keep(wireMesh);
         Keep(treeMeshes[0]);
         Keep(treeFarMesh);
+    }
+
+    // A run-yourself sprint: the runner is kept to the 2D race's grid and lines (RunTerrain), so the trunks, walls and
+    // fences built from the map must not close what the 2D game leaves open (2026-11-20, Anders: stuck in a passage
+    // between a wall and a green). Their solids on a cell the grid lets a runner through are dropped (index range).
+    void OpenPassages(int from, int to)
+    {
+        if (input.passable == null || !input.passable.sprint || to <= from) return;
+        int kept = from;
+        for (int i = from; i < to; i++)
+        {
+            TvSolid s = world.solids[i];
+            if (input.passable.NoHouse(input.centerE + s.x, input.centerN + s.z)) continue;
+            world.solids[kept++] = s;
+        }
+        world.solids.RemoveRange(kept, to - kept);
     }
 
     void Keep(TvMesh m)
@@ -2164,6 +2186,8 @@ public partial class TvWorldBuilder
                     default: continue;
                 }
                 if (random.Value() > p || Blocked(x, z, 1.3f)) continue;
+                // A town: no crown in a house, a canopy, a bridge or a street thing (the crown reaches about 2 m)
+                if (input.town != null && (TownKeepOut(x, z, 1.2f + 1.6f * s) || !Free(x, z, 1.2f + 1.4f * s))) continue;
 
                 bool near = chunk || x * x + z * z < 70f * 70f;
                 int pick = random.Value() < 0.5f ? 0 : 1;
@@ -2213,6 +2237,7 @@ public partial class TvWorldBuilder
                     default: continue;
                 }
                 if (random.Value() > p || Blocked(x, z, 0.8f)) continue;
+                if (input.town != null && TownKeepOut(x, z, 0.9f)) continue;
                 bool spruce = ThicketTree(kind != WorldCell.LightGreen) != Tree.Birch;
                 TvShape[] set = spruce ? youngSpruce : youngLeafy;
                 float sc = h / 2.5f;
