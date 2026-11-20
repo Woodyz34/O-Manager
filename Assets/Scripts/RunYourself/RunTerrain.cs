@@ -17,6 +17,7 @@ public class RunTerrain
         public float rough;       // 0.3 on a road, 1 in white forest, up to 1.7 in a thicket or a boulder field
         public Surface surface;
         public bool blocked;      // nobody gets through: a lake, a house, a garden, impassable dark green, outside the map
+        public bool stairs;       // on stairs: quick up, slow down (RunPlayer.Speed)
     }
 
     readonly WorldLayer layer;
@@ -255,13 +256,14 @@ public class RunTerrain
             g.surface = Surface.Paved;
             break;
         }
-        // On stairs: up or down, slowly (2026-11-20, a player: you must be able to run down stairs, but slowly)
+        // On stairs: up as quick as a road, down slowly (2026-11-20, Anders; RunPlayer.Speed slows the way down)
         foreach (int index in near)
         {
             Piece p = pieces[index];
             if (!IsStairs(p.kind) || Dist(x, z, p) > 1.2f) continue;
             g.blocked = false;
             g.speed = SymbolRules.StairsSpeed * forest;
+            g.stairs = true;
             g.rough = 1.2f;
             g.surface = Surface.Paved;
             break;
