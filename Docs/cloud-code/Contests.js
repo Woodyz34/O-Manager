@@ -73,14 +73,15 @@ const KEEP_DAYS = 30;              // the leaderboard (names and results) is kep
 const CLEANED_KEEP = 400;
 
 // Prizes (2026-11-19, the user): runner packs for the best, money for the rest.
-//   top      money (kr) for places 1-3; it grows with every player: their sum (the pot) gets GROWTH more for each
-//            player after the first three, shared out in the same proportions
+//   top      money (kr) for places 1-3, on top of their packs
+//   growth   kr added to a bonus pot for every player who finishes (2026-11-20, the user: more players
+//            give more money, never more packs); places 1-3 share the pot as in "share" (percent)
 //   packs    runner packs for places 1-3: "weekly" (Elite 15 %, Gold 35 %, Silver 50 %), "daily" (Elite 5 %,
 //            Gold 25 %, Silver 70 %), "normal" (the shop's pack). The odds are in the game (PrizePacks.cs).
 //   next     money for places 4-6, tookPart for everyone else who finished. A tie shares the place and its prize.
 const PRIZES = {
-  w: { top: [0, 0, 0], packs: [["weekly"], ["daily", "normal"], ["daily"]], next: [300, 275, 250], tookPart: 200, growth: 0 },
-  d: { top: [0, 500, 300], packs: [["daily"], [], []], next: [150, 130, 115], tookPart: 100, growth: 25 }
+  w: { top: [0, 0, 0], packs: [["weekly"], ["daily", "normal"], ["daily"]], next: [300, 275, 250], tookPart: 200, growth: 50, share: [50, 30, 20] },
+  d: { top: [0, 500, 300], packs: [["daily"], [], []], next: [150, 130, 115], tookPart: 100, growth: 25, share: [50, 30, 20] }
 };
 
 module.exports = async ({ params, context, logger }) => {
@@ -274,17 +275,16 @@ function standings(id, board) {
     list[i].place = i > 0 && better(kind, list[i - 1], list[i]) === 0 ? list[i - 1].place : i + 1;
   }
   const rules = PRIZES[id[0]];
-  const pot = rules.top[0] + rules.top[1] + rules.top[2];
-  const growth = pot > 0 ? 1 + rules.growth * Math.max(0, list.length - 3) / pot : 1;
+  const bonus = rules.growth * list.length;
   for (const row of list) {
-    row.prize = prize(rules, row.place, growth);
+    row.prize = prize(rules, row.place, bonus);
     row.packs = row.place <= 3 ? rules.packs[row.place - 1] : [];
   }
   return list;
 }
 
-function prize(rules, place, growth) {
-  if (place <= 3) return Math.round(rules.top[place - 1] * growth / 5) * 5;
+function prize(rules, place, bonus) {
+  if (place <= 3) return Math.round((rules.top[place - 1] + bonus * rules.share[place - 1] / 100) / 5) * 5;
   if (place <= 6) return rules.next[place - 4];
   return rules.tookPart;
 }

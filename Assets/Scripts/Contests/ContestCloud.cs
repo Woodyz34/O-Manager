@@ -69,7 +69,8 @@ public class ContestPrizeRules
     public string[][] packs;
     public int[] next;
     public int tookPart;
-    public int growth;
+    public int growth;     // kr more in the top three's bonus pot for every player who finishes
+    public int[] share;    // how the pot is shared among places 1-3, in percent
 }
 
 // Talks to the Cloud Code script "Contests" with the player's own sign-in. Everything that matters (one try each,
