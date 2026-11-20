@@ -29,6 +29,25 @@ public class IndividualRace : MonoBehaviour, IRaceStats
     bool started;
     bool statsShown;
     TextMeshProUGUI pickInfo;
+    List<RelayTrack> ownTracks;     // routes recorded elsewhere (run it yourself: the 3D run), shown instead of the 2D runners'
+
+    // Run it yourself: RunSession opens the statistics screen itself, when everyone is in and the 3D view is closed
+    public bool ManualStats;
+
+    // Run it yourself (2026-11-19): the runner ran in the 3D world, so the replay shows that GPS track
+    public void UseTracks(List<RelayTrack> tracks) => ownTracks = tracks;
+
+    // Run it yourself: the statistics screen at once when the runner is in (the 2D race never started for real)
+    public void ShowStats(List<RelayTrack> tracks)
+    {
+        ownTracks = tracks;
+        if (statsShown) return;
+        statsShown = true;
+        started = true;
+        recorder.Stop();
+        statsUI = RelayStatsUI.Create(this);
+        statsUI.Open(0, true, ownTracks);
+    }
 
     public bool FinalResultsAllowed { get; private set; }
     public CourseData Course => course;
@@ -109,12 +128,12 @@ public class IndividualRace : MonoBehaviour, IRaceStats
 
     void Update()
     {
-        if (!statsShown && started && AllFinished())
+        if (!statsShown && !ManualStats && started && AllFinished())
         {
             statsShown = true;
             recorder.Stop();
             statsUI = RelayStatsUI.Create(this);
-            statsUI.Open(0, true, recorder.Tracks);
+            statsUI.Open(0, true, ownTracks ?? recorder.Tracks);
         }
         if (CompetitionFlow.ResultsShown && statsUI != null && statsUI.IsOpen)
         {

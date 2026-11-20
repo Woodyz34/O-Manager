@@ -43,6 +43,7 @@ public class SinglePlayerMenu : MonoBehaviour
     MapSelectUI courseWindow;
     TextMeshProUGUI poolValue;
     TextMeshProUGUI modeValue;
+    GameObject runSettingsButton;     // "3D settings", only while Run it yourself is picked
     TextMeshProUGUI courseValue;
     TextMeshProUGUI poolInfo;
     RawImage coursePicture;
@@ -135,7 +136,7 @@ public class SinglePlayerMenu : MonoBehaviour
 
         // Left: the lobby's "Runner setup" card
         Image left = CourseUI.CardPanel("Runner setup", page);
-        CourseUI.Place(left.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(48, -170), new Vector2(460, 560));
+        CourseUI.Place(left.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(48, -170), new Vector2(460, 640));
         CourseUI.Column(left.gameObject, 14, new RectOffset(28, 28, 24, 24));
         TextMeshProUGUI setupTitle = CourseUI.Text("Title", left.transform, "Runner setup", 36, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(setupTitle, 48);
@@ -143,6 +144,9 @@ public class SinglePlayerMenu : MonoBehaviour
         SetupButton(left.transform, "Change course", OpenCourses, UIHints.ChangeCourse);
         SetupButton(left.transform, "Runner pool", OpenPools, UIHints.RunnerPool);
         SetupButton(left.transform, "Game mode", OpenModes, UIHints.GameMode);
+        runSettingsButton = SetupButton(left.transform, "3D settings", () => RunSettings.Open(),
+            "Graphics, game speed, man or woman and mouse speed for \"Run it yourself\".").gameObject;
+        runSettingsButton.SetActive(false);
         poolInfo = CourseUI.Text("Pool info", left.transform, "", 20, CourseUI.InkMuted);
         CourseUI.Size(poolInfo, 120);
 
@@ -198,11 +202,12 @@ public class SinglePlayerMenu : MonoBehaviour
         return value;
     }
 
-    static void SetupButton(Transform parent, string label, UnityEngine.Events.UnityAction click, string tip)
+    static Button SetupButton(Transform parent, string label, UnityEngine.Events.UnityAction click, string tip)
     {
         Button button = CourseUI.Button(label, parent, label, CourseUI.ButtonKind.Light, click, 26);
         CourseUI.Size(button, 66);
         HoverTip.Add(button, tip);
+        return button;
     }
 
     // The lobby's course window (MapSelectUI) with its tabs, search and AI course, built here in code
@@ -281,6 +286,7 @@ public class SinglePlayerMenu : MonoBehaviour
         bool noRunners = (modes & ExtraModes.NoRunners) != 0;
         poolValue.text = noRunners ? "No runners" : GameModes.PoolName(pool);
         modeValue.text = ExtraModes.Describe(modes);
+        runSettingsButton.SetActive((modes & ExtraModes.RunModes) != 0);
         courseValue.text = course != null ? LobbySettingsUI.CourseTitle(course) : "Pick a course";
 
         int owned = GameModes.OwnedRunnerCount();

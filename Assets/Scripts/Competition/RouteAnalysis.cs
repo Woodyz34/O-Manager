@@ -119,6 +119,10 @@ public static class RouteAnalysis
     }
 
     // The same smoothing and timing as the route choice game, with this runner's speed
+    // Run it yourself: the computer's route is timed by the 3D runner's own speeds (RunSession sets this), so it can be
+    // compared with the players' times. A line of map world points in, race seconds out.
+    public static System.Func<List<Vector3>, float> RealTimer;
+
     public static RouteChoiceGenerator Generator(PathfindingManager manager, float baseSpeed)
     {
         // Ground nobody can run on (a building, a fence, private land) counts as 100 times slower than open ground
@@ -652,16 +656,31 @@ public class RouteCompareView : MonoBehaviour
         if (leg > 0)
         {
             RouteChoice c = Computer(leg);
-            return c != null && c.points.Count > 1 ? Mathf.RoundToInt(c.seconds) : 0;
+            return c != null && c.points.Count > 1 ? SecondsOf(c) : 0;
         }
         int sum = 0;
         for (int k = 1; k <= Legs; k++)
         {
             RouteChoice c = Computer(k);
             if (c == null || c.points.Count < 2) return 0;
-            sum += Mathf.RoundToInt(c.seconds);
+            sum += SecondsOf(c);
         }
         return sum;
+    }
+
+    // Run it yourself: the computer's route is timed by the 3D runner's own speeds (RouteAnalysis.RealTimer)
+    readonly Dictionary<RouteChoice, int> realSeconds = new Dictionary<RouteChoice, int>();
+
+    int SecondsOf(RouteChoice c)
+    {
+        if (RouteAnalysis.RealTimer == null) return Mathf.RoundToInt(c.seconds);
+        if (realSeconds.TryGetValue(c, out int known)) return known;
+        PathfindingManager manager = Manager;
+        List<Vector3> line = new List<Vector3>();
+        foreach (Vector2 p in c.points) line.Add(RouteAnalysis.GridToWorld(manager, p));
+        int seconds = Mathf.RoundToInt(RouteAnalysis.RealTimer(line));
+        realSeconds[c] = seconds;
+        return seconds;
     }
 
     // ---- Showing a leg ----

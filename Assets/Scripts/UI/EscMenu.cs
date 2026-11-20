@@ -246,7 +246,14 @@ public class EscMenu : MonoBehaviour
         bool host = inCompetition && CompetitionFlow.IsHostRunner(runner);
 
         endButton.gameObject.SetActive(host);
-        if (settingsButton != null) settingsButton.gameObject.SetActive(runner != null && ActiveScene.Name != "MainMenu");
+        // Lobby settings only in a multiplayer game (2026-11-19, Anders); in single player the run-yourself race has its
+        // own 3D settings instead
+        bool runYourself = RunSession.Active != null;
+        if (settingsButton != null)
+        {
+            settingsButton.gameObject.SetActive(runner != null && ActiveScene.Name != "MainMenu" && (!single || runYourself));
+            CourseUI.SetButtonText(settingsButton, runYourself ? "3D settings" : "Lobby settings");
+        }
         if (host)
         {
             bool confirming = Time.unscaledTime < endConfirmUntil;
@@ -603,7 +610,9 @@ public class EscMenu : MonoBehaviour
         settingsButton = CourseUI.Button("Lobby settings", choice.transform, "Lobby settings", CourseUI.ButtonKind.Light, () =>
         {
             Close();
-            HostSettingsPopup.Open();
+            // Run it yourself has its own settings (graphics, game speed, map hand, sound)
+            if (RunSession.Active != null) RunSettings.Open();
+            else HostSettingsPopup.Open();
         }, 28);
         CourseUI.Size(settingsButton, 76);
         HoverTip.Add(settingsButton, "Race speed, TV controls, bears and control moves. Only the host can change them, also during the race; everyone else can look.");

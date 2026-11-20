@@ -13,7 +13,7 @@ public class ModesPopup : MonoBehaviour
     ExtraMode modes;
     Action<ExtraMode> chosen;
     RectTransform list;
-    ExtraMode offered = ExtraModes.AllMask;
+    ExtraMode offered = ExtraModes.LobbyMask;
     string hintText;
     bool readOnly;
     int tasksOff;
@@ -32,7 +32,7 @@ public class ModesPopup : MonoBehaviour
         canvas.sortingOrder = 200;
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
         open = go.AddComponent<ModesPopup>();
-        open.offered = offered ?? ExtraModes.AllMask;
+        open.offered = offered ?? ExtraModes.LobbyMask;
         open.modes = current & open.offered;
         open.chosen = onChosen;
         open.readOnly = readOnly;
@@ -54,12 +54,15 @@ public class ModesPopup : MonoBehaviour
         int tiles = 1, extras = 0;
         foreach (ExtraMode mode in ExtraModes.All)
         {
-            if ((offered & mode) == 0) continue;
+            if ((offered & mode) == 0 || mode == ExtraMode.RunMass) continue;
             if ((mode & ExtraModes.AddOns) != 0) extras++;
             else tiles++;
         }
         float listHeight = (tiles + extras) * TileStep + HeadingHeight * (extras > 0 ? 2 : 1);
-        float height = 150f + listHeight + 100f;
+        // Never taller than the screen (2026-11-19: the Done button fell off the bottom): the list scrolls instead
+        float screenHeight = Screen.height / ScreenSettings.FitScale();
+        float shown = Mathf.Min(listHeight, Mathf.Max(260f, screenHeight - 60f - 250f));
+        float height = 150f + shown + 100f;
         Image card = CourseUI.CardPanel("Card", transform);
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820, height));
         card.gameObject.AddComponent<ClickCatcher>();
@@ -70,9 +73,10 @@ public class ModesPopup : MonoBehaviour
         TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, hintText, 21, CourseUI.InkMuted);
         CourseUI.Size(hint, 30);
 
-        list = CourseUI.Rect("Modes", card.transform);
-        CourseUI.Column(list.gameObject, TileGap, new RectOffset(0, 0, 0, 0));
-        CourseUI.Size(list, listHeight - TileGap);
+        list = CourseUI.ScrollList("Modes", card.transform, out ScrollRect scroll);
+        CourseUI.Column(list.gameObject, TileGap, new RectOffset(0, shown < listHeight ? 22 : 0, 0, 0));
+        CourseUI.Size(scroll.GetComponent<RectTransform>(), shown - TileGap);
+        if (shown < listHeight) FastScroll.Add(scroll)?.OnLightCard();
         Fill();
 
         Button done = CourseUI.Button("Done", card.transform, "Done", CourseUI.ButtonKind.Primary, Done, 24);
@@ -97,6 +101,12 @@ public class ModesPopup : MonoBehaviour
         foreach (ExtraMode mode in ExtraModes.All)
         {
             if ((offered & mode) == 0 || (mode & ExtraModes.AddOns) != 0) continue;
+            if (mode == ExtraMode.RunMass) continue;   // shown as the start choice on "Run it yourself"
+            if (mode == ExtraMode.RunYourself)
+            {
+                AddRunTile(players);
+                continue;
+            }
             AddModeTile(mode, players, () =>
             {
                 bool wasOn = (modes & mode) != 0;
@@ -158,6 +168,44 @@ public class ModesPopup : MonoBehaviour
             Transform label = tile.transform.Find("Text");
             if (label != null) CourseUI.Stretch((RectTransform)label, 86, 190, 8, 8);
         }
+    }
+
+    // "Run it yourself (3D)": one game mode (2026-11-19, Anders), with a button on it for the start: everyone in their
+    // own forest (individual) or all together (mass start)
+    void AddRunTile(int players)
+    {
+        ExtraMode bases = ExtraModes.ImposterKinds | ExtraModes.Alone;
+        bool on = (modes & ExtraModes.RunModes) != 0;
+        bool mass = (modes & ExtraMode.RunMass) != 0;
+        bool massOffered = (offered & ExtraMode.RunMass) != 0;
+        string notHere = ExtraModes.NotOn(ExtraMode.RunYourself, CourseLibrary.Current);
+        string description = massOffered
+            ? "Be the runner: run the course yourself in 3D with the map in your hand. Choose individual start (everyone in their own forest) or mass start (all together)."
+            : ExtraModes.Description(ExtraMode.RunYourself);
+        if (notHere != null)
+        {
+            if (!readOnly) modes &= ~ExtraModes.RunModes;
+            AddTile(ExtraModes.Title(ExtraMode.RunYourself), description, false, () => UIToast.Show(notHere, 3f, CourseUI.Ink), true);
+            return;
+        }
+        Image tile = AddTile(ExtraModes.Title(ExtraMode.RunYourself), description, on, () =>
+        {
+            if (readOnly) return;
+            if (on) modes &= ~ExtraModes.RunModes;
+            else modes = (modes & ~bases & ~ExtraModes.AddOns) | ExtraMode.RunYourself;
+        });
+        if (!on || !massOffered) return;
+        // The start: a button that flips between the two
+        Button start = CourseUI.Button("Start", tile.transform, mass ? "Mass start" : "Individual", CourseUI.ButtonKind.Primary, () =>
+        {
+            if (readOnly) return;
+            modes = (modes & ~ExtraModes.RunModes) | (mass ? ExtraMode.RunYourself : ExtraMode.RunMass);
+            Fill();
+        }, 22);
+        CourseUI.Place(start.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-20, 0), new Vector2(170, 56));
+        HoverTip.Add(start, "Individual: everyone runs in their own forest; compare times and routes afterwards.\nMass start: all start together in the same forest, see each other and can bump into each other.\nClick to change.");
+        Transform label = tile.transform.Find("Text");
+        if (label != null) CourseUI.Stretch((RectTransform)label, 86, 205, 8, 8);
     }
 
     void AddHeading(string text)

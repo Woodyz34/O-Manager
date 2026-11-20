@@ -289,7 +289,7 @@ namespace MapImport
             T("roughOpen", t.roughOpen); T("paved", t.paved, true);
             sb.Append("},\n");
             TerrainLook look = (i.look ?? new TerrainLook()).Safe();
-            sb.Append("  \"look\": {\"ground\": \"").Append(Escape(look.ground)).Append("\", \"forest\": \"").Append(Escape(look.forest))
+            sb.Append("  \"look\": {\"ground\": \"").Append(Escape(look.ground)).Append("\", \"forest\": \"").Append(Escape(look.forest)).Append("\", \"town\": \"").Append(Escape(look.town))
               .Append("\", \"undergrowth\": ").Append(look.undergrowth.ToString("0.###", CultureInfo.InvariantCulture))
               .Append(", \"text\": \"").Append(Escape(look.text)).Append("\"},\n");
             sb.Append("  \"permissionConfirmed\": ").Append(i.permissionConfirmed ? "true" : "false").Append("\n}\n");
