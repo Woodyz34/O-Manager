@@ -63,62 +63,11 @@ public class TvWorldView : MonoBehaviour
         return grain;
     }
 
-    static Texture2D surface;
-
-    // The grain of everything that is not ground: soft blotches of a metre or so, smaller ones in them and fine specks,
-    // repeated every 4 m (the shader lays it on from three sides). 0.84 on average.
-    public static Texture2D Surface()
-    {
-        if (surface != null) return surface;
-        const int Size = 256;
-        var random = new System.Random(19);
-        // Value noise that repeats with the texture
-        float[] Lattice(int n)
-        {
-            var v = new float[n * n];
-            for (int i = 0; i < v.Length; i++) v[i] = (float)random.NextDouble();
-            return v;
-        }
-        int[] periods = { 4, 9, 18, 40 };
-        float[] weights = { 0.42f, 0.28f, 0.18f, 0.12f };
-        var lattices = new float[periods.Length][];
-        for (int o = 0; o < periods.Length; o++) lattices[o] = Lattice(periods[o]);
-        var pixels = new Color32[Size * Size];
-        for (int y = 0; y < Size; y++)
-        {
-            for (int x = 0; x < Size; x++)
-            {
-                float v = 0f;
-                for (int o = 0; o < periods.Length; o++)
-                {
-                    int n = periods[o];
-                    float gx = x * n / (float)Size, gy = y * n / (float)Size;
-                    int i = (int)gx, j = (int)gy;
-                    float u = gx - i, w = gy - j;
-                    u = u * u * (3f - 2f * u);
-                    w = w * w * (3f - 2f * w);
-                    float[] l = lattices[o];
-                    float a = l[j % n * n + i % n], b = l[j % n * n + (i + 1) % n], c = l[(j + 1) % n * n + i % n], d = l[(j + 1) % n * n + (i + 1) % n];
-                    v += weights[o] * (a + (b - a) * u + (c - a) * w + (a - b - c + d) * u * w);
-                }
-                // Blotches from 0.64 to 1, with fine specks
-                float t = Mathf.Clamp01((v - 0.2f) / 0.6f);
-                float g = 0.64f + 0.36f * t * t * (3f - 2f * t) + ((float)random.NextDouble() - 0.5f) * 0.12f;
-                byte k = (byte)Mathf.Clamp(g * 255f, 0f, 255f);
-                pixels[y * Size + x] = new Color32(k, k, k, 255);
-            }
-        }
-        surface = new Texture2D(Size, Size, TextureFormat.RGBA32, true) { name = "TV surface grain", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 2 };
-        surface.SetPixels32(pixels);
-        surface.Apply(true, true);
-        return surface;
-    }
-
-    // The material of the trees, stones, houses and everything else: their colours with the surface grain on them
+    // The material of the trees, stones, houses and everything else: their colours with the surface grain on them (the
+    // shader works the grain out from the place)
     public static Material NewObjectMaterial(float strength = 0.85f)
     {
         Material m = NewMaterial(Color.white);
-        m.SetTexture("_SurfaceTex", Surface());
         m.SetFloat("_Surface", strength);
         return m;
     }
