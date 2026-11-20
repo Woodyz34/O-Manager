@@ -38,5 +38,6 @@
   "privateSourceKey": "",
   "terrain": {"overall": 0.5, "roads": 0.438, "paths": 0.5, "forest": 0.5, "lightGreen": 0.5, "midGreen": 0.5, "darkGreen": 0.5, "marsh": 0.5, "stony": 0.5, "open": 0.5, "roughOpen": 0.5, "paved": 0.5},
   "look": {"ground": "moss", "forest": "mixed", "undergrowth": 0.946, "text": ""},
+  "rulesVersion": 2,
   "permissionConfirmed": true
 }

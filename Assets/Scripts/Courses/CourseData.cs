@@ -48,6 +48,9 @@ public class CourseData
     // the start and finish shots, TvDirector)
     public const int MaxTvControls = 90;
     public List<CoursePoint> tvControls = new List<CoursePoint>();
+    // Controls right at a fence, a wall or an out-of-bounds area: the side the course setter chose to punch them from
+    // (2026-11-20, PunchSides), so every player in the lobby runs to exactly the same side
+    public List<PunchSide> punchSides = new List<PunchSide>();
 
     public bool HasTvControl(CoursePoint point)
     {
@@ -473,7 +476,39 @@ public class CourseData
                 tvN = n;
             }
         }
+        // The chosen sides of controls in a "p" field (2026-11-20; older versions skip it): the control in full, then
+        // the point on its side as a step of at most 2 km
+        if (punchSides != null && punchSides.Count > 0)
+        {
+            sb.Append("|p");
+            int written = 0;
+            foreach (PunchSide side in punchSides)
+            {
+                if (side == null || written >= PunchSides.MaxSides) continue;
+                long e = (long)Math.Round(side.control.e), n = (long)Math.Round(side.control.n);
+                long de = (long)Math.Round(side.at.e) - e, dn = (long)Math.Round(side.at.n) - n;
+                if (Math.Abs(de) > 2000 || Math.Abs(dn) > 2000) continue;
+                AppendDigits(sb, e, 4);
+                AppendDigits(sb, n, 4);
+                AppendDigits(sb, de + 2048, 2);
+                AppendDigits(sb, dn + 2048, 2);
+                written++;
+            }
+        }
         return sb.ToString();
+    }
+
+    static List<PunchSide> ReadPunchSides(string text)
+    {
+        var sides = new List<PunchSide>();
+        int index = 1;   // after the "p"
+        while (index + 12 <= text.Length && sides.Count < PunchSides.MaxSides)
+        {
+            long e = ReadDigits(text, ref index, 4), n = ReadDigits(text, ref index, 4);
+            long de = ReadDigits(text, ref index, 2) - 2048, dn = ReadDigits(text, ref index, 2) - 2048;
+            sides.Add(new PunchSide { control = new CoursePoint(e, n), at = new CoursePoint(e + de, n + dn) });
+        }
+        return sides;
     }
 
     static List<CoursePoint> ReadTvControls(string text)
@@ -635,6 +670,7 @@ public class CourseData
                 if (parts[p].StartsWith("x")) course.forbidden.AddRange(ReadForbidden(parts[p], true, true));
                 if (parts[p].StartsWith("t")) course.tvControls = ReadTvControls(parts[p]);
                 if (parts[p].StartsWith("g")) course.legSexes = parts[p].Substring(1);
+                if (parts[p].StartsWith("p")) course.punchSides = ReadPunchSides(parts[p]);
             }
             string coords = parts[8];
             if (coords.Length < 14 || (coords.Length - 8) % 6 != 0)
@@ -862,6 +898,10 @@ public class CourseData
         if (tvControls == null) tvControls = new List<CoursePoint>();
         if (tvControls.Count > MaxTvControls) tvControls.RemoveRange(MaxTvControls, tvControls.Count - MaxTvControls);
         if (!Finite(tvControls)) return false;
+
+        if (punchSides == null) punchSides = new List<PunchSide>();
+        punchSides.RemoveAll(side => side == null || !Finite(side.control) || !Finite(side.at));
+        if (punchSides.Count > PunchSides.MaxSides) punchSides.RemoveRange(PunchSides.MaxSides, punchSides.Count - PunchSides.MaxSides);
 
         if (legCourse == null) legCourse = new List<int>();
         if (relayCourses == null) relayCourses = new List<RelayLegCourse>();
