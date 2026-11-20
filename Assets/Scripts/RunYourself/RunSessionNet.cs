@@ -29,8 +29,17 @@ public partial class RunSession
     float nextPlayerScan;
     bool waitingForOthers;
 
-    // More than one player in the competition
-    static bool Online => Players().Count > 1;
+    // More than one player in the competition, decided when the race is loaded (someone leaving during the race must
+    // not change the clock or the game speed for those still running)
+    bool online, onlineKnown;
+    bool Online
+    {
+        get
+        {
+            if (!onlineKnown) { online = Players().Count > 1; onlineKnown = true; }
+            return online;
+        }
+    }
 
     static List<NetworkPlayer> Players()
     {

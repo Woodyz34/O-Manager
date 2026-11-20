@@ -669,7 +669,7 @@ public partial class RunSession : MonoBehaviour
 
         backdrop = CourseUI.Panel("Loading", hud.transform, new Color(0.11f, 0.16f, 0.13f), false).gameObject;
         CourseUI.Stretch((RectTransform)backdrop.transform);
-        TextMeshProUGUI loadingTitle = CourseUI.Text("Title", backdrop.transform, "Run it yourself\n<size=60%>" + course.name + "</size>",
+        TextMeshProUGUI loadingTitle = CourseUI.Text("Title", backdrop.transform, "Run it yourself\n<size=60%>" + (course != null ? course.name : "") + "</size>",
             64, new Color(0.96f, 0.94f, 0.86f), FontStyles.Bold, TextAlignmentOptions.Center);
         loadingTitle.richText = true;
         CourseUI.Place(loadingTitle.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 80f), new Vector2(1400f, 240f));

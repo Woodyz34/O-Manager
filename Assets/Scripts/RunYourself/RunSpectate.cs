@@ -66,9 +66,21 @@ public partial class RunSession
         watchCanvas = null;
     }
 
+    double ownE, ownN;
+    float ownYaw;
+    bool ownSaved;
+
     void Watch(NetworkPlayer p)
     {
         if (p == null || p == NetworkPlayer.Local || !remotes.ContainsKey(p)) return;
+        // Where this runner stands, to go back there when the watching stops
+        if (!ownSaved && player != null)
+        {
+            ownE = player.e;
+            ownN = player.n;
+            ownYaw = player.yaw;
+            ownSaved = true;
+        }
         watching = p;
         watchedDoneSince = -1f;
         shownPitch = p.run3dPitch;
@@ -78,7 +90,18 @@ public partial class RunSession
     void StopWatching()
     {
         watching = null;
-        if (player != null) player.puppet = false;
+        if (player != null)
+        {
+            player.puppet = false;
+            if (ownSaved)
+            {
+                player.e = ownE;
+                player.n = ownN;
+                player.yaw = ownYaw;
+                player.speed = 0f;
+            }
+        }
+        ownSaved = false;
         if (handMap != null) handMap.SetUp(false);
     }
 
