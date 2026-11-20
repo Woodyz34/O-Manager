@@ -61,6 +61,9 @@ public class MapDefinition : ScriptableObject
     // The folder of a map imported on this computer
     [NonSerialized] public string folder;
 
+    // The version of the map (MapPackageInfo.editedAt): a newer copy is used instead of the built-in one
+    public long editedAt;
+
     // This player's own copy of a map that is also built into the game (it is used instead of the built-in one here)
     [NonSerialized] public bool replacesBuiltIn;
 
@@ -129,6 +132,22 @@ public class MapDefinition : ScriptableObject
     // ---- Lookup ----
 
     static List<MapDefinition> all;
+    static List<MapDefinition> builtIn;
+
+    // The version of a map built into the game (its editedAt), or -1 when it is not built in
+    public static long BuiltInVersion(string mapId)
+    {
+        if (all == null) _ = All;
+        MapDefinition m = builtIn.Find(b => b.id == mapId);
+        return m != null ? m.editedAt : -1;
+    }
+
+    // The map is built into the game in this version or a later one
+    public static bool BuiltInFrom(string mapId, long version)
+    {
+        long built = BuiltInVersion(mapId);
+        return built >= 0 && built >= version;
+    }
 
     public static List<MapDefinition> All
     {
@@ -136,16 +155,19 @@ public class MapDefinition : ScriptableObject
         {
             if (all == null)
             {
-                all = new List<MapDefinition>(Resources.LoadAll<MapDefinition>("MapDefs"));
-                // Maps imported on this computer, unless the same map is already built into the game. A map this
-                // player imported and sent in keeps their own copy even once it is built in (2026-11-20, Anders: a map
-                // built into the game could no longer be edited), so they can change it and build it again; on this
-                // computer their copy is the one used.
+                builtIn = new List<MapDefinition>(Resources.LoadAll<MapDefinition>("MapDefs"));
+                all = new List<MapDefinition>(builtIn);
+                // Maps imported on this computer, unless the same map is already built into the game. A copy of a
+                // newer version (edited after it was built in, 2026-11-20) is used instead of the built-in one until
+                // that version is built in too; the player's own copy of the built-in version also stays, so they
+                // can edit it (Anders: a map built into the game could no longer be edited).
                 foreach (MapDefinition local in MapPackages.LoadLocal())
                 {
                     int same = all.FindIndex(m => m.id == local.id);
-                    if (same < 0) all.Add(local);
-                    else if (local.CanEdit && !local.isPrivate)
+                    if (same < 0) { all.Add(local); continue; }
+                    if (local.isPrivate || local.isBorrowed) continue;
+                    long built = all[same].editedAt;
+                    if (local.editedAt > built || (local.CanEdit && local.editedAt >= built))
                     {
                         local.replacesBuiltIn = true;
                         all[same] = local;

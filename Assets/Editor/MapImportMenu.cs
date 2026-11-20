@@ -135,6 +135,8 @@ public static class MapImportMenu
                 package.info.ownerClub = sent.ownerClub;
                 package.info.contact = sent.contact;
                 if (!string.IsNullOrEmpty(sent.mapType)) package.info.mapType = sent.mapType;
+                // The sender's version, so their game knows this version is built in now
+                if (sent.editedAt > 0) package.info.editedAt = sent.editedAt;
             }
             string folder = PackagesFolder + "/" + package.info.id;
             MapPackageBuilder.WriteFolder(folder, package, ownPng, (step, share) => EditorUtility.DisplayProgressBar("Import map", step, share));
