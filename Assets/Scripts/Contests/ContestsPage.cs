@@ -186,7 +186,9 @@ public class ContestsPage : MonoBehaviour
         cardsBar.targetGraphic = handle;
         cardsBar.direction = Scrollbar.Direction.LeftToRight;
         cardsScroll.horizontalScrollbar = cardsBar;
-        cardsScroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+        // AutoHide: the ScrollRect itself hides the bar when all cards fit (Today's three). Permanent switched it back on
+        // whatever the page did (2026-11-20, the user saw it under Today).
+        cardsScroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
         leftArrow = CourseUI.Button("Left", page, "<", CourseUI.ButtonKind.Primary, () => StepCards(-1), 40);
         CourseUI.Place((RectTransform)leftArrow.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-CardsWidth / 2f - 6f, -600), new Vector2(72, 120));
@@ -340,7 +342,6 @@ public class ContestsPage : MonoBehaviour
         float x = -cards.anchoredPosition.x;
         leftArrow.gameObject.SetActive(scrolls && x > 4f);
         rightArrow.gameObject.SetActive(scrolls && x < hidden - 4f);
-        cardsBar.gameObject.SetActive(scrolls);
         countText.gameObject.SetActive(scrolls);
         if (!scrolls) return;
         float step = cardWidth + CardGap;
