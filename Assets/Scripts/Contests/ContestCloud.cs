@@ -12,7 +12,8 @@ public class ContestInfo
 {
     public string id;          // "w2026-47_rc-forest", "d2026-11-19_race-sprint"
     public string span;        // "w" weekly, "d" daily
-    public string kind;        // rc-forest, rc-sprint, race-forest, race-sprint
+    public string kind;        // weekly: rc-forest, rc-sprint, race-forest, race-sprint, run-forest, run-sprint; daily: rc, race, run
+    public bool sprint;        // a sprint map (else forest): for the daily contests the cloud draws it
     public long startsAt;      // unix milliseconds
     public long endsAt;
     public long seed;          // the same for everyone: picks the map and lays the course
@@ -25,8 +26,9 @@ public class ContestInfo
     public ContestEntry mine;  // null when I have not started it
 
     public bool Weekly => span == "w";
-    public bool RouteChoice => kind != null && kind.StartsWith("rc-");
-    public bool Sprint => kind != null && kind.EndsWith("sprint");
+    public bool RouteChoice => kind != null && (kind == "rc" || kind.StartsWith("rc-"));
+    public bool Run3D => kind != null && kind.StartsWith("run");
+    public bool Sprint => sprint || (kind != null && kind.EndsWith("sprint"));
     public bool Started => mine != null;
     public bool Done => mine != null && mine.state == "done";
     public DateTime EndsLocal => DateTimeOffset.FromUnixTimeMilliseconds(endsAt).LocalDateTime;

@@ -40,7 +40,7 @@ public static class ContestRun
 
     public static string Title(ContestInfo c)
     {
-        string what = c.RouteChoice ? "Route choice game" : "Race";
+        string what = c.RouteChoice ? "Route choice game" : c.Run3D ? "Run it yourself (3D)" : "Race";
         return what + " · " + (c.Sprint ? "Sprint" : "Forest");
     }
 
@@ -50,6 +50,7 @@ public static class ContestRun
     public static string RunnerText(ContestInfo c)
     {
         if (c.RouteChoice) return "Pick the fastest route on every leg. Most points wins.";
+        if (c.Run3D) return "Run the course yourself in 3D with the map in your hand. Fastest time wins; miss a control and it does not count.";
         int technique = c.Sprint ? 100 : c.technique;
         return "Everyone runs with physics 100, speed 100, technique " + technique + ". Fastest time wins.";
     }
@@ -74,7 +75,7 @@ public static class ContestRun
         return kind + " · about " + planned.lengthKm.ToString("0.0", CultureInfo.InvariantCulture) + " km · about " + planned.controls + " controls";
     }
 
-    public static ExtraMode ModesFor(ContestInfo c) => c.RouteChoice ? ExtraMode.RouteChoice : ExtraMode.None;
+    public static ExtraMode ModesFor(ContestInfo c) => c.RouteChoice ? ExtraMode.RouteChoice : c.Run3D ? ExtraMode.RunYourself : ExtraMode.None;
 
     // How the contest's AI course is laid (2026-11-19, the user): a random length and number of controls, drawn from the
     // contest's seed so it is the same whoever lays it. Forest: middle 4-6 km or long 8-12 km, half and half. Sprint:
