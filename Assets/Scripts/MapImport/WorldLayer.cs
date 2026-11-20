@@ -14,7 +14,8 @@ namespace MapImport
     {
         // The low four bits: what the ground is
         public const byte Forest = 0, Open = 1, RoughOpen = 2, OpenTrees = 3, RoughOpenTrees = 4, LightGreen = 5, Green = 6,
-            DarkGreen = 7, Cultivated = 8, Water = 9, BareRock = 10, Sand = 11, Paved = 12, Building = 13, Plot = 14;
+            DarkGreen = 7, Cultivated = 8, Water = 9, BareRock = 10, Sand = 11, Paved = 12, Building = 13, Plot = 14,
+            Impassable = 15;   // impassable vegetation (ISSprOM 410, the Swedish 411): looks like dark green, nobody gets through
         public const byte BaseMask = 0x0F;
         // Things drawn on top of the ground
         public const byte Marsh = 0x10, Undergrowth = 0x20, Stony = 0x40, Boulders = 0x80;
@@ -30,7 +31,12 @@ namespace MapImport
     {
         None = 0, Cliff, SmallCliff, EarthBank, EarthWall, Gully, Stream, SmallStream, Ditch, NarrowMarsh,
         WideRoad, Road, Track, Footpath, SmallPath, FaintPath, Ride, Railway, PowerLine, MajorPowerLine,
-        Wall, RuinedWall, HighWall, Fence, RuinedFence, HighFence, Log
+        Wall, RuinedWall, HighWall, Fence, RuinedFence, HighFence, Log,
+        // 2026-11-20: the same passability as the 2D grid (SymbolRules)
+        Hedge,      // impassable vegetation drawn as a line (ISSprOM 410.1, 411)
+        Barrier,    // any other line nobody may cross (out-of-bounds boundary, uncrossable water's edge, impassable pipeline)
+        Stairs,     // a stairway: up or down, over the cliff or wall it crosses, slowly
+        Bridge      // a bridge or tunnel (512) and a crossing point (710): a way over or through
     }
 
     public struct WorldPoint
@@ -64,7 +70,9 @@ namespace MapImport
     {
         public const float CellSize = 2f;
         const int Magic = 0x444C574F;   // "OWLD"
-        const int Version = 1;
+        // 2 (2026-11-20): built with the passability rules of the 2D grid (Impassable cells, Hedge, Barrier, Stairs, Bridge)
+        const int Version = 2;
+        public int version = Version;
         const long MaxCells = 120000000;
 
         public float cell = CellSize;
@@ -86,7 +94,8 @@ namespace MapImport
 
         // extent: the part of the paper the map's grid covers (after the map edge); offE/offN: what the package adds
         // to the paper's metres to get the game's coordinates (MapPackageInfo.offsetEast/offsetNorth)
-        public static WorldLayer Build(MapFile map, MapExtent extent, double offE, double offN)
+        // sprint: the map is a sprint map (impassable vegetation, hedges)
+        public static WorldLayer Build(MapFile map, MapExtent extent, double offE, double offN, bool sprint = false)
         {
             double mpm = map.MetersPerMm;
             var w = new WorldLayer();
@@ -105,7 +114,7 @@ namespace MapImport
             foreach (MapObject o in map.objects)
             {
                 if (o.kind != SymbolKind.Area || o.symbol == null) continue;
-                if (!AreaRule(o.symbol, out byte set, out byte flag, out bool clear)) continue;
+                if (!AreaRule(o.symbol, sprint, out byte set, out byte flag, out bool clear)) continue;
                 areas.Add((GridBuilder.TopColor(o.symbol), order++, o, set, flag, clear));
             }
             areas.Sort((a, b) => a.prio != b.prio ? b.prio.CompareTo(a.prio) : a.order.CompareTo(b.order));
@@ -139,7 +148,7 @@ namespace MapImport
                 }
                 else if (o.kind == SymbolKind.Line)
                 {
-                    WorldLineKind kind = LineKind(o.symbol);
+                    WorldLineKind kind = LineKind(o.symbol, sprint);
                     if (kind == WorldLineKind.None) continue;
                     foreach (double[] part in o.parts)
                     {
@@ -165,12 +174,22 @@ namespace MapImport
         }
 
         // What an area symbol does to the cells under it. set = 255: the ground stays, only the flag is added.
-        static bool AreaRule(MapSymbol s, out byte set, out byte flag, out bool clear)
+        static bool AreaRule(MapSymbol s, bool sprint, out byte set, out byte flag, out bool clear)
         {
             set = 255;
             flag = 0;
             clear = false;
             if (SymbolRules.IsBuilding(s)) { set = WorldCell.Building; clear = true; return true; }
+            if (GroundKind.Of(s) == GroundKind.Canopy) { set = WorldCell.Paved; clear = true; return true; }
+            bool blocked = SymbolRules.For(s, sprint).role == TerrainRole.Blocked;
+            switch (SymbolRules.Isom2017Major(s))
+            {
+                case 307: set = WorldCell.Water; flag = WorldCell.Marsh; clear = true; return true;   // uncrossable marsh
+                case 410: case 411:
+                    if (blocked) { set = WorldCell.Impassable; return true; }
+                    break;
+                case 709: case 714: set = WorldCell.Plot; clear = true; return true;               // out of bounds
+            }
             switch (SymbolRules.Isom2017Major(s))
             {
                 case 208: case 209: flag = WorldCell.Boulders; return true;
@@ -193,6 +212,8 @@ namespace MapImport
                 case 501: case 522: set = WorldCell.Paved; clear = true; return true;
                 case 520: set = WorldCell.Plot; clear = true; return true;
             }
+            // A map maker's own symbol for ground nobody may enter (named so; e.g. 999): out of bounds like a garden
+            if (blocked && SymbolRules.IsForbiddenArea(s)) { set = WorldCell.Plot; clear = true; return true; }
             return false;
         }
 
@@ -226,11 +247,18 @@ namespace MapImport
             return WorldPointKind.None;
         }
 
-        static WorldLineKind LineKind(MapSymbol s)
+        static WorldLineKind LineKind(MapSymbol s, bool sprint)
         {
             string name = (s.name ?? "").ToLowerInvariant();
             if (name.Contains("vindfäl") || name.Contains("windfall") || name.Contains("fallen tree")) return WorldLineKind.Log;
-            switch (SymbolRules.Isom2017Major(s))
+            TerrainRole role = SymbolRules.For(s, sprint).role;
+            if (role == TerrainRole.Stairs) return WorldLineKind.Stairs;
+            int major = SymbolRules.Isom2017Major(s);
+            if (role == TerrainRole.Bridge || major == 512) return WorldLineKind.Bridge;
+            if (role == TerrainRole.BlockingLine && (major == 410 || major == 411 || major == 421)) return WorldLineKind.Hedge;
+            // The 3D runner jumps an ordinary wall or fence, but one the 2D rules say is impassable stays impassable
+            if (role == TerrainRole.BlockingLine && (major == 513 || major == 516)) return major == 513 ? WorldLineKind.HighWall : WorldLineKind.HighFence;
+            switch (major)
             {
                 case 104: return WorldLineKind.EarthBank;
                 case 105: case 106: return WorldLineKind.EarthWall;
@@ -258,6 +286,8 @@ namespace MapImport
                 case 517: return WorldLineKind.RuinedFence;
                 case 518: return WorldLineKind.HighFence;
             }
+            // Building outlines are closed by the building itself; every other impassable line is a barrier
+            if (role == TerrainRole.BlockingLine && major != 521 && major != 526) return WorldLineKind.Barrier;
             return WorldLineKind.None;
         }
 
@@ -309,12 +339,13 @@ namespace MapImport
             if (bytes == null || bytes.Length < 12) return null;
             try
             {
-                if (BitConverter.ToInt32(bytes, 0) != Magic || BitConverter.ToInt32(bytes, 4) != Version) return null;
+                int fileVersion = BitConverter.ToInt32(bytes, 4);
+                if (BitConverter.ToInt32(bytes, 0) != Magic || fileVersion < 1 || fileVersion > Version) return null;
                 using (var ms = new MemoryStream(bytes, 8, bytes.Length - 8))
                 using (var zip = new DeflateStream(ms, CompressionMode.Decompress))
                 using (var r = new BinaryReader(zip))
                 {
-                    var w = new WorldLayer { cell = r.ReadSingle(), cols = r.ReadInt32(), rows = r.ReadInt32(), minE = r.ReadDouble(), minN = r.ReadDouble() };
+                    var w = new WorldLayer { version = fileVersion, cell = r.ReadSingle(), cols = r.ReadInt32(), rows = r.ReadInt32(), minE = r.ReadDouble(), minN = r.ReadDouble() };
                     if (w.cell <= 0f || w.cols <= 0 || w.rows <= 0 || (long)w.cols * w.rows > MaxCells) return null;
                     w.cells = ReadAll(r, w.cols * w.rows);
                     int pointCount = r.ReadInt32();

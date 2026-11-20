@@ -184,7 +184,8 @@ public partial class RunSession : MonoBehaviour
         if (this == null) return;
         data = new TvWorldData.Data { mapId = plain.mapId, layer = plain.layer, heights = detailed, look = plain.look, speeds = plain.speeds, town = plain.town };
         loadingCard.Set("Reading the terrain", 0.08f);
-        try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds, data.town)); }
+        List<ForbiddenArea> forbidden = course.forbidden;
+        try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds, data.town, forbidden)); }
         catch (Exception e)
         {
             Debug.LogWarning("RunSession: " + e);
@@ -195,6 +196,8 @@ public partial class RunSession : MonoBehaviour
 
         List<CoursePoint> flags = new List<CoursePoint>(points);
         flags.RemoveAt(0);
+        // A control by a fence or a wall stands on the side the course setter chose (PunchSides), so it is punched from there
+        for (int i = 0; i < flags.Count; i++) flags[i] = PunchSides.FlagPoint(course, flags[i]);
         world = RunWorld.Create(data, terrain, points[0], flags);
         world.transform.SetParent(transform, true);
         world.Loading = true;

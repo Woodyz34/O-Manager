@@ -237,6 +237,17 @@ public static class CourseValidator
         return RunCell(grid.speed, cell);
     }
 
+    // The cell a runner punches a course point from, on the side the course setter chose for it (PunchSides)
+    public static Vector2Int RunCell(MapDefinition map, MapGrid grid, CourseData course, CoursePoint point)
+    {
+        if (PunchSides.TryGet(course, point, out CoursePoint side))
+        {
+            Vector2Int onSide = RunCell(grid.speed, map.ToCell(side));
+            if (onSide.x >= 0) return onSide;
+        }
+        return RunCell(grid.speed, map.ToCell(point));
+    }
+
     public static Vector2Int RunCell(float[,] speed, Vector2Int cell)
     {
         int rows = speed.GetLength(0);
@@ -323,8 +334,8 @@ public static class CourseValidator
         AStarPathfinder pathfinder = new AStarPathfinder(grid.speed, grid.slopes);
         for (int i = 1; i < points.Count; i++)
         {
-            Vector2Int from = RunCell(grid, map.ToCell(points[i - 1]));
-            Vector2Int to = RunCell(grid, map.ToCell(points[i]));
+            Vector2Int from = RunCell(map, grid, course, points[i - 1]);
+            Vector2Int to = RunCell(map, grid, course, points[i]);
             if (from == to)
             {
                 return Fail(result, i, PointName(i, controls) + " is on top of " + PointName(i - 1, controls).ToLower() + ". Move it further away.");
@@ -403,8 +414,8 @@ public static class CourseValidator
         HashSet<long> done = new HashSet<long>();
         foreach (var way in ways)
         {
-            Vector2Int from = RunCell(grid, map.ToCell(way.from.point));
-            Vector2Int to = RunCell(grid, map.ToCell(way.to.point));
+            Vector2Int from = RunCell(map, grid, course, way.from.point);
+            Vector2Int to = RunCell(map, grid, course, way.to.point);
             if (from == to)
             {
                 return FailAt(result, way.to.point, Capital(way.to.name) + " is on top of " + way.from.name + ". Move it further away.");

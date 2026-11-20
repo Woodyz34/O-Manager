@@ -114,6 +114,9 @@ public class CourseBuilder : MonoBehaviour
     readonly List<Mark> shadows = new List<Mark>();
     Mark dragging;
 
+    // Controls right at a fence, a wall or an out-of-bounds area: the side the course setter picked (PunchSides)
+    readonly List<PunchSide> punchSides = new List<PunchSide>();
+
     // A click (without dragging) on the start or a control picks it: the next controls are put in after it, in the
     // middle of the course (pick control 3 and the new one becomes 4). -1 = after the start; null = at the end.
     int? insertAfter;
@@ -1060,8 +1063,11 @@ public class CourseBuilder : MonoBehaviour
         }
         else
         {
+            Vector3 dropped = dragging.position;
+            bool punched = dragging.type != MarkType.Start;
             EndDrag(false);
             SetStatus(where.Length > 0 ? markName + " was moved on " + where + " too, since it is the same control." : "", false);
+            if (punched) AskSide(dropped);
         }
         Redraw();
     }
@@ -1558,10 +1564,12 @@ public class CourseBuilder : MonoBehaviour
             MoveLinks(links, world);
             also = LegsText(links);
         }
+        bool punched = moveType != MarkType.Start;
         moveType = null;
         errorPoint = null;
         SetStatus(gone ? "" : moveName + " was moved" + (also.Length > 0 ? " on " + also + " too, since it is the same control." : "."), false);
         Redraw();
+        if (!gone && punched) AskSide(world);
     }
 
     void Place(Vector3 world)
@@ -1587,6 +1595,7 @@ public class CourseBuilder : MonoBehaviour
             return;
         }
         PushUndo();
+        Tool placed = tool;
         switch (tool)
         {
             case Tool.Start:
@@ -1613,6 +1622,7 @@ public class CourseBuilder : MonoBehaviour
                 break;
         }
         Redraw();
+        if (placed == Tool.Control || placed == Tool.Branch || placed == Tool.Finish) AskSide(world);
     }
 
     int ControlCount(EditCourse course)
@@ -2220,6 +2230,7 @@ public class CourseBuilder : MonoBehaviour
 
     void ClearCourse()
     {
+        punchSides.Clear();
         courses.Clear();
         forks.Clear();
         legCourse.Clear();
@@ -2287,6 +2298,7 @@ public class CourseBuilder : MonoBehaviour
                 if (item.fork < 0) course.controls.Add(WholeMeters(item.point));
                 else if (forks[item.fork].branches.Count > 0) foreach (Vector3 point in forks[item.fork].branches[0]) course.controls.Add(WholeMeters(point));
             }
+            AttachSides(course);
             return course;
         }
 
@@ -2346,7 +2358,66 @@ public class CourseBuilder : MonoBehaviour
         course.legSexes = new string(sexes).TrimEnd('a');
         if (course.legSexes.Length == 0) course.legSexes = null;
         course.RefreshMainFields();
+        AttachSides(course);
         return course;
+    }
+
+    // ---- Inside or outside (2026-11-20) ----
+
+    static bool SamePoint(CoursePoint a, CoursePoint b) => Math.Abs(a.e - b.e) < 1.5 && Math.Abs(a.n - b.n) < 1.5;
+
+    // The chosen sides of the controls (and finishes) the course still has
+    void AttachSides(CourseData course)
+    {
+        var used = new List<CoursePoint>();
+        foreach (EditCourse c in courses)
+        {
+            foreach (EditItem item in c.items) if (item.fork < 0) used.Add(WholeMeters(item.point));
+            if (c.finish.HasValue) used.Add(WholeMeters(c.finish.Value));
+        }
+        foreach (EditFork f in forks) foreach (List<Vector3> branch in f.branches) foreach (Vector3 p in branch) used.Add(WholeMeters(p));
+        course.punchSides = new List<PunchSide>();
+        foreach (PunchSide side in punchSides)
+        {
+            if (side == null || !used.Exists(p => SamePoint(p, side.control))) continue;
+            if (course.punchSides.Exists(s => SamePoint(s.control, side.control))) continue;
+            if (course.punchSides.Count < PunchSides.MaxSides) course.punchSides.Add(side);
+        }
+    }
+
+    // A control (or the finish) just put right at a fence, a wall, a cliff or an out-of-bounds area could be punched
+    // from either side: ask which, so every player in the lobby runs to the same side
+    void AskSide(Vector3 world)
+    {
+        if (map == null || grid == null) return;
+        CoursePoint point = WholeMeters(world);
+        punchSides.RemoveAll(s => s == null || SamePoint(s.control, point));
+        float[,] speed = grid.speed;
+        var shapes = new List<ForbiddenArea>();
+        foreach (List<Vector3> area in areas) if (area.Count >= 3) shapes.Add(new ForbiddenArea { corners = area.ConvertAll(WholeMeters) });
+        foreach (List<Vector3> line in boundaries) if (line.Count >= 2) shapes.Add(new ForbiddenArea { line = true, corners = line.ConvertAll(WholeMeters) });
+        foreach (List<Vector3> line in bridges) if (line.Count >= 2) shapes.Add(new ForbiddenArea { line = true, bridge = true, corners = line.ConvertAll(WholeMeters) });
+        if (shapes.Count > 0)
+        {
+            speed = (float[,])grid.speed.Clone();
+            ForbiddenAreas.Block(speed, map, shapes);
+        }
+        List<PunchSides.Option> options = PunchSides.Options(map, speed, point);
+        if (options.Count < 2) return;
+        var choices = new ChoicePopup.Option[options.Count];
+        for (int i = 0; i < options.Count; i++)
+            choices[i] = new ChoicePopup.Option { id = i.ToString(), title = options[i].title, description = options[i].description };
+        // Until the course setter picks, the first side (the inside, when there is one) counts
+        int first = options.FindIndex(o => o.title == "Inside");
+        if (first < 0) first = 0;
+        punchSides.Add(new PunchSide { control = point, at = options[first].at });
+        ChoicePopup.Open("Inside or outside?", choices, first.ToString(), id =>
+        {
+            if (!int.TryParse(id, out int pick) || pick < 0 || pick >= options.Count) return;
+            punchSides.RemoveAll(s => s == null || SamePoint(s.control, point));
+            punchSides.Add(new PunchSide { control = point, at = options[pick].at });
+            SetStatus("Every runner punches it from the side you picked: " + options[pick].title.ToLower() + ".", false);
+        }, "The control is right at a fence, a wall, a cliff or an out-of-bounds area. Which side is it on? Everyone in the lobby gets the same.");
     }
 
     // Whole metres, so the course is exactly the same for the players who receive it in the lobby (CourseData.ToCompact)
@@ -2591,6 +2662,7 @@ public class CourseBuilder : MonoBehaviour
                 (area.bridge ? bridges : area.line ? boundaries : areas).Add(area.corners.ConvertAll(p => map.ToWorld(p)));
             }
         }
+        if (course.punchSides != null) foreach (PunchSide side in course.punchSides) if (side != null) punchSides.Add(side);
         if (relay)
         {
             forkEveryVariant = course.forkEveryVariant;

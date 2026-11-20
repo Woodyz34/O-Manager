@@ -24,6 +24,7 @@ public static class Tunnels
     {
         public Vector2 a1, a2, b1, b2;   // side line a from a1 to a2, side line b from b1 (near a1) to b2 (near a2)
         public bool walls;               // a tunnel (true) or a bridge
+        public bool across;              // forest map brackets: the way goes from one bracket to the other (see Oriented)
     }
 
     static readonly Dictionary<string, List<Tunnel>> cache = new Dictionary<string, List<Tunnel>>();
@@ -82,13 +83,14 @@ public static class Tunnels
             return tunnels;
         }
 
-        Pair(sides, true, tunnels);
-        Pair(bridgeSides, false, tunnels);
+        Pair(sides, true, tunnels, !map.IsSprint);
+        Pair(bridgeSides, false, tunnels, false);
         return tunnels;
     }
 
     // The two side lines of a tunnel (or a bridge) run side by side, a few metres apart
-    static void Pair(List<(Vector2 from, Vector2 to)> sides, bool walls, List<Tunnel> tunnels)
+    // brackets: a forest map's tunnel (ISOM 512), drawn as two short brackets on either side of the road above it
+    static void Pair(List<(Vector2 from, Vector2 to)> sides, bool walls, List<Tunnel> tunnels, bool brackets)
     {
         bool[] used = new bool[sides.Count];
         for (int i = 0; i < sides.Count; i++)
@@ -100,13 +102,25 @@ public static class Tunnels
             float length = Vector2.Distance(a1, a2);
             int best = -1;
             float bestDistance = Mathf.Min(15f, Mathf.Max(4f, length * 0.8f));
+            // A forest map (ISOM 512) draws the two short brackets on either side of the road the tunnel goes under, as
+            // far apart as the road is wide, often further than they are long (2026-11-20, Illern: 7 m brackets 21 m
+            // apart): look up to 30 m away for a bracket running the same way, straight across from this one
+            if (brackets) bestDistance = 30f;
+            Vector2 way = (a2 - a1).normalized;
             for (int j = 0; j < sides.Count; j++)
             {
                 if (used[j]) continue;
-                float d = Vector2.Distance(mid, (sides[j].from + sides[j].to) / 2f);
+                Vector2 otherMid = (sides[j].from + sides[j].to) / 2f;
+                float d = Vector2.Distance(mid, otherMid);
+                if (brackets)
+                {
+                    Vector2 other = (sides[j].to - sides[j].from).normalized;
+                    if (Mathf.Abs(Vector2.Dot(way, other)) < 0.7f) continue;
+                    if (d > 0.01f && Mathf.Abs(Vector2.Dot(way, (otherMid - mid) / d)) > 0.75f) continue;
+                }
                 if (d < bestDistance) { bestDistance = d; best = j; }
             }
-            Tunnel tunnel = new Tunnel { a1 = a1, a2 = a2, walls = walls };
+            Tunnel tunnel = new Tunnel { a1 = a1, a2 = a2, walls = walls, across = brackets };
             if (best >= 0)
             {
                 used[best] = true;
@@ -121,6 +135,7 @@ public static class Tunnels
             else
             {
                 // Only one line: a 3 m wide way along it
+                tunnel.across = false;
                 Vector2 across = Vector2.Perpendicular((a2 - a1).normalized) * 1.5f;
                 tunnel.a1 = a1 + across; tunnel.a2 = a2 + across;
                 tunnel.b1 = a1 - across; tunnel.b2 = a2 - across;
@@ -145,11 +160,61 @@ public static class Tunnels
         return !lower.Contains("tunnel") && !lower.Contains("genomgång");
     }
 
+    // Which way a tunnel goes. A sprint map draws its two side lines along it (ISSprOM 512.2); a forest map draws two
+    // short brackets across it, one each side of the road above (ISOM 512, the picture in the standard: a path and a
+    // stream under a road). Read the wrong way round, the way ran along the road, and a path through the tunnel
+    // came in from its side, which the two levels do not allow, so the route could not be drawn through (2026-11-20).
+    // The right way is the one with open ground at both ends and closed ground (or the road) in the middle.
+    // Sprint maps keep their side lines as they are; forest brackets are turned, unless the ground clearly says the
+    // way runs along them (open at both ends that way, not the other).
+    static Tunnel Oriented(MapDefinition map, float[,] speed, Tunnel t)
+    {
+        if (!t.across) return t;
+        Tunnel across = new Tunnel { a1 = t.a1, a2 = t.b1, b1 = t.a2, b2 = t.b2, walls = t.walls };
+        int keep = EndScore(map, speed, t), turn = EndScore(map, speed, across);
+        return keep > turn + 1 ? t : across;
+    }
+
+    // 2 for each end of the way with ground a runner can stand on just beyond it, and 1 when the middle is closed
+    static int EndScore(MapDefinition map, float[,] speed, Tunnel t)
+    {
+        int rows = speed.GetLength(0), cols = speed.GetLength(1);
+        float metresPerCell = Mathf.Max(0.5f, map.gridSize);
+        bool Open(Vector2 p)
+        {
+            Vector2Int c = map.ToCell(new CoursePoint(p.x, p.y));
+            return c.x >= 0 && c.y >= 0 && c.x < cols && c.y < rows && speed[c.y, c.x] > 0.01f;
+        }
+        Vector2 start = (t.a1 + t.b1) / 2f, end = (t.a2 + t.b2) / 2f;
+        Vector2 dir = end - start;
+        float length = dir.magnitude;
+        if (length < 0.01f) return 0;
+        dir /= length;
+        int score = 0;
+        // Just beyond each end, a cell or two out
+        for (int k = 1; k <= 2; k++)
+        {
+            if (Open(start - dir * metresPerCell * k)) { score += 2; break; }
+        }
+        for (int k = 1; k <= 2; k++)
+        {
+            if (Open(end + dir * metresPerCell * k)) { score += 2; break; }
+        }
+        bool closedInside = false;
+        for (int i = 1; i < 8 && !closedInside; i++)
+        {
+            if (!Open(Vector2.Lerp(start, end, i / 8f))) closedInside = true;
+        }
+        if (closedInside) score += 1;
+        return score;
+    }
+
     // Opens the passage and puts up the walls. Returns how many cells were opened.
     static int Open(MapDefinition map, float[,] speed, Tunnel t, TwoLevels levels)
     {
         int rows = speed.GetLength(0), cols = speed.GetLength(1);
         float metresPerCell = Mathf.Max(0.5f, map.gridSize);
+        if (t.b1 != t.b2) t = Oriented(map, speed, t);
         if (!t.walls)
         {
             // A bridge reaches one cell onto the shore at each end, past the shore line

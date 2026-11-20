@@ -244,8 +244,9 @@ public class MapEditPanel : MonoBehaviour
         CourseUI.SetButtonColor(forestButton, sprint ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Primary);
         CourseUI.SetButtonColor(sprintButton, sprint ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
         typeText.text = (sprint ? "Sprint map: 2 m cells, sprint courses." : "Forest map.")
-                        + (TypeChanged ? " The map is built again when you save." : "");
-        typeText.color = TypeChanged ? CourseUI.Accent : CourseUI.InkMuted;
+                        + (TypeChanged ? " The map is built again when you save."
+                           : OldRules ? " Built with older rules for walls, fences, hedges and stairs: Save builds it again with the new ones." : "");
+        typeText.color = TypeChanged || OldRules ? CourseUI.Accent : CourseUI.InkMuted;
         bool confirming = Time.unscaledTime < deleteConfirmUntil;
         CourseUI.SetButtonText(deleteButton, confirming ? "Sure? Click again" : "Delete map");
         terrainText.text = TerrainSpeedPanel.Describe(terrain) + (terrainChanged ? " The map is built again when you save." : "");
@@ -261,6 +262,9 @@ public class MapEditPanel : MonoBehaviour
     }
 
     bool TypeChanged => mapType != (string.IsNullOrEmpty(info.mapType) ? "forest" : info.mapType);
+
+    // The map was built before the latest passability rules (SymbolRules.RulesVersion): saving builds it again
+    bool OldRules => info != null && info.rulesVersion < MapImport.SymbolRules.RulesVersion;
 
     bool ContactGiven()
     {
@@ -515,7 +519,7 @@ public class MapEditPanel : MonoBehaviour
         string sender = senderField.text.Trim(), contact = contactField.text.Trim();
         bool goPrivate = isPrivate && !info.isPrivate;
         bool goPublic = !isPrivate && info.isPrivate;
-        bool rebuild = edgeChanged || terrainChanged || TypeChanged || FileChanged;
+        bool rebuild = edgeChanged || terrainChanged || TypeChanged || FileChanged || OldRules;
         bool lookChanged = !look.SameAs(info.look);
         bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild || lookChanged
                        || (!isPrivate && (sender != (info.sender ?? "") || contact != (info.contact ?? "")));

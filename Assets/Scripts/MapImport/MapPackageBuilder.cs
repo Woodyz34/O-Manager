@@ -59,6 +59,9 @@ namespace MapImport
         // once it has been uploaded (empty before).
         public bool isPrivate;
         public string privateSourceKey;
+        // The version of the passability rules the grid was built with (SymbolRules.RulesVersion); 0 = before 2026-11-20.
+        // A map built with older rules is built again from its file when it is saved in Edit map.
+        public int rulesVersion;
     }
 
     public class MapPackage
@@ -135,6 +138,7 @@ namespace MapImport
                 offsetNorth = offN,
                 name = name,
                 mapType = sprint ? "sprint" : "forest",
+                rulesVersion = SymbolRules.RulesVersion,
                 sourceFormat = (map.format + " " + map.version).Trim(),
                 scale = (float)map.scale,
                 cellSize = cell,
@@ -164,7 +168,7 @@ namespace MapImport
             try
             {
                 var worldSw = System.Diagnostics.Stopwatch.StartNew();
-                WorldLayer world = WorldLayer.Build(map, extent, offE, offN);
+                WorldLayer world = WorldLayer.Build(map, extent, offE, offN, sprint);
                 pkg.world = world.ToBytes();
                 Log($"World layer: {world.cols} x {world.rows} cells of {world.cell:0.#} m, {world.points.Count} points, {world.lines.Count} lines, {pkg.world.Length / 1024} kB in {worldSw.ElapsedMilliseconds} ms");
             }
@@ -280,7 +284,7 @@ namespace MapImport
             }
             S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created);
             S("sharedBy", i.sharedBy); N("sharedAt", i.sharedAt);
-            B("isPrivate", i.isPrivate); S("privateSourceKey", i.privateSourceKey);
+            B("isPrivate", i.isPrivate); S("privateSourceKey", i.privateSourceKey); N("rulesVersion", i.rulesVersion);
             TerrainSpeeds t = i.terrain ?? new TerrainSpeeds();
             sb.Append("  \"terrain\": {");
             void T(string k, float v, bool last = false) { sb.Append('"').Append(k).Append("\": ").Append(v.ToString("0.###", CultureInfo.InvariantCulture)).Append(last ? "" : ", "); }
