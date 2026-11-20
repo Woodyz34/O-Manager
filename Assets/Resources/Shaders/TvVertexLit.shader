@@ -84,17 +84,15 @@ Shader "O-Manager/TvVertexLit"
             return lerp(lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y), lerp(lerp(e, g, f.x), lerp(h, k, f.x), f.y), f.z);
         }
 
-        // Grain on a surface: soft patches with smaller ones and fine specks in them, -0.24 .. +0.19 round the colour.
-        // The finest sizes fade out with distance, where they would only flicker.
+        // Grain on a surface: fine and clean, mostly a little lighter than the colour (Anders, 2026-11-20: no dirt),
+        // with only a faint large patch under it. About -0.1 .. +0.13 round the colour. The finest sizes fade out with
+        // distance, where they would only flicker.
         half TvSurfaceGrain (float3 p, float depth)
         {
             float fine = saturate(1.0 - depth / 40.0), finest = saturate(1.0 - depth / 14.0);
-            float n = TvNoise(p * 0.83) * 0.4 + TvNoise(p * 2.31 + 17.3) * 0.3
-                    + TvNoise(p * 6.17 + 41.9) * 0.2 * fine + TvNoise(p * 15.3 + 7.7) * 0.1 * finest;
-            n += 0.5 * (0.2 * (1.0 - fine) + 0.1 * (1.0 - finest));
-            float t = saturate((n - 0.2) / 0.6);
-            t = t * t * (3.0 - 2.0 * t);
-            return (0.64 + 0.36 * t) / 0.84 - 1.0;
+            float big = TvNoise(p * 0.83) * 0.6 + TvNoise(p * 2.31 + 17.3) * 0.4;
+            float small = (TvNoise(p * 6.17 + 41.9) - 0.5) * 0.55 * fine + (TvNoise(p * 15.3 + 7.7) - 0.5) * 0.45 * finest;
+            return (big - 0.5) * 0.06 + small * 0.4 + 0.02;
         }
 
         void surf (Input IN, inout SurfaceOutput o)
