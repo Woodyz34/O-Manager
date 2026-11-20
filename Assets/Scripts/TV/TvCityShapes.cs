@@ -14,11 +14,22 @@ public static class TvCityShapes
         RoofDark = TvColor.Hex("#43484b"), Copper = TvColor.Hex("#5c9783"), Tile = TvColor.Hex("#8e3f2e"), Gold = TvColor.Hex("#d4b04c"),
         Skin = TvColor.Hex("#e2b38e"), SkinDark = TvColor.Hex("#9a6a4a"), Shoe = TvColor.Hex("#2a2a2c");
 
+    // A street of old Swedish town houses: ochre, terracotta, pink, sage, light blue, pale yellow... no two the same
+    // next to each other (2026-11-20, Anders: the first town was too much one colour)
     public static readonly TvColor[] Facades =
     {
-        TvColor.Hex("#d8b46f"), TvColor.Hex("#c98e6a"), TvColor.Hex("#e6d8b8"), TvColor.Hex("#a8b8a2"),
-        TvColor.Hex("#d7a49a"), TvColor.Hex("#b9c4cc"), TvColor.Hex("#efe4c8")
+        TvColor.Hex("#e0ad48"), TvColor.Hex("#c8714c"), TvColor.Hex("#ecdfc0"), TvColor.Hex("#97b98f"),
+        TvColor.Hex("#e39c98"), TvColor.Hex("#9fbfd8"), TvColor.Hex("#f1df98"), TvColor.Hex("#b4523e"),
+        TvColor.Hex("#7fa9a2"), TvColor.Hex("#d9895a"), TvColor.Hex("#c7b5d9"), TvColor.Hex("#f2ece0")
     };
+    static readonly TvColor[] Trims = { White, White, TvColor.Hex("#f3e4c0"), TvColor.Hex("#2f4a3a"), White, TvColor.Hex("#6e2b25"), TvColor.Hex("#2c3e56") };
+    static readonly TvColor[] Doors =
+        { TvColor.Hex("#2f6b4c"), TvColor.Hex("#9a2f2a"), TvColor.Hex("#2c4a7b"), TvColor.Hex("#5b3a26"), TvColor.Hex("#d6a42c"), TvColor.Hex("#3b3f45") };
+    static readonly TvColor[] Roofs =
+        { TvColor.Hex("#43484b"), TvColor.Hex("#9a442f"), TvColor.Hex("#5f9a86"), TvColor.Hex("#6b2e24"), TvColor.Hex("#2f3336"), TvColor.Hex("#b0583a") };
+    static readonly TvColor[] Flowers =
+        { TvColor.Hex("#e23d5a"), TvColor.Hex("#f2c230"), TvColor.Hex("#e86a2a"), TvColor.Hex("#f4f0f2"), TvColor.Hex("#c04fb0"), TvColor.Hex("#ff8fb0") };
+    static readonly TvColor Leaf = TvColor.Hex("#3f7a3a"), Pipe = TvColor.Hex("#6d7275"), Rubber = TvColor.Hex("#1d1e20");
     static readonly TvColor[] Awnings = { TvColor.Hex("#2f5d46"), TvColor.Hex("#8f2f2a"), TvColor.Hex("#2c4a6b"), TvColor.Hex("#b7782a") };
     static readonly TvColor[] Clothes =
     {
@@ -104,8 +115,9 @@ public static class TvCityShapes
     }
 
     // Windows in a row on one face of a box (face: 0 = -z, 1 = +z, 2 = -x, 3 = +x), with white frames
+    // flowers: that share of the windows get a flower box under them (needs random)
     static void WindowRow(TvShapeBuilder b, int face, float hl, float hw, float y, float h, float w, float spacing, TvColor frame, TvColor glass,
-                          bool bars = true, int skip = -1)
+                          bool bars = true, int skip = -1, TvRandom random = null, float flowers = 0f, TvColor? shutters = null)
     {
         float along = face < 2 ? hl : hw, depth = face < 2 ? hw : hl;
         int count = Math.Max(1, (int)((2f * along - 0.8f) / spacing));
@@ -128,15 +140,46 @@ public static class TvCityShapes
             }
             // A sill below
             Box(u - w / 2f - 0.14f, y - 0.16f, depth - 0.02f, u + w / 2f + 0.14f, y - 0.09f, depth + 0.12f, frame);
+            // A light in some windows: warm glass behind a curtain
+            if (random != null && random.Value() < 0.18f)
+                Box(u - w / 2f + 0.04f, y + h * 0.66f, depth - 0.01f, u + w / 2f - 0.04f, y + h - 0.04f, depth + 0.065f, TvColor.Hex("#d9c9a0"));
+            if (shutters.HasValue)
+                foreach (float sd in new[] { -1f, 1f })
+                    Box(u + sd * (w / 2f + 0.12f) - 0.21f, y - 0.05f, depth - 0.02f, u + sd * (w / 2f + 0.12f) + 0.21f, y + h + 0.05f, depth + 0.08f, shutters.Value);
+            if (random != null && random.Value() < flowers)
+            {
+                // A flower box: a green trough with a row of blooms
+                Box(u - w / 2f - 0.05f, y - 0.42f, depth, u + w / 2f + 0.05f, y - 0.16f, depth + 0.3f, TvColor.Hex("#3d5a3a"));
+                TvColor bloom = Flowers[(int)(random.Value() * Flowers.Length) % Flowers.Length];
+                int n = Math.Max(3, (int)(w / 0.22f));
+                for (int k = 0; k < n; k++)
+                {
+                    float fu = u - w / 2f + w * (k + 0.5f) / n;
+                    float fy = y - 0.14f + 0.06f * (k % 2);
+                    if (face < 2) b.Blob(0.12f, 1f, 0.8f, 1f, fu, fy, sign * (depth + 0.17f), 0.3f, 0, true, k % 3 == 1 ? Leaf : bloom);
+                    else b.Blob(0.12f, 1f, 0.8f, 1f, sign * (depth + 0.17f), fy, fu, 0.3f, 0, true, k % 3 == 1 ? Leaf : bloom);
+                }
+            }
         }
     }
 
     // ---- Street things ----
 
     // An old-style street lamp: a dark green pole with a fluted foot, an arm and a lantern
-    public static TvShape StreetLamp(TvRandom random)
+    public static TvShape StreetLamp(TvRandom random, int flowers = -1)
     {
         var b = new TvShapeBuilder(random);
+        if (flowers >= 0)
+        {
+            // A hanging basket of flowers on the pole (summer in the town centre)
+            b.Tube(0.28f, 0.2f, 0.25f, 2.75f, 8, TvColor.Hex("#4a3a2a"));
+            for (int i = 0; i < 9; i++)
+            {
+                float a = i * 0.7f;
+                b.Blob(0.14f, 1f, 0.9f, 1f, (float)Math.Cos(a) * 0.27f, 2.95f - (i % 3) * 0.12f, (float)Math.Sin(a) * 0.27f, 0.3f, 0, true,
+                       i % 3 == 2 ? Leaf : Flowers[(flowers + i / 3) % Flowers.Length]);
+            }
+        }
         b.Tube(0.15f, 0.12f, 0.55f, 0f, 8, Iron);
         b.Tube(0.075f, 0.055f, 4.1f, 0.55f, 8, LampGreen);
         b.Tube(0.09f, 0.09f, 0.08f, 2.2f, 8, Iron);
@@ -244,6 +287,152 @@ public static class TvCityShapes
         return b.Done();
     }
 
+    // A Swedish flag hanging out from a pole top at (x, y, z), w long, turned by yaw (blue with a yellow cross)
+    static void SwedishFlag(TvShapeBuilder b, float x, float y, float z, float w, float yaw)
+    {
+        float h = w * 0.625f, c = (float)Math.Cos(yaw), s = (float)Math.Sin(yaw);
+        TvColor blue = TvColor.Hex("#1f5ea8"), yellow = TvColor.Hex("#f2c230");
+        void Part(float u0, float v0, float u1, float v1, TvColor col, float off)
+        {
+            // In the flag's plane (u along the flag, v down from the top), a hair in front of or behind the blue
+            float ax = x + c * u0, az = z + s * u0, bx = x + c * u1, bz = z + s * u1;
+            b.Box(Math.Min(ax, bx) - Math.Abs(s) * off, y - v1, Math.Min(az, bz) - Math.Abs(c) * off,
+                  Math.Max(ax, bx) + Math.Abs(s) * off, y - v0, Math.Max(az, bz) + Math.Abs(c) * off, col);
+        }
+        Part(0f, 0f, w, h, blue, 0.01f);
+        Part(w * 0.3125f, 0f, w * 0.4375f, h, yellow, 0.025f);
+        Part(0f, h * 0.4f, w, h * 0.6f, yellow, 0.025f);
+    }
+
+    // A white flag pole with a Swedish flag, 8 m
+    public static TvShape FlagPole(TvRandom random)
+    {
+        var b = new TvShapeBuilder(random);
+        b.Box(-0.3f, 0f, -0.3f, 0.3f, 0.15f, 0.3f, TvColor.Hex("#9c968c"));
+        b.Tube(0.07f, 0.045f, 8f, 0.15f, 8, White);
+        b.Blob(0.08f, 1f, 1f, 1f, 0f, 8.2f, 0f, 0f, 0, false, Gold);
+        SwedishFlag(b, 0.06f, 8f, 0f, 2.4f, 0f);
+        return b.Done();
+    }
+
+    // A street tree: a straight trunk in an iron grate and a round crown of a few lumps, look picks size and green
+    public static TvShape StreetTree(TvRandom random, int look)
+    {
+        var b = new TvShapeBuilder(random);
+        TvColor[] greens = { TvColor.Hex("#4f8a3c"), TvColor.Hex("#5f9a44"), TvColor.Hex("#3f7a3a"), TvColor.Hex("#7aa84a") };
+        TvColor leaf = greens[look % greens.Length];
+        float hgt = 3.2f + (look % 3) * 0.6f, r = 1.9f + (look % 2) * 0.5f;
+        b.Box(-0.7f, 0f, -0.7f, 0.7f, 0.03f, 0.7f, Iron);
+        b.Tube(0.16f, 0.11f, hgt, 0f, 7, TvColor.Hex("#5a4636"));
+        b.Blob(r, 1f, 0.85f, 1f, 0f, hgt + r * 0.6f, 0f, 0.25f, 1, true, leaf.Shade(0.8f), leaf.Lerp(TvColor.Hex("#c8d870"), 0.25f), hgt, hgt + r * 1.5f);
+        for (int i = 0; i < 4; i++)
+        {
+            float a = i * 1.57f + look;
+            b.Blob(r * 0.6f, 1f, 0.8f, 1f, (float)Math.Cos(a) * r * 0.6f, hgt + r * 0.5f + (i % 2) * 0.4f, (float)Math.Sin(a) * r * 0.6f, 0.3f, 0, true, leaf);
+        }
+        return b.Done();
+    }
+
+    // A parked car along x (front to +x), in one of many colours: body, cabin with windows, wheels, lights
+    public static TvShape Car(TvRandom random, int look)
+    {
+        var b = new TvShapeBuilder(random);
+        TvColor[] paints = { TvColor.Hex("#b8282a"), TvColor.Hex("#2a5aa8"), TvColor.Hex("#e8e6e0"), TvColor.Hex("#2b2d30"), TvColor.Hex("#9aa3a8"),
+                             TvColor.Hex("#2f6b4c"), TvColor.Hex("#e0a020"), TvColor.Hex("#6a2a5a"), TvColor.Hex("#8fc0d8") };
+        TvColor paint = paints[look % paints.Length];
+        bool van = look % 7 == 5;
+        float l = van ? 2.4f : 2.15f, w = 0.88f;
+        b.Box(-l, 0.3f, -w, l, 0.95f, w, paint);
+        if (van) b.Box(-l + 0.1f, 0.95f, -w + 0.05f, l - 0.9f, 1.9f, w - 0.05f, paint);
+        else
+        {
+            // The cabin: sloped glass front and back
+            float c0 = -1.2f, c1 = 0.9f, top = 1.45f;
+            b.Box(c0 + 0.3f, 0.95f, -w + 0.08f, c1 - 0.35f, top, w - 0.08f, paint);
+            b.Box(c0 + 0.35f, 1.0f, -w + 0.06f, c1 - 0.4f, top - 0.08f, w - 0.06f, Glass);
+            b.Triangle(c1 - 0.35f, top, -w + 0.08f, c1 - 0.35f, 0.95f, -w + 0.08f, c1 + 0.25f, 0.95f, -w + 0.08f, 0f, 1f, 0f, Glass);
+            b.Triangle(c1 - 0.35f, top, w - 0.08f, c1 - 0.35f, 0.95f, w - 0.08f, c1 + 0.25f, 0.95f, w - 0.08f, 0f, 1f, 0f, Glass);
+            float[] ws = { c1 - 0.35f, top, -w + 0.08f, c1 - 0.35f, top, w - 0.08f, c1 + 0.25f, 0.95f, w - 0.08f, c1 + 0.25f, 0.95f, -w + 0.08f };
+            Quad(b, ws, 0f, 0.6f, 0f, Glass);
+            float[] rs = { c0 + 0.3f, top, -w + 0.08f, c0 + 0.3f, top, w - 0.08f, c0 - 0.2f, 0.95f, w - 0.08f, c0 - 0.2f, 0.95f, -w + 0.08f };
+            Quad(b, rs, 0f, 0.6f, 0f, Glass);
+            b.Triangle(c0 + 0.3f, top, -w + 0.08f, c0 + 0.3f, 0.95f, -w + 0.08f, c0 - 0.2f, 0.95f, -w + 0.08f, 0f, 1f, 0f, Glass);
+            b.Triangle(c0 + 0.3f, top, w - 0.08f, c0 + 0.3f, 0.95f, w - 0.08f, c0 - 0.2f, 0.95f, w - 0.08f, 0f, 1f, 0f, Glass);
+        }
+        if (van) b.Box(l - 0.9f, 1.0f, -w + 0.04f, l - 0.85f, 1.75f, w - 0.04f, Glass);
+        foreach (float x in new[] { -l + 0.65f, l - 0.7f })
+            foreach (float z in new[] { -w + 0.05f, w - 0.05f })
+            {
+                b.Box(x - 0.33f, 0f, z - 0.12f, x + 0.33f, 0.62f, z + 0.12f, Rubber);
+                b.Box(x - 0.18f, 0.16f, z - 0.14f, x + 0.18f, 0.46f, z + 0.14f, Steel);
+            }
+        foreach (float z in new[] { -w + 0.25f, w - 0.25f })
+        {
+            b.Box(l - 0.02f, 0.68f, z - 0.15f, l + 0.03f, 0.82f, z + 0.15f, TvColor.Hex("#f4f0d8"));
+            b.Box(-l - 0.03f, 0.68f, z - 0.15f, -l + 0.02f, 0.82f, z + 0.15f, TvColor.Hex("#c0201c"));
+        }
+        b.Box(l - 0.05f, 0.3f, -w - 0.02f, l + 0.06f, 0.45f, w + 0.02f, Iron);
+        b.Box(-l - 0.06f, 0.3f, -w - 0.02f, -l + 0.05f, 0.45f, w + 0.02f, Iron);
+        return b.Done();
+    }
+
+    // A bicycle standing along x, in a bright colour
+    public static TvShape Bicycle(TvRandom random, int look)
+    {
+        var b = new TvShapeBuilder(random);
+        TvColor frame = Clothes[(look * 3 + 1) % Clothes.Length];
+        foreach (float x in new[] { -0.55f, 0.55f })
+            for (int i = 0; i < 10; i++)
+            {
+                float a0 = i * 0.6283f, a1 = (i + 1) * 0.6283f;
+                Beam(b, x + (float)Math.Cos(a0) * 0.33f, 0.34f + (float)Math.Sin(a0) * 0.33f, 0f, x + (float)Math.Cos(a1) * 0.33f, 0.34f + (float)Math.Sin(a1) * 0.33f, 0f, 0.04f, 0.04f, Rubber);
+            }
+        Beam(b, -0.55f, 0.34f, 0f, -0.05f, 0.34f, 0f, 0.035f, 0.035f, frame);
+        Beam(b, -0.05f, 0.34f, 0f, -0.2f, 0.85f, 0f, 0.04f, 0.04f, frame);
+        Beam(b, -0.55f, 0.34f, 0f, -0.2f, 0.8f, 0f, 0.035f, 0.035f, frame);
+        Beam(b, -0.2f, 0.8f, 0f, 0.42f, 0.78f, 0f, 0.04f, 0.04f, frame);
+        Beam(b, -0.05f, 0.34f, 0f, 0.42f, 0.78f, 0f, 0.04f, 0.04f, frame);
+        Beam(b, 0.55f, 0.34f, 0f, 0.45f, 0.98f, 0f, 0.035f, 0.035f, frame);
+        Beam(b, 0.45f, 0.98f, -0.25f, 0.45f, 0.98f, 0.25f, 0.035f, 0.035f, Iron);
+        b.Box(-0.33f, 0.86f, -0.07f, -0.08f, 0.92f, 0.07f, Iron);
+        if (look % 2 == 0) b.Box(0.45f, 0.7f, -0.15f, 0.8f, 0.92f, 0.15f, TvColor.Hex("#a07a4a"));   // a basket
+        return b.Done();
+    }
+
+    // A café table with two chairs and a big parasol in a bright colour
+    public static TvShape CafeSet(TvRandom random, int look)
+    {
+        var b = new TvShapeBuilder(random);
+        TvColor cloth = Awnings[look % Awnings.Length].Lerp(White, look % 2 == 0 ? 0f : 0.35f);
+        b.Tube(0.04f, 0.04f, 0.72f, 0f, 6, Iron);
+        b.Tube(0.35f, 0.35f, 0.04f, 0.72f, 10, White);
+        b.Tube(0.03f, 0.03f, 2.2f, 0.76f, 6, Steel);
+        // The parasol: eight panels, white and coloured in turn
+        for (int i = 0; i < 8; i++)
+        {
+            float a0 = i * 0.7854f, a1 = (i + 1) * 0.7854f;
+            b.Triangle((float)Math.Cos(a0) * 1.4f, 2.45f, (float)Math.Sin(a0) * 1.4f, (float)Math.Cos(a1) * 1.4f, 2.45f, (float)Math.Sin(a1) * 1.4f,
+                       0f, 2.95f, 0f, 0f, 2.0f, 0f, i % 2 == 0 ? cloth : White);
+            b.Triangle((float)Math.Cos(a0) * 1.4f, 2.45f, (float)Math.Sin(a0) * 1.4f, (float)Math.Cos(a1) * 1.4f, 2.45f, (float)Math.Sin(a1) * 1.4f,
+                       0f, 2.95f, 0f, 0f, 4.0f, 0f, cloth.Shade(0.6f));
+        }
+        // Two chairs, facing the table
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            float x = sx * 0.62f;
+            b.Box(x - 0.2f, 0.44f, -0.2f, x + 0.2f, 0.48f, 0.2f, Wood);
+            foreach (float cx in new[] { -0.17f, 0.17f })
+                foreach (float cz in new[] { -0.17f, 0.17f })
+                    b.Box(x + cx - 0.02f, 0f, cz - 0.02f, x + cx + 0.02f, 0.45f, cz + 0.02f, Iron);
+            b.Box(x + sx * 0.18f - 0.02f, 0.48f, -0.2f, x + sx * 0.2f + 0.02f, 0.9f, 0.2f, Wood);
+        }
+        // A cup and a little vase
+        b.Tube(0.04f, 0.045f, 0.08f, 0.76f, 6, White, null, 0f, 1f, 0.12f, 0.05f);
+        b.Tube(0.03f, 0.03f, 0.12f, 0.76f, 6, Glass, null, 0f, 1f, -0.1f, -0.08f);
+        b.Blob(0.05f, 1f, 1f, 1f, -0.1f, 0.92f, -0.08f, 0f, 0, true, Flowers[look % Flowers.Length]);
+        return b.Done();
+    }
+
     // ---- Buildings ----
 
     public enum Kind { TownHouse, Apartments, Villa, Church, TownHall, Hall }
@@ -262,47 +451,135 @@ public static class TvCityShapes
         }
     }
 
-    // A town house of the old town centre: plastered in a light colour, shops with awnings on the street floor,
-    // rows of white-framed windows, a cornice and a dark metal hip roof with a chimney
+    // A town house of the old town centre: plastered in its own colour, corner stones or pilasters, shops with
+    // awnings and painted signs on the street floor, a coloured front door, windows with frames, flower boxes and
+    // sometimes shutters, drainpipes, a cornice, a hip roof with dormers and chimneys
     static TvShape TownHouse(TvRandom random, float len, float wid, int floors, int look, float plinth)
     {
         var b = new TvShapeBuilder(random);
         float hl = len / 2f, hw = wid / 2f, fh = 3.1f, ground = 3.6f;
         float top = plinth + ground + fh * (floors - 1);
-        TvColor wall = Facades[look % Facades.Length], band = wall.Lerp(White, 0.55f), awning = Awnings[look % Awnings.Length];
+        TvColor wall = Facades[look % Facades.Length], band = wall.Lerp(White, 0.55f), awning = Awnings[(look * 3 + 1) % Awnings.Length];
+        TvColor trim = Trims[(look * 5 + 2) % Trims.Length], door = Doors[(look * 7 + 3) % Doors.Length];
+        TvColor roof = Roofs[(look * 11 + 1) % Roofs.Length];
+        TvColor? shutters = look % 4 == 3 ? Doors[(look + 2) % Doors.Length].Shade(0.9f) : (TvColor?)null;
         b.Box(-hl - 0.05f, -0.6f, -hw - 0.05f, hl + 0.05f, plinth, hw + 0.05f, Plinth);
         b.Box(-hl, plinth, -hw, hl, top, hw, wall);
-        // The street floor: big shop windows on the long sides, a band above them
+        // Splash and dirt along the foot of the wall
+        b.Box(-hl - 0.03f, plinth, -hw - 0.03f, hl + 0.03f, plinth + 0.45f, hw + 0.03f, wall.Shade(0.72f));
+        // The corners: stone blocks in a light colour, or flat pilasters up the whole wall
+        foreach (float su in new[] { -1f, 1f })
+            foreach (float sv in new[] { -1f, 1f })
+            {
+                if (look % 3 == 1)
+                    b.Box(su * hl - 0.3f, plinth + 0.45f, sv * hw - 0.3f, su * hl + 0.06f * su + (su > 0 ? 0f : 0.3f), top, sv * hw + 0.06f * sv + (sv > 0 ? 0f : 0.3f), band);
+                else
+                    for (float y = plinth + ground; y < top - 0.4f; y += 0.62f)
+                    {
+                        float l = ((int)((y - plinth) / 0.62f) % 2 == 0) ? 0.62f : 0.38f;
+                        b.Box(su * hl - (su > 0 ? l : -0.06f), y, sv * hw - (sv > 0 ? l : -0.06f), su * hl + (su > 0 ? 0.06f : -l) * 1f + (su < 0 ? 0f : 0f),
+                              y + 0.5f, sv * hw + (sv > 0 ? 0.06f : -l), band);
+                    }
+            }
+        // The street floor: big shop windows on the long sides, a door where there is no awning, a band above
         b.Box(-hl - 0.06f, plinth + ground - 0.35f, -hw - 0.06f, hl + 0.06f, plinth + ground - 0.1f, hw + 0.06f, band);
+        int count = Math.Max(1, (int)((len - 0.8f) / 3.6f));
+        int doorAt = -1;
+        for (int i = 0; i < count; i++) if ((i + look) % 3 == 2) { doorAt = i; break; }
         for (int face = 0; face < 2; face++)
         {
-            WindowRow(b, face, hl, hw, plinth + 0.45f, 2.3f, 2.2f, 3.6f, TvColor.Hex("#2a2a28"), GlassShop, false);
-            // Awnings over the shops
             float sign = face == 0 ? -1f : 1f;
-            int count = Math.Max(1, (int)((len - 0.8f) / 3.6f));
+            WindowRow(b, face, hl, hw, plinth + 0.45f, 2.3f, 2.2f, 3.6f, TvColor.Hex("#2a2a28"), GlassShop, false, doorAt);
             for (int i = 0; i < count; i++)
             {
-                if ((i + look) % 3 == 2) continue;
                 float u = -hl + len * (i + 0.5f) / count;
-                float[] q = { u - 1.3f, plinth + 2.95f, sign * hw, u + 1.3f, plinth + 2.95f, sign * hw,
-                              u + 1.3f, plinth + 2.55f, sign * (hw + 1.0f), u - 1.3f, plinth + 2.55f, sign * (hw + 1.0f) };
-                Quad(b, q, u, plinth, sign * (hw - 1f), awning);
-                Quad(b, q, u, plinth + 6f, sign * (hw + 3f), awning.Shade(0.6f));
-                b.Box(u - 1.3f, plinth + 2.35f, sign * (hw + 0.97f) - 0.02f, u + 1.3f, plinth + 2.57f, sign * (hw + 0.97f) + 0.02f, awning.Lerp(White, 0.2f));
+                if (i == doorAt)
+                {
+                    // A front door in its own colour, a glass light above it, a stone step
+                    b.Box(u - 0.75f, plinth, sign * hw - 0.04f, u + 0.75f, plinth + 3.0f, sign * (hw + 0.1f), trim);
+                    b.Box(u - 0.58f, plinth, sign * hw - 0.04f, u + 0.58f, plinth + 2.3f, sign * (hw + 0.14f), door);
+                    b.Box(u - 0.5f, plinth + 2.4f, sign * hw - 0.04f, u + 0.5f, plinth + 2.85f, sign * (hw + 0.13f), Glass);
+                    b.Box(u - 0.04f, plinth + 1.0f, sign * (hw + 0.14f) - 0.02f, u + 0.04f, plinth + 1.3f, sign * (hw + 0.2f), Gold);
+                    b.Box(u - 0.95f, plinth - 0.3f, sign * hw, u + 0.95f, plinth, sign * (hw + 0.6f), TvColor.Hex("#9c968c"));
+                    continue;
+                }
+                TvColor shop = Awnings[(i * 3 + look) % Awnings.Length];
+                if ((i + look) % 4 != 1)
+                {
+                    // An awning over the shop, striped with white
+                    float[] q = { u - 1.3f, plinth + 2.95f, sign * hw, u + 1.3f, plinth + 2.95f, sign * hw,
+                                  u + 1.3f, plinth + 2.55f, sign * (hw + 1.0f), u - 1.3f, plinth + 2.55f, sign * (hw + 1.0f) };
+                    Quad(b, q, u, plinth, sign * (hw - 1f), shop);
+                    Quad(b, q, u, plinth + 6f, sign * (hw + 3f), shop.Shade(0.6f));
+                    for (int k = 0; k < 4; k++)
+                    {
+                        float s0 = u - 1.3f + 0.65f * k + 0.2f;
+                        b.Box(s0, plinth + 2.36f, sign * (hw + 0.97f) - 0.02f, s0 + 0.25f, plinth + 2.57f, sign * (hw + 0.97f) + 0.02f, k % 2 == 0 ? White : shop);
+                    }
+                }
+                // A painted sign above the shop window: a board with light letters
+                TvColor board = (i + look) % 2 == 0 ? TvColor.Hex("#1f2422") : shop.Shade(0.8f);
+                b.Box(u - 1.2f, plinth + 3.0f, sign * hw - 0.02f, u + 1.2f, plinth + 3.38f, sign * (hw + 0.08f), board);
+                int letters = 4 + (i + look) % 4;
+                for (int k = 0; k < letters; k++)
+                {
+                    float lu = u - 0.95f + 1.9f * (k + 0.5f) / letters;
+                    b.Box(lu - 0.07f, plinth + 3.08f, sign * (hw + 0.08f) - 0.01f, lu + 0.07f, plinth + 3.3f, sign * (hw + 0.1f), k % 5 == 3 ? board : (board.r < 60 ? Gold : White));
+                }
             }
         }
-        // Upper floors: windows all round, a thin band between floors
+        // Upper floors: windows all round with flower boxes on some, a thin band between floors
         for (int f = 1; f < floors; f++)
         {
             float y = plinth + ground + fh * (f - 1) + 0.85f;
-            for (int face = 0; face < 4; face++) WindowRow(b, face, hl, hw, y, 1.55f, 1.0f, 2.4f, White, Glass);
+            for (int face = 0; face < 4; face++)
+                WindowRow(b, face, hl, hw, y, 1.55f, 1.0f, 2.4f, trim, Glass, true, -1, random, face < 2 ? 0.3f : 0f, face < 2 ? shutters : null);
+            if (f > 1) b.Box(-hl - 0.04f, y - 0.62f, -hw - 0.04f, hl + 0.04f, y - 0.5f, hw + 0.04f, band);
         }
-        // The cornice at the top
+        // Drainpipes down the front corners
+        foreach (float su in new[] { -1f, 1f })
+            foreach (float sv in new[] { -1f, 1f })
+                b.Tube(0.06f, 0.06f, top - plinth, plinth, 6, Pipe, null, 0f, 1f, su * (hl - 0.35f), sv * (hw + 0.1f));
+        // The cornice and the roof, with dormers and chimneys
         b.Box(-hl - 0.25f, top - 0.1f, -hw - 0.25f, hl + 0.25f, top + 0.3f, hw + 0.25f, band);
-        HipRoof(b, hl, hw, top + 0.3f, Math.Min(hw * 0.75f, 4.5f), 0.1f, look % 2 == 0 ? RoofDark : Tile);
-        float cx = hl * 0.45f;
-        b.Box(cx - 0.35f, top, -0.3f, cx + 0.35f, top + Math.Min(hw * 0.75f, 4.5f) + 0.8f, 0.4f, wall.Shade(0.85f));
+        float rise = Math.Min(hw * 0.75f, 4.5f), eave = top + 0.3f;
+        HipRoof(b, hl, hw, eave, rise, 0.1f, roof);
+        int dormers = len > 9f ? (int)(len / 5.5f) : 0;
+        for (int i = 0; i < dormers; i++)
+        {
+            float u = -hl + len * (i + 0.5f) / dormers;
+            foreach (float sv in new[] { -1f, 1f }) Dormer(b, u, sv, hw, eave, rise, wall, roof, trim);
+        }
+        float[] chimneys = len > 12f ? new[] { -hl * 0.55f, hl * 0.45f } : new[] { hl * 0.45f };
+        foreach (float cx in chimneys)
+        {
+            TvColor brick = look % 2 == 0 ? TvColor.Hex("#8e4a35") : wall.Shade(0.85f);
+            b.Box(cx - 0.4f, top, -0.35f, cx + 0.4f, eave + rise + 0.9f, 0.45f, brick);
+            b.Box(cx - 0.5f, eave + rise + 0.9f, -0.45f, cx + 0.5f, eave + rise + 1.05f, 0.55f, TvColor.Hex("#3a3a3a"));
+        }
         return b.Done();
+    }
+
+    // A dormer on a hip roof: a small gabled window box at u along the house, on the side sv (-1/+1)
+    static void Dormer(TvShapeBuilder b, float u, float sv, float hw, float eave, float rise, TvColor wall, TvColor roof, TvColor trim)
+    {
+        float zf = hw * 0.62f, zb = hw * 0.15f;                      // front and back (in from the wall)
+        float yRoof = eave + rise * (1f - zf / hw);                 // the roof under the front
+        float w = 0.75f, h = 1.35f, peak = 0.6f;
+        b.Box(u - w, yRoof - 0.3f, sv > 0 ? zb : -zf, u + w, yRoof + h, sv > 0 ? zf : -zb, wall);
+        float ff = sv * zf;
+        b.Box(u - 0.45f, yRoof + 0.15f, ff - 0.02f * sv, u + 0.45f, yRoof + 1.15f, ff + 0.05f * sv, trim);
+        b.Box(u - 0.35f, yRoof + 0.25f, ff - 0.02f * sv, u + 0.35f, yRoof + 1.05f, ff + 0.08f * sv, Glass);
+        // Its own little roof: two slopes from the front back to the main roof, a gable in the wall colour
+        float yt = yRoof + h, o = 0.15f;
+        float zbk = sv * zb, zfr = sv * (zf + o);
+        b.Triangle(u - w, yt, ff, u + w, yt, ff, u, yt + peak, ff, u, yt, ff - sv, wall);
+        float[] l = { u - w - o, yt - 0.08f, zfr, u, yt + peak, zfr, u, yt + peak, zbk, u - w - o, yt - 0.08f, zbk };
+        float[] r = { u + w + o, yt - 0.08f, zfr, u, yt + peak, zfr, u, yt + peak, zbk, u + w + o, yt - 0.08f, zbk };
+        Quad(b, l, u, yt - 1f, ff - sv, roof);
+        Quad(b, r, u, yt - 1f, ff - sv, roof);
+        Quad(b, l, u - 3f, yt + 3f, ff, roof.Shade(0.6f));
+        Quad(b, r, u + 3f, yt + 3f, ff, roof.Shade(0.6f));
     }
 
     // A block of flats from the 1950s-60s: brick or light plaster, flat roof, balconies on one side
@@ -310,14 +587,16 @@ public static class TvCityShapes
     {
         var b = new TvShapeBuilder(random);
         float hl = len / 2f, hw = wid / 2f, fh = 2.9f, top = plinth + fh * floors + 0.3f;
-        TvColor wall = look % 3 == 0 ? TvColor.Hex("#9a5a42") : look % 3 == 1 ? TvColor.Hex("#d9d3c4") : TvColor.Hex("#c7b28c");
+        TvColor[] walls = { TvColor.Hex("#9a5a42"), TvColor.Hex("#e2d6b8"), TvColor.Hex("#c7a06a"), TvColor.Hex("#b9cbd2"), TvColor.Hex("#e7c26a"), TvColor.Hex("#c98d78") };
+        TvColor[] panels = { TvColor.Hex("#c8d3d6"), TvColor.Hex("#b6573e"), TvColor.Hex("#3f6f8f"), TvColor.Hex("#e0b53a"), TvColor.Hex("#5f8f5a"), TvColor.Hex("#f2efe6") };
+        TvColor wall = walls[look % walls.Length], panel = panels[(look * 5 + 1) % panels.Length];
         b.Box(-hl - 0.05f, -0.6f, -hw - 0.05f, hl + 0.05f, plinth, hw + 0.05f, Plinth);
         b.Box(-hl, plinth, -hw, hl, top, hw, wall);
         b.Box(-hl - 0.1f, top, -hw - 0.1f, hl + 0.1f, top + 0.45f, hw + 0.1f, TvColor.Hex("#5a5c5c"));
         for (int f = 0; f < floors; f++)
         {
             float y = plinth + fh * f + 0.9f;
-            for (int face = 0; face < 4; face++) WindowRow(b, face, hl, hw, y, 1.3f, 1.25f, 3.0f, White, Glass, false, face == 1 && f == 0 ? 1000 : -1);
+            for (int face = 0; face < 4; face++) WindowRow(b, face, hl, hw, y, 1.3f, 1.25f, 3.0f, White, Glass, false, face == 1 && f == 0 ? 1000 : -1, random, face == 1 ? 0.15f : 0f);
         }
         // Balconies on the -z side, every other window
         int count = Math.Max(1, (int)((len - 0.8f) / 3.0f));
@@ -326,11 +605,17 @@ public static class TvCityShapes
             {
                 float u = -hl + len * (i + 0.5f) / count, y = plinth + fh * f + 0.1f;
                 b.Box(u - 1.3f, y - 0.15f, -hw - 1.2f, u + 1.3f, y, -hw, TvColor.Hex("#8d8a84"));
-                b.Box(u - 1.3f, y, -hw - 1.2f, u + 1.3f, y + 1.0f, -hw - 1.12f, look % 2 == 0 ? TvColor.Hex("#c8d3d6") : TvColor.Hex("#b6573e"));
+                b.Box(u - 1.3f, y, -hw - 1.2f, u + 1.3f, y + 1.0f, -hw - 1.12f, (i / 2 + f) % 3 == 0 ? panel.Lerp(White, 0.3f) : panel);
+                if (random.Value() < 0.35f)
+                    for (int k = 0; k < 4; k++)
+                        b.Blob(0.16f, 1f, 0.8f, 1f, u - 0.9f + k * 0.6f, y + 1.1f, -hw - 1.1f, 0.3f, 0, true, k % 2 == 0 ? Leaf : Flowers[(i + f + k) % Flowers.Length]);
             }
         // The stairwell door on +z
         b.Box(-0.8f, plinth - 0.05f, hw - 0.05f, 0.8f, plinth + 2.4f, hw + 0.12f, White);
-        b.Box(-0.65f, plinth, hw, 0.65f, plinth + 2.25f, hw + 0.16f, TvColor.Hex("#5b3a26"));
+        b.Box(-0.65f, plinth, hw, 0.65f, plinth + 2.25f, hw + 0.16f, Doors[(look * 3 + 2) % Doors.Length]);
+        // A light band along the bottom and the edge of the roof in the balconies' colour
+        b.Box(-hl - 0.03f, plinth, -hw - 0.03f, hl + 0.03f, plinth + 0.5f, hw + 0.03f, wall.Shade(0.75f));
+        b.Box(-hl - 0.12f, top + 0.3f, -hw - 0.12f, hl + 0.12f, top + 0.5f, hw + 0.12f, panel);
         b.Box(-1.2f, plinth + 2.5f, hw, 1.2f, plinth + 2.65f, hw + 1.0f, TvColor.Hex("#5a5c5c"));
         return b.Done();
     }
@@ -340,8 +625,9 @@ public static class TvCityShapes
     {
         var b = new TvShapeBuilder(random);
         float hl = len / 2f, hw = wid / 2f, eaves = plinth + (len > 11f ? 5.2f : 2.7f);
-        TvColor wall = look % 3 == 0 ? TvColor.Hex("#8f3426") : look % 3 == 1 ? TvColor.Hex("#e0c27a") : TvColor.Hex("#dfe3e0");
-        TvColor trim = look % 3 == 2 ? TvColor.Hex("#3d5a73") : White;
+        TvColor[] walls = { TvColor.Hex("#8f3426"), TvColor.Hex("#e0c27a"), TvColor.Hex("#dfe3e0"), TvColor.Hex("#9cc0d8"), TvColor.Hex("#a9c49a"), TvColor.Hex("#e9d9a6") };
+        TvColor wall = walls[look % walls.Length];
+        TvColor trim = look % walls.Length == 2 ? TvColor.Hex("#3d5a73") : look % walls.Length == 5 ? TvColor.Hex("#2f4a3a") : White;
         b.Box(-hl - 0.05f, -0.6f, -hw - 0.05f, hl + 0.05f, plinth, hw + 0.05f, Plinth);
         b.Box(-hl, plinth, -hw, hl, eaves, hw, wall);
         foreach (float su in new[] { -1f, 1f })
@@ -350,13 +636,17 @@ public static class TvCityShapes
         int levels = eaves - plinth > 4f ? 2 : 1;
         for (int f = 0; f < levels; f++)
             for (int face = 0; face < 4; face++)
-                WindowRow(b, face, hl, hw, plinth + 0.9f + f * 2.6f, 1.15f, 0.95f, 2.6f, trim, Glass, true, face == 1 && f == 0 ? 0 : -1);
+                WindowRow(b, face, hl, hw, plinth + 0.9f + f * 2.6f, 1.15f, 0.95f, 2.6f, trim, Glass, true, face == 1 && f == 0 ? 0 : -1, random, f == 0 ? 0.35f : 0f);
+        // Standing wooden panels: a thin darker line every 0.5 m on the long sides
+        for (float u = -hl + 0.5f; u < hl - 0.3f; u += 0.5f)
+            foreach (float sv in new[] { -1f, 1f })
+                b.Box(u - 0.025f, plinth + 0.05f, sv * hw - 0.02f, u + 0.025f, eaves - 0.05f, sv * (hw + 0.025f), wall.Shade(0.8f));
         // Door and porch on +z
         float du = -hl + len * 0.5f / Math.Max(1, (int)((len - 0.8f) / 2.6f));
         b.Box(du - 0.55f, plinth, hw - 0.02f, du + 0.55f, plinth + 2.15f, hw + 0.1f, trim);
-        b.Box(du - 0.45f, plinth, hw, du + 0.45f, plinth + 2.05f, hw + 0.14f, TvColor.Hex("#3d4f5e"));
+        b.Box(du - 0.45f, plinth, hw, du + 0.45f, plinth + 2.05f, hw + 0.14f, Doors[(look * 5 + 1) % Doors.Length]);
         b.Box(du - 1.1f, plinth - 0.3f, hw, du + 1.1f, plinth, hw + 1.4f, TvColor.Hex("#8a8680"));
-        GableRoof(b, hl, hw, eaves, hw * 0.75f, 0.4f, look % 2 == 0 ? Tile : RoofDark, wall);
+        GableRoof(b, hl, hw, eaves, hw * 0.75f, 0.4f, Roofs[(look * 7 + 1) % Roofs.Length], wall);
         b.Box(hl * 0.4f - 0.3f, eaves + hw * 0.3f, -0.6f, hl * 0.4f + 0.3f, eaves + hw * 0.75f + 0.8f, 0f, TvColor.Hex("#7d746c"));
         return b.Done();
     }
@@ -458,6 +748,17 @@ public static class TvCityShapes
             b.Box(s * t / 2f - 0.03f, tt - 3.3f, -1.1f, s * t / 2f + 0.08f, tt - 1.1f, 1.1f, White);
         }
         b.Cone(t * 0.75f, 5.5f, tt + 0.15f, 4, Copper, 0f, 0f);
+        // Two Swedish flags on short poles out from the front, and flowers in urns by the stair
+        foreach (float fx in new[] { -hl * 0.55f, hl * 0.55f })
+        {
+            Beam(b, fx, plinth + 5.2f, -hw, fx, plinth + 6.6f, -hw - 1.6f, 0.06f, 0.06f, White);
+            SwedishFlag(b, fx, plinth + 6.6f, -hw - 1.6f, 1.2f, 0.25f);
+        }
+        foreach (float ux in new[] { -2.9f, 2.9f })
+        {
+            b.Tube(0.35f, 0.45f, 0.7f, plinth - 0.5f, 8, stone.Shade(0.85f), null, 0f, 1f, ux, -hw - 1.2f);
+            for (int k = 0; k < 5; k++) b.Blob(0.17f, 1f, 0.8f, 1f, ux - 0.2f + 0.1f * k, plinth + 0.3f, -hw - 1.2f + (k % 2) * 0.15f, 0.3f, 0, true, k % 2 == 0 ? Flowers[k % Flowers.Length] : Leaf);
+        }
         b.Box(-0.05f, tt + 5.5f, -0.05f, 0.05f, tt + 7f, 0.05f, Gold);
         return b.Done();
     }
@@ -473,6 +774,11 @@ public static class TvCityShapes
         for (int face = 0; face < 4; face++) WindowRow(b, face, hl, hw, plinth + 3.8f, 1.6f, 3.2f, 4.0f, TvColor.Hex("#3b3d3e"), Glass, false);
         for (int face = 0; face < 2; face++) WindowRow(b, face, hl, hw, plinth + 0.9f, 1.6f, 2.0f, 6.0f, TvColor.Hex("#3b3d3e"), Glass, false);
         b.Box(-hl - 0.2f, top, -hw - 0.2f, hl + 0.2f, top + 0.5f, hw + 0.2f, TvColor.Hex("#4e5254"));
+        // A coloured band round the top and a big sign on the front
+        TvColor stripe = Awnings[look % Awnings.Length];
+        b.Box(-hl - 0.04f, top - 1.1f, -hw - 0.04f, hl + 0.04f, top - 0.6f, hw + 0.04f, stripe);
+        b.Box(-3.5f, top - 2.9f, -hw - 0.12f, 3.5f, top - 1.5f, -hw, White);
+        for (int k = 0; k < 7; k++) b.Box(-3f + k * 0.9f, top - 2.6f, -hw - 0.16f, -2.5f + k * 0.9f, top - 1.8f, -hw - 0.1f, stripe);
         return b.Done();
     }
 
@@ -526,6 +832,13 @@ public static class TvCityShapes
         b.Tube(0.05f * s, 0.05f * s, 0.1f * s, shoulder, 6, skin);
         b.Blob(0.115f * s, 0.9f, 1.05f, 0.95f, 0f, head, 0f, 0.05f, 1, false, skin);
         b.Blob(0.12f * s, 0.95f, 0.75f, 1f, 0f, head + 0.045f * s, 0.025f * s, 0.05f, 0, false, hair);
+        if (look % 5 == 2)
+        {
+            // A cap in a bright colour
+            TvColor cap = Clothes[(look + 4) % Clothes.Length];
+            b.Blob(0.125f * s, 1f, 0.6f, 1f, 0f, head + 0.07f * s, 0.01f, 0f, 0, false, cap);
+            b.Box(-0.08f * s, head + 0.06f * s, -0.22f * s, 0.08f * s, head + 0.085f * s, -0.06f * s, cap);
+        }
         // Arms
         foreach (float side in new[] { -1f, 1f })
         {
@@ -542,6 +855,12 @@ public static class TvCityShapes
             Beam(b, sx, shoulder - 0.04f * s, 0f, ex, ey, ez, 0.1f * s, 0.1f * s, top);
             Beam(b, ex, ey, ez, hx, hy, hz, 0.085f * s, 0.085f * s, pose == Pose.Cheer ? skin : top);
             b.Blob(0.05f * s, 1f, 1f, 1f, hx, hy, hz, 0f, 0, false, skin);
+            // Some who cheer wave a little Swedish flag
+            if (pose == Pose.Cheer && side > 0f && look % 2 == 0)
+            {
+                Beam(b, hx, hy - 0.05f, hz, hx, hy + 0.45f, hz, 0.02f, 0.02f, Wood);
+                SwedishFlag(b, hx, hy + 0.45f, hz, 0.4f, 0f);
+            }
         }
         return b.Done();
     }
