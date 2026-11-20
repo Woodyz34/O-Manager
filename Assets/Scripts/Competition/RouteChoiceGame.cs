@@ -652,12 +652,34 @@ public class RouteChoiceView : MonoBehaviour
             local.choiceQuestions = question;
             local.choiceDone = true;
         }
+        SendContestResult();
         ClearDrawn();
         panelHeading = heading;
         panelInfo = info;
         panelBody = body;
         BuildOverlay();
         ShowOverlay(Page.Legs);
+    }
+
+    // A weekly or daily contest (ContestRun): the points, and every question's routes with the one picked, so the
+    // others can see the route choices afterwards
+    void SendContestResult()
+    {
+        if (!ContestRun.InRace || results == null || picks == null) return;
+        List<ContestReplay.ChoiceLeg> asked = new List<ContestReplay.ChoiceLeg>();
+        for (int k = 1; k < results.Length && k < picks.Length; k++)
+        {
+            RouteChoiceLeg made = results[k];
+            if (made == null || picks[k] == -2 || made.choices == null || made.choices.Count == 0) continue;
+            RouteChoiceGame.ReadLeg(NetworkPlayer.Local, k, out _, out int points);
+            ContestReplay.ChoiceLeg leg = new ContestReplay.ChoiceLeg { leg = k, fastest = made.Fastest, pick = picks[k], points = points };
+            foreach (RouteChoice c in made.choices)
+            {
+                leg.routes.Add(new ContestReplay.ChoiceRoute { colour = c.colour, seconds = c.seconds, world = WorldPoints(k, c.points) });
+            }
+            asked.Add(leg);
+        }
+        ContestRun.OnRouteChoiceFinished(score, asked);
     }
 
     void BuildOverlay()
@@ -694,7 +716,8 @@ public class RouteChoiceView : MonoBehaviour
 
     void OnOverlayButton()
     {
-        if (page == Page.Legs) ShowOverlay(Page.Money);
+        // A contest has no results page of its own: its leaderboard and prizes are on the contests page
+        if (page == Page.Legs && ContestRun.Active == null) ShowOverlay(Page.Money);
         else CompetitionFlow.HostReturnToLobby();
     }
 
@@ -705,7 +728,7 @@ public class RouteChoiceView : MonoBehaviour
         bool host = CompetitionFlow.LocalIsHost();
         if (page == Page.Legs)
         {
-            CourseUI.SetButtonText(overlayLobby, "See results  >");
+            CourseUI.SetButtonText(overlayLobby, ContestRun.Active != null ? CompetitionFlow.BackButtonText : "See results  >");
             overlayLobby.interactable = true;
         }
         else
@@ -970,6 +993,8 @@ public class RouteChoiceView : MonoBehaviour
     {
         if (paid) return;
         paid = true;
+        // Weekly and daily contests pay their own prize money when the contest is over (2026-11-19, the user)
+        if (ContestRun.Active != null) return;
         paidTookPart = finished ? RouteChoiceGame.TookPart : 0;
         paidPlace = finished ? place : 0;
         paidPlaceOf = players;

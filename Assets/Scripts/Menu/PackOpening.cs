@@ -160,13 +160,16 @@ public class PackOpening : MonoBehaviour
 
     // "Open packs" (RunnerRules / OpenPacks.cs): a free pack in a competition. The runner is only on loan, so the
     // card says so and the only button goes on (to the next pack or to placing the runners).
+    // Also used for the packs won in contests (PrizePacks), with onLoan false: the runner is then the player's.
     string loanTitle;
     string loanButton;
+    bool onLoan = true;
 
-    public void PlayLoan(CardData runner, string title, string buttonText, Action closed)
+    public void PlayLoan(CardData runner, string title, string buttonText, Action closed, bool loan = true)
     {
         loanTitle = title;
         loanButton = buttonText;
+        onLoan = loan;
         // The competition has its own screens (overlay canvases) above any camera: the show goes over them all
         Canvas canvas = GetComponentInChildren<Canvas>(true);
         if (canvas != null)
@@ -175,7 +178,7 @@ public class PackOpening : MonoBehaviour
             canvas.overrideSorting = true;
             canvas.sortingOrder = 500;
         }
-        Play(new PackResult { card = runner, isNew = false, paid = 0 }, exit => closed?.Invoke());
+        Play(new PackResult { card = runner, isNew = !loan, paid = 0 }, exit => closed?.Invoke());
     }
 
     // ---------- the show ----------
@@ -738,7 +741,7 @@ public class PackOpening : MonoBehaviour
         if (loanTitle != null)
         {
             titleText.text = loanTitle;
-            subtitleText.text = RunnerCards.TierName(tier) + "   <color=#FBF4DA>OVERALL " + RunnerCards.Overall(result.card) + "   ON LOAN</color>";
+            subtitleText.text = RunnerCards.TierName(tier) + "   <color=#FBF4DA>OVERALL " + RunnerCards.Overall(result.card) + (onLoan ? "   ON LOAN" : "   NEW RUNNER") + "</color>";
         }
         else if (result.isNew)
         {

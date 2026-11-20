@@ -82,6 +82,9 @@ public class SinglePlayerMenu : MonoBehaviour
         mapHandler = gameObject.AddComponent<MapHandler>();
         Build();
         Refresh();
+
+        // A weekly or daily contest from the contests page: start it at once with its own course, runner and mode
+        if (ContestRun.StartPending) StartContest();
     }
 
     CourseData Chosen => mapHandler != null ? mapHandler.course : CourseLibrary.CurrentOrDefault;
@@ -355,7 +358,44 @@ public class SinglePlayerMenu : MonoBehaviour
         ChosenGameMode = string.IsNullOrWhiteSpace(pool) ? GameModes.YourRunners : pool;
         ChosenModes = modes & ExtraModes.Solo;
         if (MapSelectUI.IsAICourse(course)) AICoursePanel.RacedCourseId = course.id;
+        await Launch();
+    }
 
+    // A weekly or daily contest (ContestRun): the contest's course, its runner values and game mode, nothing to pick
+    async void StartContest()
+    {
+        if (starting) return;
+        starting = true;
+        GameObject cover = new GameObject("Contest cover", typeof(Canvas), typeof(CanvasScaler));
+        Canvas coverCanvas = cover.GetComponent<Canvas>();
+        coverCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        coverCanvas.sortingOrder = 200;
+        ScreenSettings.Fit(cover.GetComponent<CanvasScaler>());
+        Image sheet = CourseUI.Panel("Sheet", cover.transform, CourseUI.CardSolid, false);
+        CourseUI.Stretch(sheet.rectTransform);
+        TextMeshProUGUI text = CourseUI.Text("Text", sheet.transform, ContestRun.SpanName(ContestRun.Active) + "\n" + ContestRun.Title(ContestRun.Active) + "\n\nStarting...",
+            44, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+        CourseUI.Stretch(text.rectTransform, 60, 60, 60, 60);
+
+        CourseLibrary.Current = ContestRun.ActiveCourse;
+        ChosenGameMode = ContestRun.GameModeFor(ContestRun.Active);
+        ChosenModes = ContestRun.ModesFor(ContestRun.Active) & ExtraModes.Solo;
+        ContestRun.Started();
+        bool ok = await Launch();
+        if (!ok)
+        {
+            ContestRun.Leave();
+            SceneManager.LoadScene("MainMenu");
+        }
+        else if (cover != null)
+        {
+            Destroy(cover, 1.5f);
+        }
+    }
+
+    // Starts the competition in Fusion's Single mode with what is set in CourseLibrary.Current and the Chosen* values
+    async Task<bool> Launch()
+    {
         NetworkRunner runner = Instantiate(runnerPrefab);
         runner.name = "Single player runner";
         runner.ProvideInput = true;
@@ -372,7 +412,7 @@ public class SinglePlayerMenu : MonoBehaviour
         });
         if (result.Ok)
         {
-            GameAnalytics.Record("single_player_started", "terrain", course != null && course.IsSprint() ? "sprint" : "forest");
+            GameAnalytics.Record("single_player_started", "terrain", CourseLibrary.Current != null && CourseLibrary.Current.IsSprint() ? "sprint" : "forest");
         }
         if (!result.Ok)
         {
@@ -385,7 +425,9 @@ public class SinglePlayerMenu : MonoBehaviour
                 UIToast.Show("The game could not start: " + result.ShutdownReason);
                 Refresh();
             }
+            return false;
         }
+        return true;
     }
 
     // The same card and loading bar as in the lobby (ReadyUIHandler)
@@ -422,6 +464,13 @@ public class SinglePlayerMenu : MonoBehaviour
     {
         ChosenGameMode = null;
         ChosenModes = ExtraMode.None;
+        // A contest race goes back to the contests page in the main menu
+        if (ContestRun.Active != null)
+        {
+            ContestRun.Leave();
+            SceneLoader.LeaveSession(runner, "MainMenu");
+            return;
+        }
         SceneLoader.LeaveSession(runner, "SingelPlayer");
     }
 }

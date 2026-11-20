@@ -176,6 +176,7 @@ public static class CompetitionFlow
         {
             NetworkPlayer local = NetworkPlayer.Local;
             bool single = local != null && local.Runner != null && local.Runner.GameMode == GameMode.Single;
+            if (single && ContestRun.Active != null) return "Back to contests";
             return single ? "Back to single player" : "Back to the lobby";
         }
     }

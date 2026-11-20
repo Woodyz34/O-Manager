@@ -219,11 +219,12 @@ public class RelayStatsUI : MonoBehaviour
         }
 
         continueButton.gameObject.SetActive(host);
-        CourseUI.SetButtonText(continueButton, final ? "Show the results" : "Start leg " + (leg + 2));
+        CourseUI.SetButtonText(continueButton, final ? (ContestRun.Active != null ? CompetitionFlow.BackButtonText : "Show the results") : "Start leg " + (leg + 2));
         waitingText.gameObject.SetActive(!host);
         waitingText.text = final ? "Waiting for the host to show the results..." : "Waiting for the host to start leg " + (leg + 2) + "...";
 
         foreach (Transform child in content) Destroy(child.gameObject);
+        lastTeamCount = teams.Count;
         switch (tab)
         {
             case Tab.Results: BuildResults(teams); break;
@@ -231,17 +232,32 @@ public class RelayStatsUI : MonoBehaviour
             case Tab.Legs: BuildLegs(teams); break;
             case Tab.Routes: BuildRoutes(teams); break;
         }
-        bool anyMistakeData = teams.Count > 1;
+        // Alone (2026-11-19, the user): no places and no mistake estimate, they would always say 1st and 0:00
         footnote.text = tab == Tab.Legs
-            ? "Each leg: leg time (place on the leg), then the team's total time (place after the leg)."
+            ? (Alone ? "Each leg: leg time, then the total time after the leg." : "Each leg: leg time (place on the leg), then the team's total time (place after the leg).")
             : tab == Tab.Routes
             ? "Click a leg to see everyone's route on the map, next to the computer's fastest route."
-            : "Mistakes are estimated the way WinSplits does it: compared with the fastest 25 % on each split and the runner's own normal pace, a split that lost more than 30 s and 25 % is marked red."
-              + (anyMistakeData ? "" : " With only one team there is nothing to compare with.");
+            : Alone ? ""
+            : "Mistakes (est.): every split is compared with the fastest 25 % of the runners on it, adjusted to the runner's own pace on the other splits. A split that took more than 30 s and 25 % longer than that is marked red, and the time lost is shown.";
     }
+
+    // Only one team or player: places and mistake estimates mean nothing
+    bool Alone => lastTeamCount <= 1;
+    int lastTeamCount = 2;
 
     void BuildResults(List<RelayTeamResult> teams)
     {
+        if (Alone)
+        {
+            if (race.IsRelay) Row(48, true, Cell("Team", 300), Cell("Runner", 300), Cell("Leg time", 170), Cell("Total", 170));
+            else Row(48, true, Cell(race.IsRelay ? "Team" : "Player", 300), Cell("Runner", 300), Cell("Time", 170));
+            foreach (RelayTeamResult t in teams)
+            {
+                if (race.IsRelay) Row(52, false, t.isLocal, Cell(t.team, 300, FontStyles.Bold), Cell(t.runner, 300), Cell(RelayStats.Time(t.legTime), 170), Cell(RelayStats.Time(t.total), 170));
+                else Row(52, false, t.isLocal, Cell(t.team, 300, FontStyles.Bold), Cell(t.runner, 300), Cell(RelayStats.Time(t.total), 170));
+            }
+            return;
+        }
         if (race.IsRelay) Row(48, true, Cell("Pl.", 80), Cell("+/-", 90), Cell("Team", 300), Cell("Runner", 300), Cell("Leg time", 170), Cell("Leg pl.", 110), Cell("Total", 170), Cell("Mistakes (est.)", 230));
         // One leg only: no place changes or leg columns, and the time is the race clock the places are made from
         else Row(48, true, Cell("Pl.", 80), Cell("Player", 300), Cell("Runner", 300), Cell("Time", 170), Cell("Mistakes (est.)", 230));
@@ -305,16 +321,18 @@ public class RelayStatsUI : MonoBehaviour
                     continue;
                 }
                 string branch = t.variants[c] >= 0 ? "<color=" + Muted + ">" + CourseData.BranchLetter(t.variants[c]) + "</color> " : "";
-                string text = branch + "<b>" + RelayStats.Time(t.split[c]) + "</b> (" + t.splitPlace[c] + ")"
+                string text = Alone
+                    ? branch + "<b>" + RelayStats.Time(t.split[c]) + "</b>\n<size=80%>" + RelayStats.Time(t.clocks[c] - t.clocks[0]) + "</size>"
+                    : branch + "<b>" + RelayStats.Time(t.split[c]) + "</b> (" + t.splitPlace[c] + ")"
                     + "\n<size=80%>" + RelayStats.Time(t.clocks[c] - t.clocks[0]) + " (" + t.cumPlace[c] + ")</size>";
-                if (t.mistake[c]) text += "\n<size=80%><color=" + Red + ">+" + RelayStats.Time(t.loss[c]) + "</color></size>";
+                if (t.mistake[c] && !Alone) text += "\n<size=80%><color=" + Red + ">+" + RelayStats.Time(t.loss[c]) + "</color></size>";
                 CellData cell = Cell(text, 160);
-                if (t.mistake[c]) cell.back = MistakeBack;
+                if (t.mistake[c] && !Alone) cell.back = MistakeBack;
                 cells.Add(cell);
             }
             Row(t.hasSplits && System.Array.Exists(t.mistake, m => m) ? 96 : 76, false, t.isLocal, cells.ToArray());
         }
-        Row(40, false, Cell("<size=85%><color=" + Muted + ">" + (race.IsRelay
+        Row(40, false, Cell("<size=85%><color=" + Muted + ">" + (Alone ? "Each box: time from the control before, then time since the start." : race.IsRelay
             ? "Times between the controls every team runs. Each box: time from the common control before (place among the teams that ran the same branch, shown by its letter), then time since the changeover (race position there)."
             : "Each box: time from the control before (place on that split), then time since the start (place at the control).") + "</color></size>", 1500));
     }
@@ -351,8 +369,8 @@ public class RelayStatsUI : MonoBehaviour
             for (int l = 0; l <= leg; l++)
             {
                 string runner = race.History.Runner(l, t.player, leg);
-                cells.Add(Cell(RelayStats.Time(t.player.relayLegTimes[l]) + " (" + legPlace[i, l] + ")"
-                    + "\n<size=80%>" + RelayStats.Time(t.player.relayTotals[l]) + " (" + totalPlace[i, l] + ")</size>"
+                cells.Add(Cell(RelayStats.Time(t.player.relayLegTimes[l]) + (Alone ? "" : " (" + legPlace[i, l] + ")")
+                    + "\n<size=80%>" + RelayStats.Time(t.player.relayTotals[l]) + (Alone ? "" : " (" + totalPlace[i, l] + ")") + "</size>"
                     + (runner != "" ? "\n<size=75%><color=" + Muted + ">" + runner + "</color></size>" : ""), 210));
             }
             Row(92, false, t.isLocal, cells.ToArray());
@@ -383,14 +401,15 @@ public class RelayStatsUI : MonoBehaviour
                     cells.Add(Cell("<color=" + Muted + ">-</color>", 190));
                     continue;
                 }
-                string text = RelayStats.Time(t.split[c]) + " (" + t.splitPlace[c] + ")";
-                CellData cell = Cell(t.splitPlace[c] == 1 ? "<b>" + text + "</b>" : text, 190);
+                string text = RelayStats.Time(t.split[c]) + (Alone ? "" : " (" + t.splitPlace[c] + ")");
+                CellData cell = Cell(t.splitPlace[c] == 1 && !Alone ? "<b>" + text + "</b>" : text, 190);
                 cells.Add(cell);
             }
             Row(52, false, cells.ToArray());
         }
         Row(40, false, Cell("<size=85%><color=" + Muted + ">" + (RouteAnalysis.On
             ? "Everyone ran with the same runner and nobody made mistakes, so the times show which route choice was best."
+            : Alone ? "Time on each leg."
             : "Time on each leg (place on the leg). The runners have different speed and technique, so the times are not only about the route.") + "</color></size>", 1500));
     }
 

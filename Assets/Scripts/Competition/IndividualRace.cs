@@ -132,6 +132,7 @@ public class IndividualRace : MonoBehaviour, IRaceStats
         {
             statsShown = true;
             recorder.Stop();
+            SendContestResult();
             statsUI = RelayStatsUI.Create(this);
             statsUI.Open(0, true, ownTracks ?? recorder.Tracks);
         }
@@ -139,6 +140,17 @@ public class IndividualRace : MonoBehaviour, IRaceStats
         {
             statsUI.Close();
         }
+    }
+
+    // A weekly or daily contest (ContestRun): the finish time and the way round go to the leaderboard
+    void SendContestResult()
+    {
+        if (!ContestRun.InRace) return;
+        NetworkPlayer local = NetworkPlayer.Local;
+        if (local == null || local.Object == null || !local.Object.IsValid || !local.raceFinished) return;
+        int seconds = local.hourCount * 3600 + local.minuterCount * 60 + local.secoundCount;
+        RelayTrack track = recorder.Tracks.Find(t => t.isLocal);
+        ContestRun.OnRaceFinished(seconds, track);
     }
 
     static bool AllFinished()
@@ -157,6 +169,13 @@ public class IndividualRace : MonoBehaviour, IRaceStats
     public void HostContinue()
     {
         if (!CompetitionFlow.LocalIsHost()) return;
+        // A weekly or daily contest has no results page or race money: its leaderboard and prizes are on the
+        // contests page (2026-11-19, the user)
+        if (ContestRun.Active != null)
+        {
+            CompetitionFlow.HostReturnToLobby();
+            return;
+        }
         FinalResultsAllowed = true;
         CompetitionFlow.HostShowResults();
     }

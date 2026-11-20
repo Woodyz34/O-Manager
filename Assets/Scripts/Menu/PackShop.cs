@@ -120,7 +120,12 @@ public static class PackShop
     // First the tier, by the fixed odds; then any runner of that tier the player does not have yet
     static CardData Draw()
     {
-        List<CardData> cards = Available();
+        return DrawFrom(Available());
+    }
+
+    // A runner from these by the shop's fixed tier odds; also used for the normal pack won in a contest (PrizePacks)
+    public static CardData DrawFrom(List<CardData> cards)
+    {
         float roll = Random.value;
         RunnerTier picked = RunnerTier.Bronze;
         bool found = false;
