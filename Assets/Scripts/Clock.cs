@@ -146,6 +146,25 @@ public class Clock : MonoBehaviour
 
         }
     }
+    // A replay is playing (RelayReplayView): the clock shows the replay's time instead (2026-11-20, Anders: it stood at 00:00:00)
+    public void ShowReplayTime(int seconds)
+    {
+        if (hourBox == null || minuterBox == null || secoundBox == null) return;
+        int h = seconds / 3600, m = seconds / 60 % 60, s = seconds % 60;
+        hourBox.text = h.ToString("00") + ":";
+        minuterBox.text = m.ToString("00") + ":";
+        secoundBox.text = s.ToString("00");
+    }
+
+    // Back from a replay: the race's own time again
+    public void ShowOwnTime()
+    {
+        if (hourBox == null || minuterBox == null || secoundBox == null) return;
+        hourBox.text = hourCount.ToString("00") + ":";
+        minuterBox.text = minuterCount.ToString("00") + ":";
+        secoundBox.text = Mathf.FloorToInt(sekundercount).ToString("00");
+    }
+
     public void UpdateTimer()
     {
         if(agentMovement.manualPathDrawer == null)

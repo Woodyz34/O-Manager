@@ -36,6 +36,8 @@ public class TvTown
         if (layer == null) return town;
         try { town.ReadLines(linesJson); }
         catch (Exception) { }
+        try { town.StitchCanopies(); }
+        catch (Exception) { }
         try { town.Landmarks(layer); }
         catch (Exception) { }
         return town;
@@ -78,9 +80,52 @@ public class TvTown
                     case 3: stairs.Add(xy); stairWidths.Add(Footprint(name)); break;
                     case 4:
                         if (xy.Length >= 8 && Math.Abs(xy[0] - xy[xy.Length - 2]) < 0.6f && Math.Abs(xy[1] - xy[xy.Length - 1]) < 0.6f) canopies.Add(xy);
+                        else canopyPieces.Add(xy);
                         break;
                 }
             }
+        }
+    }
+
+    // Pieces of canopy outlines that are not closed on their own (2026-11-20: a map often draws one canopy as several
+    // lines, and those canopies had no roof)
+    readonly List<float[]> canopyPieces = new List<float[]>();
+
+    // Joins the pieces end to end (ends within 0.6 m) into closed outlines
+    void StitchCanopies()
+    {
+        var left = new List<List<float>>();
+        foreach (float[] p in canopyPieces) left.Add(new List<float>(p));
+        canopyPieces.Clear();
+        bool Near(float ax, float az, float bx, float bz) => Math.Abs(ax - bx) < 0.6f && Math.Abs(az - bz) < 0.6f;
+        while (left.Count > 0)
+        {
+            List<float> ring = left[left.Count - 1];
+            left.RemoveAt(left.Count - 1);
+            bool grew = true;
+            while (grew && !(ring.Count >= 8 && Near(ring[0], ring[1], ring[ring.Count - 2], ring[ring.Count - 1])))
+            {
+                grew = false;
+                float ex = ring[ring.Count - 2], ez = ring[ring.Count - 1];
+                for (int k = 0; k < left.Count; k++)
+                {
+                    List<float> q = left[k];
+                    bool head = Near(ex, ez, q[0], q[1]), tail = Near(ex, ez, q[q.Count - 2], q[q.Count - 1]);
+                    if (!head && !tail) continue;
+                    if (tail)
+                    {
+                        // Turn it round
+                        var r = new List<float>(q.Count);
+                        for (int i = q.Count - 2; i >= 0; i -= 2) { r.Add(q[i]); r.Add(q[i + 1]); }
+                        q = r;
+                    }
+                    ring.AddRange(q.GetRange(2, q.Count - 2));
+                    left.RemoveAt(k);
+                    grew = true;
+                    break;
+                }
+            }
+            if (ring.Count >= 8 && Near(ring[0], ring[1], ring[ring.Count - 2], ring[ring.Count - 1])) canopies.Add(ring.ToArray());
         }
     }
 

@@ -211,11 +211,15 @@ public class RelayReplayView : MonoBehaviour
     bool settingSlider;
     static Material material;
 
+    // The replay on the screen, if any: the Follow runner button hides and the clock shows the replay's time
+    public static RelayReplayView Current { get; private set; }
+
     public static RelayReplayView Open(List<RelayTrack> tracks, System.Action onClose)
     {
         RelayReplayView view = new GameObject("Relay replay").AddComponent<RelayReplayView>();
         view.tracks = tracks;
         view.onClose = onClose;
+        Current = view;
         view.Build();
         return view;
     }
@@ -225,7 +229,11 @@ public class RelayReplayView : MonoBehaviour
         NetworkPlayer local = NetworkPlayer.Local;
         cameraController = local != null ? local.GetComponent<CameraController>() : null;
         cam = cameraController != null && cameraController.cam != null ? cameraController.cam : Camera.main;
-        if (cameraController != null) cameraController.enabled = false;
+        if (cameraController != null)
+        {
+            cameraController.enabled = false;
+            cameraController.HideFollowButton();
+        }
         savedPosition = cam.transform.position;
         savedRotation = cam.transform.rotation;
         savedSize = cam.orthographicSize;
@@ -524,6 +532,8 @@ public class RelayReplayView : MonoBehaviour
         if (timeText != null)
         {
             timeText.text = "+" + RelayStats.Time(Mathf.RoundToInt(time * PackRunning.GameSecondsPerSecond));
+        Clock clock = NetworkPlayer.Local != null ? NetworkPlayer.Local.clock : null;
+        if (clock != null) clock.ShowReplayTime(Mathf.RoundToInt(time * PackRunning.GameSecondsPerSecond));
         }
         if (slider != null)
         {
@@ -548,6 +558,12 @@ public class RelayReplayView : MonoBehaviour
     // Closed by a scene change (the host took everyone back to the lobby) rather than by Close()
     void OnDestroy()
     {
+        if (Current == this)
+        {
+            Current = null;
+            Clock clock = NetworkPlayer.Local != null ? NetworkPlayer.Local.clock : null;
+            if (clock != null) clock.ShowOwnTime();
+        }
         if (cameraController != null) cameraController.enabled = true;
         // The runners live on into the next race: they must not stay hidden
         ShowRealRunners();

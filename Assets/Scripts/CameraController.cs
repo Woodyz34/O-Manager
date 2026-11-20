@@ -303,6 +303,12 @@ public class CameraController : MonoBehaviour
 
     // Knappen skapas i koden så att den finns i alla banor utan att varje scen behöver ändras.
     // Den visas bara medan löparen springer, inte medan spelaren ritar.
+    // A replay takes the camera over (and turns this off): the button goes with it
+    public void HideFollowButton()
+    {
+        if (followButton != null) followButton.gameObject.SetActive(false);
+    }
+
     private void UpdateFollowButton()
     {
         if (followButton == null)
@@ -314,7 +320,8 @@ public class CameraController : MonoBehaviour
             }
         }
 
-        bool show = IsRunPhase();
+        // Never in a replay (2026-11-20, Anders: it does nothing there and is in the way)
+        bool show = IsRunPhase() && RelayReplayView.Current == null;
         if (followButton.gameObject.activeSelf != show)
         {
             followButton.gameObject.SetActive(show);

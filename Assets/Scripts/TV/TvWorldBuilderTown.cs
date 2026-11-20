@@ -83,6 +83,7 @@ public partial class TvWorldBuilder
         TownLines();
         foreach (var l in townLines)
         {
+            if (l.kind == 3) { StairSlope(l.xz, l.w); continue; }
             if (l.kind != 1) continue;
             float[] c = l.xz;
             int n = c.Length / 2;
@@ -103,6 +104,59 @@ public partial class TvWorldBuilder
                     F[k] = Lerp(deck, F[k], Sm(1.25f, 1.7f, d));
                 });
             }
+        }
+    }
+
+    // Stairs always climb (2026-11-20, Anders: flat stairs looked wrong). Which way and how much: the map's heights
+    // a little beyond each end when they differ; else up to the house the stairs lead to (steps up to a door); else
+    // the way the land rises round them; else up along the line as drawn. The ground along the stairs is set to
+    // the slope, and the steps (TownStructures) follow it.
+    void StairSlope(float[] c, float width)
+    {
+        int n = c.Length / 2;
+        if (n < 2) return;
+        var along = new float[n];
+        for (int i = 1; i < n; i++)
+            along[i] = along[i - 1] + (float)Math.Sqrt((c[i * 2] - c[i * 2 - 2]) * (c[i * 2] - c[i * 2 - 2]) + (c[i * 2 + 1] - c[i * 2 - 1]) * (c[i * 2 + 1] - c[i * 2 - 1]));
+        float total = along[n - 1];
+        if (total < 0.6f || total > 80f) return;
+        float ax = c[0], az = c[1], bx = c[c.Length - 2], bz = c[c.Length - 1];
+        // The way out of each end
+        float adx = c[0] - c[2], adz = c[1] - c[3], al = Math.Max(0.01f, (float)Math.Sqrt(adx * adx + adz * adz));
+        float bdx = c[c.Length - 2] - c[c.Length - 4], bdz = c[c.Length - 1] - c[c.Length - 3], bl = Math.Max(0.01f, (float)Math.Sqrt(bdx * bdx + bdz * bdz));
+        adx /= al; adz /= al; bdx /= bl; bdz /= bl;
+        float hA = Plain(ax + adx * 2.5f, az + adz * 2.5f), hB = Plain(bx + bdx * 2.5f, bz + bdz * 2.5f);
+        float dh = hB - hA, usual = Math.Max(0.45f, Math.Min(total * 0.5f, 3f));
+        float rise;
+        if (Math.Abs(dh) >= 0.3f) rise = Math.Sign(dh) * Math.Max(Math.Abs(dh), Math.Min(usual, Math.Abs(dh) * 1.5f));
+        else
+        {
+            bool houseA = Base(CellAt(ax + adx * 1.2f, az + adz * 1.2f)) == WorldCell.Building;
+            bool houseB = Base(CellAt(bx + bdx * 1.2f, bz + bdz * 1.2f)) == WorldCell.Building;
+            float door = Math.Max(0.45f, Math.Min(total * 0.5f, 1.4f));
+            if (houseB && !houseA) rise = door;
+            else if (houseA && !houseB) rise = -door;
+            else
+            {
+                float wide = Plain(bx + bdx * 9f, bz + bdz * 9f) - Plain(ax + adx * 9f, az + adz * 9f);
+                rise = Math.Abs(wide) > 0.1f ? Math.Sign(wide) * usual : usual;
+            }
+        }
+        float h0 = Plain(ax, az);
+        if (rise < 0f) { h0 = Plain(bx, bz) - rise; }   // keep the low end on the ground there
+        float half = (width > 0.5f ? width : 2f) / 2f;
+        for (int q = 0; q + 3 < c.Length; q += 2)
+        {
+            int seg = q / 2;
+            float sx = c[q], sz = c[q + 1], ex = c[q + 2], ez = c[q + 3];
+            float segLen = along[seg + 1] - along[seg];
+            ForNear(sx, sz, ex, ez, half + 0.9f, (k, d, qx, qz) =>
+            {
+                float t = segLen > 0.01f ? (float)Math.Sqrt((qx - sx) * (qx - sx) + (qz - sz) * (qz - sz)) / segLen : 0f;
+                float f = (along[seg] + t * segLen) / total;
+                float y = h0 + rise * f;
+                F[k] = Lerp(y, F[k], Sm(half + 0.15f, half + 0.9f, d));
+            });
         }
     }
 
@@ -798,6 +852,19 @@ public partial class TvWorldBuilder
         }
         b.Box(-hl - 0.2f, 2.9f, -hw - 0.2f, hl + 0.2f, 3.1f, hw + 0.2f, roof);
         townBuiltMesh.Add(b.Done(), cx, lowest, cz, 1f, 1f, 1f, -angle);
+        // A canopy standing alone on the paving is most often a bicycle shelter (2026-11-20, Anders): a row of bikes
+        // under it along its back
+        if (len >= 2.5f && wid >= 1.6f)
+        {
+            int look2 = look;
+            for (float u = -hl + 0.5f; u <= hl - 0.4f; u += 0.75f)
+            {
+                look2 = look2 * 7 + 3;
+                if (TvRandom.Hash((int)Math.Floor((cx + ox) * 3f + u * 5f), (int)Math.Floor((cz + oz) * 3f)) < 0.25f) continue;   // a gap now and then
+                float v = -hw + 0.95f, x = cx + ux * u - uz * v, z = cz + uz * u + ux * v;
+                townThingMesh.Add(Shape(Thing.Bike, Math.Abs(look2) % 8, input.town.style), x, H(x, z), z, 1f, 1f, 1f, -angle);
+            }
+        }
     }
 
     // ---- Keeping it: the paved ground as a mesh of its own (asphalt or cobble grain), and the town's meshes ----
