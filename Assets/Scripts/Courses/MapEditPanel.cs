@@ -593,6 +593,8 @@ public class MapEditPanel : MonoBehaviour
             }
             updated.name = name;
             updated.ownerClub = club;
+            // A new version: shared and used instead of the built-in map until this version is built in
+            updated.editedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             updated.look = look.Copy();
             if (!isPrivate)
             {

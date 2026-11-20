@@ -142,6 +142,7 @@ public static class MapPackages
         map.id = info.id;
         map.displayName = info.name;
         map.mapType = info.mapType;
+        map.editedAt = info.editedAt;
         map.gridName = root + "grid";
         map.pointsPath = root + "points";
         map.linesPath = root + "lines";

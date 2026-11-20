@@ -24,8 +24,10 @@ using PlayerData = Unity.Services.CloudSave.Models.Data.Player;
 // Other computers download the map file and build the map from it themselves (MapImportPanel.BuildPackage), into
 // <persistent data>/Maps/<id>/ with map.json "sharedBy" set, so it works like a map imported there.
 //
-// When the map has been built into the game (a MapDefinition in Resources with the same id), the downloaded copies
-// are deleted, and the sharing player's game takes the map out of "sharedMaps" and deletes its files in the cloud.
+// When the map has been built into the game (a MapDefinition in Resources with the same id and the same version or a
+// later one), the downloaded copies are deleted, and the sharing player's game takes the map out of "sharedMaps" and
+// deletes its files in the cloud. When the player edits the map afterwards (MapEditPanel), the new version is sent in
+// and shared again, and used instead of the built-in one, until it is built in as well (2026-11-20).
 // The game's owner's Unity also deletes the files when a sent-in map is imported (SentMapsDownloader).
 public static class SharedMaps
 {
@@ -56,6 +58,7 @@ public static class SharedMaps
         public TerrainLook look;          // ground, trees and undergrowth for the 3D view, or null for the normal look
         public TerrainSpeeds terrain;     // the terrain sliders, or null for the normal speeds (maps shared before them)
         public long sharedAt;             // unix seconds
+        public long editedAt;             // the map's version (MapPackageInfo.editedAt); 0 for maps shared before versions
         [JsonIgnore] public string ownerId;
     }
 
@@ -89,7 +92,8 @@ public static class SharedMaps
             boundary = info.boundary != null && info.boundary.Length >= 6 ? info.boundary : null,
             terrain = info.terrain != null && !info.terrain.IsDefault() ? info.terrain.Copy() : null,
             look = info.look != null && !info.look.IsDefault() ? info.look.Safe() : null,
-            sharedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            sharedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            editedAt = info.editedAt
         });
         await SaveMineAsync(mine);
         PlayerPrefs.SetInt(HaveSharedPref, 1);
@@ -131,8 +135,9 @@ public static class SharedMaps
         await CloudSaveService.Instance.Data.Player.SaveAsync(data, new PlayerData.SaveOptions(new PlayerData.PublicWriteAccessClassOptions()));
     }
 
-    // A map built into the game is no longer shared: built-in maps are the non-local ones in MapDefinition.All
-    static bool IsBuiltIn(string id) => MapDefinition.All.Exists(m => m.id == id && (!m.isLocal || m.replacesBuiltIn));
+    // A map built into the game in this version (or a later one) is no longer shared. A version edited after the map
+    // was built in is shared again until that version is built in too (2026-11-20, Anders).
+    static bool IsBuiltIn(string id, long version) => MapDefinition.BuiltInFrom(id, version);
 
     // ---- Listing (called by CloudCourses with every player the course query returns) ----
 
@@ -250,7 +255,7 @@ public static class SharedMaps
             int downloads = 0;
             foreach (SharedMap m in new List<SharedMap>(others))
             {
-                if (m.ownerId == me || IsBuiltIn(m.id) || failed.Contains(m.ownerId + "/" + m.id)) continue;
+                if (m.ownerId == me || IsBuiltIn(m.id, m.editedAt) || failed.Contains(m.ownerId + "/" + m.id)) continue;
                 if (downloads >= MaxDownloadsPerSync) break;   // the rest the next time
                 MapPackageInfo local = ReadLocal(m.id);
                 if (local != null)
@@ -324,6 +329,7 @@ public static class SharedMaps
             package.info.permissionConfirmed = true;   // confirmed by the player who shared it
             package.info.sharedBy = m.ownerId;
             package.info.sharedAt = m.sharedAt;
+            package.info.editedAt = m.editedAt;
             // Built next to the real folder and moved in when done, so a half-built map is never listed
             if (Directory.Exists(building)) Directory.Delete(building, true);
             MapPackageBuilder.WriteFolder(building, package, ownPng);
@@ -356,7 +362,7 @@ public static class SharedMaps
                 }
                 MapPackageInfo info = ReadLocal(name);
                 if (info == null || string.IsNullOrEmpty(info.sharedBy)) continue;
-                bool builtIn = IsBuiltIn(info.id);
+                bool builtIn = IsBuiltIn(info.id, info.editedAt);
                 bool withdrawn = listedOwners.Contains(info.sharedBy) && !others.Exists(m => m.ownerId == info.sharedBy && m.id == info.id);
                 if (!builtIn && !withdrawn) continue;
                 Directory.Delete(folder, true);
@@ -380,7 +386,7 @@ public static class SharedMaps
     {
         if (!CloudCourses.IsSignedIn || PlayerPrefs.GetInt(HaveSharedPref, 0) == 0) return;
         List<SharedMap> mine = await LoadMineAsync();
-        List<SharedMap> done = mine.FindAll(m => IsBuiltIn(m.id));
+        List<SharedMap> done = mine.FindAll(m => IsBuiltIn(m.id, m.editedAt));
         if (done.Count == 0) return;
         List<FileItem> files = await CloudSaveService.Instance.Files.Player.ListAllAsync();
         foreach (SharedMap m in done)

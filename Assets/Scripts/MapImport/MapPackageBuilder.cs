@@ -43,6 +43,9 @@ namespace MapImport
         public string ownerClub;
         public string contact;
         public string created;                // ISO date
+        // Which version of the map this is (unix seconds of the build or the last edit). A copy newer than the one
+        // built into the game is used and shared until the newer one is built in (2026-11-20). 0: before versions.
+        public long editedAt;
         public bool permissionConfirmed;      // the uploader says the map's owner allows it
         public double[] boundary;             // the edge of the finished map the player chose (paper mm), or empty for all of it
         // How quick the kinds of ground are (the sliders at import). All in the middle = the game's normal speeds.
@@ -158,7 +161,8 @@ namespace MapImport
                 terrain = map.terrain != null ? map.terrain.Copy() : new TerrainSpeeds(),
                 look = map.look != null ? map.look.Safe() : new TerrainLook(),
                 crs = map.crsCode,
-                created = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                created = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                editedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
             };
             pkg.info = info;
             pkg.grid = WriteGrid(grid, info);
@@ -282,7 +286,7 @@ namespace MapImport
                 for (int k = 0; k < i.boundary.Length; k++) sb.Append(k > 0 ? "," : "").Append(i.boundary[k].ToString("0.###", CultureInfo.InvariantCulture));
                 sb.Append("],\n");
             }
-            S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created);
+            S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created); N("editedAt", i.editedAt);
             S("sharedBy", i.sharedBy); N("sharedAt", i.sharedAt);
             B("isPrivate", i.isPrivate); S("privateSourceKey", i.privateSourceKey); N("rulesVersion", i.rulesVersion);
             TerrainSpeeds t = i.terrain ?? new TerrainSpeeds();
