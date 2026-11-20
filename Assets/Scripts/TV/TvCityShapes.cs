@@ -4,7 +4,7 @@ using System;
 // street lamps, litter bins, park benches, fine fences, and people out in the town who watch the race). Low-poly
 // shapes with their colours in the corners, like the rest of the 3D world, made once and copied many times.
 // Measures in metres; y up; a building is built round its middle on the ground, its length along x.
-public static class TvCityShapes
+public static partial class TvCityShapes
 {
     // ---- Colours ----
 
