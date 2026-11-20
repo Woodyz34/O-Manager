@@ -76,6 +76,40 @@ public partial class TvWorldBuilder
         return best;
     }
 
+    // Inside the outline of a canopy (a roof on posts, or a passage under a house)
+    bool InsideCanopy(float x, float z)
+    {
+        foreach (var l in townLines)
+        {
+            if (l.kind != 4) continue;
+            float[] c = l.xz;
+            bool inside = false;
+            for (int i = 0, j = c.Length / 2 - 1; i < c.Length / 2; j = i++)
+            {
+                float xi = c[i * 2], zi = c[i * 2 + 1], xj = c[j * 2], zj = c[j * 2 + 1];
+                if ((zi > z) != (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
+            }
+            if (inside) return true;
+        }
+        return false;
+    }
+
+    // Something built stands within gap of here: a house, a canopy, a bridge, a tunnel or stairs (2026-11-20, Anders:
+    // a tree grew up through a bicycle shelter). Trees, thickets and street things keep out of them.
+    bool TownKeepOut(float x, float z, float gap)
+    {
+        if (Base(CellAt(x, z)) == WorldCell.Building) return true;
+        if (gap > 0.3f)
+            for (int k = 0; k < 8; k++)
+            {
+                float a = k * 0.785398f;
+                if (Base(CellAt(x + (float)Math.Cos(a) * gap, z + (float)Math.Sin(a) * gap)) == WorldCell.Building) return true;
+            }
+        TownLines();
+        if (InsideCanopy(x, z) || TownLineDist(x, z, 4) < gap) return true;
+        return TownLineDist(x, z, 1) < gap + 1.5f || TownLineDist(x, z, 2) < gap + 1.8f || TownLineDist(x, z, 3) < gap + 1f;
+    }
+
     // ---- Heights: bridge decks are level with their ends ----
 
     void TownHeights()
@@ -489,6 +523,7 @@ public partial class TvWorldBuilder
                 // Clear of the course's flags and the bridges, tunnels and stairs
                 if (NearFlag(x, z, 4f)) continue;
                 if (TownLineDist(x, z, 1) < 3f || TownLineDist(x, z, 2) < 3f || TownLineDist(x, z, 3) < 2.5f || TownLineDist(x, z, 4) < 2f) continue;
+                if (InsideCanopy(x, z)) continue;
                 // How far the paving reaches in 8 directions
                 float min = 99f;
                 int minDir = 0;
@@ -617,7 +652,7 @@ public partial class TvWorldBuilder
                     }
                 }
                 // Trees on wide streets and squares
-                if (min >= 3f && across >= 12f && h > 0.3f && h < 0.42f && FarFrom(x, z, 9f, 7) && Free(x, z, 2.5f))
+                if (min >= 3f && across >= 12f && h > 0.3f && h < 0.42f && FarFrom(x, z, 9f, 7) && Free(x, z, 2.5f) && !TownKeepOut(x, z, 3.2f))
                 {
                     townThingMesh.Add(Shape(Thing.Tree, look % 4, style), x, y, z, 1f, 1f, 1f, h2 * 6.28f);
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.3f });
