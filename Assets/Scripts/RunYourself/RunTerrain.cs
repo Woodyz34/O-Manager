@@ -35,6 +35,7 @@ public class RunTerrain
     {
         public WorldLineKind kind;
         public float ax, az, bx, bz;     // metres from the layer's lower left corner
+        public float way;                // a bridge or tunnel: metres from its middle line that are on it
     }
 
     // Bridges and tunnels of a town (TvTown): a way over water and through houses, fences and walls
@@ -68,12 +69,22 @@ public class RunTerrain
         bucketRows = Math.Max(1, (int)Math.Ceiling(layer.rows * layer.cell / Bucket));
         buckets = new List<int>[bucketCols * bucketRows];
         var all = new List<(WorldLineKind kind, float[] xy)>();
+        var wayHalf = new Dictionary<float[], float>();
         foreach (WorldLine line in layer.lines)
             if (line.xy != null && Matters(line.kind)) all.Add((line.kind, line.xy));
         if (town != null)
         {
-            foreach (float[] xy in town.bridges) all.Add((BridgeKind, xy));
-            foreach (float[] xy in town.tunnels) all.Add((TunnelKind, xy));
+            // A bridge or tunnel drawn as two side lines is one line down its middle, as wide as the sides are apart
+            for (int b = 0; b < town.bridges.Count; b++)
+            {
+                all.Add((BridgeKind, town.bridges[b]));
+                if (b < town.bridgeWidths.Count && town.bridgeWidths[b] > 0.5f) wayHalf[town.bridges[b]] = Math.Min(5f, town.bridgeWidths[b] / 2f) + 0.2f;
+            }
+            for (int b = 0; b < town.tunnels.Count; b++)
+            {
+                all.Add((TunnelKind, town.tunnels[b]));
+                if (b < town.tunnelWidths.Count && town.tunnelWidths[b] > 0.5f) wayHalf[town.tunnels[b]] = Math.Min(5f, town.tunnelWidths[b] / 2f);
+            }
             foreach (float[] xy in town.stairs) all.Add((TownStairsKind, xy));
         }
         if (forbidden != null)
@@ -112,12 +123,13 @@ public class RunTerrain
                 var p = new Piece
                 {
                     kind = line.kind,
+                    way = wayHalf.TryGetValue(line.xy, out float wh) ? Math.Max(1.4f, wh) : 1.4f,
                     ax = (float)(line.xy[i] - layer.minE), az = (float)(line.xy[i + 1] - layer.minN),
                     bx = (float)(line.xy[i + 2] - layer.minE), bz = (float)(line.xy[i + 3] - layer.minN)
                 };
                 int index = pieces.Count;
                 pieces.Add(p);
-                const float Pad = 4f;
+                float Pad = Math.Max(4f, p.way + 1f);
                 int i0 = Math.Max(0, (int)((Math.Min(p.ax, p.bx) - Pad) / Bucket)), i1 = Math.Min(bucketCols - 1, (int)((Math.Max(p.ax, p.bx) + Pad) / Bucket));
                 int j0 = Math.Max(0, (int)((Math.Min(p.az, p.bz) - Pad) / Bucket)), j1 = Math.Min(bucketRows - 1, (int)((Math.Max(p.az, p.bz) + Pad) / Bucket));
                 for (int j = j0; j <= j1; j++)
@@ -189,7 +201,7 @@ public class RunTerrain
         {
             // A town: closed exactly where the 2D race is closed. Where the map is open but the 3D world has a
             // house, water or a garden (a passage the 2D game opens), the runner runs on paving.
-            bool closed = passable.Closed(e, n);
+            bool closed = passable.Closed(e, n) && !OnWay(e, n);
             if (g.blocked && !closed)
             {
                 g.speed = speeds.Ground(TerrainKind.Paved, 1.5f);
@@ -267,7 +279,7 @@ public class RunTerrain
         {
             Piece p = pieces[index];
             if (!IsWay(p.kind)) continue;
-            if (Dist(x, z, p) > 1.4f) continue;
+            if (Dist(x, z, p) > p.way) continue;
             g.blocked = false;
             g.speed = Math.Max(g.speed, speeds.Ground(TerrainKind.Paved, 1.5f));
             g.rough = 0.3f;
@@ -287,6 +299,20 @@ public class RunTerrain
             break;
         }
         return g;
+    }
+
+    // On a bridge or in a tunnel
+    bool OnWay(double e, double n)
+    {
+        float x = (float)(e - layer.minE), z = (float)(n - layer.minN);
+        List<int> near = BucketAt(x, z);
+        if (near == null) return false;
+        foreach (int index in near)
+        {
+            Piece p = pieces[index];
+            if (IsWay(p.kind) && Dist(x, z, p) <= p.way) return true;
+        }
+        return false;
     }
 
     static void OnTrack(ref Ground g, float d, float half, float speed, float rough, Surface surface)
@@ -312,7 +338,7 @@ public class RunTerrain
         foreach (int index in near)
         {
             Piece p = pieces[index];
-            if ((IsWay(p.kind) && Dist(x, z, p) < 1.4f) || (IsStairs(p.kind) && Dist(x, z, p) < 1.2f)) return false;
+            if ((IsWay(p.kind) && Dist(x, z, p) < p.way) || (IsStairs(p.kind) && Dist(x, z, p) < 1.2f)) return false;
         }
         foreach (int index in near)
         {
@@ -339,7 +365,7 @@ public class RunTerrain
         foreach (int index in near)
         {
             Piece p = pieces[index];
-            if ((IsWay(p.kind) || IsStairs(p.kind)) && Dist((ax + bx) / 2f, (az + bz) / 2f, p) < 1.6f) return false;
+            if ((IsWay(p.kind) || IsStairs(p.kind)) && Dist((ax + bx) / 2f, (az + bz) / 2f, p) < Math.Max(1.6f, p.way)) return false;
         }
         foreach (int index in near)
         {

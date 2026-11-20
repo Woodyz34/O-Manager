@@ -57,8 +57,8 @@ public partial class TvWorldBuilder
                 townLines.Add((kind, xz, widths != null && s < widths.Count ? widths[s] : 0f));
             }
         }
-        Take(t.bridges, 1);
-        Take(t.tunnels, 2);
+        Take(t.bridges, 1, t.bridgeWidths);
+        Take(t.tunnels, 2, t.tunnelWidths);
         Take(t.stairs, 3, t.stairWidths);
         Take(t.canopies, 4);
     }
@@ -118,7 +118,7 @@ public partial class TvWorldBuilder
                 float a = k * 0.785398f;
                 if (CanopyCell(x + (float)Math.Cos(a) * gap, z + (float)Math.Sin(a) * gap)) return true;
             }
-        return TownLineDist(x, z, 1) < gap + 1.5f || TownLineDist(x, z, 2) < gap + 1.8f || TownLineDist(x, z, 3) < gap + 1f;
+        return TownLineDist(x, z, 1) < gap + 2.5f || TownLineDist(x, z, 2) < gap + 2.5f || TownLineDist(x, z, 3) < gap + 1f;
     }
 
     // ---- Heights: bridge decks are level with their ends ----
@@ -131,6 +131,7 @@ public partial class TvWorldBuilder
             if (l.kind == 3) { StairSlope(l.xz, l.w); continue; }
             if (l.kind != 1) continue;
             float[] c = l.xz;
+            float bh = BridgeWidth(l.w) / 2f;
             int n = c.Length / 2;
             var along = new float[n];
             for (int i = 1; i < n; i++)
@@ -142,11 +143,11 @@ public partial class TvWorldBuilder
                 int seg = q / 2;
                 float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
                 float segLen = along[seg + 1] - along[seg];
-                ForNear(ax, az, bx, bz, 1.7f, (k, d, qx, qz) =>
+                ForNear(ax, az, bx, bz, bh + 0.4f, (k, d, qx, qz) =>
                 {
                     float t = segLen > 0.01f ? (float)Math.Sqrt((qx - ax) * (qx - ax) + (qz - az) * (qz - az)) / segLen : 0f;
                     float deck = Lerp(h0, h1, (along[seg] + t * segLen) / total) + 0.1f;
-                    F[k] = Lerp(deck, F[k], Sm(1.25f, 1.7f, d));
+                    F[k] = Lerp(deck, F[k], Sm(bh - 0.05f, bh + 0.4f, d));
                 });
             }
         }
@@ -204,6 +205,10 @@ public partial class TvWorldBuilder
             });
         }
     }
+
+    // A bridge's deck across, from the metres between its side lines (0: drawn as one line)
+    static float BridgeWidth(float w) => w > 0.5f ? Math.Max(2f, Math.Min(10f, w)) : 2.6f;
+    static float TunnelWidth(float w) => w > 0.5f ? Math.Max(2.4f, Math.Min(10f, w - 0.4f)) : 3.2f;
 
     // The height of a bridge's deck at a point on it
     float DeckAt(float x, float z) => H(x, z);
@@ -768,7 +773,7 @@ public partial class TvWorldBuilder
                 if (l.kind == 1)
                 {
                     // A bridge: a deck in short level pieces that follow the ramp, railings or stone parapets, piers at the ends
-                    const float W = 2.6f;
+                    float W = BridgeWidth(l.w);
                     for (int p = 0; p < parts; p++)
                     {
                         float t = (p + 0.5f) / parts, x = ax + dx * len * t, z = az + dz * len * t, y = DeckAt(x, z), pl = len / parts + 0.05f;
@@ -797,7 +802,8 @@ public partial class TvWorldBuilder
                 else if (l.kind == 2)
                 {
                     // A tunnel or an underpass: walls on both sides and a slab over it
-                    const float W = 3.2f, Top = 2.8f;
+                    float W = TunnelWidth(l.w);
+                    const float Top = 2.8f;
                     for (int p = 0; p < parts; p++)
                     {
                         float t = (p + 0.5f) / parts, x = ax + dx * len * t, z = az + dz * len * t, y = H(x, z), pl = len / parts + 0.05f;

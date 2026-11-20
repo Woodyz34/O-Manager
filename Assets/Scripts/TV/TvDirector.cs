@@ -200,9 +200,9 @@ public class TvDirector : MonoBehaviour
     public static TvDirector Create(GameObject host, CourseData course, MapDefinition map)
     {
         if (course == null || course.tvControls == null || course.tvControls.Count == 0 || map == null) return null;
-        if (course.IsSprint() || !TvWorldData.HasWorld(map))
+        if (!TvWorldData.HasWorld(map, true))
         {
-            Debug.Log("TvDirector: the course has TV controls, but " + (course.IsSprint() ? "it is a sprint" : "the map has no 3D layer") + "; no TV");
+            Debug.Log("TvDirector: the course has TV controls, but the map has no 3D layer; no TV");
             return null;
         }
         TvDirector director = host.AddComponent<TvDirector>();

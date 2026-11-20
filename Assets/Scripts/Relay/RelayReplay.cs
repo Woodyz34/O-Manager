@@ -285,7 +285,8 @@ public class RelayReplayView : MonoBehaviour
             line.useWorldSpace = true;
             lines.Add(line);
 
-            GameObject marker = track.plainDot ? PlainDot(track, dotSize * 1.3f) : track.look != null ? CopyLook(track.look) : null;
+            // A runner who left the game has no dot of its own any more: a plain round one (2026-11-20, Anders: it was a square)
+            GameObject marker = track.plainDot || track.look == null ? PlainDot(track, dotSize * 1.3f) : CopyLook(track.look);
             if (marker == null)
             {
                 marker = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -330,6 +331,8 @@ public class RelayReplayView : MonoBehaviour
     GameObject PlainDot(RelayTrack track, float diameter)
     {
         RunnerMarker look = track.look != null ? track.look.GetComponentInChildren<RunnerMarker>(true) : null;
+        // Gone (the runner left): the round dot of any runner still here
+        if (look == null || look.circle == null) look = FindAnyObjectByType<RunnerMarker>(FindObjectsInactive.Include);
         Sprite round = look != null && look.circle != null ? look.circle.sprite : null;
         if (round == null) return null;
         Sprite ringSprite = look.ring != null ? look.ring.sprite : null;

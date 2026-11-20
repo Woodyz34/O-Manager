@@ -63,6 +63,7 @@ public static class RunContourField
         // ---- Which way is up: a closed contour is a hill, unless it has a tick (a hollow) ----
         foreach (double[] t in ticks)
         {
+            if (t.Length > 2 && t[2] > 0) continue;   // a form line's tick (below)
             int cid = ContourHeights.Nearest(ids, C, R, (t[0] - ox) / res, (t[1] - oy) / res, 2);
             if (cid == 0 || !contours[cid - 1].line.closed) continue;
             contours[cid - 1].line.hollow = true;
@@ -190,6 +191,14 @@ public static class RunContourField
         if (!Fill(z, isFixed, sum, count, R, C)) return null;
 
         // ---- Form lines: half way between the contours round them ----
+        // A closed form line is a small knoll, or a small hollow when it has a slope tick (2026-11-20, Anders: hollows
+        // drawn with form lines on Illern came out as knolls; the form lines' ticks (103.1) were not read at all)
+        foreach (Line l in lines)
+        {
+            if (!l.formLine || !l.closed) continue;
+            foreach (double[] t in ticks)
+                if (NearLine(l.xy, t[0], t[1], 2.5)) { l.hollow = true; break; }
+        }
         int forms = 0;
         foreach (Line l in lines)
         {
@@ -204,7 +213,10 @@ public static class RunContourField
                 m += z[cy * C + cx]; n++;
             }
             if (n == 0) continue;
-            l.level = (Math.Floor(m / n / eq) + 0.5) * eq;
+            m /= n;
+            if (l.closed && l.hollow) l.level = (Math.Ceiling(m / eq - 0.02) - 0.5) * eq;
+            else if (l.closed) l.level = (Math.Floor(m / eq + 0.02) + 0.5) * eq;
+            else l.level = (Math.Floor(m / eq) + 0.5) * eq;
             l.solved = true;
             Fix(q, l.level, sum, count, C, R);
             forms++;
@@ -221,6 +233,22 @@ public static class RunContourField
         foreach (Line l in lines) if (l.solved) l.level -= min;
         log?.Invoke($"{contours.Count} contours ({known} with known slope), {forms} form lines, {edges.Count} pairs, {C}x{R} cells");
         return fine;
+    }
+
+    // Within reach metres of the line
+    static bool NearLine(double[] p, double x, double y, double reach)
+    {
+        double r2 = reach * reach;
+        for (int i = 0; i + 3 < p.Length; i += 2)
+        {
+            double ax = p[i], ay = p[i + 1], dx = p[i + 2] - ax, dy = p[i + 3] - ay;
+            if (Math.Min(ax, ax + dx) - reach > x || Math.Max(ax, ax + dx) + reach < x || Math.Min(ay, ay + dy) - reach > y || Math.Max(ay, ay + dy) + reach < y) continue;
+            double l2 = dx * dx + dy * dy;
+            double t = l2 > 0 ? Math.Max(0, Math.Min(1, ((x - ax) * dx + (y - ay) * dy) / l2)) : 0;
+            double qx = ax + t * dx - x, qy = ay + t * dy - y;
+            if (qx * qx + qy * qy <= r2) return true;
+        }
+        return false;
     }
 
     static void Blur(double[] z, int R, int C, int passes)
@@ -270,18 +298,26 @@ public static class RunContourField
     {
         var list = new List<Line>();
         if (json == null) return list;
+        var contours = new List<double[]>();
+        var forms = new List<double[]>();
         foreach (var (code, xy) in Features(json))
         {
             if (code.Length < 3 || xy.Count < 4) continue;
             string major = code.Substring(0, 3);
             if (major != "101" && major != "102" && major != "103") continue;
-            double[] p = xy.ToArray();
-            list.Add(new Line { xy = p, closed = MapGeometry.IsClosed(p, 1.5), formLine = major == "103" });
+            (major == "103" ? forms : contours).Add(xy.ToArray());
         }
+        // A contour is often drawn as several lines (cut at a tick, a text or a cliff): joined end to end again, so a
+        // ring round a knoll or a hollow is known as closed (2026-11-20, as ContourHeights does at the import)
+        foreach (double[] p in ContourHeights.StitchContours(contours, 1.0))
+            list.Add(new Line { xy = p, closed = MapGeometry.IsClosed(p, 1.5) });
+        foreach (double[] p in ContourHeights.StitchContours(forms, 1.0))
+            list.Add(new Line { xy = p, closed = MapGeometry.IsClosed(p, 1.5), formLine = true });
         return list;
     }
 
-    // Slope ticks: points of the contour symbols with a sub-number (101.1)
+    // Slope ticks: points of the contour and form line symbols with a sub-number (101.1, 103.1): x, y, and 1 for a
+    // form line's tick
     public static List<double[]> ReadTicks(byte[] json)
     {
         var list = new List<double[]>();
@@ -290,7 +326,8 @@ public static class RunContourField
         {
             if (code.Length < 6 || xy.Count < 2) continue;
             string major = code.Substring(0, 3);
-            if ((major == "101" || major == "102") && code.Substring(3, 3) != "000") list.Add(new[] { xy[0], xy[1] });
+            if ((major == "101" || major == "102" || major == "103") && code.Substring(3, 3) != "000")
+                list.Add(new[] { xy[0], xy[1], major == "103" ? 1.0 : 0.0 });
         }
         return list;
     }

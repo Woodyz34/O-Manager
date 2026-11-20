@@ -19,6 +19,8 @@ public class TvTown
     // Lines as e0, n0, e1, n1, ... in the game's coordinates; width: metres across (0 = not given)
     public readonly List<float[]> bridges = new List<float[]>(), tunnels = new List<float[]>(), stairs = new List<float[]>();
     public readonly List<float> stairWidths = new List<float>();
+    // Metres between the two side lines of each bridge and tunnel (0 = drawn as one line)
+    public readonly List<float> bridgeWidths = new List<float>(), tunnelWidths = new List<float>();
     // Outlines of canopies (roofs on posts, and passages under houses), closed
     public readonly List<float[]> canopies = new List<float[]>();
 
@@ -37,6 +39,12 @@ public class TvTown
         try { town.ReadLines(linesJson); }
         catch (Exception) { }
         try { town.StitchCanopies(); }
+        catch (Exception) { }
+        try
+        {
+            PairSides(town.bridges, town.bridgeWidths);
+            PairSides(town.tunnels, town.tunnelWidths);
+        }
         catch (Exception) { }
         try { town.Landmarks(layer); }
         catch (Exception) { }
@@ -126,6 +134,58 @@ public class TvTown
                 }
             }
             if (ring.Count >= 8 && Near(ring[0], ring[1], ring[ring.Count - 2], ring[ring.Count - 1])) canopies.Add(ring.ToArray());
+        }
+    }
+
+    // A bridge or a tunnel is drawn as its two side lines (ISSprOM 512.1/512.2). Each pair becomes one line down the
+    // middle, with the metres between the sides as its width (2026-11-20, Anders: a bridge was two narrow decks with
+    // water between them, and nobody got over it).
+    static void PairSides(List<float[]> lines, List<float> widths)
+    {
+        var src = new List<float[]>(lines);
+        lines.Clear();
+        widths.Clear();
+        var used = new bool[src.Count];
+        for (int i = 0; i < src.Count; i++)
+        {
+            if (used[i]) continue;
+            used[i] = true;
+            float[] a = src[i];
+            float ax1 = a[0], az1 = a[1], ax2 = a[a.Length - 2], az2 = a[a.Length - 1];
+            float alen = (float)Math.Sqrt((ax2 - ax1) * (ax2 - ax1) + (az2 - az1) * (az2 - az1));
+            if (alen < 0.5f) continue;
+            float ux = (ax2 - ax1) / alen, uz = (az2 - az1) / alen;
+            float amx = (ax1 + ax2) / 2f, amz = (az1 + az2) / 2f;
+            int best = -1;
+            float bestGap = 12f;
+            for (int j = 0; j < src.Count; j++)
+            {
+                if (used[j]) continue;
+                float[] b = src[j];
+                float bx1 = b[0], bz1 = b[1], bx2 = b[b.Length - 2], bz2 = b[b.Length - 1];
+                float blen = (float)Math.Sqrt((bx2 - bx1) * (bx2 - bx1) + (bz2 - bz1) * (bz2 - bz1));
+                if (blen < 0.5f) continue;
+                // Running the same way, side by side: across, not along
+                if (Math.Abs(ux * (bx2 - bx1) / blen + uz * (bz2 - bz1) / blen) < 0.8f) continue;
+                float dx = (bx1 + bx2) / 2f - amx, dz = (bz1 + bz2) / 2f - amz;
+                float alongGap = Math.Abs(dx * ux + dz * uz), across = Math.Abs(-dx * uz + dz * ux);
+                if (alongGap > Math.Max(alen, blen) * 0.6f + 1f) continue;
+                if (across < 1.2f || across > Math.Min(12f, Math.Max(4f, Math.Max(alen, blen) * 1.2f))) continue;
+                if (across < bestGap) { bestGap = across; best = j; }
+            }
+            if (best < 0)
+            {
+                lines.Add(a);
+                widths.Add(0f);
+                continue;
+            }
+            used[best] = true;
+            float[] o = src[best];
+            float ox1 = o[0], oz1 = o[1], ox2 = o[o.Length - 2], oz2 = o[o.Length - 1];
+            if ((ox2 - ox1) * ux + (oz2 - oz1) * uz < 0f) { float t = ox1; ox1 = ox2; ox2 = t; t = oz1; oz1 = oz2; oz2 = t; }
+            // The ends: where the shorter side ends, so the way does not run out over the water past the bridge
+            lines.Add(new[] { (ax1 + ox1) / 2f, (az1 + oz1) / 2f, (ax2 + ox2) / 2f, (az2 + oz2) / 2f });
+            widths.Add(bestGap);
         }
     }
 

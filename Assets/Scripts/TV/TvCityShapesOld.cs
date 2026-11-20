@@ -34,6 +34,8 @@ public static partial class TvCityShapes
 
     public static Palette PaletteOf(int look, Style style, Kind kind)
     {
+        // Never negative (2026-11-20: a look worked out from a negative position crashed the 3D run)
+        look = (look % 99991 + 99991) % 99991;
         var p = new Palette { glass = Glass, shop = GlassShop };
         if (style == Style.OldStone)
         {

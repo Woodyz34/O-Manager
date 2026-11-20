@@ -91,6 +91,9 @@ public class ManualPathDrawer : MonoBehaviour
     }
     private void InitializeAfterManagerFound()
     {
+        // In the lobby (or a manager without a course yet) there is nothing to draw from (2026-11-20: an error on the
+        // way back to the lobby)
+        if (manager == null || manager.controlPoints == null || manager.controlPoints.Count < 2 || line == null) return;
         ThisControll = manager.controlPoints[0]; // startpunkten
         targetControl = manager.controlPoints[1]; // första kontrollen
         line.positionCount = 0;

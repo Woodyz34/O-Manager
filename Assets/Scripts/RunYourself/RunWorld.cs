@@ -273,6 +273,13 @@ public class RunWorld : MonoBehaviour
             people = gameObject.AddComponent<RunPeople>();
             people.Init(plainMaterial, look.shadows > 0);
         }
+        else
+        {
+            // The forest's tarmac roads (2026-11-20)
+            pavedMaterial = TvWorldView.NewMaterial(Color.white);
+            pavedMaterial.SetTexture("_DetailTex", RunPeople.Asphalt());
+            pavedMaterial.SetFloat("_Detail", 0.75f);
+        }
         foreach (Material m in new[] { plainMaterial, groundMaterial, pavedMaterial })
         {
             if (m == null) continue;

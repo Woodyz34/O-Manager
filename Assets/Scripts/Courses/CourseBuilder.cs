@@ -4244,10 +4244,11 @@ public class CourseBuilder : MonoBehaviour
         }
     }
 
-    // ---- TV controls (relays on forest maps) ----
+    // ---- TV controls (relays) ----
 
-    // A relay on a forest map whose package has the 3D layer (maps imported before it have to be imported again)
-    bool TvAllowed => relay && terrain != CourseData.Sprint && map != null && !map.IsSprint;
+    // A relay on a map whose package has the 3D layer (maps imported before it have to be imported again). Sprint
+    // maps too since 2026-11-20 (Anders): they are built as a 3D town.
+    bool TvAllowed => relay && map != null;
 
     void ToggleTv(EditItem item, EditCourse finishOf)
     {
@@ -4256,11 +4257,10 @@ public class CourseBuilder : MonoBehaviour
         {
             if (!TvAllowed)
             {
-                SetStatus(terrain == CourseData.Sprint || (map != null && map.IsSprint)
-                    ? "TV controls are only for forest maps so far." : "TV controls are only for relays.", true);
+                SetStatus("TV controls are only for relays.", true);
                 return;
             }
-            if (!TvWorldData.HasWorld(map))
+            if (!TvWorldData.HasWorld(map, true))
             {
                 SetStatus("This map has no 3D layer for TV controls yet. Import the map again to get it.", true);
                 return;
