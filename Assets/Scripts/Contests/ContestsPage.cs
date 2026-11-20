@@ -444,24 +444,22 @@ public class ContestsPage : MonoBehaviour
     static string PrizeText(ContestInfo c)
     {
         if (!ContestCloud.PrizeRules.TryGetValue(c.span, out ContestPrizeRules rules) || rules.top == null || rules.top.Length < 3) return "";
-        int pot = rules.top[0] + rules.top[1] + rules.top[2];
-        float growth = pot > 0 ? 1f + rules.growth * Mathf.Max(0, c.entries - 3) / (float)pot : 1f;
-        bool grows = false;
+        // The same sum as the cloud's prize(): base money plus a share of the bonus pot that grows with every player
+        float bonus = rules.growth * c.entries;
+        bool grows = rules.growth > 0;
         string Place(int i)
         {
             List<string> parts = new List<string>();
             if (rules.packs != null && i < rules.packs.Length && rules.packs[i] != null)
                 foreach (string kind in rules.packs[i]) parts.Add(PrizePacks.Name(kind));
-            if (rules.top[i] > 0)
-            {
-                parts.Add(Kr(Mathf.RoundToInt(rules.top[i] * growth / 5f) * 5));
-                grows |= rules.growth > 0;
-            }
+            float share = rules.share != null && i < rules.share.Length ? rules.share[i] : 0f;
+            int money = Mathf.RoundToInt((rules.top[i] + bonus * share / 100f) / 5f) * 5;
+            if (money > 0) parts.Add(Kr(money));
             return parts.Count > 0 ? string.Join(" + ", parts) : "-";
         }
         string text = "Prizes: 1st <b>" + Place(0) + "</b>, 2nd " + Place(1) + ", 3rd " + Place(2) + ", 4th-6th "
                + Kr(rules.next[rules.next.Length - 1]) + "+, everyone who finishes " + Kr(rules.tookPart) + ".";
-        return grows ? text + " The money grows with every player." : text;
+        return grows ? text + " The top 3 get more money with every player." : text;
     }
 
     static string PacksTip(ContestInfo c)
