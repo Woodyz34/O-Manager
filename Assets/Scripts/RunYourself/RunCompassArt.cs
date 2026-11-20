@@ -7,21 +7,28 @@ public static class RunCompassArt
     const int Ppm = 4;
     static Texture2D plate, capsule, needle;
 
-    // A thumb compass as orienteers use it (2026-11-20, Anders' photo): a clear wedge-shaped plate, a round capsule
-    // in a silver ring at the front corner, a black elastic strap round the thumb behind the capsule, orange lines
-    // along the edges and a red bar on the front edge. Made for the left thumb (the right one is the mirror image).
-    // The picture covers x -20..36 mm and y -4..60 mm round the thumb; the front is up.
-    public const float PlateW = 56f, PlateH = 64f, OriginX = 20f, OriginY = 4f;
-    public const float CapsuleX = -2f, CapsuleY = 36f, CapsuleD = 32f, StrapFrom = 7f, StrapTo = 18f;
-    static readonly Vector2[] Outline = { new Vector2(-18f, 58f), new Vector2(15f, 58f), new Vector2(34f, 13f), new Vector2(8f, -2f), new Vector2(-18f, -2f) };
+    // A thumb compass as orienteers use it (2026-11-20, Anders' pictures of a real one, seen from above): a clear plate
+    // with one long straight edge (a black line, an orange line beside it) from the front tip to the back tip, a wing
+    // at the front with two dotted grip circles and an orange-and-black stripe on its edge, a lobe at the side with
+    // X-shaped slots where the black strap goes round the thumb, and the big capsule in a silver ring beside the edge
+    // at the back, with a small tab beside it with another orange-and-black stripe. Made for the left thumb (the right
+    // one is the mirror image); millimetres round the thumb under the strap, the front up.
+    public const float PlateW = 63f, PlateH = 72f, OriginX = 13f, OriginY = 34f;
+    public const float CapsuleX = 30.5f, CapsuleY = -9f, CapsuleD = 33f, EdgeX = 25.7f;
+    static readonly Vector2[] Outline =
+    {
+        new Vector2(23f, 35.8f), new Vector2(25.5f, 36.2f), new Vector2(25.7f, 8f), new Vector2(43f, 6.5f), new Vector2(47.5f, 5.5f),
+        new Vector2(47.5f, -5.5f), new Vector2(44.5f, -19f), new Vector2(32.5f, -28f), new Vector2(25.7f, -32.2f), new Vector2(21.5f, -27f),
+        new Vector2(11f, -13.5f), new Vector2(-7.5f, -5.5f), new Vector2(-11f, 2.5f), new Vector2(-1f, 13.8f), new Vector2(-1f, 30.5f)
+    };
 
     public static Texture2D Baseplate()
     {
         if (plate != null) return plate;
         int w = (int)PlateW * Ppm, h = (int)PlateH * Ppm;
         Color[] px = Blank(w, h);
-        Color tint = new Color(0.88f, 0.94f, 0.96f, 0.3f), rim = new Color(0.55f, 0.62f, 0.66f, 0.85f), shine = new Color(1f, 1f, 1f, 0.55f);
-        Color orange = new Color(0.93f, 0.4f, 0.1f, 1f), red = new Color(0.86f, 0.1f, 0.08f, 1f), black = new Color(0.05f, 0.05f, 0.06f, 1f);
+        Color tint = new Color(0.9f, 0.95f, 0.97f, 0.34f), rim = new Color(0.62f, 0.68f, 0.72f, 0.9f), shine = new Color(1f, 1f, 1f, 0.6f);
+        Color orange = new Color(0.97f, 0.45f, 0.08f, 1f), black = new Color(0.05f, 0.05f, 0.06f, 1f), frost = new Color(1f, 1f, 1f, 0.55f);
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
@@ -30,64 +37,82 @@ public static class RunCompassArt
                 float inside = Mathf.Clamp01(0.5f - d);
                 if (inside <= 0f) continue;
                 Over(px, w, x, y, tint, inside);
-                // A cut edge of clear plastic: a darker rim with a bright line just inside it
-                Over(px, w, x, y, rim, Mathf.Clamp01(0.6f * Ppm - Mathf.Abs(d + 0.6f * Ppm)) * inside);
-                Over(px, w, x, y, shine, Mathf.Clamp01(0.35f * Ppm - Mathf.Abs(d + 1.5f * Ppm)) * inside);
+                // A cut edge of clear plastic: a grey rim with a bright line just inside it
+                Over(px, w, x, y, rim, Mathf.Clamp01(0.45f * Ppm - Mathf.Abs(d + 0.45f * Ppm)) * inside);
+                Over(px, w, x, y, shine, Mathf.Clamp01(0.3f * Ppm - Mathf.Abs(d + 1.3f * Ppm)) * inside);
+                // The two dotted grip circles on the front wing
+                float g1 = Vector2.Distance(mm, new Vector2(12f, 24f)), g2 = Vector2.Distance(mm, new Vector2(15.5f, 18.5f));
+                if (g1 < 3.4f || g2 < 1.9f)
+                {
+                    float dots = Mathf.Abs(Mathf.Sin(mm.x * 9f)) * Mathf.Abs(Mathf.Sin(mm.y * 9f));
+                    Over(px, w, x, y, frost, Mathf.Clamp01((g1 < 3.4f ? 3.4f - g1 : 1.9f - g2) * Ppm) * (0.35f + 0.65f * dots));
+                }
             }
-        // Orange lines along the straight back edge and the slanted side, as on the photo
-        Line(px, w, h, new Vector2(-15.8f, 1f), new Vector2(-15.8f, 55.5f), 0.35f, orange);
-        Line(px, w, h, new Vector2(14.2f, 55.6f), new Vector2(31.6f, 13.8f), 0.35f, orange);
-        Line(px, w, h, new Vector2(9f, 0.4f), new Vector2(31.2f, 12.6f), 0.3f, orange);
-        // The red bar on the front edge, and a red tip on the far corner
-        Line(px, w, h, new Vector2(-17.2f, 56.9f), new Vector2(-6f, 56.9f), 0.8f, red);
-        Line(px, w, h, new Vector2(-17.2f, 56.9f), new Vector2(-15.5f, 56.9f), 0.85f, black);
-        Line(px, w, h, new Vector2(29.5f, 16.4f), new Vector2(32.8f, 13.6f), 0.7f, red);
-        // A few dots of grip on the plate, where the thumb's tip lies
-        for (int i = 0; i < 14; i++)
+        // The long straight edge: black on the edge itself, an orange line beside it, the whole length
+        Line(px, w, h, new Vector2(EdgeX - 0.25f, 35.9f), new Vector2(EdgeX - 0.25f, -31.6f), 0.22f, black);
+        Line(px, w, h, new Vector2(21.8f, 33.5f), new Vector2(21.8f, -26.4f), 0.2f, orange);
+        // Orange-and-black stripes on the wing's outer edge and on the tab beside the capsule
+        Line(px, w, h, new Vector2(-0.55f, 14.6f), new Vector2(-0.55f, 30.2f), 0.25f, black);
+        Line(px, w, h, new Vector2(0.35f, 14.6f), new Vector2(0.35f, 30.3f), 0.55f, orange);
+        Line(px, w, h, new Vector2(47.05f, 5.2f), new Vector2(47.05f, -5.2f), 0.25f, black);
+        Line(px, w, h, new Vector2(46.15f, 5.4f), new Vector2(46.15f, -5.2f), 0.55f, orange);
+        // The lobe with its X-shaped slots and two holes, frosted
+        foreach (Vector2 c in new[] { new Vector2(-2f, 4.5f), new Vector2(10.5f, -2.5f) })
         {
-            Vector2 c = new Vector2(16f + (i % 4) * 2.2f + (i / 4 % 2) * 1.1f, 24f + (i / 4) * 2f);
-            Dot(px, w, h, c, 0.45f, new Color(1f, 1f, 1f, 0.35f));
+            Vector2 u = new Vector2(0.75f, 0.66f) * 5.2f, v = new Vector2(-0.66f, 0.75f) * 3.6f;
+            Line(px, w, h, c - u - v, c + u + v, 0.55f, frost);
+            Line(px, w, h, c - u + v, c + u - v, 0.55f, frost);
         }
-        // The black elastic strap across, ribbed, with a clear buckle at the side
-        Color strap = new Color(0.1f, 0.1f, 0.11f, 0.97f), rib = new Color(0.24f, 0.25f, 0.27f, 0.9f);
+        Dot(px, w, h, new Vector2(5f, 5f), 0.8f, frost);
+        Dot(px, w, h, new Vector2(2.5f, -3f), 0.8f, frost);
+        // The black elastic strap through the slots, over the thumb, ribbed, with a clear buckle at its end
+        Color strap = new Color(0.1f, 0.1f, 0.11f, 0.97f), rib = new Color(0.26f, 0.27f, 0.29f, 0.9f);
+        Vector2 sa = new Vector2(-10f, 15f), sb = new Vector2(9.5f, -13f);   // across the thumb
+        Vector2 se = (sb - sa).normalized, sn = new Vector2(-se.y, se.x);
+        float slen = Vector2.Distance(sa, sb), shalf = 5.2f;
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
                 Vector2 mm = new Vector2((x + 0.5f) / Ppm - OriginX, (y + 0.5f) / Ppm - OriginY);
-                if (mm.x < -19.5f || mm.x > 19f) continue;
-                float edge = Mathf.Clamp01(Mathf.Min(mm.y - StrapFrom, StrapTo - mm.y) * Ppm + 0.5f);
-                if (edge <= 0f) continue;
-                float side = Mathf.Clamp01(Mathf.Min(mm.x + 19.5f, 19f - mm.x) * Ppm + 0.5f);
-                Over(px, w, x, y, strap, edge * side);
-                float ribbed = Mathf.Abs(Mathf.Sin(mm.x * 2.6f + mm.y * 0.4f));
-                Over(px, w, x, y, rib, edge * side * Mathf.Clamp01(1.2f - ribbed * 2f) * 0.5f);
+                float t = Vector2.Dot(mm - sa, se), q = Vector2.Dot(mm - sa, sn);
+                float cover = Mathf.Clamp01(Mathf.Min(t, slen - t) * Ppm + 0.5f) * Mathf.Clamp01((shalf - Mathf.Abs(q)) * Ppm + 0.5f);
+                if (cover <= 0f) continue;
+                Over(px, w, x, y, strap, cover);
+                float ribbed = Mathf.Abs(Mathf.Sin(q * 2.4f + t * 0.3f));
+                Over(px, w, x, y, rib, cover * Mathf.Clamp01(1.2f - ribbed * 2f) * 0.5f);
             }
-        RectOutline(px, w, h, new Vector2(17.5f, StrapFrom - 1.2f), new Vector2(23.5f, StrapTo + 1.2f), 0.8f, new Color(0.75f, 0.8f, 0.82f, 0.9f));
+        Color buckle = new Color(0.8f, 0.85f, 0.88f, 0.95f);
+        Vector2 b0 = sa - se * 0.4f;
+        Line(px, w, h, b0 + sn * (shalf + 0.9f), b0 - sn * (shalf + 0.9f), 0.45f, buckle);
+        Line(px, w, h, b0 + se * 2.6f + sn * (shalf + 0.9f), b0 + se * 2.6f - sn * (shalf + 0.9f), 0.45f, buckle);
+        Line(px, w, h, b0 + sn * (shalf + 0.9f), b0 + se * 2.6f + sn * (shalf + 0.9f), 0.45f, buckle);
+        Line(px, w, h, b0 - sn * (shalf + 0.9f), b0 + se * 2.6f - sn * (shalf + 0.9f), 0.45f, buckle);
         return plate = Make("Thumb compass plate", w, h, px);
     }
 
-    // Distance (mm) to the plate's outline, negative inside (the outline is convex)
+    // Distance (mm) to the plate's outline, negative inside (any outline, convex or not)
     static float PlateDistance(Vector2 p)
     {
-        float d = float.MinValue;
-        for (int i = 0; i < Outline.Length; i++)
+        float best = float.MaxValue;
+        bool inside = false;
+        for (int i = 0, j = Outline.Length - 1; i < Outline.Length; j = i++)
         {
-            Vector2 a = Outline[i], b = Outline[(i + 1) % Outline.Length];
-            Vector2 e = (b - a).normalized;
-            Vector2 n = new Vector2(-e.y, e.x);              // outwards: the outline runs clockwise
-            d = Mathf.Max(d, Vector2.Dot(p - a, n));
+            Vector2 a = Outline[j], b = Outline[i], e = b - a;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, e) / Mathf.Max(1e-6f, e.sqrMagnitude));
+            best = Mathf.Min(best, Vector2.Distance(p, a + e * t));
+            if ((a.y > p.y) != (b.y > p.y) && p.x < a.x + (p.y - a.y) / (b.y - a.y) * e.x) inside = !inside;
         }
-        return d;
+        return inside ? -best : best;
     }
 
-    // The capsule: clear liquid in a thick silver ring, a thin black north-south line and east-west line
+    // The capsule: clear liquid in a thick silver ring
     public static Texture2D Capsule()
     {
         if (capsule != null) return capsule;
         int s = (int)CapsuleD * Ppm;
         Color[] px = Blank(s, s);
-        float c = s * 0.5f, rOut = s * 0.5f - 1f, ring = 2.6f * Ppm;
-        Color liquid = new Color(0.92f, 0.97f, 0.98f, 0.4f), line = new Color(0.08f, 0.08f, 0.09f, 0.8f);
+        float c = s * 0.5f, rOut = s * 0.5f - 1f, ring = 2.2f * Ppm;
+        Color liquid = new Color(0.92f, 0.97f, 0.98f, 0.3f);
         for (int y = 0; y < s; y++)
             for (int x = 0; x < s; x++)
             {
@@ -95,11 +120,6 @@ public static class RunCompassArt
                 float inside = Mathf.Clamp01(rOut - d + 0.5f);
                 if (inside <= 0f) continue;
                 Over(px, s, x, y, liquid, inside);
-                if (d < rOut - ring)
-                {
-                    Over(px, s, x, y, line, Mathf.Clamp01(0.18f * Ppm - Mathf.Abs(dx) + 0.5f));
-                    Over(px, s, x, y, line * new Color(1, 1, 1, 0.6f), Mathf.Clamp01(0.14f * Ppm - Mathf.Abs(dy) + 0.5f));
-                }
                 // The silver ring: lit from the upper left, a dark line where it meets the liquid
                 float inRing = Mathf.Clamp01(d - (rOut - ring) + 0.5f) * inside;
                 if (inRing > 0f)
@@ -114,21 +134,25 @@ public static class RunCompassArt
         return capsule = Make("Compass capsule", s, s, px);
     }
 
-    // The needle of a thumb compass: a broad red north half with a white stripe down the middle, a white south half
-    // with a black edge, a small hub
+    // The needle of a thumb compass (Anders' pictures): a long flat bar, the north half red with a white stripe down
+    // the middle and a notch at its tip, the south half white with a thin grey line, a thin dark edge, a small pivot
     public static Texture2D Needle()
     {
         if (needle != null) return needle;
         int w = 7 * Ppm, h = 28 * Ppm;
         Color[] px = Blank(w, h);
-        float cx = w * 0.5f, cy = h * 0.5f;
-        Color red = new Color(0.9f, 0.1f, 0.08f, 1f), white = new Color(0.98f, 0.98f, 0.96f, 1f), dark = new Color(0.06f, 0.06f, 0.07f, 1f);
-        Rect(px, w, h, cx - 2.6f * Ppm, cy, cx + 2.6f * Ppm, h - 1.5f * Ppm, red);
-        Triangle(px, w, h, new Vector2(cx, h - 0.2f), new Vector2(cx - 2.6f * Ppm, h - 1.6f * Ppm), new Vector2(cx + 2.6f * Ppm, h - 1.6f * Ppm), red);
-        Rect(px, w, h, cx - 0.45f * Ppm, cy + 1.5f * Ppm, cx + 0.45f * Ppm, h - 2.5f * Ppm, white);
-        Rect(px, w, h, cx - 2.6f * Ppm, 1f * Ppm, cx + 2.6f * Ppm, cy, dark);
-        Rect(px, w, h, cx - 2.0f * Ppm, 1.6f * Ppm, cx + 2.0f * Ppm, cy - 0.3f * Ppm, white);
-        Dot(px, w, h, new Vector2(cx / Ppm, cy / Ppm), 1.3f, new Color(0.75f, 0.75f, 0.72f, 1f), true);
+        float cx = w * 0.5f, cy = h * 0.5f, half = 3.1f * Ppm, end = 0.6f * Ppm;
+        Color red = new Color(0.9f, 0.08f, 0.07f, 1f), white = new Color(0.98f, 0.98f, 0.96f, 1f), dark = new Color(0.12f, 0.12f, 0.13f, 1f);
+        Color grey = new Color(0.62f, 0.63f, 0.64f, 1f);
+        Rect(px, w, h, cx - half - 0.25f * Ppm, end - 0.25f * Ppm, cx + half + 0.25f * Ppm, h - end + 0.25f * Ppm, dark);
+        Rect(px, w, h, cx - half, cy, cx + half, h - end, red);
+        Rect(px, w, h, cx - half, end, cx + half, cy, white);
+        Rect(px, w, h, cx - 0.55f * Ppm, cy + 1.2f * Ppm, cx + 0.55f * Ppm, h - end, white);
+        Triangle(px, w, h, new Vector2(cx - half, h - end + 0.5f), new Vector2(cx + half, h - end + 0.5f), new Vector2(cx, h - end - 1.6f * Ppm), white);
+        Rect(px, w, h, cx - 0.12f * Ppm, end, cx + 0.12f * Ppm, cy - 0.6f * Ppm, grey);
+        Rect(px, w, h, cx - half, cy - 0.15f * Ppm, cx + half, cy + 0.15f * Ppm, grey);
+        Dot(px, w, h, new Vector2(cx / Ppm, cy / Ppm), 0.9f, new Color(0.8f, 0.8f, 0.78f, 1f), true);
+        Dot(px, w, h, new Vector2(cx / Ppm, cy / Ppm), 0.35f, dark, true);
         return needle = Make("Compass needle", w, h, px);
     }
 

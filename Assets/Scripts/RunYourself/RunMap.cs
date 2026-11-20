@@ -181,12 +181,12 @@ public class RunMap : MonoBehaviour
         rect.pivot = new Vector2(RunCompassArt.OriginX / RunCompassArt.PlateW, RunCompassArt.OriginY / RunCompassArt.PlateH);
         // Drawn for the left thumb, the plate reaching in over the map; the right thumb wears the mirror image
         rect.localScale = new Vector3(side < 0f ? 0.001f : -0.001f, 0.001f, 0.001f);
-        // On the thumb (2026-11-20, Anders' photo of a real one): the strap over the end of the thumb, the capsule
-        // just past its tip, in front of it so the thumb shows through the clear plate
+        // On the thumb (2026-11-20, Anders' photos of a real one): the strap round the thumb, the plate under its tip, the
+        // capsule beside the tip on the map, drawn over the thumb so the thumb shows through the clear plate
         const float tilt = 12f;                                         // as the thumb leans
         Quaternion turn = Quaternion.Euler(0f, 0f, side * tilt);
         Vector3 along = turn * Vector3.up, across = turn * Vector3.right * -side;
-        rect.localPosition = new Vector3(-side * 0.004f, -0.006f, -0.024f) + along * 0.005f + across * (-RunCompassArt.CapsuleX * 0.001f);
+        rect.localPosition = new Vector3(-side * 0.004f, -0.006f, -0.024f) + along * 0.002f;   // the strap round the thumb, the capsule beside its tip
         rect.localRotation = turn;
 
         // Always drawn last and over everything in the hand, the map and the thumb included
