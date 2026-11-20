@@ -490,14 +490,25 @@ async function mayLook(api, context, me, id, now) {
   const { board } = await loadBoard(api, context, id);
   const mine = board.entries[me];
   const over = endOf(id) > 0 && now > endOf(id);
-  if (!(mine && mine.state === "done") && !over) throw new Error("Run the contest first");
+  // A started run counts as your try even when it never finished (a crash, or leaving), so it opens the board too
+  // (2026-11-20, the user)
+  if (!mine && !over) throw new Error("Run the contest first");
   return board;
 }
 
 async function board(api, context, me, payload, now) {
   const id = checkId(payload.id);
   const b = await mayLook(api, context, me, id, now);
-  return { rows: publicRows(standings(id, b), me), course: b.course, over: now > endOf(id) };
+  const over = now > endOf(id);
+  const rows = publicRows(standings(id, b), me);
+  // Started but no result: "Did not finish" at the bottom. While the contest runs only your own such row is shown,
+  // since the others may still be running
+  for (const playerId of Object.keys(b.entries)) {
+    const e = b.entries[playerId];
+    if (!e || e.state === "done" || (!over && playerId !== me)) continue;
+    rows.push({ playerId, name: e.name, score: 0, seconds: 0, place: 0, prize: 0, packs: [], dnf: true, me: playerId === me });
+  }
+  return { rows, course: b.course, over };
 }
 
 async function replays(api, context, me, payload, now) {

@@ -476,13 +476,13 @@ public class ContestsPage : MonoBehaviour
 
         string state;
         if (c.Done) state = "<color=#3F7D54><b>Your result: " + (c.RouteChoice ? RouteChoiceGame.Points(c.mine.score) + " points" : CompetitionFlow.FormatTime(c.mine.seconds)) + "</b></color>";
-        else if (c.Started) state = "<color=#C0392B><b>You started but did not finish.</b></color> The leaderboard opens when the contest is over.";
+        else if (c.Started) state = "<color=#C0392B><b>You started but did not finish.</b></color> That was your try; you can still see the leaderboard.";
         else state = c.entries + (c.entries == 1 ? " player has" : " players have") + " run it. Run it to see the leaderboard.";
         TextMeshProUGUI status = CourseUI.Text("Status", card.transform, state, 20, CourseUI.Ink);
         status.richText = true;
         CourseUI.Size(status, 56);
 
-        if (c.Done)
+        if (c.Started)
         {
             Button board = CourseUI.Button("Leaderboard", card.transform, "Leaderboard (" + c.entries + ")", CourseUI.ButtonKind.Secondary, () => ShowBoard(c), 24);
             CourseUI.Size(board, 64);
@@ -596,7 +596,8 @@ public class ContestsPage : MonoBehaviour
         float height = Mathf.Clamp(140 + 120 + rows.Count * 58f, 420f, 900f);
         GameObject sheet = PopupFrame(ContestRun.SpanName(c) + ": " + ContestRun.Title(c), 1100, height);
         Transform body = sheet.transform.GetChild(0);
-        TextMeshProUGUI note = CourseUI.Text("Note", body, rows.Count + (rows.Count == 1 ? " runner" : " runners")
+        int finished = rows.FindAll(r => !r.dnf).Count;
+        TextMeshProUGUI note = CourseUI.Text("Note", body, finished + (finished == 1 ? " runner" : " runners")
             + ". Prize money is paid when the contest is over; it can still change as more players run.", 20, CourseUI.InkMuted);
         CourseUI.Place(note.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -96), new Vector2(1020, 34));
 
@@ -612,12 +613,15 @@ public class ContestsPage : MonoBehaviour
         {
             Image row = CourseUI.Panel("Row", list, r.me ? CourseUI.Hex("E8742A", 0.22f) : CourseUI.Soft);
             CourseUI.Size(row, 52);
-            string result = c.RouteChoice ? RouteChoiceGame.Points(r.score) + " p" : CompetitionFlow.FormatTime(r.seconds);
-            TextMeshProUGUI place = CourseUI.Text("Place", row.transform, r.place + ".", 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+            string result = r.dnf ? "Did not finish" : c.RouteChoice ? RouteChoiceGame.Points(r.score) + " p" : CompetitionFlow.FormatTime(r.seconds);
+            TextMeshProUGUI place = CourseUI.Text("Place", row.transform, r.dnf ? "-" : r.place + ".", 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
             CourseUI.Place(place.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(10, 0), new Vector2(60, 50));
             TextMeshProUGUI who = CourseUI.Text("Name", row.transform, r.name + (r.me ? "  (you)" : ""), 24, CourseUI.Ink, r.me ? FontStyles.Bold : FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
             CourseUI.Place(who.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(90, 0), new Vector2(520, 50));
             TextMeshProUGUI res = CourseUI.Text("Result", row.transform, result, 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+            res.enableAutoSizing = true;
+            res.fontSizeMin = 16;
+            res.fontSizeMax = 24;
             CourseUI.Place(res.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(620, 0), new Vector2(180, 50));
             List<string> won = new List<string>();
             if (r.packs != null) foreach (string kind in r.packs) won.Add(PrizePacks.Name(kind));
@@ -630,7 +634,7 @@ public class ContestsPage : MonoBehaviour
         }
 
         // The top three and you, on the map
-        List<ContestRow> picked = rows.FindAll(r => r.place <= 3 || r.me);
+        List<ContestRow> picked = rows.FindAll(r => !r.dnf && (r.place <= 3 || r.me));
         if (picked.Count > 6) picked = picked.GetRange(0, 6);
         string label = c.RouteChoice ? "See the top 3's route choices" : "Watch the top 3's replay";
         Button watch = CourseUI.Button("Watch", body, label, CourseUI.ButtonKind.Primary, () => OpenReplays(c, picked), 24);
