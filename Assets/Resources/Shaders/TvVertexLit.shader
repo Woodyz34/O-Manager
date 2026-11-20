@@ -6,7 +6,7 @@
 // (RunYourself/RunWorld.cs), which sets the fog to its own view distance.
 // Everything else (houses, trees, stones, people) can get a surface grain too (_SurfaceTex, 2026-11-20, Anders: the
 // objects as lively as the ground): soft blotches and specks laid on from all three sides by the surface's direction,
-// with streaks down the walls, so no face is one flat colour.
+// lighter and darker and richer in colour, so no face is one flat colour.
 Shader "O-Manager/TvVertexLit"
 {
     Properties
@@ -78,17 +78,21 @@ Shader "O-Manager/TvVertexLit"
             c *= lerp(1.0, grain, _Detail);
             if (_Surface > 0.001)
             {
-                // From the side that faces the surface most; walls get the pattern drawn out downwards (weather streaks)
+                // From the side that faces the surface most: mostly the fine grain, a little of the soft blotches
                 float3 w = abs(IN.worldNormal);
                 w = w * w * w * w;
                 w /= (w.x + w.y + w.z + 1e-4);
                 float3 p = IN.worldPos;
-                half sx = tex2D(_SurfaceTex, float2(p.z, p.y * 0.45) * 0.25).r * 0.65 + tex2D(_SurfaceTex, float2(p.z, p.y) * 1.1 + 0.37).r * 0.35;
-                half sy = tex2D(_SurfaceTex, p.xz * 0.25).r * 0.65 + tex2D(_SurfaceTex, p.xz * 1.1 + 0.37).r * 0.35;
-                half sz = tex2D(_SurfaceTex, float2(p.x, p.y * 0.45) * 0.25).r * 0.65 + tex2D(_SurfaceTex, float2(p.x, p.y) * 1.1 + 0.37).r * 0.35;
-                half s = sx * w.x + sy * w.y + sz * w.z;
-                // The grain is 0.84 on average: kept as bright as the colour itself
-                c *= lerp(1.0, s / 0.84, _Surface);
+                half sx = tex2D(_SurfaceTex, p.zy * 0.25).r * 0.3 + tex2D(_SurfaceTex, p.zy * 1.1 + 0.37).r * 0.7;
+                half sy = tex2D(_SurfaceTex, p.xz * 0.25).r * 0.3 + tex2D(_SurfaceTex, p.xz * 1.1 + 0.37).r * 0.7;
+                half sz = tex2D(_SurfaceTex, p.xy * 0.25).r * 0.3 + tex2D(_SurfaceTex, p.xy * 1.1 + 0.37).r * 0.7;
+                // -0.24 .. +0.19 round the colour itself (the grain is 0.84 on average)
+                half v = (sx * w.x + sy * w.y + sz * w.z) / 0.84 - 1.0;
+                // Not dirt but life (Anders, 2026-11-20): the grain goes both lighter and darker, and the light specks
+                // make the colour stronger, never greyer; the colours as a whole a little richer
+                c *= 1.0 + v * 0.75 * _Surface;
+                half l = dot(c, half3(0.2126, 0.7152, 0.0722));
+                c = max(0.0, lerp(l.xxx, c, 1.0 + _Surface * (0.14 + max(v, 0.0) * 1.4)));
             }
             o.Albedo = c;
             // Light from the sky and the ground
