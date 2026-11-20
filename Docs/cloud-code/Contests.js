@@ -1,11 +1,18 @@
 // Cloud Code script "Contests" for O-Manager (see Assets/Scripts/Contests/ContestCloud.cs).
 //
 // The weekly and daily contests: single player, one try each, a shared leaderboard and prize money when the
-// contest is over. Four contests run every week (Monday 00:00 to Sunday 23:59, Swedish time) and four every day:
+// contest is over. Six contests run every week (Monday 00:00 to Sunday 23:59, Swedish time):
 //   rc-forest    route choice game on an AI course on a forest map
 //   rc-sprint    route choice game on an AI course on a sprint map
 //   race-forest  a normal race, physics/speed 100 and a technique drawn for the contest (0-100)
 //   race-sprint  a normal race, every value 100
+//   run-forest   run it yourself in 3D on a forest map
+//   run-sprint   run it yourself in 3D on a sprint map (a town)
+// and three every day (2026-11-20, the user), each on a sprint or a forest map, half and half, drawn from the id:
+//   rc           route choice game
+//   race         a normal race (forest: middle or long, half and half, like every forest contest)
+//   run          run it yourself in 3D
+// "sprint" in the status tells the game which it is.
 //
 // Everything is kept where players can not write it themselves, so nobody can run twice, peek at the results
 // before running or give themselves prize money:
@@ -40,7 +47,22 @@
 
 const { DataApi } = require("@unity-services/cloud-save-1.4");
 
-const KINDS = ["rc-forest", "rc-sprint", "race-forest", "race-sprint"];
+const KINDS = {
+  w: ["rc-forest", "rc-sprint", "race-forest", "race-sprint", "run-forest", "run-sprint"],
+  d: ["rc", "race", "run"]
+};
+// Kinds that are no longer run, still known so their prizes are paid and their data cleaned up
+const OLD_KINDS = ["rc-forest", "rc-sprint", "race-forest", "race-sprint"];
+
+function kindsOf(span) { return span === "w" ? KINDS.w : KINDS.d.concat(OLD_KINDS); }
+
+// A sprint map or a forest map: in the kind, or for the daily contests drawn from the id
+function isSprint(id) {
+  const kind = id.substring(id.indexOf("_") + 1);
+  if (/-sprint$/.test(kind)) return true;
+  if (/-forest$/.test(kind)) return false;
+  return ((seedOf(id + "#sprint") >>> 13) & 1) === 0;   // a high bit: the lowest bit of this hash hardly varies
+}
 const MAX_COURSE_CHARS = 120000;
 const MAX_REPLAY_CHARS = 400000;
 const MAX_NAME = 24;
@@ -158,7 +180,7 @@ function endOf(id) {
 function checkId(id) {
   id = String(id || "");
   const match = /^([wd])[0-9-]{7,10}_([a-z-]+)$/.exec(id);
-  if (!match || KINDS.indexOf(match[2]) < 0) throw new Error("Bad contest id");
+  if (!match || kindsOf(match[1]).indexOf(match[2]) < 0) throw new Error("Bad contest id");
   return id;
 }
 
@@ -235,7 +257,7 @@ async function saveHistory(api, context, playerId, history) {
 // ---- Standings and prizes ----
 
 function better(kind, a, b) {        // negative when a is ahead
-  if (kind.indexOf("rc-") === 0) return b.score - a.score;
+  if (kind === "rc" || kind.indexOf("rc-") === 0) return b.score - a.score;
   return a.seconds - b.seconds;
 }
 
@@ -275,18 +297,23 @@ function publicRows(list, me) {
 
 async function status(api, context, me, now, logger) {
   const p = periods(now);
+  const list = [];
+  for (const span of ["w", "d"]) for (const kind of KINDS[span]) list.push({ span, kind, id: p[span].id + "_" + kind });
+  const boards = await Promise.all(list.map(async x => {
+    try { return (await loadBoard(api, context, x.id)).board; } catch (err) { logger.warning("status: " + x.id + " " + err); return emptyBoard(); }
+  }));
   const contests = [];
-  for (const span of ["w", "d"]) {
-    for (const kind of KINDS) {
-      const id = p[span].id + "_" + kind;
-      let board = emptyBoard();
-      try { board = (await loadBoard(api, context, id)).board; } catch (err) { logger.warning("status: " + id + " " + err); }
+  for (let i = 0; i < list.length; i++) {
+    {
+      const { span, kind, id } = list[i];
+      const board = boards[i];
       const mine = board.entries[me];
       const facts = courseFacts(board.course);
       let entries = 0;
       for (const key of Object.keys(board.entries)) if (board.entries[key].state === "done") entries++;
       contests.push({
         id, span, kind,
+        sprint: isSprint(id),
         startsAt: p[span].startsAt, endsAt: p[span].endsAt,
         seed: seedOf(id),
         technique: seedOf(id + "#tech") % 101,
@@ -309,7 +336,7 @@ async function status(api, context, me, now, logger) {
 function finishedIds(now, minAge, daysBack) {
   const ids = [];
   const add = periodId => {
-    for (const kind of KINDS) {
+    for (const kind of kindsOf(periodId[0])) {
       const id = periodId + "_" + kind;
       if (ids.indexOf(id) < 0 && now > endOf(id) + minAge) ids.push(id);
     }
@@ -385,9 +412,11 @@ async function deleteItem(api, context, customId, key) {
   }
 }
 
+// Running now, and of a kind that is still run
 function isCurrent(id, now) {
   const p = periods(now);
-  return id.indexOf(p.w.id + "_") === 0 || id.indexOf(p.d.id + "_") === 0;
+  const kind = id.substring(id.indexOf("_") + 1);
+  return (id.indexOf(p.w.id + "_") === 0 && KINDS.w.indexOf(kind) >= 0) || (id.indexOf(p.d.id + "_") === 0 && KINDS.d.indexOf(kind) >= 0);
 }
 
 // The straight-line length (m, start - controls - finish) and the number of controls of a course

@@ -38,13 +38,15 @@ public class IndividualRace : MonoBehaviour, IRaceStats
     public void UseTracks(List<RelayTrack> tracks) => ownTracks = tracks;
 
     // Run it yourself: the statistics screen at once when the runner is in (the 2D race never started for real)
-    public void ShowStats(List<RelayTrack> tracks)
+    // valid is false when a control was missed: then nothing goes to a contest's leaderboard
+    public void ShowStats(List<RelayTrack> tracks, bool valid = true)
     {
         ownTracks = tracks;
         if (statsShown) return;
         statsShown = true;
         started = true;
         recorder.Stop();
+        if (valid) SendContestResult();
         statsUI = RelayStatsUI.Create(this);
         statsUI.Open(0, true, ownTracks);
     }
@@ -149,7 +151,7 @@ public class IndividualRace : MonoBehaviour, IRaceStats
         NetworkPlayer local = NetworkPlayer.Local;
         if (local == null || local.Object == null || !local.Object.IsValid || !local.raceFinished) return;
         int seconds = local.hourCount * 3600 + local.minuterCount * 60 + local.secoundCount;
-        RelayTrack track = recorder.Tracks.Find(t => t.isLocal);
+        RelayTrack track = (ownTracks ?? recorder.Tracks).Find(t => t != null && t.isLocal);
         ContestRun.OnRaceFinished(seconds, track);
     }
 

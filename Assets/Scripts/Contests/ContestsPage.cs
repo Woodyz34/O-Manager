@@ -6,9 +6,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // The weekly and daily contests page, opened from the main menu (2026-11-19, the user's wish).
-// Four contests each week (Monday 00:00 to Sunday 23:59, Swedish time) and four each day: route choice game in the
-// forest and on a sprint map, and a race in the forest and on a sprint map, all on AI courses. One try each, played
-// alone. The leaderboard, the replays and the route choices of the others show only after your own run. Prize money is
+// Six contests each week (Monday 00:00 to Sunday 23:59, Swedish time): route choice game, race and run it yourself in
+// 3D, each in the forest and on a sprint map. Three each day: route choice game, race and 3D, each on a sprint or a
+// forest map as the cloud draws it (2026-11-20). All on AI courses. One try each, played alone. The leaderboard, the replays and the route choices of the others show only after your own run. Prize money is
 // paid when the contest is over (the next time the game is opened): see Docs/cloud-code/Contests.js for the amounts.
 public class ContestsPage : MonoBehaviour
 {
@@ -29,6 +29,11 @@ public class ContestsPage : MonoBehaviour
     bool busy;
 
     RectTransform cards;
+    ScrollRect cardsScroll;
+    const float CardsWidth = 1820f;
+    const float CardGap = 26f;
+    const float MinCardWidth = 430f;
+    float cardWidth = MinCardWidth;
     TextMeshProUGUI info;
     TextMeshProUGUI moneyText;
     Button weekTab, dayTab;
@@ -137,11 +142,30 @@ public class ContestsPage : MonoBehaviour
         HoverTip.Add(packsButton, "Runner packs you won in the contests.");
         ShowPacks();
 
-        cards = CourseUI.Rect("Cards", page);
-        CourseUI.Place(cards, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -260), new Vector2(1820, 720));
-        HorizontalLayoutGroup row = CourseUI.Row(cards.gameObject, 26, new RectOffset(0, 0, 0, 0));
-        row.childForceExpandWidth = true;
-        row.childAlignment = TextAnchor.UpperCenter;
+        // The cards side by side; with more than four (the week has six, 2026-11-20) they scroll sideways
+        RectTransform viewport = CourseUI.Rect("Cards view", page);
+        CourseUI.Place(viewport, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -260), new Vector2(CardsWidth, 740));
+        viewport.gameObject.AddComponent<RectMask2D>();
+        Image catcher = viewport.gameObject.AddComponent<Image>();
+        catcher.color = new Color(0, 0, 0, 0);
+        cards = CourseUI.Rect("Cards", viewport);
+        cards.anchorMin = new Vector2(0f, 1f);
+        cards.anchorMax = new Vector2(0f, 1f);
+        cards.pivot = new Vector2(0f, 1f);
+        cards.anchoredPosition = Vector2.zero;
+        cards.sizeDelta = new Vector2(CardsWidth, 720);
+        HorizontalLayoutGroup row = CourseUI.Row(cards.gameObject, CardGap, new RectOffset(0, 0, 0, 0));
+        row.childForceExpandWidth = false;
+        row.childControlWidth = true;
+        row.childAlignment = TextAnchor.UpperLeft;
+        cardsScroll = viewport.gameObject.AddComponent<ScrollRect>();
+        cardsScroll.content = cards;
+        cardsScroll.viewport = viewport;
+        cardsScroll.horizontal = true;
+        cardsScroll.vertical = false;
+        cardsScroll.movementType = ScrollRect.MovementType.Clamped;
+        cardsScroll.scrollSensitivity = 70f;
+        cardsScroll.inertia = true;
     }
 
     void ShowMoney()
@@ -259,7 +283,12 @@ public class ContestsPage : MonoBehaviour
         ContestInfo first = shown[0];
         TimeSpan left = DateTimeOffset.FromUnixTimeMilliseconds(first.endsAt) - DateTimeOffset.UtcNow;
         string leftText = left.TotalHours >= 24 ? (int)left.TotalDays + " d " + left.Hours + " h" : Mathf.Max(0, (int)left.TotalHours) + " h " + Mathf.Max(0, left.Minutes) + " min";
-        info.text = (weekly ? "Monday 00:00 to Sunday 23:59" : "00:00 to 23:59") + " Swedish time.  Ends in <b>" + leftText + "</b>.  One try each, played alone.";
+        info.text = (weekly ? "Monday 00:00 to Sunday 23:59" : "00:00 to 23:59") + " Swedish time.  Ends in <b>" + leftText + "</b>.  One try each, played alone."
+                    + (shown.Count > 4 ? "  Scroll sideways for all " + shown.Count + "." : "");
+        int n = shown.Count;
+        cardWidth = Mathf.Max(MinCardWidth, (CardsWidth - CardGap * (n - 1)) / n);
+        cards.sizeDelta = new Vector2(Mathf.Max(CardsWidth, n * cardWidth + (n - 1) * CardGap), cards.sizeDelta.y);
+        cards.anchoredPosition = Vector2.zero;
         foreach (ContestInfo c in shown) Card(c);
     }
 
@@ -279,12 +308,15 @@ public class ContestsPage : MonoBehaviour
     void Card(ContestInfo c)
     {
         Image card = CourseUI.CardPanel(c.id, cards);
-        CourseUI.Size(card, 700, 430);
+        CourseUI.Size(card, 700, cardWidth);
         CourseUI.Column(card.gameObject, 10, new RectOffset(26, 26, 24, 24));
 
-        TextMeshProUGUI kind = CourseUI.Text("Kind", card.transform, (c.RouteChoice ? "ROUTE CHOICE GAME" : "RACE") + "  ·  " + (c.Sprint ? "SPRINT" : "FOREST"), 18, CourseUI.Accent, FontStyles.Bold);
+        TextMeshProUGUI kind = CourseUI.Text("Kind", card.transform, (c.RouteChoice ? "ROUTE CHOICE GAME" : c.Run3D ? "RUN IT YOURSELF (3D)" : "RACE") + "  ·  " + (c.Sprint ? "SPRINT" : "FOREST"), 18, CourseUI.Accent, FontStyles.Bold);
         CourseUI.Size(kind, 26);
-        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, c.RouteChoice ? (c.Sprint ? "Sprint route choices" : "Forest route choices") : (c.Sprint ? "Sprint race" : "Forest race"), 32, CourseUI.Ink, FontStyles.Bold);
+        string heading = c.RouteChoice ? (c.Sprint ? "Sprint route choices" : "Forest route choices")
+                         : c.Run3D ? (c.Sprint ? "Sprint run in 3D" : "Forest run in 3D")
+                         : (c.Sprint ? "Sprint race" : "Forest race");
+        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, heading, 32, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 44);
 
         CourseData course = ContestRun.ReadCourse(c.course);

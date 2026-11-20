@@ -592,7 +592,7 @@ public partial class RunSession : MonoBehaviour
         // The usual statistics screen: results, split times, replay; then "Show the results" (prize money) and back
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
-        if (IndividualRace.Active != null) IndividualRace.Active.ShowStats(AllTracks());
+        if (IndividualRace.Active != null) IndividualRace.Active.ShowStats(AllTracks(), ok);
         else CompetitionFlow.HostShowResults();
         Debug.Log("RunSession: finished, statistics shown (" + (IndividualRace.Active != null) + ")");
     }
