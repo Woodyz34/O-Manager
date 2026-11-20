@@ -67,6 +67,15 @@ Shader "O-Manager/TvVertexLit"
             return c;
         }
 
+        // The grain at three sizes, each turned its own way and at sizes that never meet, so it does not repeat as a
+        // pattern (Anders, 2026-11-20)
+        half TvGrain (float2 uv)
+        {
+            float2 a = float2(uv.x * 0.799 - uv.y * 0.602, uv.x * 0.602 + uv.y * 0.799);
+            float2 b = float2(uv.x * 0.309 + uv.y * 0.951, uv.y * 0.309 - uv.x * 0.951);
+            return tex2D(_SurfaceTex, uv * 0.231).r * 0.3 + tex2D(_SurfaceTex, a * 0.773 + 0.37).r * 0.4 + tex2D(_SurfaceTex, b * 1.937 + 0.71).r * 0.3;
+        }
+
         void surf (Input IN, inout SurfaceOutput o)
         {
             float3 c = IN.color.rgb;
@@ -74,18 +83,18 @@ Shader "O-Manager/TvVertexLit"
             c = GammaToLinearSpace(c);
             #endif
             c *= _Color.rgb;
-            half grain = tex2D(_DetailTex, IN.worldPos.xz * 0.2).r;
+            // Two layers turned against each other, so the ground's grain does not repeat either
+            float2 g = IN.worldPos.xz;
+            half grain = tex2D(_DetailTex, g * 0.2).r * 0.5 + tex2D(_DetailTex, float2(g.x * 0.602 + g.y * 0.799, g.y * 0.602 - g.x * 0.799) * 0.1367 + 0.3).r * 0.5;
             c *= lerp(1.0, grain, _Detail);
             if (_Surface > 0.001)
             {
-                // From the side that faces the surface most: mostly the fine grain, a little of the soft blotches
+                // From the side that faces the surface most
                 float3 w = abs(IN.worldNormal);
                 w = w * w * w * w;
                 w /= (w.x + w.y + w.z + 1e-4);
                 float3 p = IN.worldPos;
-                half sx = tex2D(_SurfaceTex, p.zy * 0.25).r * 0.3 + tex2D(_SurfaceTex, p.zy * 1.1 + 0.37).r * 0.7;
-                half sy = tex2D(_SurfaceTex, p.xz * 0.25).r * 0.3 + tex2D(_SurfaceTex, p.xz * 1.1 + 0.37).r * 0.7;
-                half sz = tex2D(_SurfaceTex, p.xy * 0.25).r * 0.3 + tex2D(_SurfaceTex, p.xy * 1.1 + 0.37).r * 0.7;
+                half sx = TvGrain(p.zy), sy = TvGrain(p.xz), sz = TvGrain(p.xy);
                 // -0.24 .. +0.19 round the colour itself (the grain is 0.84 on average)
                 half v = (sx * w.x + sy * w.y + sz * w.z) / 0.84 - 1.0;
                 // Not dirt but life (Anders, 2026-11-20): the grain goes both lighter and darker, and the light specks
