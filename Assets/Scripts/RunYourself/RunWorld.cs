@@ -114,7 +114,7 @@ public class RunWorld : MonoBehaviour
     void Make()
     {
         look = RunSettings.Current;
-        plainMaterial = TvWorldView.NewMaterial(Color.white);
+        plainMaterial = TvWorldView.NewObjectMaterial();
         groundMaterial = TvWorldView.NewMaterial(Color.white);
         groundMaterial.SetTexture("_DetailTex", TvWorldView.Grain());
         groundMaterial.SetFloat("_Detail", 1f);

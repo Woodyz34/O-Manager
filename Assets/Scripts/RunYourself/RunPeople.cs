@@ -231,7 +231,8 @@ public class RunPeople : MonoBehaviour
                     }
                 float edge = Mathf.Sqrt(second) - Mathf.Sqrt(best);
                 float stone = tone[which] * (1f - 0.18f * Mathf.Sqrt(best));
-                float v = Mathf.Lerp(0.5f, stone, Mathf.SmoothStep(0.05f, 0.16f, edge)) + ((float)random.NextDouble() - 0.5f) * 0.05f;
+                float joint = Mathf.Clamp01((edge - 0.05f) / 0.11f);
+                float v = Mathf.Lerp(0.5f, stone, joint * joint * (3f - 2f * joint)) + ((float)random.NextDouble() - 0.5f) * 0.05f;
                 byte b = (byte)Mathf.Clamp(v * 255f, 0f, 255f);
                 pixels[y * Size + x] = new Color32(b, b, b, 255);
             }

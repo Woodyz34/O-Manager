@@ -4,6 +4,9 @@
 // into the sky colour far away. The colour comes from every corner of the mesh (written in sRGB), times _Color. The
 // ground also gets a fine grain (_DetailTex, repeated every 5 metres). Also used by the run-yourself game mode's world
 // (RunYourself/RunWorld.cs), which sets the fog to its own view distance.
+// Everything else (houses, trees, stones, people) can get a surface grain too (_SurfaceTex, 2026-11-20, Anders: the
+// objects as lively as the ground): soft blotches and specks laid on from all three sides by the surface's direction,
+// with streaks down the walls, so no face is one flat colour.
 Shader "O-Manager/TvVertexLit"
 {
     Properties
@@ -11,6 +14,8 @@ Shader "O-Manager/TvVertexLit"
         _Color ("Color", Color) = (1,1,1,1)
         _DetailTex ("Ground grain", 2D) = "white" {}
         _Detail ("Ground grain strength", Range(0,1)) = 0
+        _SurfaceTex ("Surface grain", 2D) = "white" {}
+        _Surface ("Surface grain strength", Range(0,1)) = 0
         _FogStart ("Fog start (m)", Float) = 45
         _FogEnd ("Fog end (m)", Float) = 230
     }
@@ -33,6 +38,8 @@ Shader "O-Manager/TvVertexLit"
         fixed4 _Color;
         sampler2D _DetailTex;
         half _Detail;
+        sampler2D _SurfaceTex;
+        half _Surface;
         // The TV's fog starts at 45 m and the sky takes over at 230 m; the run-yourself world sets its own (RunWorld)
         float _FogStart;
         float _FogEnd;
@@ -69,6 +76,20 @@ Shader "O-Manager/TvVertexLit"
             c *= _Color.rgb;
             half grain = tex2D(_DetailTex, IN.worldPos.xz * 0.2).r;
             c *= lerp(1.0, grain, _Detail);
+            if (_Surface > 0.001)
+            {
+                // From the side that faces the surface most; walls get the pattern drawn out downwards (weather streaks)
+                float3 w = abs(IN.worldNormal);
+                w = w * w * w * w;
+                w /= (w.x + w.y + w.z + 1e-4);
+                float3 p = IN.worldPos;
+                half sx = tex2D(_SurfaceTex, float2(p.z, p.y * 0.45) * 0.25).r * 0.65 + tex2D(_SurfaceTex, float2(p.z, p.y) * 1.1 + 0.37).r * 0.35;
+                half sy = tex2D(_SurfaceTex, p.xz * 0.25).r * 0.65 + tex2D(_SurfaceTex, p.xz * 1.1 + 0.37).r * 0.35;
+                half sz = tex2D(_SurfaceTex, float2(p.x, p.y * 0.45) * 0.25).r * 0.65 + tex2D(_SurfaceTex, float2(p.x, p.y) * 1.1 + 0.37).r * 0.35;
+                half s = sx * w.x + sy * w.y + sz * w.z;
+                // The grain is 0.84 on average: kept as bright as the colour itself
+                c *= lerp(1.0, s / 0.84, _Surface);
+            }
             o.Albedo = c;
             // Light from the sky and the ground
             half up = IN.worldNormal.y * 0.5 + 0.5;

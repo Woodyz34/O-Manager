@@ -396,8 +396,11 @@ public class TvShapeBuilder
             float len = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
             if (len < 1e-9f) return;
             nx /= len; ny /= len; nz /= len;
-            int a = V(ax, ay, az, nx, ny, nz, color), b = V(bx, by, bz, nx, ny, nz, color);
-            int q = V(qx, qy, qz, nx, ny, nz, color), d = V(dx, dy, dz, nx, ny, nz, color);
+            // Each side a shade of its own (a few per cent), so a house or a box is not one flat colour
+            float mx = (ax + qx) * 0.5f, my = (ay + qy) * 0.5f, mz = (az + qz) * 0.5f;
+            TvColor col = color.Shade(0.95f + 0.1f * TvRandom.Hash((int)(mx * 7.31f + mz * 3.17f), (int)(my * 5.71f + nx * 11f + nz * 13f)));
+            int a = V(ax, ay, az, nx, ny, nz, col), b = V(bx, by, bz, nx, ny, nz, col);
+            int q = V(qx, qy, qz, nx, ny, nz, col), d = V(dx, dy, dz, nx, ny, nz, col);
             if (flip) { t.Add(a); t.Add(q); t.Add(b); t.Add(a); t.Add(d); t.Add(q); }
             else { t.Add(a); t.Add(b); t.Add(q); t.Add(a); t.Add(q); t.Add(d); }
         }
