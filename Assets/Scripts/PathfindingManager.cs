@@ -170,6 +170,7 @@ public class PathfindingManager : MonoBehaviour
                 // which only converts the cells someone can run in)
                 RaceGreen.Apply(gridName, speedGrid2D);
                 TerrainSpeedModel.Apply(speedGrid2D, slopeFactors);
+                StairsSlopes.Apply(gridName, speedGrid2D, slopeFactors, GridBinary.LastHeights);   // quick up, slow down
                 Passages.Apply(gridName, speedGrid2D);
                 Tunnels.Apply(gridName, speedGrid2D);
                 cellSize = gridData.grid_size * scaleFactor;

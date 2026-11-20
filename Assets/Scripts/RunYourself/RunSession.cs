@@ -135,7 +135,7 @@ public partial class RunSession : MonoBehaviour
                 RunTerrain.Ground g = terrain.At(e, n);
                 float rise = terrain.MapHeight(e + ux * 3.0, n + uz * 3.0) - terrain.MapHeight(e - ux * 3.0, n - uz * 3.0);
                 float gradient = Mathf.Clamp(rise / 6f / RunSettings.Hills, -1.2f, 1.2f);
-                float speed = RunPlayer.ForestSpeed * (g.blocked ? 0.05f : Mathf.Max(0.05f, g.speed)) * RunPlayer.SlopeFactor(gradient, g.rough);
+                float speed = RunPlayer.ForestSpeed * (g.blocked ? 0.05f : Mathf.Max(0.05f, RunPlayer.GroundSpeed(g, gradient)));
                 seconds += step / Mathf.Max(0.05f, speed);
             }
             a = b;

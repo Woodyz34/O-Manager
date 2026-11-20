@@ -156,13 +156,14 @@ namespace MapImport
                 hard[idx] = false;
                 path[idx] = true;
             });
-            // 3b. Stairs (ISOM / ISSprOM 532): a way up or down, slower than the paved ground round it, so the speed of
-            //     the stairs is set, not the quicker of the two
+            // 3b. Stairs (ISOM / ISSprOM 532): a way up or down with its own speed (quick up, slow down: the kind
+            //     tells StairsSlopes which cells are stairs), so the speed of the stairs is set, not the quicker of the two
             var stairs = new bool[n];
             ForLines(map, sprint, TerrainRole.Stairs, g, ox, oy, scale, (idx, rule) =>
             {
                 if (building[idx]) return;
                 g.speed[idx] = rule.speed;
+                g.kind[idx] = GroundKind.Stairs;
                 hard[idx] = false;
                 stairs[idx] = true;
             });

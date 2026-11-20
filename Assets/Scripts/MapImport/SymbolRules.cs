@@ -39,10 +39,13 @@ namespace MapImport
         // told apart (MapPackageInfo.rulesVersion) and the player asked to build them again.
         // 2 (2026-11-20): ISOM 2017-2 / ISSprOM 2019-2 check: hedges (410.1, 411), 513.1 wall, stairs, canopies,
         // 707 marked route (not a barrier), 708 out-of-bounds boundary, 710 crossing, green minimum-width lines.
-        public const int RulesVersion = 2;
+        // 3 (2026-11-20): stairs as quick as a road going up, 0.6 going down (GroundKind.Stairs, StairsSlopes).
+        public const int RulesVersion = 3;
 
-        // Stairs: a little slower than white forest, up and down (the slope model adds the climb)
-        public const float StairsSpeed = 0.6f;
+        // Stairs: up (and on the flat) as quick as a road (Anders, 2026-11-20: running up stairs is quick), down slowly.
+        // Which way is down is worked out from the heights when the grid is loaded (StairsSlopes).
+        public const float StairsSpeed = 1.35f;
+        public const float StairsDownSpeed = 0.6f;
         // Old maps (ISOM 2000, ISSOM 2007, many OCAD 6-10 files) number some symbols differently: building 526,
         // forbidden area 527, paved area 529, uncrossable water 304. In the new standards 526-529 are points or
         // lines, never areas, so an area symbol with one of those numbers tells the map uses the old numbering.
@@ -565,7 +568,7 @@ namespace MapImport
         public const byte Forest = 0, Open = 1, Cultivated = 2, RoughOpen = 3, OpenTrees = 4, LightGreen = 5, Green = 6,
             DarkGreen = 7, Marsh = 8, IndistinctMarsh = 9, UncrossableMarsh = 10, Water = 11, ShallowWater = 12, Plot = 13,
             Building = 14, Paved = 15, Stony = 16, BoulderField = 17, BareRock = 18, Sand = 19, BrokenGround = 20,
-            Orchard = 21, OneWayForest = 22, Canopy = 23, OutOfBounds = 24;
+            Orchard = 21, OneWayForest = 22, Canopy = 23, OutOfBounds = 24, Stairs = 25;
 
         public static byte Of(MapSymbol s)
         {
