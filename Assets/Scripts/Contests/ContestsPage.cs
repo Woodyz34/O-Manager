@@ -33,7 +33,14 @@ public class ContestsPage : MonoBehaviour
     const float CardsWidth = 1820f;
     const float CardGap = 26f;
     const float MinCardWidth = 430f;
+    // With more than four contests (the week has six) the cards are this wide, so a fifth one peeks in at the right
+    // edge and shows there are more (2026-11-20, the user: hard to see that there were six)
+    const float ScrollCardWidth = 400f;
     float cardWidth = MinCardWidth;
+    int shownCount;
+    Button leftArrow, rightArrow;
+    Scrollbar cardsBar;
+    TextMeshProUGUI countText;
     TextMeshProUGUI info;
     TextMeshProUGUI moneyText;
     Button weekTab, dayTab;
@@ -124,7 +131,7 @@ public class ContestsPage : MonoBehaviour
         CourseUI.Place((RectTransform)weekTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(246, -90), new Vector2(200, 58));
         info = CourseUI.Text("Info", head.transform, "", 20, CourseUI.InkMuted);
         info.richText = true;
-        CourseUI.Place(info.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(32, 6), new Vector2(720, 44));
+        CourseUI.Place(info.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(32, 6), new Vector2(1116, 44));
 
         TextMeshProUGUI nameCaption = CourseUI.Text("Name caption", head.transform, "YOUR NAME ON THE LEADERBOARDS", 16, CourseUI.InkMuted, FontStyles.Bold);
         CourseUI.Place(nameCaption.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32, -24), new Vector2(380, 26));
@@ -166,6 +173,32 @@ public class ContestsPage : MonoBehaviour
         cardsScroll.movementType = ScrollRect.MovementType.Clamped;
         cardsScroll.scrollSensitivity = 70f;
         cardsScroll.inertia = true;
+
+        // A scrollbar under the cards, arrows on their sides and "1-4 of 6", shown when the cards do not all fit
+        Image barBack = CourseUI.Panel("Cards scrollbar", page, CourseUI.Hex("FBF4DA", 0.85f));
+        CourseUI.Place(barBack.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -1012), new Vector2(CardsWidth, 22));
+        RectTransform slide = CourseUI.Rect("Sliding area", barBack.transform);
+        CourseUI.Stretch(slide, 3, 3, 3, 3);
+        Image handle = CourseUI.Panel("Handle", slide, CourseUI.Accent);
+        CourseUI.Stretch(handle.rectTransform);
+        cardsBar = barBack.gameObject.AddComponent<Scrollbar>();
+        cardsBar.handleRect = handle.rectTransform;
+        cardsBar.targetGraphic = handle;
+        cardsBar.direction = Scrollbar.Direction.LeftToRight;
+        cardsScroll.horizontalScrollbar = cardsBar;
+        cardsScroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+
+        leftArrow = CourseUI.Button("Left", page, "<", CourseUI.ButtonKind.Primary, () => StepCards(-1), 40);
+        CourseUI.Place((RectTransform)leftArrow.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-CardsWidth / 2f - 6f, -600), new Vector2(72, 120));
+        rightArrow = CourseUI.Button("Right", page, ">", CourseUI.ButtonKind.Primary, () => StepCards(1), 40);
+        CourseUI.Place((RectTransform)rightArrow.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(CardsWidth / 2f + 6f, -600), new Vector2(72, 120));
+        HoverTip.Add(leftArrow, "The contests to the left");
+        HoverTip.Add(rightArrow, "More contests to the right");
+
+        countText = CourseUI.Text("Count", page, "", 22, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+        CourseUI.Place(countText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -1046), new Vector2(700, 34));
+        cardsScroll.onValueChanged.AddListener(_ => ShowScroll());
+        ShowScroll();
     }
 
     void ShowMoney()
@@ -267,6 +300,10 @@ public class ContestsPage : MonoBehaviour
         CourseUI.SetButtonColor(weekTab, weekly ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
         CourseUI.SetButtonColor(dayTab, weekly ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Primary);
         foreach (Transform child in cards) Destroy(child.gameObject);
+        shownCount = 0;
+        cards.sizeDelta = new Vector2(CardsWidth, cards.sizeDelta.y);
+        cards.anchoredPosition = Vector2.zero;
+        ShowScroll();
 
         if (busy || contests == null)
         {
@@ -283,13 +320,45 @@ public class ContestsPage : MonoBehaviour
         ContestInfo first = shown[0];
         TimeSpan left = DateTimeOffset.FromUnixTimeMilliseconds(first.endsAt) - DateTimeOffset.UtcNow;
         string leftText = left.TotalHours >= 24 ? (int)left.TotalDays + " d " + left.Hours + " h" : Mathf.Max(0, (int)left.TotalHours) + " h " + Mathf.Max(0, left.Minutes) + " min";
-        info.text = (weekly ? "Monday 00:00 to Sunday 23:59" : "00:00 to 23:59") + " Swedish time.  Ends in <b>" + leftText + "</b>.  One try each, played alone."
-                    + (shown.Count > 4 ? "  Scroll sideways for all " + shown.Count + "." : "");
         int n = shown.Count;
-        cardWidth = Mathf.Max(MinCardWidth, (CardsWidth - CardGap * (n - 1)) / n);
+        info.text = (weekly ? "Monday 00:00 to Sunday 23:59" : "00:00 to 23:59") + " Swedish time.  Ends in <b>" + leftText + "</b>.  One try each, played alone."
+                    + (n > 4 ? "  <b>" + n + " contests</b>: use the arrows to see them all." : "");
+        cardWidth = n > 4 ? ScrollCardWidth : Mathf.Max(MinCardWidth, (CardsWidth - CardGap * (n - 1)) / n);
         cards.sizeDelta = new Vector2(Mathf.Max(CardsWidth, n * cardWidth + (n - 1) * CardGap), cards.sizeDelta.y);
         cards.anchoredPosition = Vector2.zero;
+        shownCount = n;
         foreach (ContestInfo c in shown) Card(c);
+        ShowScroll();
+    }
+
+    // How far the cards are scrolled: arrows only where there is more, the bar and "1-4 of 6" only when not all fit
+    void ShowScroll()
+    {
+        if (cards == null || leftArrow == null) return;
+        float hidden = cards.sizeDelta.x - CardsWidth;
+        bool scrolls = shownCount > 4 && hidden > 1f && !busy;
+        float x = -cards.anchoredPosition.x;
+        leftArrow.gameObject.SetActive(scrolls && x > 4f);
+        rightArrow.gameObject.SetActive(scrolls && x < hidden - 4f);
+        cardsBar.gameObject.SetActive(scrolls);
+        countText.gameObject.SetActive(scrolls);
+        if (!scrolls) return;
+        float step = cardWidth + CardGap;
+        int firstSeen = Mathf.Clamp(Mathf.RoundToInt(x / step), 0, shownCount - 1);
+        int lastSeen = Mathf.Clamp(Mathf.FloorToInt((x + CardsWidth + CardGap) / step), firstSeen + 1, shownCount);
+        countText.text = "Contests " + (firstSeen + 1) + "-" + lastSeen + " of " + shownCount;
+    }
+
+    // One arrow click moves a whole card
+    void StepCards(int direction)
+    {
+        float hidden = cards.sizeDelta.x - CardsWidth;
+        if (hidden <= 0f) return;
+        float step = cardWidth + CardGap;
+        float x = Mathf.Clamp(Mathf.Round(-cards.anchoredPosition.x / step + direction) * step, 0f, hidden);
+        cardsScroll.StopMovement();
+        cardsScroll.horizontalNormalizedPosition = x / hidden;
+        ShowScroll();
     }
 
     void Message(string text, bool retry)
@@ -321,7 +390,7 @@ public class ContestsPage : MonoBehaviour
 
         CourseData course = ContestRun.ReadCourse(c.course);
         Image frame = CourseUI.Panel("Picture", card.transform, CourseUI.CardSolid);
-        CourseUI.Size(frame, 206);
+        CourseUI.Size(frame, 186);
         frame.gameObject.AddComponent<RectMask2D>();
         Texture2D thumbnail = course != null ? CourseThumbnail.Get(course) : null;
         if (thumbnail != null && (c.Started || c.Done))
@@ -343,7 +412,7 @@ public class ContestsPage : MonoBehaviour
 
         TextMeshProUGUI rules = CourseUI.Text("Rules", card.transform, "<b>" + ContestRun.CourseText(c, course) + "</b>\n" + ContestRun.RunnerText(c), 19, CourseUI.InkMuted);
         rules.richText = true;
-        CourseUI.Size(rules, 76);
+        CourseUI.Size(rules, 96);
         TextMeshProUGUI prizes = CourseUI.Text("Prizes", card.transform, PrizeText(c), 19, CourseUI.Ink);
         prizes.richText = true;
         prizes.raycastTarget = true;
