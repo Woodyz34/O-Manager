@@ -752,9 +752,10 @@ public partial class TvWorldBuilder
         // rises straight from it. The cliff is only as high as the ground says: nothing is lifted above the ground
         // round it, so the top never sticks up (2026-11-19, Anders: cliffs of a fixed height stood up above the
         // hill they sit in and bent the contours; let the ground decide their size).
-        // Where the ground's own drop is less than the cliff's least height (drop), the ground below is dug down the
-        // rest of the way first, and climbs back to the map's height further out (1 in 2.5), so every cliff has a
-        // real face and the land round it still looks right (2026-11-20, Anders).
+        // Where the ground's own drop is less than the cliff's least height (drop), the rest is made up: mostly by
+        // lifting the ground above the edge (a cliff stands up and is seen from afar), a little by lowering the foot.
+        // Both go back to the map's height further out (1 in 2.5), so the land round it still looks right
+        // (2026-11-21, Anders: dug down only, a cliff sat in a hollow and was not seen until you were there).
         const float Reach = 6f, TopReach = 3f, Back = 2.5f;
         foreach (var pair in best)
         {
@@ -776,8 +777,14 @@ public partial class TvWorldBuilder
             float ends = 1f - Sm(0.5f, 3f, beyond);
             float weight = (1f - Sm(reach - 1.5f, reach + 1f, d)) * ends;
             F[k] += (want - here) * weight;
-            if (extra > 0f && side > 0f)
-                F[k] -= extra * down * (1f - Sm(Reach * 0.5f, Reach + extra * Back, side)) * ends;
+            if (extra > 0f)
+            {
+                const float Up = 0.7f;   // the share of the missing height that is lifted above the edge
+                if (side > 0f) F[k] -= extra * (1f - Up) * down * (1f - Sm(Reach * 0.5f, Reach + extra * Back, side)) * ends;
+                // Above: the top is lifted right up to the edge (rock), then slopes back down into the hillside
+                float lift = 1f - Sm(1f, 1f + extra * Up * Back * 1.5f, -side);
+                F[k] += extra * Up * (1f - down) * lift * ends;
+            }
             float face = Sm(-0.8f, 0.2f, side) * (1f - Sm(1.3f, 2.6f, d));
             if (rocky) rock[pair.Key] = Math.Max(rock[pair.Key], face);
             else soil[pair.Key] = Math.Max(soil[pair.Key], face * 0.8f);
