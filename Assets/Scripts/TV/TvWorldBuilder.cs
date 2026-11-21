@@ -342,6 +342,8 @@ public partial class TvWorldBuilder
         rock = new float[N * N];
         trackBlend = new float[N * N];
         trackColor = new TvColor[N * N];
+        asphaltCorner = null;
+        pavedCorner = null;
         clear = new float[N * N];
         water = new float[N * N];
         bog = new float[N * N];
@@ -375,6 +377,7 @@ public partial class TvWorldBuilder
         Waters();
         Stones();
         Structures();
+        if (input.town != null) TownStreets();
         ControlFlag();
         CameraSpot();
         Trees();
@@ -390,6 +393,13 @@ public partial class TvWorldBuilder
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { wireMesh }, "Wires", false, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh>(treeMeshes), "Trees", true, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh>(tuftMeshes), "Undergrowth", false, R, DrawTiles));
+        if (townMesh != null)
+        {
+            // A sprint map's town (TV controls on sprint maps, 2026-11-20)
+            world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townMesh }, "Town houses", true, R, DrawTiles));
+            world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townThingMesh }, "Town things", true, R, DrawTiles));
+            world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townBuiltMesh }, "Town bridges", true, R, DrawTiles));
+        }
         foreach (TvMesh m in world.meshes)
         {
             world.vertices += m.VertexCount;
@@ -417,6 +427,8 @@ public partial class TvWorldBuilder
         rock = new float[N * N];
         trackBlend = new float[N * N];
         trackColor = new TvColor[N * N];
+        asphaltCorner = null;
+        pavedCorner = null;
         clear = new float[N * N];
         water = new float[N * N];
         bog = new float[N * N];
@@ -465,7 +477,7 @@ public partial class TvWorldBuilder
         int treeSolids = world.solids.Count;
         Trees();
         OpenPassages(treeSolids, world.solids.Count);
-        if (input.town != null) KeepTown();
+        if (pavedCorner != null) KeepTown();
         Keep(groundMesh);
         Keep(GroundFar());
         Keep(waterMesh);
@@ -634,10 +646,11 @@ public partial class TvWorldBuilder
             float[] c = line.xz;
             switch (line.kind)
             {
-                // As high as the ground makes them (the drop is no longer used: 2026-11-19, Anders)
-                case WorldLineKind.Cliff: Cliff(c, 3.5f, true); break;
+                // As high as the ground makes them, but never lower than this (2026-11-20, Anders: an impassable
+                // cliff was a decimetre high where the contours showed no drop)
+                case WorldLineKind.Cliff: Cliff(c, 2.6f, true); break;
                 case WorldLineKind.SmallCliff: Cliff(c, 1.2f, true); break;
-                case WorldLineKind.EarthBank: Cliff(c, 1.0f, false); break;
+                case WorldLineKind.EarthBank: Cliff(c, 0.7f, false); break;
                 case WorldLineKind.EarthWall: Groove(c, 0.6f, 1.6f, 0.5f, false); break;
                 case WorldLineKind.Gully: Groove(c, -0.9f, 2.6f, 0.5f, false); break;
                 case WorldLineKind.Ditch: Groove(c, -0.45f, 1.3f, 0.7f, false); break;
@@ -726,7 +739,7 @@ public partial class TvWorldBuilder
             if (nl < 1e-6f) continue;
             nx *= lowSide / nl;
             nz *= lowSide / nl;
-            ForNear(ax, az, bx, bz, 10f, (k, d, qx, qz) =>
+            ForNear(ax, az, bx, bz, 13f, (k, d, qx, qz) =>
             {
                 if (best.TryGetValue(k, out var known) && known.d <= d) return;
                 float px = k % N - R, pz = k / N - R;
@@ -739,14 +752,19 @@ public partial class TvWorldBuilder
         // rises straight from it. The cliff is only as high as the ground says: nothing is lifted above the ground
         // round it, so the top never sticks up (2026-11-19, Anders: cliffs of a fixed height stood up above the
         // hill they sit in and bent the contours; let the ground decide their size).
-        const float Reach = 6f, TopReach = 3f;
+        // Where the ground's own drop is less than the cliff's least height (drop), the rest is made up: mostly by
+        // lifting the ground above the edge (a cliff stands up and is seen from afar), a little by lowering the foot.
+        // Both go back to the map's height further out (1 in 2.5), so the land round it still looks right
+        // (2026-11-21, Anders: dug down only, a cliff sat in a hollow and was not seen until you were there).
+        const float Reach = 6f, TopReach = 3f, Back = 2.5f;
         foreach (var pair in best)
         {
             float d = pair.Value.d, side = pair.Value.side;
-            if (d > Reach + 1f) continue;
+            if (d > Reach + drop * Back + 1f) continue;
             float qx = pair.Value.qx, qz = pair.Value.qz, nx = pair.Value.nx, nz = pair.Value.nz;
             float high = BaseHeight(qx - nx * TopReach, qz - nz * TopReach), foot = BaseHeight(qx + nx * Reach, qz + nz * Reach);
             float low = Math.Min(foot, high);
+            float extra = Math.Max(0f, drop - (high - low));
             // A rock cliff drops at once (a vertical face is built on it, CliffFaces); an earth bank slopes
             float down = rocky ? Sm(-0.25f, 0.45f, side) : Sm(-0.5f, 0.9f, side);
             float want = high + (low - high) * down;
@@ -756,8 +774,17 @@ public partial class TvWorldBuilder
             float reach = side < 0f ? TopReach : Reach;
             // Past the ends of the line the step fades out, so a cliff does not wrap round its own end
             float beyond = (float)Math.Sqrt(Math.Max(0f, d * d - side * side));
-            float weight = (1f - Sm(reach - 1.5f, reach + 1f, d)) * (1f - Sm(0.5f, 3f, beyond));
+            float ends = 1f - Sm(0.5f, 3f, beyond);
+            float weight = (1f - Sm(reach - 1.5f, reach + 1f, d)) * ends;
             F[k] += (want - here) * weight;
+            if (extra > 0f)
+            {
+                const float Up = 0.7f;   // the share of the missing height that is lifted above the edge
+                if (side > 0f) F[k] -= extra * (1f - Up) * down * (1f - Sm(Reach * 0.5f, Reach + extra * Back, side)) * ends;
+                // Above: the top is lifted right up to the edge (rock), then slopes back down into the hillside
+                float lift = 1f - Sm(1f, 1f + extra * Up * Back * 1.5f, -side);
+                F[k] += extra * Up * (1f - down) * lift * ends;
+            }
             float face = Sm(-0.8f, 0.2f, side) * (1f - Sm(1.3f, 2.6f, d));
             if (rocky) rock[pair.Key] = Math.Max(rock[pair.Key], face);
             else soil[pair.Key] = Math.Max(soil[pair.Key], face * 0.8f);
@@ -777,8 +804,9 @@ public partial class TvWorldBuilder
             TvColor color;
             switch (line.kind)
             {
-                case WorldLineKind.WideRoad: half = 2.6f; strength = 1f; color = Gravel; break;
-                case WorldLineKind.Road: half = 1.8f; strength = 1f; color = Gravel; break;
+                // Roads are tarmac (2026-11-20, Anders: a narrow asphalt road looked like a path in the forest)
+                case WorldLineKind.WideRoad: half = 2.6f; strength = 1f; color = Asphalt; break;
+                case WorldLineKind.Road: half = 1.9f; strength = 1f; color = Asphalt; break;
                 // Paths a little wider and clearer than in real life (2026-11-19, Anders: hard to find; the ground
                 // has one corner per metre, so a narrow path barely showed)
                 case WorldLineKind.Track: half = 1.5f; strength = 1f; color = Earth; break;
@@ -795,11 +823,14 @@ public partial class TvWorldBuilder
                 default: continue;
             }
             float[] c = line.xz;
+            bool tarmac = line.kind == WorldLineKind.WideRoad || line.kind == WorldLineKind.Road;
+            if (tarmac && asphaltCorner == null) asphaltCorner = new bool[N * N];
             for (int q = 0; q + 3 < c.Length; q += 2)
             {
                 ForNear(c[q], c[q + 1], c[q + 2], c[q + 3], half + 3f, (k, d, qx, qz) =>
                 {
                     clear[k] = Math.Min(clear[k], d - half);
+                    if (tarmac && d <= half) asphaltCorner[k] = true;
                     if (strength <= 0f) return;
                     float blend = (1f - Sm(half * 0.45f, half + 0.35f, d)) * strength;
                     if (blend > trackBlend[k])
@@ -847,10 +878,12 @@ public partial class TvWorldBuilder
         Paved = TvColor.Hex("#8a8782"), Plot = TvColor.Hex("#8f9a4e"), MarshColor = TvColor.Hex("#6f7440"), Wet = TvColor.Hex("#4a4a2e"),
         Soil = TvColor.Hex("#6b563c");
 
+    bool[] asphaltCorner;               // the ground corners on a tarmac road (Tracks), kept with the paved ground
+
     void Ground()
     {
         GroundLook floor = ForestFloor();
-        if (input.town != null) pavedCorner = new bool[N * N];
+        if (input.town != null || asphaltCorner != null) pavedCorner = new bool[N * N];
         for (int j = 0; j < N; j++)
         {
             for (int i = 0; i < N; i++)
@@ -885,6 +918,13 @@ public partial class TvWorldBuilder
                     default:
                         c = floor.a.Lerp(floor.b, Sm(0.35f, 0.7f, f)).Lerp(floor.c, Sm(0.55f, 0.8f, TvRandom.Noise(ax * 0.2f + 40f, az * 0.2f)) * 0.7f);
                         break;
+                }
+                if (asphaltCorner != null && asphaltCorner[k] && kind != WorldCell.Water)
+                {
+                    // A tarmac road: grey asphalt on the asphalt grain, whatever the ground is around it
+                    c = Asphalt.Shade(0.95f + f2 * 0.08f);
+                    hard = true;
+                    pavedCorner[k] = true;
                 }
                 if (!hard)
                 {

@@ -31,6 +31,7 @@ public class WaitingScreen : MonoBehaviour
     TextMeshProUGUI players;
     Button changeButton;
     GameObject card;
+    GameObject forest;
     float nextRefresh;
 
     void Awake()
@@ -50,6 +51,24 @@ public class WaitingScreen : MonoBehaviour
             back.sprite = null;
             back.color = new Color(0.04f, 0.1f, 0.07f, 0.72f);
             back.raycastTarget = true;   // the map under it is not clicked by mistake
+        }
+
+        // While waiting for the others, the forest picture covers the map, so nobody sees the course before the start
+        // (2026-11-20, Anders)
+        Sprite picture = Resources.Load<Sprite>("Sprites/e2bf7ebc-02a1-4b78-b52f-e0211eeac746");   // the lobby's forest
+        if (picture != null)
+        {
+            Image cover = CourseUI.Panel("Forest", transform, Color.white, false);
+            CourseUI.Stretch(cover.rectTransform);
+            gameObject.AddComponent<RectMask2D>();
+            Image art = CourseUI.Panel("Picture", cover.transform, Color.white, false);
+            art.sprite = picture;
+            art.raycastTarget = false;
+            AspectRatioFitter fitter = art.gameObject.AddComponent<AspectRatioFitter>();
+            fitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fitter.aspectRatio = picture.rect.width / Mathf.Max(1f, picture.rect.height);
+            forest = cover.gameObject;
+            forest.SetActive(false);
         }
 
         Image cardImage = CourseUI.CardPanel("Waiting card", transform);
@@ -84,6 +103,7 @@ public class WaitingScreen : MonoBehaviour
         bool waiting = multiplayer && agent != null && agent.WaitingForAllPlayersToChooseRunner && local.HasChoosenRunner
             && (manager.ChooseRunnerPanel == null || !manager.ChooseRunnerPanel.activeSelf);
         if (card.activeSelf != waiting) card.SetActive(waiting);
+        if (forest != null && forest.activeSelf != waiting) forest.SetActive(waiting);
         if (!waiting) return;
         // Same stats (Imposter, Secret task...): nobody picks a runner, so the ones not ready are still loading in, and
         // there is no runner to change to (2026-11-19)

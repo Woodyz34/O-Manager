@@ -140,10 +140,12 @@ public class TvWorldView : MonoBehaviour
     public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control, bool start = false, float camDirX = 0f, float camDirZ = 0f,
                                                   float legDirX = 0f, float legDirZ = 0f)
     {
-        TvWorldData.Data data = await TvWorldData.LoadAsync(map);
+        // A sprint map is a town (2026-11-20, Anders: TV controls in relays on sprint maps)
+        TvWorldData.Data data = await TvWorldData.LoadAsync(map, map != null && map.IsSprint);
         if (data == null) return null;
         var input = new TvWorldInput
         {
+            town = data.town,
             layer = data.layer,
             heights = data.heights,
             look = data.look,

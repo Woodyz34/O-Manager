@@ -534,8 +534,7 @@ public partial class TvWorldBuilder
         if (flowersMaybe && TvRandom.Hash((int)((sg.ax + ox) * 5f + u * 3f), (int)((sg.az + oz) * 5f + y * 7f)) < 0.25f)
         {
             WallBox(m, sg, ux, uz, nx, nz, u - w / 2f - 0.04f, u + w / 2f + 0.04f, y - 0.4f, y - 0.17f, 0f, 0.28f, TvColor.Hex("#3d5a3a"));
-            TvColor bloom = TvCityShapes.PaletteOf((int)(u * 13f) + (int)y, input.town.style, TvCityShapes.Kind.TownHouse).awning;
-            bloom = ((int)(u * 7f + y)) % 2 == 0 ? TvColor.Hex("#e23d5a") : TvColor.Hex("#f2c230");
+            TvColor bloom = ((int)(u * 7f + y)) % 2 == 0 ? TvColor.Hex("#e23d5a") : TvColor.Hex("#f2c230");
             WallBox(m, sg, ux, uz, nx, nz, u - w / 2f, u + w / 2f, y - 0.17f, y - 0.05f, 0.03f, 0.26f, bloom);
         }
     }
