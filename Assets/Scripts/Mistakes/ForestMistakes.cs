@@ -81,6 +81,7 @@ public class ForestMistakes
         mode = Mode.Route; U = 8f; sinceFix = 0f; travel = 0f; quietUntil = 0f; smallDone = false; flagBlindUntil = 0f; nextObserve = 0f; parallels = 0; sureTravel = 0f; trail.Clear(); lastSide = 0; nextSideCheck = 0f; misses = 0; nextContour = 25f;
         skill = baseSkill = Mathf.Clamp01(1f - agent.runnerStatTec);
         seen.Clear(); lostTargets.Clear();
+        plan = null;   // the route of an earlier leg (or race) is never the one to get back onto
     }
 
     float baseSkill;

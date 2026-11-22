@@ -9,6 +9,8 @@ public class MistakeLogic : MonoBehaviour
     public RunnerCollision runnerDetector;
     private AgentMovement agentMovement;
     private static System.Random random = new System.Random();
+    // The mistakes from before ForestMistakes (draw misses and long angle misses). Off since 2026-11-22.
+    public static bool UseOldMistakes = false;
     // Start is called before the first frame update
     public void Start()
     {
@@ -33,8 +35,11 @@ public class MistakeLogic : MonoBehaviour
             return;
         }
         // Forest mistakes are made by ForestMistakes now (direction and parallel errors, reading in on the map),
-        // once the map's objects are read. Until then (the first seconds of a race) the old logic stands in.
-        if (MapFeatureIndex.Ready)
+        // once the map's objects are read. The old logic no longer stands in until then (2026-11-22): its long miss ran
+        // a straight line 20-45 degrees off for 1.3 times the distance to the control (kilometres on a long leg), and
+        // when the map's objects could not be read it did that all race, every race on that map. No mistakes until
+        // the forest mistakes are ready.
+        if (MapFeatureIndex.Ready || !UseOldMistakes)
         {
             runnerDetector.shouldMiss = false;
             return;
