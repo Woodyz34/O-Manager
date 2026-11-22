@@ -92,7 +92,8 @@ public class NetworkRunnerHandler : MonoBehaviour
             CustomLobbyName = "OurLobbyID",
             PlayerCount = MaxPlayersPerLobby,
             SceneManager = sceneManager,
-            ConnectionToken = connectionToken
+            ConnectionToken = connectionToken,
+            CustomPhotonAppSettings = PhotonRegion.Settings() // same region for everyone, see PhotonRegion
         });
         if (!result.Ok)
         {
@@ -114,7 +115,8 @@ public class NetworkRunnerHandler : MonoBehaviour
             SceneManager = sceneManager,
             HostMigrationToken = hostMigrationToken,
             HostMigrationResume = HostMigrationResume,
-            ConnectionToken = GameManager.Instance.GetConnectionsToken()
+            ConnectionToken = GameManager.Instance.GetConnectionsToken(),
+            CustomPhotonAppSettings = PhotonRegion.Settings()
         });
     }
 
@@ -211,7 +213,7 @@ public class NetworkRunnerHandler : MonoBehaviour
 
         string lobbyID = "OurLobbyID";
 
-        var result = await networkRunner.JoinSessionLobby(SessionLobby.Custom, lobbyID);
+        var result = await networkRunner.JoinSessionLobby(SessionLobby.Custom, lobbyID, customAppSettings: PhotonRegion.Settings());
 
         if (!result.Ok)
         {
