@@ -78,6 +78,25 @@ public class TvPassable
         return sprint && speed[i, j] <= 0.01f;
     }
 
+    // An open cell of the grid (not one the course closed) has its middle within reach metres of here. The 2D grid's
+    // cells are 2 m, and a narrow way (a gap between two walls, a footbridge between two fences) is often a single
+    // row of open cells that does not lie quite on the way: in 3D the runner then got stuck in a gap that is open on
+    // the map (2026-11-22, Anders). Near such a cell the 3D world's own walls, fences and ground decide.
+    public bool NearOpen(double e, double n, double reach)
+    {
+        if (!Cell(e, n, out int i, out int j)) return false;
+        double sx = spanX / Math.Max(1, cols - 1), sy = spanY / Math.Max(1, rows - 1), r2 = reach * reach;
+        for (int di = -1; di <= 1; di++)
+            for (int dj = -1; dj <= 1; dj++)
+            {
+                int ii = i + di, jj = j + dj;
+                if (ii < 0 || jj < 0 || ii >= rows || jj >= cols || speed[ii, jj] <= 0.01f || purple.Contains(ii * cols + jj)) continue;
+                double de = minx + jj * sx - e, dn = miny + ii * sy - n;
+                if (de * de + dn * dn <= r2) return true;
+            }
+        return false;
+    }
+
     // The grid lets a runner through here, so no house stands here (a cell the course's purple shapes closed keeps
     // whatever the map has: closed by them, it is no way through either way)
     public bool NoHouse(double e, double n)

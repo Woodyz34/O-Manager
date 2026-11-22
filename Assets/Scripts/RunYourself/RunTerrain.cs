@@ -42,6 +42,9 @@ public class RunTerrain
     const WorldLineKind BridgeKind = (WorldLineKind)250, TunnelKind = (WorldLineKind)251;
     // The course setter's uncrossable boundaries and bridges (ForbiddenArea), and the stairs of a town
     const WorldLineKind CourseLineKind = (WorldLineKind)252, CourseBridgeKind = (WorldLineKind)253, TownStairsKind = (WorldLineKind)254;
+    // The paths and paved ways of a town as the map draws them: where one runs, the 2D grid's 2 m cells do not shut it
+    // (only the 3D walls, fences, houses and water do)
+    const WorldLineKind TownPathKind = (WorldLineKind)255;
 
     // The 2D race's own grid: on a sprint map it says where the runner may go (2026-11-20). Null when the scene has none.
     readonly TvPassable passable;
@@ -86,6 +89,11 @@ public class RunTerrain
                 if (b < town.tunnelWidths.Count && town.tunnelWidths[b] > 0.5f) wayHalf[town.tunnels[b]] = Math.Min(5f, town.tunnelWidths[b] / 2f);
             }
             foreach (float[] xy in town.stairs) all.Add((TownStairsKind, xy));
+            foreach (var (xy, width) in town.paths)
+            {
+                all.Add((TownPathKind, xy));
+                wayHalf[xy] = width > 0.5f ? Math.Min(4f, width / 2f) : 1f;
+            }
         }
         if (forbidden != null)
         {
@@ -123,7 +131,7 @@ public class RunTerrain
                 var p = new Piece
                 {
                     kind = line.kind,
-                    way = wayHalf.TryGetValue(line.xy, out float wh) ? Math.Max(1.4f, wh) : 1.4f,
+                    way = wayHalf.TryGetValue(line.xy, out float wh) ? (line.kind == TownPathKind ? wh : Math.Max(1.4f, wh)) : 1.4f,
                     ax = (float)(line.xy[i] - layer.minE), az = (float)(line.xy[i + 1] - layer.minN),
                     bx = (float)(line.xy[i + 2] - layer.minE), bz = (float)(line.xy[i + 3] - layer.minN)
                 };
@@ -202,6 +210,9 @@ public class RunTerrain
             // A town: closed exactly where the 2D race is closed. Where the map is open but the 3D world has a
             // house, water or a garden (a passage the 2D game opens), the runner runs on paving.
             bool closed = passable.Closed(e, n) && !OnWay(e, n);
+            // Right beside an open cell, where the 3D ground itself is open (no house, water or garden) and the course
+            // has not closed it, the 3D walls and fences decide (TvPassable.NearOpen: narrow gaps and footbridges)
+            if (closed && !g.blocked && !passable.Purple(e, n) && (passable.NearOpen(e, n, passable.CellSize * 0.8) || OnTownPath(e, n))) closed = false;
             if (g.blocked && !closed)
             {
                 g.speed = speeds.Ground(TerrainKind.Paved, 1.5f);
@@ -311,6 +322,20 @@ public class RunTerrain
         {
             Piece p = pieces[index];
             if (IsWay(p.kind) && Dist(x, z, p) <= p.way) return true;
+        }
+        return false;
+    }
+
+    // On a path or paved way of a town, as the map draws it
+    bool OnTownPath(double e, double n)
+    {
+        float x = (float)(e - layer.minE), z = (float)(n - layer.minN);
+        List<int> near = BucketAt(x, z);
+        if (near == null) return false;
+        foreach (int index in near)
+        {
+            Piece p = pieces[index];
+            if (p.kind == TownPathKind && Dist(x, z, p) <= p.way) return true;
         }
         return false;
     }
