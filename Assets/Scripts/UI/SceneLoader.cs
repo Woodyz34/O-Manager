@@ -23,6 +23,16 @@ public class SceneLoader : MonoBehaviour
         cachedPage = null;
         runner = null;
         loading = false;
+        SceneManager.sceneLoaded -= RememberPage;
+        SceneManager.sceneLoaded += RememberPage;
+    }
+
+    // The page is copied as soon as a scene that has one opens (2026-11-22). Before, it was only copied the first
+    // time the loader was used, and the lobby has no page of its own: opening the course builder from the lobby
+    // showed no loading page at all, only a frozen lobby.
+    static void RememberPage(Scene scene, LoadSceneMode mode)
+    {
+        if (cachedPage == null) Page();
     }
 
     public static void Load(string scene, string message)
@@ -96,7 +106,11 @@ public class SceneLoader : MonoBehaviour
             cachedPage.SetActive(false);
             DontDestroyOnLoad(cachedPage);
             Canvas canvas = cachedPage.GetComponent<Canvas>();
-            if (canvas != null) canvas.sortingOrder = 1000;
+            if (canvas != null)
+            {
+                canvas.enabled = true;   // in case the original was switched off (a lobby visit hides the lobby's canvases)
+                canvas.sortingOrder = 1000;
+            }
             return cachedPage;
         }
         return null;

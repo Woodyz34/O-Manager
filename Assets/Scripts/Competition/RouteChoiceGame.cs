@@ -552,7 +552,7 @@ public class RouteChoiceView : MonoBehaviour
         {
             RouteChoice mine = current.choices[choice];
             verdict = "<color=#C0392B><b>Not quite.</b></color> " + RouteChoiceGame.ColourNames[best.colour] + " was "
-                + Mathf.RoundToInt(mine.seconds - best.seconds) + " s faster than " + RouteChoiceGame.ColourNames[mine.colour].ToLowerInvariant() + ".";
+                + RelayStats.Gap(mine.seconds - best.seconds) + " faster than " + RouteChoiceGame.ColourNames[mine.colour].ToLowerInvariant() + ".";
         }
         info.text = verdict;
 
@@ -565,7 +565,7 @@ public class RouteChoiceView : MonoBehaviour
         {
             RouteChoice c = current.choices[i];
             int seconds = Mathf.RoundToInt(c.seconds);
-            string time = i == fastest ? RelayStats.Time(seconds) : "<color=#C0392B>+" + (seconds - bestSeconds) + " s</color>";
+            string time = i == fastest ? RelayStats.Time(seconds) : "<color=#C0392B>+" + RelayStats.Gap(seconds - bestSeconds) + "</color>";
             string name = "<b>" + RouteChoiceGame.ColourNames[c.colour] + "</b>" + (i == choice ? "  <size=80%>(your pick)</size>" : "")
                 + "\n<size=75%><color=#5B7563>" + Mathf.RoundToInt(c.meters) + " m" + (i == fastest ? ", fastest" : ", " + RelayStats.Time(seconds)) + "</color></size>";
             AddRow(RouteChoiceGame.Colours[c.colour], name, time, i == choice);
@@ -894,7 +894,7 @@ public class RouteChoiceView : MonoBehaviour
                 RouteChoiceGame.ReadLeg(p, k, out int pick, out _);
                 if (pick == i) who.Add(p.Object.HasStateAuthority ? "you" : BearMode.Name(p));
             }
-            string time = i == fastest ? RelayStats.Time(seconds) : "<color=#C0392B>+" + (seconds - bestSeconds) + " s</color>";
+            string time = i == fastest ? RelayStats.Time(seconds) : "<color=#C0392B>+" + RelayStats.Gap(seconds - bestSeconds) + "</color>";
             string name = "<b>" + RouteChoiceGame.ColourNames[c.colour] + "</b>  <size=75%><color=#5B7563>" + Mathf.RoundToInt(c.meters) + " m</color></size>"
                 + "\n<size=75%><color=#5B7563>" + (who.Count > 0 ? string.Join(", ", who) : "nobody") + "</color></size>";
             AddRow(RouteChoiceGame.Colours[c.colour], name, time, i == mine);

@@ -688,8 +688,13 @@ public class ContestsPage : MonoBehaviour
         Image dim = CourseUI.Panel("Popup", transform, new Color(0.05f, 0.1f, 0.07f, 0.6f), false);
         CourseUI.Stretch(dim.rectTransform);
         popup = dim.gameObject;
+        // A click outside the card closes it too (2026-11-22, the user), not only Close
+        Button outside = dim.gameObject.AddComponent<Button>();
+        outside.transition = Selectable.Transition.None;
+        outside.onClick.AddListener(() => Destroy(dim.gameObject));
         Image card = CourseUI.CardPanel("Card", dim.transform);
         card.color = CourseUI.CardSolid;
+        card.gameObject.AddComponent<ClickCatcher>();
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(width, height));
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, heading, 36, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Place(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -30), new Vector2(width - 260, 56));
@@ -723,8 +728,12 @@ public class ContestsPage : MonoBehaviour
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
         Image dim = CourseUI.Panel("Dim", go.transform, new Color(0.05f, 0.1f, 0.07f, 0.6f), false);
         CourseUI.Stretch(dim.rectTransform);
+        Button outside = dim.gameObject.AddComponent<Button>();
+        outside.transition = Selectable.Transition.None;
+        outside.onClick.AddListener(() => Destroy(go));
         Image card = CourseUI.CardPanel("Card", dim.transform);
         card.color = CourseUI.CardSolid;
+        card.gameObject.AddComponent<ClickCatcher>();
         float height = 260 + 40 * lines.Count;
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, Mathf.Min(900, height)));
         string heading = packs > 0 ? "You won " + (packs == 1 ? "a runner pack" : packs + " runner packs") + (total > 0 ? " and " + Kr(total) : "") + "!"
