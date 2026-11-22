@@ -176,7 +176,7 @@ public partial class RunSession : MonoBehaviour
         string mapId = mapDef.id;
         // The ground from the contours is kept on disk; a new version of the map's lines (an import) gets a new file
         string cacheFile = System.IO.Path.Combine(Application.persistentDataPath, "RunHeights",
-            Safe(mapId) + "-" + (linesJson != null ? linesJson.Length : 0) + "-" + (pointsJson != null ? pointsJson.Length : 0) + "-v3.bytes");
+            Safe(mapId) + "-" + (linesJson != null ? linesJson.Length : 0) + "-" + (pointsJson != null ? pointsJson.Length : 0) + "-v4.bytes");
         TvWorldData.Data plain = data;
         TvHeights detailed = plain.heights;
         try { detailed = await Task.Run(() => RunContours.Detailed(mapId, plain.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile)); }
