@@ -61,6 +61,7 @@ public class ChoiceDropdown : MonoBehaviour
         panel.sizeDelta = new Vector2(width, height);
         panel.anchoredPosition = new Vector2(x, top);
 
+        float widest = 0f;
         for (int i = 0; i < labels.Length; i++)
         {
             int index = i;
@@ -81,11 +82,22 @@ public class ChoiceDropdown : MonoBehaviour
             text.enableWordWrapping = false;
             text.raycastTarget = false;
             CourseUI.Size(text, 42, -1, 1);
+            widest = Mathf.Max(widest, text.GetPreferredValues(labels[i], float.PositiveInfinity, 42f).x);
             button.onClick.AddListener(() =>
             {
                 Close();
                 chosen?.Invoke(index);
             });
+        }
+
+        // Wide enough for the longest text (2026-11-20: "Copy a leg" cut its texts off), kept inside the screen
+        float needed = Mathf.Min(widest + 2f * 18f + 2f * 10f + 8f, r.width - 20f);
+        if (needed > width)
+        {
+            width = needed;
+            x = Mathf.Clamp(bottomLeft.x, r.xMin + 10f, r.xMax - width - 10f);
+            panel.sizeDelta = new Vector2(width, height);
+            panel.anchoredPosition = new Vector2(x, top);
         }
     }
 

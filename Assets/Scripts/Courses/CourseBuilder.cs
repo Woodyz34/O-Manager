@@ -3123,17 +3123,39 @@ public class CourseBuilder : MonoBehaviour
     }
 
     // What the dot on a leg button shows
-    enum LegState { Empty, Started, Done, Forked, Check, Unfinished }
+    // A dot on a leg button only when something is wrong (2026-11-20, the user: the dots were always there, even on a
+    // finished relay). Red: the relay can't be saved like this. Yellow: changed by a fork on another leg, have a look.
+    enum LegState { Ok, Check, Problem }
 
-    LegState StateOf(int leg)
+    LegState StateOf(int leg) => LegProblem(leg) != null ? LegState.Problem : checkLegs.Contains(leg) ? LegState.Check : LegState.Ok;
+
+    // What stops the leg from being saved, the same checks as Save makes (null: nothing)
+    string LegProblem(int leg)
     {
+        if (leg < 0 || leg >= legs || leg >= legCourse.Count) return null;
         EditCourse course = courses[legCourse[leg]];
-        if (MissingFork(leg, out _)) return LegState.Unfinished;
-        if (checkLegs.Contains(leg)) return LegState.Check;
-        bool planned = forks.Exists(f => f.legs.Contains(leg));
-        if (planned || course.items.Exists(item => item.fork >= 0 && forks[item.fork].branches.Count > 1)) return LegState.Forked;
-        if (course.start.HasValue && course.finish.HasValue && course.items.Count > 0) return LegState.Done;
-        return IsEmpty(course) ? LegState.Empty : LegState.Started;
+        if (MissingFork(leg, out int missing)) return "it should run fork " + (missing + 1) + ", but it has no control where the fork starts";
+        if (forkEveryVariant)
+        {
+            foreach (EditItem item in course.items)
+            {
+                if (item.fork < 0) continue;
+                int runs = LegsWithFork(item.fork).Count;
+                if (forks[item.fork].branches.Count > runs)
+                    return "fork " + (item.fork + 1) + " has " + forks[item.fork].branches.Count + " branches but only " + runs + (runs == 1 ? " leg runs" : " legs run") + " it";
+            }
+        }
+        if (IsEmpty(course))
+        {
+            // Filled with a copy of a leg with its fork at save, so that is fine
+            for (int f = 0; f < forks.Count; f++)
+                if (forks[f].legs.Contains(leg) && LegsWithFork(f).Exists(other => other != leg)) return null;
+            return "it has no course yet";
+        }
+        if (!course.start.HasValue) return "it has no start";
+        if (course.items.Count == 0) return "it has no controls";
+        if (!course.finish.HasValue) return "it has no finish";
+        return null;
     }
 
     string LegTip(int leg)
@@ -3147,17 +3169,10 @@ public class CourseBuilder : MonoBehaviour
         string text = "Leg " + (leg + 1) + ": " + (IsEmpty(course) ? "empty" : ControlCount(course) + " controls") + (forkNames.Count > 0 ? ", " + string.Join(", ", forkNames) : "");
         LegSex sex = SexOf(leg);
         if (sex != LegSex.Any) text += ". Only " + (sex == LegSex.Women ? "women" : "men") + " may run it";
-        switch (StateOf(leg))
-        {
-            case LegState.Unfinished:
-                MissingFork(leg, out int f);
-                text += ".\nNot finished: it should run fork " + (f + 1) + ", but it has no control where the fork starts.";
-                break;
-            case LegState.Check: text += ".\nChanged by a fork on another leg: have a look."; break;
-            case LegState.Done: text += ".\nReady."; break;
-            case LegState.Empty: text += ".\nIt starts as a copy of the leg before when you open it."; break;
-            default: text += "."; break;
-        }
+        string problem = LegProblem(leg);
+        if (problem != null) text += ".\nNot ready: " + problem + ".";
+        else if (checkLegs.Contains(leg)) text += ".\nChanged by a fork on another leg: have a look.";
+        else text += ".";
         return text;
     }
 
@@ -3183,8 +3198,7 @@ public class CourseBuilder : MonoBehaviour
             Button button = CourseUI.Button("Leg " + (leg + 1), legButtonRow, (leg + 1) + who,
                 leg == selectedLeg ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light, () => SelectLeg(captured), 22);
             LegState state = StateOf(leg);
-            Color? dot = state == LegState.Unfinished ? CourseUI.Danger : state == LegState.Check ? CourseUI.Hex("D9A21B")
-                : state == LegState.Forked ? CourseUI.Accent : state == LegState.Done ? CourseUI.Hex("3A9A5B") : (Color?)null;
+            Color? dot = state == LegState.Problem ? CourseUI.Danger : state == LegState.Check ? CourseUI.Hex("D9A21B") : (Color?)null;
             if (dot.HasValue)
             {
                 // White ring, so an orange dot shows on the orange button of the leg being laid too
