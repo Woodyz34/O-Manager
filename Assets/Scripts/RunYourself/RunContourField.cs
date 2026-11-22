@@ -72,7 +72,14 @@ public static class RunContourField
         // contour next to it. The map import knew the ticks' directions and its 10 m heights clearly show a hill
         // inside: then it is a hill (2026-11-22: on Stora Stöeryd whole hillsides of 300 m sank into hollows)
         foreach (Contour c in contours)
-            if (c.line.hollow && grid.h != null && RiseInside(grid, c.line.xy) > 1.5) c.line.hollow = false;
+        {
+            if (!c.line.closed || grid.h == null) continue;
+            double rise = RiseInside(grid, c.line.xy, out bool large);
+            if (c.line.hollow && rise > (large ? 1.5 : 0.6)) c.line.hollow = false;
+            // A small ring whose tick was not found next to it (drawn a little off, or on a piece of the ring the
+            // stitching left apart): the import's heights clearly sink inside it
+            else if (!c.line.hollow && !large && rise < -0.75) c.line.hollow = true;
+        }
         foreach (Contour c in contours)
         {
             if (c.line.closed)
@@ -81,6 +88,21 @@ public static class RunContourField
                 bool insideLeft = MapGeometry.SignedArea(c.p) > 0;
                 bool insideUp = !c.line.hollow;
                 if (insideLeft == insideUp) c.votesUp += 3; else c.votesDown += 3;
+            }
+            else if (grid.h != null)
+            {
+                // An open contour: which side is up, from the import's 10 m heights (the import read the ticks'
+                // directions from the OCAD file) a few metres either side of the whole line, when they say it clearly
+                double vote = 0, total = 0, reach = 6 / res;
+                for (int i = 0; i + 3 < c.p.Length; i += 2)
+                {
+                    double sx = c.p[i + 2] - c.p[i], sy = c.p[i + 3] - c.p[i + 1], l = Math.Sqrt(sx * sx + sy * sy);
+                    if (l < 1e-6) continue;
+                    double mx = (c.p[i] + c.p[i + 2]) / 2, my = (c.p[i + 1] + c.p[i + 3]) / 2, nx = -sy / l * reach, ny = sx / l * reach;
+                    vote += l * (grid.At(ox + (mx + nx) * res, oy + (my + ny) * res) - grid.At(ox + (mx - nx) * res, oy + (my - ny) * res));
+                    total += l;
+                }
+                if (total * res > 15 && Math.Abs(vote) > 0.4 * total) { if (vote > 0) c.votesUp += 3; else c.votesDown += 3; }
             }
             c.orientation = c.votesUp > c.votesDown ? 1 : c.votesDown > c.votesUp ? -1 : 0;
         }
@@ -154,9 +176,9 @@ public static class RunContourField
                 if (vote != 0) c.orientation = vote > 0 ? 1 : -1;
             }
         }
-        int known = 0;
-        foreach (Contour c in contours) if (c.orientation != 0) known++;
-        if (known < contours.Count / 4) return null;
+        int knownSlope = 0;
+        foreach (Contour c in contours) if (c.orientation != 0) knownSlope++;
+        if (knownSlope < contours.Count / 4) return null;
 
         var diff = new double[edges.Count];
         var weight = new double[edges.Count];
@@ -180,6 +202,9 @@ public static class RunContourField
             }
         }
         ids = null;
+        var known = new bool[contours.Count + 1];
+        foreach (Contour c in contours) known[c.id] = adj[c.id].Count > 0;
+        int nested = NestLevels(contours, level, known, out bool[] certain, out bool[] hasInside);
 
         // ---- The ground: fixed on every contour, smooth in between ----
         var z = new double[R * C];
@@ -188,12 +213,34 @@ public static class RunContourField
         var count = new int[R * C];
         foreach (Contour c in contours)
         {
-            if (adj[c.id].Count == 0) continue;
+            if (!known[c.id]) continue;
             c.line.level = Math.Round(level[c.id]) * eq;
             c.line.solved = true;
             Fix(c.p, c.line.level, sum, count, C, R);
         }
         if (!Fill(z, isFixed, sum, count, R, C)) return null;
+
+        // ---- A small knoll or hollow on a slope: level with the ground round it ----
+        // An innermost ring whose level came from the rays alone (not from a ring round it) can end up one interval
+        // too low for a knoll (or too high for a hollow): the ground round it is then above its top and it becomes a
+        // pit (2026-11-22). The ground round the ring is filled again without the ring, and a knoll's ring is put at
+        // the first contour level at or above that ground (a hollow's at the first at or below).
+        int moved = 0;
+        foreach (Contour c in contours)
+        {
+            if (!known[c.id] || certain[c.id] || hasInside[c.id] || !c.line.closed) continue;
+            double without = GroundWithout(c.p, z, isFixed, sum, count, C, R);
+            if (double.IsNaN(without)) continue;
+            double at = c.line.level / eq, g = without / eq;
+            double want = c.line.hollow ? Math.Min(at, Math.Floor(g + 0.1)) : Math.Max(at, Math.Ceiling(g - 0.1));
+            if (want == at) continue;
+            double shift = (want - at) * eq;
+            for (int i = 0; i + 3 < c.p.Length; i += 2)
+                GridBuilder.Supercover(c.p[i], c.p[i + 1], c.p[i + 2], c.p[i + 3], C, R, (x, y) => sum[y * C + x] += shift);
+            c.line.level = want * eq;
+            moved++;
+        }
+        if (moved > 0 && !Fill(z, isFixed, sum, count, R, C)) return null;
 
         // ---- Form lines: half way between the contours round them ----
         // A closed form line is a small knoll, or a small hollow when it has a slope tick (2026-11-20, Anders: hollows
@@ -249,12 +296,76 @@ public static class RunContourField
         var fine = new TvHeights { cell = (float)res, minx = grid.minx, miny = grid.miny, cols = C, rows = R, h = new float[R * C] };
         for (int i = 0; i < z.Length; i++) fine.h[i] = (float)(z[i] - min);
         foreach (Line l in lines) if (l.solved) l.level -= min;
-        log?.Invoke($"{contours.Count} contours ({known} with known slope), {forms} form lines, {edges.Count} pairs, {C}x{R} cells");
+        log?.Invoke($"{contours.Count} contours ({knownSlope} with known slope, {nested} set by the ring round them, {moved} small rings moved to the ground round them), {forms} form lines, {edges.Count} pairs, {C}x{R} cells");
         return fine;
     }
 
-    // How much higher the 10 m heights are inside a large ring than on it (0 for a small ring)
-    static double RiseInside(TvHeights grid, double[] xy)
+    // A closed contour straight inside another, with no other contour between them, is one interval above it when
+    // both are hill rings (below when both are hollows), and at the same level when one is a hill and the other a
+    // hollow (a hollow on a hilltop). That is certain from the map alone, so it is put above what the solver found
+    // from its rays, which could put a small top ring below the ring round it and dig a hole in the top
+    // (2026-11-22, Anders: wanted the heights 100% right). Rings the rays never reached get their level this way too.
+    static int NestLevels(List<Contour> contours, double[] level, bool[] known, out bool[] certain, out bool[] hasInside)
+    {
+        certain = new bool[contours.Count + 1];
+        hasInside = new bool[contours.Count + 1];
+        var rings = new List<(Contour c, double area, double minX, double minY, double maxX, double maxY)>();
+        foreach (Contour c in contours)
+        {
+            if (!c.line.closed) continue;
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+            for (int i = 0; i + 1 < c.p.Length; i += 2)
+            {
+                minX = Math.Min(minX, c.p[i]); maxX = Math.Max(maxX, c.p[i]);
+                minY = Math.Min(minY, c.p[i + 1]); maxY = Math.Max(maxY, c.p[i + 1]);
+            }
+            rings.Add((c, Math.Abs(MapGeometry.SignedArea(c.p)), minX, minY, maxX, maxY));
+        }
+        // The smallest ring round each contour (round its first and middle points)
+        var parent = new int[contours.Count + 1];
+        foreach (Contour c in contours)
+        {
+            int n = c.p.Length / 2;
+            double x0 = c.p[0], y0 = c.p[1], x1 = c.p[(n / 2) * 2], y1 = c.p[(n / 2) * 2 + 1];
+            double ownArea = c.line.closed ? Math.Abs(MapGeometry.SignedArea(c.p)) : 0;
+            double best = double.MaxValue;
+            foreach (var r in rings)
+            {
+                if (r.c == c || r.area <= ownArea || r.area >= best) continue;
+                if (x0 < r.minX || x0 > r.maxX || y0 < r.minY || y0 > r.maxY || x1 < r.minX || x1 > r.maxX || y1 < r.minY || y1 > r.maxY) continue;
+                if (!Inside(r.c.p, x0, y0) || !Inside(r.c.p, x1, y1)) continue;
+                best = r.area;
+                parent[c.id] = r.c.id;
+            }
+        }
+        // A ring with an open contour (a contour cut by a cliff or the map's edge) inside it: what lies between is not known
+        var mixed = new bool[contours.Count + 1];
+        foreach (Contour c in contours)
+        {
+            if (parent[c.id] == 0) continue;
+            hasInside[parent[c.id]] = true;
+            if (!c.line.closed) mixed[parent[c.id]] = true;
+        }
+        for (int i = 1; i < level.Length; i++) if (known[i]) level[i] = Math.Round(level[i]);
+        rings.Sort((a, b) => b.area.CompareTo(a.area));
+        int set = 0;
+        foreach (var r in rings)
+        {
+            int pid = parent[r.c.id];
+            if (pid == 0 || !known[pid] || mixed[pid]) continue;
+            bool outerHollow = contours[pid - 1].line.hollow, hollow = r.c.line.hollow;
+            double want = level[pid] + (outerHollow == hollow ? (hollow ? -1 : 1) : 0);
+            certain[r.c.id] = true;
+            if (known[r.c.id] && level[r.c.id] == want) continue;
+            level[r.c.id] = want;
+            known[r.c.id] = true;
+            set++;
+        }
+        return set;
+    }
+
+    // How much higher the 10 m heights are inside a ring than on it; large: 25 m across or more
+    static double RiseInside(TvHeights grid, double[] xy, out bool large)
     {
         double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue, on = 0;
         int n = 0;
@@ -264,9 +375,10 @@ public static class RunContourField
             minY = Math.Min(minY, xy[i + 1]); maxY = Math.Max(maxY, xy[i + 1]);
             on += grid.At(xy[i], xy[i + 1]); n++;
         }
-        if (n == 0 || maxX - minX < 25 || maxY - minY < 25) return 0;
+        large = maxX - minX >= 25 && maxY - minY >= 25;
+        if (n == 0) return 0;
         on /= n;
-        double step = Math.Min(maxX - minX, maxY - minY) / 10, inside = 0;
+        double step = Math.Max(0.5, Math.Min(maxX - minX, maxY - minY) / 10), inside = 0;
         int m = 0;
         for (double y = minY + step * 0.5; y < maxY; y += step)
             for (double x = minX + step * 0.5; x < maxX; x += step)
@@ -317,6 +429,60 @@ public static class RunContourField
             if ((yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
         }
         return inside;
+    }
+
+    // The ground along a ring when the ring itself is not there: the fill redone in a window round it (the ring's own
+    // cells free, the rest as filled), averaged over the ring's cells; NaN when it can't be told
+    static double GroundWithout(double[] p, double[] z, bool[] isFixed, double[] sum, int[] count, int C, int R)
+    {
+        double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+        for (int i = 0; i + 1 < p.Length; i += 2)
+        {
+            minX = Math.Min(minX, p[i]); maxX = Math.Max(maxX, p[i]);
+            minY = Math.Min(minY, p[i + 1]); maxY = Math.Max(maxY, p[i + 1]);
+        }
+        const int Margin = 8;
+        int x0 = Math.Max(0, (int)minX - Margin), x1 = Math.Min(C - 1, (int)maxX + Margin);
+        int y0 = Math.Max(0, (int)minY - Margin), y1 = Math.Min(R - 1, (int)maxY + Margin);
+        int w = x1 - x0 + 1, h = y1 - y0 + 1;
+        if (w < 3 || h < 3 || (long)w * h > 20000) return double.NaN;
+        var own = new bool[w * h];
+        for (int i = 0; i + 3 < p.Length; i += 2)
+            GridBuilder.Supercover(p[i], p[i + 1], p[i + 2], p[i + 3], C, R, (x, y) =>
+            {
+                if (x >= x0 && x <= x1 && y >= y0 && y <= y1) own[(y - y0) * w + (x - x0)] = true;
+            });
+        var t = new double[w * h];
+        var held = new bool[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int k = y * w + x, g = (y + y0) * C + x + x0;
+                t[k] = z[g];
+                // The window's edge stays as filled; another line's cell stays fixed (a cell the ring shares with
+                // another line is let go)
+                bool edge = x == 0 || y == 0 || x == w - 1 || y == h - 1;
+                held[k] = edge || (isFixed[g] && !own[k]);
+            }
+        // Inside the ring there is nothing to hold the ground up any more: start it from the window's mean
+        double mean = 0;
+        int n = 0;
+        for (int k = 0; k < t.Length; k++) if (held[k]) { mean += t[k]; n++; }
+        if (n == 0) return double.NaN;
+        mean /= n;
+        for (int k = 0; k < t.Length; k++) if (!held[k]) t[k] = mean;
+        for (int it = 0; it < 150; it++)
+            for (int y = 1; y < h - 1; y++)
+                for (int x = 1; x < w - 1; x++)
+                {
+                    int k = y * w + x;
+                    if (held[k]) continue;
+                    t[k] += 1.8 * ((t[k - 1] + t[k + 1] + t[k - w] + t[k + w]) / 4 - t[k]);
+                }
+        double s = 0;
+        int m = 0;
+        for (int k = 0; k < t.Length; k++) if (own[k]) { s += t[k]; m++; }
+        return m == 0 ? double.NaN : s / m;
     }
 
     // Within reach metres of the line
