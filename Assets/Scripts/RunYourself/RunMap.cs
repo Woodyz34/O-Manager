@@ -156,8 +156,8 @@ public class RunMap : MonoBehaviour
         Part(cube, skin, hand, new Vector3(side * 0.042f, -0.008f, 0.016f), new Vector3(0.04f, 0.072f, 0.022f), Quaternion.Euler(0f, 0f, side * 8f));
         Part(cube, band, hand, new Vector3(side * 0.05f, -0.065f, 0.02f), new Vector3(0.056f, 0.012f, 0.036f), Quaternion.Euler(0f, side * -20f, side * 14f));
         Part(cube, sleeve, hand, new Vector3(side * 0.058f, -0.12f, 0.025f), new Vector3(0.06f, 0.1f, 0.04f), Quaternion.Euler(0f, side * -20f, side * 14f));
-        // The thumb on the front of the sheet, along the edge, pointing up
-        Part(capsule, skin, hand, new Vector3(-side * 0.004f, -0.006f, -0.008f), new Vector3(0.0145f, 0.027f, 0.012f), Quaternion.Euler(0f, 0f, side * 12f));
+        // The thumb on the front of the sheet, along the edge, pointing straight up the map like the compass on it
+        Part(capsule, skin, hand, new Vector3(-side * 0.004f, -0.006f, -0.008f), new Vector3(0.0145f, 0.027f, 0.012f), Quaternion.identity);
 
         if (withCompass) BuildCompass(hand, side);
         return hand;
@@ -180,14 +180,16 @@ public class RunMap : MonoBehaviour
         // The picture's own millimetre origin (the thumb's middle) is the pivot
         rect.pivot = new Vector2(RunCompassArt.OriginX / RunCompassArt.PlateW, RunCompassArt.OriginY / RunCompassArt.PlateH);
         // Drawn for the left thumb, the plate reaching in over the map; the right thumb wears the mirror image
-        rect.localScale = new Vector3(side < 0f ? 0.001f : -0.001f, 0.001f, 0.001f);
+        // 1.5 times the real size (2026-11-22, Anders: too small to read)
+        const float mm = 0.001f * CompassSize;
+        rect.localScale = new Vector3(side < 0f ? mm : -mm, mm, mm);
         // On the thumb (2026-11-20, Anders' photos of a real one): the strap round the thumb, the plate under its tip, the
-        // capsule beside the tip on the map, drawn over the thumb so the thumb shows through the clear plate
-        const float tilt = 12f;                                         // as the thumb leans
-        Quaternion turn = Quaternion.Euler(0f, 0f, side * tilt);
-        Vector3 along = turn * Vector3.up, across = turn * Vector3.right * -side;
-        rect.localPosition = new Vector3(-side * 0.004f, -0.006f, -0.024f) + along * 0.002f;   // the strap round the thumb, the capsule beside its tip
-        rect.localRotation = turn;
+        // capsule beside the tip on the map, drawn over the thumb so the thumb shows through the clear plate.
+        // Not turned with the thumb: the straight edge lies exactly along the leg, which runs straight up the map
+        // (2026-11-22, Anders: it was turned 12 degrees with the leaning thumb, so the edge pointed right of the
+        // control and he ran off to the right following it)
+        rect.localPosition = new Vector3(-side * 0.004f, -0.004f, -0.024f);
+        rect.localRotation = Quaternion.identity;
 
         // Always drawn last and over everything in the hand, the map and the thumb included
         canvas.overrideSorting = true;
@@ -203,6 +205,7 @@ public class RunMap : MonoBehaviour
         CourseUI.Place(needle, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(7f, 28f));
     }
 
+    const float CompassSize = 1.5f;
     static Material onTop;
 
     // The UI material without the depth test, so the compass is never cut by the sheet or the thumb
@@ -268,7 +271,8 @@ public class RunMap : MonoBehaviour
         Vector3 a = map.ToWorld(points[Leg]), b = map.ToWorld(points[Leg + 1]);
         lookAtTarget = (a + b) * 0.5f;
         // Turned so the leg runs from the bottom of the map to the top
-        float bearing = Bearing(points[Leg], points[Leg + 1]);
+        // (measured on the map picture itself, so the leg is exactly upright on the paper and along the compass edge)
+        float bearing = (b - a).sqrMagnitude > 1e-12f ? Mathf.Atan2(b.x - a.x, b.y - a.y) * Mathf.Rad2Deg : Bearing(points[Leg], points[Leg + 1]);
         turnTarget = turn + Mathf.DeltaAngle(turn, bearing);
         float length = (b - a).magnitude;
         sizeTarget = Mathf.Clamp(length * 0.5f * 1.3f + 90f * unitsPerMetre, minSize, maxSize);
@@ -368,7 +372,9 @@ public class RunMap : MonoBehaviour
         // you only see the map when you read it)
         Vector3 down = new Vector3(side * 0.14f, -0.46f, 0.26f), up = new Vector3(0f, -0.012f, 0.285f);
         Vector3 position = Vector3.Lerp(down, up, t) + new Vector3(0f, -Mathf.Sin(Mathf.PI * t) * 0.03f, Mathf.Sin(Mathf.PI * t) * 0.04f);
-        Quaternion rotation = Quaternion.Slerp(Quaternion.Euler(70f, side * 25f, side * -30f), Quaternion.Euler(10f, 0f, side * -1.5f), t);
+        // Held up, the map is not rolled at all: rolled, the leg on it leaned off straight ahead, and with the map
+        // oriented by the needle the runner ran that much off the leg (2026-11-22: 1.5 degrees, to the right in the left hand)
+        Quaternion rotation = Quaternion.Slerp(Quaternion.Euler(70f, side * 25f, side * -30f), Quaternion.Euler(10f, 0f, 0f), t);
 
         // The hand moves with the steps, and more the harder the running is
         float shake = player.Shake + player.Jolt * 0.6f;
@@ -390,11 +396,18 @@ public class RunMap : MonoBehaviour
             otherHand.localPosition = HandSpot(!rightHand) + new Vector3(0f, -(1f - g) * 0.25f, 0f);
         }
 
-        // The needle points to the real north, whichever way the map and the runner are turned
+        // The needle points to the real north, whichever way the map and the runner are turned: as on a map held flat in
+        // front of you, the top of the map ahead. (It used to take north straight through the upright map in front of
+        // the eyes, which bent the needle far over to the side whenever north was a little to the side ahead: the map
+        // could not be oriented by it, 2026-11-22.) North is `heading` degrees to the left of where the eyes look,
+        // so on the paper it is that much to the left of straight up; mirrored on the right thumb by the scale.
         if (needle != null)
         {
-            Vector3 north = needle.parent.InverseTransformDirection(Vector3.forward);
-            if (north.x * north.x + north.y * north.y > 1e-8f) needle.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(-north.x, north.y) * Mathf.Rad2Deg);
+            Vector3 f = player.cam.transform.forward;
+            float heading = Mathf.Atan2(f.x, f.z);
+            Vector3 onScreen = handCam.transform.TransformDirection(new Vector3(-Mathf.Sin(heading), Mathf.Cos(heading), 0f));
+            Vector3 north = needle.parent.InverseTransformVector(onScreen);
+            if (north.x * north.x + north.y * north.y > 1e-12f) needle.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(-north.x, north.y) * Mathf.Rad2Deg);
         }
     }
 
