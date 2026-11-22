@@ -145,6 +145,8 @@ public class AgentMovement : NetworkBehaviour
             // Om tävlingen avbryts mitt i ett lopp kan bom-coroutiner och rit-läget annars leva kvar in i lobbyn
             StopAllCoroutines();
             isWaiting = false;
+            routeSearchRunning = false;
+            findingControl = false;
             doingSlowMovingCoroutine = false;
             readingSlowUntil = -1f;
             if (originalBaseSpeed > 0f)
@@ -358,6 +360,7 @@ public class AgentMovement : NetworkBehaviour
     {
         path.Clear();
         path = newPath;
+        routeSearchRunning = false;   // a search for the old route is no longer wanted
         // A route that starts or ends on ground nobody can run on (the line was started a few metres from the control,
         // inside a building or a plot) would leave the runner standing still for good: its speed there is 0.
         // Those cells are left out; the runner runs straight from the control to the first open cell.
@@ -456,11 +459,7 @@ public class AgentMovement : NetworkBehaviour
                 && !(packRunning != null && packRunning.IsHanging)
                 && !(forestMistakes != null && forestMistakes.Blocking))
             {
-                Vector2Int controlCell = WorldToGridPositionCentered(pathfindingManager.controlPoints[currentKontroll].position);
-                if (path[path.Count - 1] != controlCell)
-                {
-                    path.Add(controlCell);
-                }
+                FinishRouteToControl();
             }
 
             if (relayHold || modeHold)
@@ -868,6 +867,97 @@ public class AgentMovement : NetworkBehaviour
     {
         float[,] grid = pathfindingManager.speedGrid2D;
         return c.y >= 0 && c.x >= 0 && c.y < grid.GetLength(0) && c.x < grid.GetLength(1) && grid[c.y, c.x] > 0.01f;
+    }
+
+    // The open cell nearest c (c itself when it is open), within maxRadius cells; (-1, -1) when there is none
+    public Vector2Int NearestOpenCell(Vector2Int c, int maxRadius = 60)
+    {
+        if (pathfindingManager == null || pathfindingManager.speedGrid2D == null) return new Vector2Int(-1, -1);
+        float[,] grid = pathfindingManager.speedGrid2D;
+        int rows = grid.GetLength(0), cols = grid.GetLength(1);
+        c = new Vector2Int(Mathf.Clamp(c.x, 0, cols - 1), Mathf.Clamp(c.y, 0, rows - 1));
+        if (grid[c.y, c.x] > 0.01f) return c;
+        Vector2Int best = new Vector2Int(-1, -1);
+        int bestDistance = int.MaxValue;
+        for (int r = 1; r <= maxRadius; r++)
+        {
+            // A cell on ring r is at least r cells away: nothing further out can beat what is found by then
+            if (bestDistance <= r * r) break;
+            for (int dy = -r; dy <= r; dy++)
+            {
+                int y = c.y + dy;
+                if (y < 0 || y >= rows) continue;
+                int step = (dy == -r || dy == r) ? 1 : 2 * r;   // the top and bottom rows whole, the sides only at the edge
+                for (int dx = -r; dx <= r; dx += step)
+                {
+                    int x = c.x + dx;
+                    if (x < 0 || x >= cols || grid[y, x] <= 0.01f) continue;
+                    int d = dx * dx + dy * dy;
+                    if (d < bestDistance) { bestDistance = d; best = new Vector2Int(x, y); }
+                }
+            }
+        }
+        return best;
+    }
+
+    // Is every cell on the straight line from a to b open?
+    bool StraightLineOpen(Vector2Int a, Vector2Int b)
+    {
+        int steps = Mathf.Max(Mathf.Abs(b.x - a.x), Mathf.Abs(b.y - a.y));
+        for (int s = 1; s <= steps; s++)
+        {
+            float t = (float)s / steps;
+            Vector2Int cell = new Vector2Int(Mathf.RoundToInt(Mathf.Lerp(a.x, b.x, t)), Mathf.RoundToInt(Mathf.Lerp(a.y, b.y, t)));
+            if (!OpenCell(cell)) return false;
+        }
+        return true;
+    }
+
+    // ---- The route ran out before the control (2026-11-22) ----
+    // Before, the control's cell was simply added to the route, and the runner ran a straight line to it however far it
+    // was: over a lake, through houses, at the speed of the one cell it left from (that is why it was slow). A short
+    // open gap (the drawn line ending a few cells from the flag) is still run straight; anything else gets a real route.
+    bool routeSearchRunning;
+
+    void FinishRouteToControl()
+    {
+        if (routeSearchRunning) return;
+        Vector2Int controlCell = WorldToGridPositionCentered(pathfindingManager.controlPoints[currentKontroll].position);
+        Vector2Int end = path[path.Count - 1];
+        if (end == controlCell) return;
+        if (Mathf.Max(Mathf.Abs(end.x - controlCell.x), Mathf.Abs(end.y - controlCell.y)) <= 3 && StraightLineOpen(end, controlCell))
+        {
+            path.Add(controlCell);
+            return;
+        }
+        StartCoroutine(RouteToControlRoutine(currentKontroll));
+    }
+
+    IEnumerator RouteToControlRoutine(int control)
+    {
+        routeSearchRunning = true;
+        Vector2Int here = WorldToGridPositionCentered(transform.position);
+        Vector2Int controlCell = WorldToGridPositionCentered(pathfindingManager.controlPoints[control].position);
+        List<Vector2Int> result = null;
+        yield return StartCoroutine(CalculatePathAsync(here, controlCell, r => result = r, true));
+        routeSearchRunning = false;
+        // Punched, finished or given a new route meanwhile
+        if (control != currentKontroll || hasFinished || path == null || currentTargetIndex < path.Count) yield break;
+        if (result == null || result.Count == 0)
+        {
+            // No way there over open ground at all (should not happen on a checked course): the old straight line
+            Debug.LogWarning("AgentMovement: no route from " + here + " to control " + control + ", running straight to it");
+            result = new List<Vector2Int> { here, controlCell };
+        }
+        else if (result[result.Count - 1] != controlCell && OpenCell(controlCell))
+        {
+            result.Add(controlCell);
+        }
+        path = result;
+        ComputeTurns();
+        currentTargetIndex = 0;
+        currentTargetPosition = GridToWorldPosition(path[0]);
+        lastGridCell = OpenCell(here) ? here : path[0];
     }
 
     // The turns along a new path. The direction in and out of each cell is measured over about 20 m, so the zigzag
@@ -1343,6 +1433,17 @@ public class AgentMovement : NetworkBehaviour
         Vector2Int startCell = WorldToGridPositionCentered(transform.position);
         Vector2Int missCell = WorldToGridPositionCentered(missPoint);
         Vector2Int controlCell = WorldToGridPositionCentered(controlPos2);
+        // The miss point can land in a lake beside the control: look round on the nearest dry ground instead
+        Vector2Int openMiss = NearestOpenCell(missCell, 12);
+        Vector2Int openStart = NearestOpenCell(startCell, 12);
+        if (openMiss.x < 0 || openStart.x < 0)
+        {
+            isDrawMissing = false;
+            hasDoneADrawCloseMiss = true;
+            yield break;
+        }
+        missCell = openMiss;
+        startCell = openStart;
 
         // Kör båda A*-sökningarna i en bakgrundstråd så att spelet inte hackar till mitt i löpningen.
         // Agenten står still (isWaiting) de få bildrutor sökningen tar.
@@ -1385,8 +1486,12 @@ public class AgentMovement : NetworkBehaviour
         }
         else
         {
+            // No way to the miss point: no miss this time. (It used to run straight to the miss point and on to the
+            // control, over a lake if one was in the way.) The runner goes on along its route.
             Debug.LogWarning("MissPath kunde inte genereras med A*");
-            path = new List<Vector2Int> { missCell, controlCell };
+            isDrawMissing = false;
+            hasDoneADrawCloseMiss = true;
+            yield break;
         }
 
         currentTargetIndex = 0;
@@ -1403,6 +1508,13 @@ public class AgentMovement : NetworkBehaviour
         {
             start = WorldToGridPositionCentered(transform.position);
         }
+        // A search from or to ground nobody can run on (in a lake, on its black shore line) finds nothing: every
+        // neighbour is closed. The runner then walked a straight line to the control, slowly, right over the lake
+        // (2026-11-22). Search from and to the nearest open cells instead.
+        Vector2Int openStart = NearestOpenCell(start);
+        Vector2Int openGoal = NearestOpenCell(goal);
+        if (openStart.x >= 0) start = openStart;
+        if (openGoal.x >= 0) goal = openGoal;
         List<Vector2Int> result = null;
         bool done = false;
 
@@ -1772,11 +1884,14 @@ public class AgentMovement : NetworkBehaviour
         }
         if (newPath == null || newPath.Count == 0)
         {
+            Debug.LogWarning("AgentMovement: no route to control " + currentKontroll + " after letting go, running straight to it");
             newPath = new List<Vector2Int> { WorldToGridPositionCentered(transform.position), controlCell };
         }
         path = newPath;
+        ComputeTurns();
         currentTargetIndex = 0;
         currentTargetPosition = GridToWorldPosition(path[0]);
+        lastGridCell = path[0];
     }
 
     // Puts the runner on the start of a new relay leg, ready to draw
@@ -1784,6 +1899,7 @@ public class AgentMovement : NetworkBehaviour
     {
         StopAllCoroutines();
         findingControl = false;
+        routeSearchRunning = false;
         doingSlowMovingCoroutine = false;
         isWaiting = false;
         relayHold = false;
