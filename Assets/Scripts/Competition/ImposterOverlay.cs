@@ -157,8 +157,8 @@ public class ImposterOverlay : MonoBehaviour
             smallText.text = "SECRET TASK";
             bigText.text = amImposter ? "YOU ARE THE IMPOSTER" : "YOUR SECRET TASK";
             detailText.text = amImposter
-                ? "Everyone else got a secret task, but nobody told you what it is. Watch how they run and blend in."
-                : SecretTasks.Text(task) + "\nOne of you doesn't know the task. Spot who!";
+                ? "Everyone else got a secret task, but nobody told you what it is. Watch how they run and blend in. If you get caught, you get one guess at the task: guess right and you still win."
+                : SecretTasks.Text(task) + "\nOne of you doesn't know the task. Spot who, but don't make it too obvious: a caught imposter who guesses the task wins.";
         }
         else
         {
@@ -259,6 +259,44 @@ public class ImposterOverlay : MonoBehaviour
         detailText.text = result.detail;
         yield return FadeText(detailText, 0f, 0.9f, 0.4f);
         yield return FlickerHold(bigText, 2.4f);
+
+        yield return Fade(stageGroup, 1f, 0f, 0.7f);
+        stage.SetActive(false);
+    }
+
+    // Secret task mode, after a caught imposter has guessed: the task is shown, and who won
+    public IEnumerator PlayTaskVerdict(string taskName, bool imposterWins, string detail)
+    {
+        ResetStage();
+        pulseSpeed = 1f;
+        pulseStrength = 0.35f;
+        smallText.text = "THE TASK WAS";
+        bigText.text = taskName.ToUpperInvariant();
+        bigText.color = boneColor;
+        // A task name is longer than a player name, so let it shrink to fit
+        if (!bigText.enableAutoSizing)
+        {
+            bigText.fontSizeMax = bigText.fontSize;
+            bigText.fontSizeMin = Mathf.Min(36f, bigText.fontSize);
+            bigText.enableAutoSizing = true;
+        }
+
+        yield return Fade(stageGroup, 0f, 1f, 0.5f);
+        yield return Flicker(smallText, 0.5f);
+        StartCoroutine(Shake(0.35f, 16f));
+        yield return SlamIn(bigText, 0.28f);
+        yield return new WaitForSecondsRealtime(0.7f);
+
+        verdictText.text = imposterWins ? "THE IMPOSTER WINS!" : "THE IMPOSTER LOSES!";
+        verdictText.color = imposterWins ? bloodColor : escapeColor;
+        pulseSpeed = imposterWins ? 1.6f : 0.8f;
+        pulseStrength = imposterWins ? 0.65f : 0.3f;
+        if (imposterWins) StartCoroutine(FlashRoutine(0.5f, 0.35f));
+        StartCoroutine(Shake(0.3f, 12f));
+        yield return SlamIn(verdictText, 0.25f);
+        detailText.text = detail;
+        yield return FadeText(detailText, 0f, 0.9f, 0.4f);
+        yield return FlickerHold(bigText, 2.6f);
 
         yield return Fade(stageGroup, 1f, 0f, 0.7f);
         stage.SetActive(false);

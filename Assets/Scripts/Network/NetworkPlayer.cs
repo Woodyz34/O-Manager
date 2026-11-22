@@ -83,6 +83,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public bool hasGuessedImposter { get; set; }
     // Secret task mode: the task everyone but the imposter has, set by the host (SecretTasks; 0 = none)
     [Networked] public int secretTask { get; set; }
+    // Secret task mode: a caught imposter's guess at the task, set on the imposter's own player
+    // (0 = not guessed yet, -1 = ran out of time, otherwise a SecretTasks.Task)
+    [Networked] public int secretTaskGuess { get; set; }
 
     // The host's lobby choices, published on the host's own player so everyone can see them
     [Networked] public NetworkString<_128> lobbyGameMode { get; set; }
@@ -960,6 +963,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             ClearRelayResults();
             hasGuessedImposter = false;
             imposterGuess = PlayerRef.None;
+            secretTaskGuess = 0;
             ClearModeChoices();
 
             InitializeAfterSceneLoad();
@@ -984,6 +988,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                 imposterGuess = PlayerRef.None;
                 hasGuessedImposter = false;
                 secretTask = 0;
+                secretTaskGuess = 0;
                 competitionModes = 0;
                 ClearModeChoices();
                 agentMovement.NetPosition = spawnPosition;
