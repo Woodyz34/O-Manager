@@ -68,6 +68,11 @@ public static class RunContourField
             if (cid == 0 || !contours[cid - 1].line.closed) continue;
             contours[cid - 1].line.hollow = true;
         }
+        // A tick carries no direction here, and a tick by a large ring can belong to the hill's own outside or to the
+        // contour next to it. The map import knew the ticks' directions and its 10 m heights clearly show a hill
+        // inside: then it is a hill (2026-11-22: on Stora Stöeryd whole hillsides of 300 m sank into hollows)
+        foreach (Contour c in contours)
+            if (c.line.hollow && grid.h != null && RiseInside(grid, c.line.xy) > 1.5) c.line.hollow = false;
         foreach (Contour c in contours)
         {
             if (c.line.closed)
@@ -199,6 +204,9 @@ public static class RunContourField
             foreach (double[] t in ticks)
                 if (NearLine(l.xy, t[0], t[1], 2.5)) { l.hollow = true; break; }
         }
+        var rings = new List<Ring>();
+        foreach (Contour c in contours)
+            if (c.line.closed && c.line.solved) rings.Add(new Ring(c.line));
         int forms = 0;
         foreach (Line l in lines)
         {
@@ -214,7 +222,17 @@ public static class RunContourField
             }
             if (n == 0) continue;
             m /= n;
-            if (l.closed && l.hollow) l.level = (Math.Ceiling(m / eq - 0.02) - 0.5) * eq;
+            // Inside a closed contour the ground is above its level for a hill, below for a hollow, so the form line
+            // is half a contour above (or below) it, or further when it lies above a contour drawn in part inside.
+            // The fill's own height is not trusted there: where two contours run close it sinks below the ring's
+            // level, and a knoll's form line on a hilltop was put half a contour down, digging a hollow round the
+            // top (2026-11-22, Anders: a hill with a rim, a big hollow and a small knoll in the middle).
+            Line ring = Enclosing(rings, l.xy);
+            if (ring != null && !ring.hollow)
+                l.level = ring.level + (Math.Max(0, Math.Floor((m - ring.level) / eq + 0.1)) + 0.5) * eq;
+            else if (ring != null)
+                l.level = ring.level - (Math.Max(0, Math.Floor((ring.level - m) / eq + 0.1)) + 0.5) * eq;
+            else if (l.closed && l.hollow) l.level = (Math.Ceiling(m / eq - 0.02) - 0.5) * eq;
             else if (l.closed) l.level = (Math.Floor(m / eq + 0.02) + 0.5) * eq;
             else l.level = (Math.Floor(m / eq) + 0.5) * eq;
             l.solved = true;
@@ -233,6 +251,72 @@ public static class RunContourField
         foreach (Line l in lines) if (l.solved) l.level -= min;
         log?.Invoke($"{contours.Count} contours ({known} with known slope), {forms} form lines, {edges.Count} pairs, {C}x{R} cells");
         return fine;
+    }
+
+    // How much higher the 10 m heights are inside a large ring than on it (0 for a small ring)
+    static double RiseInside(TvHeights grid, double[] xy)
+    {
+        double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue, on = 0;
+        int n = 0;
+        for (int i = 0; i + 1 < xy.Length; i += 2)
+        {
+            minX = Math.Min(minX, xy[i]); maxX = Math.Max(maxX, xy[i]);
+            minY = Math.Min(minY, xy[i + 1]); maxY = Math.Max(maxY, xy[i + 1]);
+            on += grid.At(xy[i], xy[i + 1]); n++;
+        }
+        if (n == 0 || maxX - minX < 25 || maxY - minY < 25) return 0;
+        on /= n;
+        double step = Math.Min(maxX - minX, maxY - minY) / 10, inside = 0;
+        int m = 0;
+        for (double y = minY + step * 0.5; y < maxY; y += step)
+            for (double x = minX + step * 0.5; x < maxX; x += step)
+                if (Inside(xy, x, y)) { inside += grid.At(x, y); m++; }
+        return m == 0 ? 0 : inside / m - on;
+    }
+
+    class Ring
+    {
+        public Line line;
+        public double area, minX, minY, maxX, maxY;
+        public Ring(Line l)
+        {
+            line = l;
+            area = Math.Abs(MapGeometry.SignedArea(l.xy));
+            minX = minY = double.MaxValue; maxX = maxY = double.MinValue;
+            for (int i = 0; i + 1 < l.xy.Length; i += 2)
+            {
+                minX = Math.Min(minX, l.xy[i]); maxX = Math.Max(maxX, l.xy[i]);
+                minY = Math.Min(minY, l.xy[i + 1]); maxY = Math.Max(maxY, l.xy[i + 1]);
+            }
+        }
+    }
+
+    // The smallest closed contour round a line (round its first and middle points), or null
+    static Line Enclosing(List<Ring> rings, double[] xy)
+    {
+        int n = xy.Length / 2;
+        double x0 = xy[0], y0 = xy[1], x1 = xy[(n / 2) * 2], y1 = xy[(n / 2) * 2 + 1];
+        Ring best = null;
+        foreach (Ring r in rings)
+        {
+            if (best != null && r.area >= best.area) continue;
+            if (x0 < r.minX || x0 > r.maxX || y0 < r.minY || y0 > r.maxY || x1 < r.minX || x1 > r.maxX || y1 < r.minY || y1 > r.maxY) continue;
+            if (!Inside(r.line.xy, x0, y0) || !Inside(r.line.xy, x1, y1)) continue;
+            best = r;
+        }
+        return best?.line;
+    }
+
+    static bool Inside(double[] p, double x, double y)
+    {
+        bool inside = false;
+        int n = p.Length / 2;
+        for (int i = 0, j = n - 1; i < n; j = i++)
+        {
+            double xi = p[2 * i], yi = p[2 * i + 1], xj = p[2 * j], yj = p[2 * j + 1];
+            if ((yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+        }
+        return inside;
     }
 
     // Within reach metres of the line
@@ -310,10 +394,29 @@ public static class RunContourField
         // A contour is often drawn as several lines (cut at a tick, a text or a cliff): joined end to end again, so a
         // ring round a knoll or a hollow is known as closed (2026-11-20, as ContourHeights does at the import)
         foreach (double[] p in ContourHeights.StitchContours(contours, 1.0))
-            list.Add(new Line { xy = p, closed = MapGeometry.IsClosed(p, 1.5) });
+            list.Add(new Line { xy = CloseSmallGap(p, out bool closed), closed = closed });
         foreach (double[] p in ContourHeights.StitchContours(forms, 1.0))
-            list.Add(new Line { xy = p, closed = MapGeometry.IsClosed(p, 1.5), formLine = true });
+            list.Add(new Line { xy = CloseSmallGap(p, out bool closed), closed = closed, formLine = true });
         return list;
+    }
+
+    // A ring the mapper left with a small gap between its ends (2026-11-22, Anders: a hill on Nya Slogebo became a
+    // rim round a big hollow: the form line on its top had a 1.7 m gap, so it was read as an open line on flat ground
+    // and put half a contour below the top). The gap is closed when it is small next to the ring.
+    static double[] CloseSmallGap(double[] p, out bool closed)
+    {
+        closed = MapGeometry.IsClosed(p, 1.5);
+        int n = p.Length / 2;
+        if (closed || n < 4) return p;
+        double length = 0;
+        for (int i = 0; i + 3 < p.Length; i += 2) length += MapGeometry.Dist(p[i], p[i + 1], p[i + 2], p[i + 3]);
+        double gap = MapGeometry.Dist(p[0], p[1], p[2 * n - 2], p[2 * n - 1]);
+        if (gap > Math.Min(8.0, Math.Max(1.5, 0.12 * length)) || length < 4 * gap) return p;
+        closed = true;
+        var q = new double[p.Length + 2];
+        Array.Copy(p, q, p.Length);
+        q[p.Length] = p[0]; q[p.Length + 1] = p[1];
+        return q;
     }
 
     // Slope ticks: points of the contour and form line symbols with a sub-number (101.1, 103.1): x, y, and 1 for a
@@ -326,7 +429,9 @@ public static class RunContourField
         {
             if (code.Length < 6 || xy.Count < 2) continue;
             string major = code.Substring(0, 3);
-            if ((major == "101" || major == "102" || major == "103") && code.Substring(3, 3) != "000")
+            // Any point of the contour symbols is a tick: most maps number it 101.1 or 103.1, but some (Stora Stöeryd,
+            // Ängaryd) draw it as a point of 101.0 itself, and those ticks were not read before (2026-11-22)
+            if (major == "101" || major == "102" || major == "103")
                 list.Add(new[] { xy[0], xy[1], major == "103" ? 1.0 : 0.0 });
         }
         return list;

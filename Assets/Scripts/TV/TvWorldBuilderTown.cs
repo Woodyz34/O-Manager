@@ -515,6 +515,23 @@ public partial class TvWorldBuilder
         });
     }
 
+    // The 2D race shuts this spot (a wall, a fence, the course's tape or out-of-bounds): only known when the world is
+    // built for running (RunYourself), else false
+    bool ShutAt(float x, float z) => input.passable != null && input.passable.sprint && input.passable.Closed(input.centerE + x, input.centerN + z);
+
+    // A car's place (4.6 x 1.9 m along the street's edge, which is towards (ex, ez)) and a metre round it on the
+    // street's side are all open paving
+    bool RoomForCar(float x, float z, float ex, float ez)
+    {
+        for (float a = -3.3f; a <= 3.31f; a += 1.1f)
+            for (float c = -2.1f; c <= 0.51f; c += 0.65f)
+            {
+                float px = x - ez * a + ex * c, pz = z + ex * a + ez * c;
+                if (Base(CellAt(px, pz)) != WorldCell.Paved || ShutAt(px, pz)) return false;
+            }
+        return true;
+    }
+
     // ---- Streets: what stands on them, and the bridges, tunnels, stairs and canopies ----
 
     void TownStreets()
@@ -552,7 +569,7 @@ public partial class TvWorldBuilder
                     for (float s = 0.7f; s < 14f; s += 0.7f)
                     {
                         int b = Base(CellAt(x + dx * s, z + dz * s));
-                        if (b != WorldCell.Paved)
+                        if (b != WorldCell.Paved || ShutAt(x + dx * s, z + dz * s))
                         {
                             d[k] = s;
                             hitHouse[k] = b == WorldCell.Building;
@@ -635,7 +652,11 @@ public partial class TvWorldBuilder
                         Mark(x, z, 0.5f, 2);
                         continue;
                     }
-                    if (!Old && !wall && across >= 8f && h > 0.82f && h < 0.95f && FarFrom(x, z, 7f, 3) && Free(x, z, 3f))
+                    // A parked car only where the street is wide and open: at least 6 m free beside it, and nothing
+                    // the runner can't pass (a wall, a fence, tape) under it (2026-11-22, Anders: a car blocked a
+                    // narrow paved way between walls and tape, so nobody got past)
+                    if (!Old && !wall && across >= 10f && d[(minDir + 4) % 8] >= 6f && h > 0.82f && h < 0.95f && FarFrom(x, z, 7f, 3) && Free(x, z, 3f)
+                        && RoomForCar(x, z, ex, ez))
                     {
                         townThingMesh.Add(Shape(Thing.Car, look % 12, style), x, y, z, 1f, 1f, 1f, alongEdge + (h2 < 0.5f ? 0f : (float)Math.PI));
                         foreach (float s in new[] { -1.4f, 0f, 1.4f })

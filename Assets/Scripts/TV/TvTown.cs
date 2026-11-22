@@ -46,6 +46,8 @@ public class TvTown
             PairSides(town.tunnels, town.tunnelWidths);
         }
         catch (Exception) { }
+        try { town.PathsOverWater(layer); }
+        catch (Exception) { }
         try { town.Landmarks(layer); }
         catch (Exception) { }
         return town;
@@ -86,11 +88,82 @@ public class TvTown
                     case 1: bridges.Add(xy); break;
                     case 2: tunnels.Add(xy); break;
                     case 3: stairs.Add(xy); stairWidths.Add(Footprint(name)); break;
+                    case 5: paths.Add((xy, Footprint(name))); break;
                     case 4:
                         if (xy.Length >= 8 && Math.Abs(xy[0] - xy[xy.Length - 2]) < 0.6f && Math.Abs(xy[1] - xy[xy.Length - 1]) < 0.6f) canopies.Add(xy);
                         else canopyPieces.Add(xy);
                         break;
                 }
+            }
+        }
+    }
+
+    // The paths and roads, with their width when the symbol says it (0 = not said)
+    public readonly List<(float[] xy, float width)> paths = new List<(float[], float)>();
+
+    // A path drawn straight over water is a bridge (2026-11-22, Anders: on Tranås a footbridge drawn as a paved path
+    // between two high fences, without the bridge symbol, was water in 3D and nobody got over it). Where a path runs
+    // at least 3 m over water with land at both ends, that stretch becomes a bridge. Made when the world loads, so
+    // the maps need not be imported again.
+    void PathsOverWater(WorldLayer layer)
+    {
+        const float Step = 1f;
+        int before = bridges.Count;
+        foreach (var (xy, width) in paths)
+        {
+            // Points every metre along the line, and whether each is over water
+            var pts = new List<float>();
+            var wet = new List<bool>();
+            for (int i = 0; i + 3 < xy.Length; i += 2)
+            {
+                float ax = xy[i], az = xy[i + 1], bx = xy[i + 2], bz = xy[i + 3];
+                float len = (float)Math.Sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
+                int k = Math.Max(1, (int)Math.Ceiling(len / Step));
+                for (int j = (i == 0 ? 0 : 1); j <= k; j++)
+                {
+                    float t = j / (float)k, x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+                    pts.Add(x); pts.Add(z);
+                    wet.Add((layer.At(x, z) & WorldCell.BaseMask) == WorldCell.Water);
+                }
+            }
+            int at = 0;
+            while (at < wet.Count)
+            {
+                if (!wet[at]) { at++; continue; }
+                int first = at;
+                while (at < wet.Count && wet[at]) at++;
+                int last = at - 1;
+                // Land at both ends of the line, and long enough not to be a path along a shore
+                if (first == 0 || at >= wet.Count || last - first + 1 < 3) continue;
+                int from = first - 1, to = at;
+                float mx = (pts[2 * from] + pts[2 * to]) / 2f, mz = (pts[2 * from + 1] + pts[2 * to + 1]) / 2f;
+                bool known = false;
+                for (int b = 0; b < before && !known; b++)
+                {
+                    float[] o = bridges[b];
+                    for (int q = 0; q + 1 < o.Length; q += 2)
+                        if (Math.Abs(o[q] - mx) < 8f && Math.Abs(o[q + 1] - mz) < 8f) { known = true; break; }
+                }
+                if (known) continue;
+                // A metre onto the land at each end, so the deck meets the ground
+                int a0 = Math.Max(0, from - 1), a1 = Math.Min(wet.Count - 1, to + 1);
+                // The points where the line bends (within 0.3 m), not one every metre
+                var deck = new List<float> { pts[2 * a0], pts[2 * a0 + 1] };
+                int kept = a0;
+                for (int j = a0 + 1; j < a1; j++)
+                {
+                    float kx = pts[2 * kept], kz = pts[2 * kept + 1], nx = pts[2 * j + 2], nz = pts[2 * j + 3];
+                    float dx = nx - kx, dz = nz - kz, l = (float)Math.Sqrt(dx * dx + dz * dz);
+                    bool bends = false;
+                    for (int m = kept + 1; m <= j && !bends; m++)
+                        bends = l > 1e-3f && Math.Abs((pts[2 * m] - kx) * dz - (pts[2 * m + 1] - kz) * dx) / l > 0.3f;
+                    if (!bends) continue;
+                    deck.Add(pts[2 * j]); deck.Add(pts[2 * j + 1]);
+                    kept = j;
+                }
+                deck.Add(pts[2 * a1]); deck.Add(pts[2 * a1 + 1]);
+                bridges.Add(deck.ToArray());
+                bridgeWidths.Add(width > 0.5f ? width : 0f);
             }
         }
     }
@@ -200,6 +273,10 @@ public class TvTown
         if (n.Contains("skärmtak") || n.Contains("canopy")) return 4;
         if ((code == 532 && (n.Contains("stair") || n.Contains("trapp"))) || (n.Contains("trappa") && !n.Contains("kontur")) || (n.Contains("stairway") && !n.Contains("edge")))
             return 3;
+        // A path or road (paved paths are drawn as lines of 501 too, but not the edges and steps of a paved area)
+        if (code >= 502 && code <= 507) return 5;
+        if (code == 501 && (n.Contains("stig") || n.Contains("footprint") || n.Contains("path") || n.Contains("väg"))
+            && !n.Contains("kontur") && !n.Contains("edge") && !n.Contains("step") && !n.Contains("kant")) return 5;
         return 0;
     }
 
