@@ -515,7 +515,7 @@ public class ContestReplay : MonoBehaviour
         {
             ChoiceRoute route = shownLeg.routes[i];
             string colourName = RouteChoiceGame.ColourNames[Mathf.Clamp(route.colour, 0, RouteChoiceGame.ColourNames.Length - 1)];
-            string head = "<b>" + colourName + "</b>  " + (i == shownLeg.fastest ? "fastest" : "+" + Mathf.RoundToInt(route.seconds - best) + " s");
+            string head = "<b>" + colourName + "</b>  " + (i == shownLeg.fastest ? "fastest" : "+" + RelayStats.Gap(route.seconds - best));
             List<string> who = new List<string>();
             foreach (Runner r in runners)
             {

@@ -36,7 +36,7 @@ public class RelayTeamResult
 //   reference on a split = the average of the fastest 25 % of the split times (the teams that ran the same split)
 //   performance index on a split = split time / reference
 //   the runner's normal performance = the median of their indices over the leg, weighted by the length of the splits
-//     (the reference time is used for the length)
+//     (the reference time is used for the length), or the plain median when that is lower (few splits, see below)
 //   expected split time = reference x normal performance;  time lost = split time - expected split time
 //   a split counts as a mistake when the time lost is more than 30 seconds and more than 25 % (WinSplits' defaults)
 // With only one team on a split there is nothing to compare with, so nothing is marked.
@@ -152,7 +152,11 @@ public static class RelayStats
                 weights.Add(reference[i, c]);
             }
             if (indices.Count == 0) continue;
-            float normal = WeightedMedian(indices, weights);
+            // The weighted median alone failed with few splits (2026-11-22, the user: 26 min on a long first split vs 8 min
+            // for the other runner gave 0:00): that one long split carried over half the weight, so the mistake itself
+            // became the runner's normal pace. The plain median is used when it is lower, so one bad split can never
+            // make itself look normal.
+            float normal = Mathf.Min(WeightedMedian(indices, weights), LowerMedian(indices));
             for (int c = 1; c < points; c++)
             {
                 if (reference[i, c] <= 0f) continue;
@@ -166,6 +170,14 @@ public static class RelayStats
                 }
             }
         }
+    }
+
+    // The median; with an even number of values the lower of the two middle ones
+    static float LowerMedian(List<float> values)
+    {
+        List<float> sorted = new List<float>(values);
+        sorted.Sort();
+        return sorted[(sorted.Count - 1) / 2];
     }
 
     static float WeightedMedian(List<float> values, List<float> weights)
@@ -224,6 +236,13 @@ public static class RelayStats
     public static string Time(int seconds)
     {
         return CompetitionFlow.FormatTime(Mathf.Max(0, seconds));
+    }
+
+    // A time difference: "42 s" under a minute, "1:10" from a minute up (2026-11-22, the user: 70 s is hard to read)
+    public static string Gap(float seconds)
+    {
+        int s = Mathf.Max(0, Mathf.RoundToInt(seconds));
+        return s < 60 ? s + " s" : s / 60 + ":" + (s % 60).ToString("00");
     }
 }
 
