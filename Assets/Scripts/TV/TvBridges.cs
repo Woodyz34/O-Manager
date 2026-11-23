@@ -35,9 +35,9 @@ public static class TvBridges
     static bool IsWater(WorldLayer layer, float x, float z) => (layer.At(x, z) & WorldCell.BaseMask) == WorldCell.Water;
 
     // Over water: the cell itself, or the cells just beyond the path on both sides (a narrow land strip under it)
-    static bool Wet(WorldLayer layer, float x, float z, float nx, float nz, float half)
+    static bool Wet(WorldLayer layer, float x, float z, float nx, float nz, float half, bool sidesOnly = false)
     {
-        if (IsWater(layer, x, z)) return true;
+        if (!sidesOnly && IsWater(layer, x, z)) return true;
         float s = half + 1.6f, s2 = s + 1.4f;
         return (IsWater(layer, x + nx * s, z + nz * s) || IsWater(layer, x + nx * s2, z + nz * s2))
                && (IsWater(layer, x - nx * s, z - nz * s) || IsWater(layer, x - nx * s2, z - nz * s2));
@@ -102,14 +102,18 @@ public static class TvBridges
             switch (l.kind)
             {
                 case WorldLineKind.Fence: case WorldLineKind.HighFence: case WorldLineKind.Wall: case WorldLineKind.HighWall:
+                case WorldLineKind.Barrier:
                     break;
                 default:
                     continue;
             }
+            // The fifth number: 1 for an uncrossable water's edge (a narrow strip of land between two of them is a
+            // footbridge the map draws too thin to see, ISSprOM 2019 draws small footbridges like that)
+            float edge = l.kind == WorldLineKind.Barrier ? 1f : 0f;
             for (int i = 0; i + 3 < l.xy.Length; i += 2)
             {
                 float sx = l.xy[i + 2] - l.xy[i], sz = l.xy[i + 3] - l.xy[i + 1];
-                if (sx * sx + sz * sz >= 16f) segs.Add(new[] { l.xy[i], l.xy[i + 1], l.xy[i + 2], l.xy[i + 3] });
+                if (sx * sx + sz * sz >= 16f) segs.Add(new[] { l.xy[i], l.xy[i + 1], l.xy[i + 2], l.xy[i + 3], edge });
             }
         }
         for (int a = 0; a < segs.Count; a++)
@@ -121,16 +125,18 @@ public static class TvBridges
             {
                 float[] B = segs[b];
                 float bdx = B[2] - B[0], bdz = B[3] - B[1], bl = (float)Math.Sqrt(bdx * bdx + bdz * bdz);
-                if (Math.Abs((bdx * ux + bdz * uz) / bl) < 0.97f) continue;
+                if (A[4] != B[4] || Math.Abs((bdx * ux + bdz * uz) / bl) < 0.97f) continue;
+                bool shores = A[4] > 0f;
                 float c0 = (B[0] - ax) * nx + (B[1] - az) * nz, c1 = (B[2] - ax) * nx + (B[3] - az) * nz;
                 float gap = (c0 + c1) / 2f;
-                if (Math.Abs(gap) < 1f || Math.Abs(gap) > 6f || Math.Abs(c0 - c1) > 1f) continue;
+                if (Math.Abs(gap) < (shores ? 0.3f : 1f) || Math.Abs(gap) > (shores ? 3f : 6f) || Math.Abs(c0 - c1) > 1f) continue;
                 float t0 = (B[0] - ax) * ux + (B[1] - az) * uz, t1 = (B[2] - ax) * ux + (B[3] - az) * uz;
                 float lo = Math.Max(0f, Math.Min(t0, t1)), hi = Math.Min(al, Math.Max(t0, t1));
                 if (hi - lo < 4f) continue;
                 float half = Math.Abs(gap) / 2f;
                 float mx0 = ax + nx * gap / 2f, mz0 = az + nz * gap / 2f;
-                bool WetAt(float t) => Wet(layer, mx0 + ux * t, mz0 + uz * t, nx, nz, half);
+                // (between two water's edges: water on both sides, not a narrow channel of water between two shores)
+                bool WetAt(float t) => Wet(layer, mx0 + ux * t, mz0 + uz * t, nx, nz, half, shores);
                 // Over water for at least 3 m between the fences
                 int wetRun = 0, best = 0;
                 for (float t = lo; t <= hi; t += 1f) { wetRun = WetAt(t) ? wetRun + 1 : 0; best = Math.Max(best, wetRun); }
@@ -144,11 +150,13 @@ public static class TvBridges
                 float mx = mx0 + ux * (s0 + s1) / 2f, mz = mz0 + uz * (s0 + s1) / 2f;
                 if (OnLine(known, mx, mz, 5f) || found.Exists(f => OnLine(f.xy, mx, mz, 5f))) continue;
                 bool paved = (layer.At(mx, mz) & WorldCell.BaseMask) == WorldCell.Paved;
+                // Between two water's edges the strip is a small wooden footbridge with its own railings, made wide
+                // enough to run over (the map draws it a metre or two wide)
                 found.Add(new Span
                 {
                     xy = new[] { mx0 + ux * s0, mz0 + uz * s0, mx0 + ux * s1, mz0 + uz * s1 },
-                    width = Math.Abs(gap),
-                    flags = OverWater | Fenced | (paved ? 0 : Wood),
+                    width = shores ? Math.Max(2.4f, Math.Abs(gap)) : Math.Abs(gap),
+                    flags = shores ? OverWater | Wood : OverWater | Fenced | (paved ? 0 : Wood),
                 });
             }
         }
