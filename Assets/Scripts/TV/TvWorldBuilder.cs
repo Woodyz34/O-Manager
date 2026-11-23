@@ -937,12 +937,14 @@ public partial class TvWorldBuilder
                 {
                     clear[k] = Math.Min(clear[k], d - half);
                     int b = Base(CellAt(k % N - R, k / N - R));
-                    if (b == WorldCell.Paved || b == WorldCell.Building || b == WorldCell.Water) return;
-                    if (paved)
+                    // A paved path is asphalt all along its line, its own paved cells too (2026-11-23, Anders: grass
+                    // broke a paved path where its cells' smooth share was low)
+                    if (paved && b != WorldCell.Building && b != WorldCell.Water)
                     {
                         AsphaltAt(k, half - d);
                         return;
                     }
+                    if (b == WorldCell.Paved || b == WorldCell.Building || b == WorldCell.Water) return;
                     float blend = 1f - Sm(half * 0.6f, half + 0.3f, d);
                     if (blend > trackBlend[k])
                     {
