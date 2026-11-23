@@ -1277,7 +1277,10 @@ public partial class TvWorldBuilder
                     else if (kind == WorldCell.Water) level = -9f;
                     else
                     {
-                        level = (PavedWeight(x, z) - 0.5f) * 2.5f;
+                        // A little more paving than half (a narrow paved strip drawn slanting has under half its cells'
+                        // weight in its middle: the grass showed through, 2026-11-23); the cell's own kind as well
+                        level = (PavedWeight(x, z) - 0.42f) * 2.5f;
+                        if (level < 0.02f && (kind == WorldCell.Paved || kind == WorldCell.Building)) level = 0.02f;
                         if (pDist != null && pDist[k] < EdgeReach) level = pLvl[k];
                         if (kind == WorldCell.Plot) level = Math.Min(level, -0.3f);
                         if (asphaltLevel != null) level = Math.Max(level, asphaltLevel[k]);
@@ -1387,7 +1390,11 @@ public partial class TvWorldBuilder
                         if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
                         lo = Math.Min(lo, low[jj * N + ii]);
                     }
-                level[j * N + i] = lo;
+                // By a bridge (not under its deck, where the ground is drawn low): never up to the deck's ends,
+                // which lie on the ground (2026-11-23, Anders: water showed through the deck near the land)
+                int kk = j * N + i;
+                if (BridgeWater(i - R, j - R) && !UnderBridgeDeck(i - R, j - R)) lo = Math.Min(lo, F[kk] - 0.7f);
+                level[kk] = lo;
             }
         }
         var corner = new int[N * N];
@@ -2024,8 +2031,15 @@ public partial class TvWorldBuilder
                     {
                         // The mesh copy turns its x axis to (cos, -sin) of the angle given, so the line's own angle goes in
                         // negated (2026-11-20: walls on slanting lines stood across the line)
-                        thingMesh.Add(wallPiece, x, H(x, z) - 0.1f, z, len + 0.05f, 1.9f, 1f, -yaw, Rr(0.94f, 1.04f));
-                        thingMesh.Add(wallCap, x, H(x, z) + 1.78f, z, len + 0.05f, 1f, 1f, -yaw);
+                        // A wall with the ground higher on one side (a town's drop, WallSteps): from the low ground's
+                        // foot up to a little over the high ground (2026-11-23, Anders)
+                        float wnx = (float)Math.Sin(yaw), wnz = -(float)Math.Cos(yaw);
+                        float g0 = H(x + wnx * 0.8f, z + wnz * 0.8f), g1 = H(x - wnx * 0.8f, z - wnz * 0.8f);
+                        float lo = Math.Min(Math.Min(g0, g1), H(x, z)), hi = Math.Max(g0, g1);
+                        float top = hi - lo >= 0.5f ? hi + 0.35f : H(x, z) + 1.8f;
+                        float tall = Math.Max(0.5f, top - (lo - 0.1f));
+                        thingMesh.Add(wallPiece, x, lo - 0.1f, z, len + 0.05f, tall, 1f, -yaw, Rr(0.94f, 1.04f));
+                        thingMesh.Add(wallCap, x, top - 0.02f, z, len + 0.05f, 1f, 1f, -yaw);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.55f });
                     });
                     break;
