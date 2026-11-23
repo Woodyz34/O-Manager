@@ -1395,6 +1395,9 @@ public partial class TvWorldBuilder
         var highest = new float[comps];
         var byHouse = new bool[comps];
         var count = new int[comps];
+        // From the first cell's own height (2026-11-23: they started at 0, so on ground above y = 0 the roof of a
+        // bicycle shelter came down to head height)
+        for (int q = 0; q < comps; q++) { lowest[q] = float.MaxValue; highest[q] = float.MinValue; }
         for (int k = 0; k < cells.Count; k++)
         {
             float x = (float)(cells[k].e - input.centerE), z = (float)(cells[k].n - input.centerN);
@@ -1441,7 +1444,15 @@ public partial class TvWorldBuilder
             }
             else
             {
-                b.Box(x0 - 0.1f, 2.9f, z0 - 0.1f, x1 + 0.1f, 3.1f, z1 + 0.1f, roof);
+                // Each row's roof at least 2.6 m over its own highest ground (a long shelter on a slope)
+                float rowHigh = float.MinValue;
+                for (int q = runStart; q <= e; q++)
+                {
+                    var rc = cells[order[q]];
+                    rowHigh = Math.Max(rowHigh, H((float)(rc.e - input.centerE), (float)(rc.n - input.centerN)));
+                }
+                float roofAt = Math.Max(2.9f, rowHigh - y + 2.6f);
+                b.Box(x0 - 0.1f, roofAt, z0 - 0.1f, x1 + 0.1f, roofAt + 0.2f, z1 + 0.1f, roof);
                 // Posts on the edge of the roof, about every 4 m
                 for (int q = runStart; q <= e; q++)
                 {
@@ -1451,7 +1462,7 @@ public partial class TvWorldBuilder
                                 || !at.ContainsKey(Key(cell.i, cell.j + 1)) || !at.ContainsKey(Key(cell.i, cell.j - 1));
                     if (!edge) continue;
                     float px = (float)(cell.e - input.centerE), pz = (float)(cell.n - input.centerN);
-                    b.Box(px - 0.08f, H(px, pz) - y - 0.3f, pz - 0.08f, px + 0.08f, 2.9f, pz + 0.08f, post);
+                    b.Box(px - 0.08f, H(px, pz) - y - 0.3f, pz - 0.08f, px + 0.08f, roofAt, pz + 0.08f, post);
                     world.solids.Add(new TvSolid { x = px, z = pz, r = 0.15f });
                 }
             }
