@@ -133,6 +133,12 @@ public class TvTown
             bridgeWidths.Add(s.width);
             bridgeFlags.Add(s.flags);
         }
+        foreach (TvBridges.Span s in TvBridges.FencedOverWater(layer, new List<float[]>(bridges)))
+        {
+            bridges.Add(s.xy);
+            bridgeWidths.Add(s.width);
+            bridgeFlags.Add(s.flags);
+        }
     }
 
     // Pieces of canopy outlines that are not closed on their own (2026-11-20: a map often draws one canopy as several

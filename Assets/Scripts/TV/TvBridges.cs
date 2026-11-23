@@ -90,6 +90,91 @@ public static class TvBridges
         return found;
     }
 
+    // Two fences or walls running side by side over water, 1-6 m apart, with no path drawn between them (Tranås by
+    // the start, 2026-11-23: a paved area between two high fences over the river). The deck runs half way between
+    // them, out to land at both ends.
+    public static List<Span> FencedOverWater(WorldLayer layer, List<float[]> known)
+    {
+        var found = new List<Span>();
+        var segs = new List<float[]>();
+        foreach (WorldLine l in layer.lines)
+        {
+            switch (l.kind)
+            {
+                case WorldLineKind.Fence: case WorldLineKind.HighFence: case WorldLineKind.Wall: case WorldLineKind.HighWall:
+                    break;
+                default:
+                    continue;
+            }
+            for (int i = 0; i + 3 < l.xy.Length; i += 2)
+            {
+                float sx = l.xy[i + 2] - l.xy[i], sz = l.xy[i + 3] - l.xy[i + 1];
+                if (sx * sx + sz * sz >= 16f) segs.Add(new[] { l.xy[i], l.xy[i + 1], l.xy[i + 2], l.xy[i + 3] });
+            }
+        }
+        for (int a = 0; a < segs.Count; a++)
+        {
+            float[] A = segs[a];
+            float ax = A[0], az = A[1], adx = A[2] - ax, adz = A[3] - az, al = (float)Math.Sqrt(adx * adx + adz * adz);
+            float ux = adx / al, uz = adz / al, nx = -uz, nz = ux;
+            for (int b = a + 1; b < segs.Count; b++)
+            {
+                float[] B = segs[b];
+                float bdx = B[2] - B[0], bdz = B[3] - B[1], bl = (float)Math.Sqrt(bdx * bdx + bdz * bdz);
+                if (Math.Abs((bdx * ux + bdz * uz) / bl) < 0.97f) continue;
+                float c0 = (B[0] - ax) * nx + (B[1] - az) * nz, c1 = (B[2] - ax) * nx + (B[3] - az) * nz;
+                float gap = (c0 + c1) / 2f;
+                if (Math.Abs(gap) < 1f || Math.Abs(gap) > 6f || Math.Abs(c0 - c1) > 1f) continue;
+                float t0 = (B[0] - ax) * ux + (B[1] - az) * uz, t1 = (B[2] - ax) * ux + (B[3] - az) * uz;
+                float lo = Math.Max(0f, Math.Min(t0, t1)), hi = Math.Min(al, Math.Max(t0, t1));
+                if (hi - lo < 4f) continue;
+                float half = Math.Abs(gap) / 2f;
+                float mx0 = ax + nx * gap / 2f, mz0 = az + nz * gap / 2f;
+                bool WetAt(float t) => Wet(layer, mx0 + ux * t, mz0 + uz * t, nx, nz, half);
+                // Over water for at least 3 m between the fences
+                int wetRun = 0, best = 0;
+                for (float t = lo; t <= hi; t += 1f) { wetRun = WetAt(t) ? wetRun + 1 : 0; best = Math.Max(best, wetRun); }
+                if (best < 3) continue;
+                // Out to land at both ends (up to 6 m beyond the fences), then a metre more
+                float s0 = lo, s1 = hi;
+                while (s0 > lo - 6f && WetAt(s0)) s0 -= 1f;
+                while (s1 < hi + 6f && WetAt(s1)) s1 += 1f;
+                if (WetAt(s0) || WetAt(s1)) continue;
+                s0 -= 1f; s1 += 1f;
+                float mx = mx0 + ux * (s0 + s1) / 2f, mz = mz0 + uz * (s0 + s1) / 2f;
+                if (OnLine(known, mx, mz, 5f) || found.Exists(f => OnLine(f.xy, mx, mz, 5f))) continue;
+                bool paved = (layer.At(mx, mz) & WorldCell.BaseMask) == WorldCell.Paved;
+                found.Add(new Span
+                {
+                    xy = new[] { mx0 + ux * s0, mz0 + uz * s0, mx0 + ux * s1, mz0 + uz * s1 },
+                    width = Math.Abs(gap),
+                    flags = OverWater | Fenced | (paved ? 0 : Wood),
+                });
+            }
+        }
+        return found;
+    }
+
+    static bool OnLine(List<float[]> lines, float x, float z, float reach)
+    {
+        if (lines == null) return false;
+        foreach (float[] o in lines) if (OnLine(o, x, z, reach)) return true;
+        return false;
+    }
+
+    // Within reach of the line's segments, not only its corners (a long bridge has its middle far from both ends)
+    static bool OnLine(float[] o, float x, float z, float reach)
+    {
+        for (int q = 0; q + 3 < o.Length; q += 2)
+        {
+            float sx = o[q + 2] - o[q], sz = o[q + 3] - o[q + 1], l2 = sx * sx + sz * sz;
+            float t = l2 < 1e-6f ? 0f : Math.Max(0f, Math.Min(1f, ((x - o[q]) * sx + (z - o[q + 1]) * sz) / l2));
+            float dx = o[q] + sx * t - x, dz = o[q + 1] + sz * t - z;
+            if (dx * dx + dz * dz < reach * reach) return true;
+        }
+        return false;
+    }
+
     // The points of a run where the line bends (more than 0.3 m off the straight line), not one every metre: a path
     // drawn straight over the water gives a straight deck
     static float[] Straight(List<float> pts, int a0, int a1)
