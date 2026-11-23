@@ -435,7 +435,7 @@ public static partial class TvCityShapes
 
     // ---- Buildings ----
 
-    public enum Kind { TownHouse, Apartments, Villa, Church, TownHall, Hall }
+    public enum Kind { TownHouse, Apartments, Villa, Church, TownHall, Hall, School }
 
     // A building of the given kind, len x wid, built round its middle; floors for the town houses and blocks
     public static TvShape Building(TvRandom random, Kind kind, float len, float wid, int floors, int look, float plinth = 0.4f)
@@ -447,6 +447,7 @@ public static partial class TvCityShapes
             case Kind.Apartments: return Apartments(random, len, wid, floors, look, plinth);
             case Kind.Villa: return Villa(random, len, wid, look, plinth);
             case Kind.Hall: return Hall(random, len, wid, look, plinth);
+            case Kind.School: return Apartments(random, len, wid, Math.Max(2, Math.Min(floors, 3)), look, plinth);
             default: return TownHouse(random, len, wid, floors, look, plinth);
         }
     }

@@ -69,12 +69,39 @@ namespace MapImport
         }
     }
 
+    // The outline of an area the 3D town needs exactly (2026-11-23, Anders: the gardens were the zigzag of the 2 m
+    // cells; on the map they are straight): a garden (olive green, ISSprOM 520) or ground out of bounds (709, 714,
+    // a map maker's own forbidden area). One ring per part of the area (holes too), in the game's map metres.
+    public enum WorldAreaKind : byte { None = 0, Garden = 1, OutOfBounds = 2 }
+
+    public class WorldArea
+    {
+        public WorldAreaKind kind;
+        public bool hole;           // a hole in the area before it (a house standing in a garden)
+        public float[] xy;          // e0, n0, e1, n1, ... closed (the last point joins the first)
+        public float minE, minN, maxE, maxN;
+
+        public void Bounds()
+        {
+            minE = minN = float.MaxValue;
+            maxE = maxN = float.MinValue;
+            for (int i = 0; i + 1 < xy.Length; i += 2)
+            {
+                if (xy[i] < minE) minE = xy[i];
+                if (xy[i] > maxE) maxE = xy[i];
+                if (xy[i + 1] < minN) minN = xy[i + 1];
+                if (xy[i + 1] > maxN) maxN = xy[i + 1];
+            }
+        }
+    }
+
     public class WorldLayer
     {
         public const float CellSize = 2f;
         const int Magic = 0x444C574F;   // "OWLD"
         // 2 (2026-11-20): built with the passability rules of the 2D grid (Impassable cells, Hedge, Barrier, Stairs, Bridge)
-        const int Version = 2;
+        // 3 (2026-11-23): the outlines of gardens and out-of-bounds areas (areas)
+        const int Version = 3;
         public int version = Version;
         const long MaxCells = 120000000;
 
@@ -84,6 +111,7 @@ namespace MapImport
         public byte[] cells;            // rows * cols, row 0 at the south
         public List<WorldPoint> points = new List<WorldPoint>();
         public List<WorldLine> lines = new List<WorldLine>();
+        public List<WorldArea> areas = new List<WorldArea>();   // empty in layers made before version 3
 
         // What is at a place; outside the layer it is plain forest
         public byte At(double e, double n)
@@ -119,6 +147,7 @@ namespace MapImport
                 if (o.kind != SymbolKind.Area || o.symbol == null) continue;
                 if (!AreaRule(o.symbol, sprint, out byte set, out byte flag, out bool clear)) continue;
                 areas.Add((GridBuilder.TopColor(o.symbol), order++, o, set, flag, clear));
+                if (set == WorldCell.Plot) w.KeepOutline(o, SymbolRules.Isom2017Major(o.symbol) == 520 ? WorldAreaKind.Garden : WorldAreaKind.OutOfBounds, mpm, offE, offN);
             }
             areas.Sort((a, b) => a.prio != b.prio ? b.prio.CompareTo(a.prio) : a.order.CompareTo(b.order));
             double scale = mpm / w.cell;
@@ -174,6 +203,33 @@ namespace MapImport
                 }
             }
             return w;
+        }
+
+        // An area's outline, every part a ring of its own, points closer than 0.3 m dropped
+        void KeepOutline(MapObject o, WorldAreaKind kind, double mpm, double offE, double offN)
+        {
+            for (int part = 0; part < o.parts.Count; part++)
+            {
+                double[] p = o.parts[part];
+                if (p == null || p.Length < 6) continue;
+                var pts = new List<float>(p.Length);
+                for (int i = 0; i + 1 < p.Length; i += 2)
+                {
+                    float e = (float)(p[i] * mpm + offE), n = (float)(p[i + 1] * mpm + offN);
+                    int c = pts.Count;
+                    if (c >= 2 && Math.Abs(pts[c - 2] - e) + Math.Abs(pts[c - 1] - n) < 0.3f) continue;
+                    pts.Add(e);
+                    pts.Add(n);
+                }
+                // Closed: the last point is not the first again
+                int k = pts.Count;
+                if (k >= 4 && Math.Abs(pts[0] - pts[k - 2]) + Math.Abs(pts[1] - pts[k - 1]) < 0.3f) pts.RemoveRange(k - 2, 2);
+                if (pts.Count < 6) continue;
+                var area = new WorldArea { kind = kind, hole = part > 0, xy = pts.ToArray() };
+                area.Bounds();
+                if (area.maxE < minE || area.maxN < minN || area.minE > minE + cols * cell || area.minN > minN + rows * cell) continue;
+                areas.Add(area);
+            }
         }
 
         // What an area symbol does to the cells under it. set = 255: the ground stays, only the flag is added.
@@ -332,6 +388,15 @@ namespace MapImport
                         Buffer.BlockCopy(line.xy, 0, raw, 0, raw.Length);
                         w.Write(raw);
                     }
+                    w.Write(areas.Count);
+                    foreach (WorldArea area in areas)
+                    {
+                        w.Write((byte)((byte)area.kind | (area.hole ? 0x80 : 0)));
+                        w.Write(area.xy.Length);
+                        var raw = new byte[area.xy.Length * 4];
+                        Buffer.BlockCopy(area.xy, 0, raw, 0, raw.Length);
+                        w.Write(raw);
+                    }
                 }
                 return ms.ToArray();
             }
@@ -370,6 +435,23 @@ namespace MapImport
                         Buffer.BlockCopy(raw, 0, line.xy, 0, raw.Length);
                         line.Bounds();
                         w.lines.Add(line);
+                    }
+                    if (fileVersion >= 3)
+                    {
+                        int areaCount = r.ReadInt32();
+                        if (areaCount < 0 || areaCount > 2000000) return null;
+                        for (int i = 0; i < areaCount; i++)
+                        {
+                            byte head = r.ReadByte();
+                            var area = new WorldArea { kind = (WorldAreaKind)(head & 0x7F), hole = (head & 0x80) != 0 };
+                            int n = r.ReadInt32();
+                            if (n < 0 || n > 4000000) return null;
+                            byte[] raw = ReadAll(r, n * 4);
+                            area.xy = new float[n];
+                            Buffer.BlockCopy(raw, 0, area.xy, 0, raw.Length);
+                            area.Bounds();
+                            w.areas.Add(area);
+                        }
                     }
                     return w;
                 }

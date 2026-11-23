@@ -39,6 +39,8 @@ public partial class TvWorldBuilder
         public float baseY, top, plinth;
         public TvCityShapes.Palette colour;
         public bool flat;
+        public int group = -1;          // the big house or row it belongs to (TvWorldBuilderTown.HouseGroup), -1 none
+        public bool row;                // a home in a row of terraced houses: a front door whatever is in front
     }
 
     void BuildBlockHouses(List<(List<(float x, float z)> pts, TvCityShapes.Kind kind)> houses)
@@ -190,6 +192,7 @@ public partial class TvWorldBuilder
             o.cx = mx / houses[h - 1].pts.Count;
             o.cz = mz / houses[h - 1].pts.Count;
             o.kind = houses[h - 1].kind;
+            if (blockGroup != null && h - 1 < blockGroup.Count) o.group = blockGroup[h - 1];
             outlines[h - 1] = o;
         }
 
@@ -202,20 +205,33 @@ public partial class TvWorldBuilder
             float h1 = TvRandom.Hash(hx, hz), h2 = TvRandom.Hash(hx + 101, hz - 37);
             o.look = (int)(h1 * 997f);
             float area = Math.Abs(o.area);
-            if (o.kind == TvCityShapes.Kind.TownHouse)
+            HouseGroup grp = o.group >= 0 && groups != null && o.group < groups.Count ? groups[o.group] : null;
+            if (grp != null)
             {
-                if ((area < 170f && GardenNearAt(o.cx, o.cz, (float)Math.Sqrt(area))) || (Old && area < 60f)) o.kind = TvCityShapes.Kind.Villa;
+                // The wings of one big house, the homes of one row: one look, their own floors
+                o.look = grp.look;
+                o.floors = Math.Max(1, blockFloors[h]);
+                o.row = grp.row;
             }
-            switch (o.kind)
+            else
             {
-                case TvCityShapes.Kind.Apartments: o.floors = 3 + (int)(h2 * 3f); break;
-                case TvCityShapes.Kind.Hall: o.floors = 1; break;
-                case TvCityShapes.Kind.Villa: o.floors = 1 + (int)(h2 * 1.99f); break;
-                default: o.floors = Old ? 1 + (int)(h2 * (area > 110f ? 3.99f : 2.5f)) : 2 + (int)(h2 * 3f); break;
+                if (o.kind == TvCityShapes.Kind.TownHouse)
+                {
+                    if ((area < 170f && GardenNearAt(o.cx, o.cz, (float)Math.Sqrt(area))) || (Old && area < 60f)) o.kind = TvCityShapes.Kind.Villa;
+                }
+                switch (o.kind)
+                {
+                    case TvCityShapes.Kind.Apartments: o.floors = 3 + (int)(h2 * 3f); break;
+                    case TvCityShapes.Kind.Hall: o.floors = 1; break;
+                    case TvCityShapes.Kind.School: o.floors = 2; break;
+                    case TvCityShapes.Kind.Villa: o.floors = 1 + (int)(h2 * 1.99f); break;
+                    default: o.floors = Old ? 1 + (int)(h2 * (area > 110f ? 3.99f : 2.5f)) : 2 + (int)(h2 * 3f); break;
+                }
             }
-            // Neighbours never the same colour: step on until it differs from the houses already given one
+            // Neighbours never the same colour: step on until it differs from the houses already given one (the
+            // wings of one house and the homes of one row keep theirs)
             int tries = 0;
-            while (tries++ < 6 && SameAsNeighbour(o, h, outlines)) o.look += 7;
+            while (grp == null && tries++ < 6 && SameAsNeighbour(o, h, outlines)) o.look += 7;
             o.colour = TvCityShapes.PaletteOf(o.look, input.town.style, o.kind);
             float lowest = float.MaxValue, highest = float.MinValue;
             foreach (var sg in o.rings[0])
@@ -225,7 +241,7 @@ public partial class TvWorldBuilder
             }
             o.plinth = Math.Min(3f, highest - lowest) + 0.3f;
             o.baseY = lowest - 0.25f;
-            float ground = o.kind == TvCityShapes.Kind.Hall ? 5.5f : Old ? 3.2f : 3.6f, upper = Old ? 2.9f : 3.1f;
+            float ground = GroundFloor(o), upper = UpperFloor(o);
             o.top = o.baseY + o.plinth + ground + upper * (o.floors - 1);
         }
 
@@ -254,6 +270,10 @@ public partial class TvWorldBuilder
 
     static int K(int i, int j, int W) => j * (W + 1) + i;
 
+    // Storey heights: a hall is one high room, a school has high classrooms, a terraced home is low
+    float GroundFloor(HouseOutline o) => o.kind == TvCityShapes.Kind.Hall ? 5.5f : o.kind == TvCityShapes.Kind.School ? 3.8f : o.row ? 2.9f : Old ? 3.2f : 3.6f;
+    float UpperFloor(HouseOutline o) => o.kind == TvCityShapes.Kind.School ? 3.5f : o.row ? 2.7f : Old ? 2.9f : 3.1f;
+
     static float Area(List<HouseSeg> ring)
     {
         float a = 0f;
@@ -269,7 +289,7 @@ public partial class TvWorldBuilder
             {
                 if (sg.other <= 0 || sg.other - 1 >= self) continue;   // only the houses already given a look
                 HouseOutline n = all[sg.other - 1];
-                if (n == null) continue;
+                if (n == null || (o.group >= 0 && n.group == o.group)) continue;
                 TvCityShapes.Palette theirs = TvCityShapes.PaletteOf(n.look, input.town.style, n.kind);
                 if (theirs.wall.r == mine.wall.r && theirs.wall.g == mine.wall.g && theirs.wall.b == mine.wall.b) return true;
             }
@@ -347,12 +367,13 @@ public partial class TvWorldBuilder
     {
         TvCityShapes.Palette col = o.colour;
         float y0 = o.baseY, top = o.top, foot = y0 + o.plinth;
-        float groundFloor = o.kind == TvCityShapes.Kind.Hall ? 5.5f : Old ? 3.2f : 3.6f, upper = Old ? 2.9f : 3.1f;
+        float groundFloor = GroundFloor(o), upper = UpperFloor(o);
 
         // The roof first: it says whether the walls get gables
         List<(float x, float z)> roofCorners = o.rings.Count == 1 ? Corners(o.rings[0]) : null;
-        bool pitched = roofCorners != null && roofCorners.Count == 4 && Convex(roofCorners) && o.kind != TvCityShapes.Kind.Hall
-                       && o.kind != TvCityShapes.Kind.Apartments || (roofCorners != null && roofCorners.Count == 4 && Convex(roofCorners) && o.kind == TvCityShapes.Kind.Apartments && o.look % 3 == 0);
+        bool four = roofCorners != null && roofCorners.Count == 4 && Convex(roofCorners);
+        bool pitched = four && o.kind != TvCityShapes.Kind.Hall && o.kind != TvCityShapes.Kind.School
+                       && (o.kind != TvCityShapes.Kind.Apartments || o.look % 3 == 0);
         o.flat = !pitched;
 
         for (int r = 0; r < o.rings.Count; r++)
@@ -442,16 +463,24 @@ public partial class TvWorldBuilder
         float midX = (sg.ax + sg.bx) / 2f + nx * 2.5f, midZ = (sg.az + sg.bz) / 2f + nz * 2.5f;
         bool street = Base(CellAt(midX, midZ)) == WorldCell.Paved;
         bool shops = street && !Old && o.kind == TvCityShapes.Kind.TownHouse && o.look % 3 != 0 && len >= 3.4f;
-        bool hall = o.kind == TvCityShapes.Kind.Hall;
+        bool hall = o.kind == TvCityShapes.Kind.Hall, school = o.kind == TvCityShapes.Kind.School;
+        bool flats = o.kind == TvCityShapes.Kind.Apartments;
 
-        // Windows: one every 2.4 m (a big one every 4 m on a hall), none on a wall shorter than 1.6 m
-        float spacing = hall ? 4.2f : Old ? 2.8f : 2.4f;
+        // A hall's walls of ribbed sheet metal
+        if (hall && detail == 2)
+            for (float ru = 0.4f; ru < len - 0.2f; ru += 0.8f)
+                WallBox(m, sg, ux, uz, nx, nz, ru - 0.05f, ru + 0.05f, foot, top - 0.35f, 0f, 0.06f, col.wall.Shade(0.88f), false);
+
+        // Windows: one every 2.4 m (a big one every 4 m on a hall, wide bands on a school), none on a wall shorter than 1.6 m
+        float spacing = hall ? 4.2f : school ? 3.0f : Old ? 2.8f : 2.4f;
         int count = (int)((len - 0.6f) / spacing);
         if (count < 1) return;
         float step = len / count;
         // The door: on the street floor of the longest street wall... one per wall that is long enough, from the place
-        int door = street && len >= 2.2f ? (int)(TvRandom.Hash((int)(sg.ax + ox), (int)(sg.az + oz)) * count) : -1;
-        float ww = hall ? 2.6f : Old ? 0.85f : 1.0f, wh = hall ? 1.2f : Old ? 1.25f : 1.55f;
+        // (a school, a block of flats and a terraced home have doors towards their yard and garden too)
+        bool doorHere = (street || o.row || school || (flats && len >= 8f)) && len >= 2.2f;
+        int door = doorHere ? (int)(TvRandom.Hash((int)(sg.ax + ox), (int)(sg.az + oz)) * count) : -1;
+        float ww = hall ? 2.6f : school ? 2.6f : o.row ? 1.2f : Old ? 0.85f : 1.0f, wh = hall ? 1.2f : school ? 1.65f : o.row ? 1.3f : Old ? 1.25f : 1.55f;
         for (int f = 0; f < o.floors; f++)
         {
             float fy = f == 0 ? foot : foot + groundFloor + upper * (f - 1);
@@ -473,6 +502,9 @@ public partial class TvWorldBuilder
                             WallBox(m, sg, ux, uz, nx, nz, u - 0.45f, u + 0.45f, foot + 2.35f, foot + 2.75f, 0f, 0.09f, col.glass);
                             WallBox(m, sg, ux, uz, nx, nz, u - 0.9f, u + 0.9f, foot - 0.3f, foot, 0f, 0.55f, TvColor.Hex("#9c968c"));
                         }
+                        // A roof over the entrance of a school, a block of flats or a terraced home
+                        if (detail >= 1 && (school || flats || o.row))
+                            WallBox(m, sg, ux, uz, nx, nz, u - (school ? 2.2f : 1.1f), u + (school ? 2.2f : 1.1f), foot + 2.95f, foot + 3.12f, 0f, school ? 2.0f : 1.1f, TvColor.Hex("#3b3f45"));
                         continue;
                     }
                     if (shops && step >= 2.6f)
@@ -505,7 +537,17 @@ public partial class TvWorldBuilder
                         continue;
                     }
                 }
-                Window(m, sg, ux, uz, nx, nz, u, f == 0 ? foot + 0.9f : fy + 0.85f, ww, wh, col, detail, f > 0 && street);
+                Window(m, sg, ux, uz, nx, nz, u, f == 0 ? foot + 0.9f : fy + 0.85f, ww, wh, col, detail, f > 0 && street && !school);
+                // A block of flats: balconies on its yard side, every other window from the first floor up
+                if (flats && f > 0 && !street && detail >= 1 && k % 2 == 0 && step >= 2.0f)
+                {
+                    float bw = Math.Min(3.2f, step * 1.3f);
+                    WallBox(m, sg, ux, uz, nx, nz, u - bw / 2f, u + bw / 2f, fy - 0.12f, fy + 0.04f, 0f, 1.4f, TvColor.Hex("#c9c6bf"));
+                    WallBox(m, sg, ux, uz, nx, nz, u - bw / 2f, u + bw / 2f, fy + 0.04f, fy + 1.05f, 1.34f, 1.4f, col.awning);
+                    if (detail == 2)
+                        foreach (float side in new[] { -1f, 1f })
+                            WallBox(m, sg, ux, uz, nx, nz, u + side * bw / 2f - 0.03f, u + side * bw / 2f + 0.03f, fy + 0.04f, fy + 1.05f, 0f, 1.4f, col.awning.Shade(0.9f));
+                }
             }
         }
         // A drainpipe at each end of a long street wall
@@ -721,9 +763,10 @@ public partial class TvWorldBuilder
                 float dx = sg.bx - sg.ax, dz = sg.bz - sg.az, len = (float)Math.Sqrt(dx * dx + dz * dz);
                 if (len < 0.05f) continue;
                 float ux = dx / len, uz = dz / len, nx = uz, nz = -ux;
-                WallQuad(m, sg.ax, sg.az, sg.bx, sg.bz, nx, nz, y, y + 0.45f, col.band);
+                TvColor edge = o.kind == TvCityShapes.Kind.School || o.kind == TvCityShapes.Kind.Hall ? col.roof : col.band;
+                WallQuad(m, sg.ax, sg.az, sg.bx, sg.bz, nx, nz, y, y + 0.45f, edge);
                 WallQuad(m, sg.ax, sg.az, sg.bx, sg.bz, -nx, -nz, y, y + 0.45f, col.wall.Shade(0.85f), -0.2f);
-                Face(m, sg.ax, y + 0.45f, sg.az, sg.bx, y + 0.45f, sg.bz, sg.bx - nx * 0.2f, y + 0.45f, sg.bz - nz * 0.2f, sg.ax - nx * 0.2f, y + 0.45f, sg.az - nz * 0.2f, 0f, 1f, 0f, col.band.Shade(1.05f));
+                Face(m, sg.ax, y + 0.45f, sg.az, sg.bx, y + 0.45f, sg.bz, sg.bx - nx * 0.2f, y + 0.45f, sg.bz - nz * 0.2f, sg.ax - nx * 0.2f, y + 0.45f, sg.az - nz * 0.2f, 0f, 1f, 0f, edge.Shade(1.05f));
             }
         if (detail < 2) return;
         // A box for the stairs or a fan, now and then

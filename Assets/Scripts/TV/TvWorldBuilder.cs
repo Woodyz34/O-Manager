@@ -454,6 +454,7 @@ public partial class TvWorldBuilder
             world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townMesh }, "Town houses", true, R, DrawTiles));
             world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townThingMesh }, "Town things", true, R, DrawTiles));
             world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townBuiltMesh }, "Town bridges", true, R, DrawTiles));
+            if (yardMesh != null) world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { yardMesh }, "Town gardens", true, R, DrawTiles));
         }
         else if (townBuiltMesh != null)
             world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townBuiltMesh }, "Bridges", true, R, DrawTiles));
@@ -974,6 +975,22 @@ public partial class TvWorldBuilder
         Soil = TvColor.Hex("#6b563c");
 
     bool[] asphaltCorner;               // the ground corners on a tarmac road (Tracks), kept with the paved ground
+    static readonly TvColor Lawn = TvColor.Hex("#5f8a36"), LawnLight = TvColor.Hex("#76a043");
+
+    // What lies beside a garden's cells where the map's straight edge leaves them out of the garden: the nearest cell
+    // round about that is no garden (a street, a lawn), else open land
+    byte NotGardenNear(float x, float z)
+    {
+        for (float d = 1.5f; d <= 4.6f; d += 1.5f)
+            for (int a = 0; a < 8; a++)
+            {
+                float ang = a * 0.785398f;
+                byte c = CellAt(x + (float)Math.Cos(ang) * d, z + (float)Math.Sin(ang) * d);
+                int b = Base(c);
+                if (b != WorldCell.Plot && b != WorldCell.Building && b != WorldCell.Water) return c;
+            }
+        return WorldCell.Open;
+    }
 
     void Ground()
     {
@@ -993,6 +1010,17 @@ public partial class TvWorldBuilder
                 int kind = Base(cell);
                 // A bridge made from a path over water: water round its deck, not the zigzag land strip of the cells
                 if (kind != WorldCell.Water && BridgeWater(x, z)) { kind = WorldCell.Water; cell = WorldCell.Water; }
+                // A garden as the map draws it, straight, not the zigzag of its cells (2026-11-23, Anders)
+                if (input.town != null && input.town.gardens != null && kind != WorldCell.Water && kind != WorldCell.Building)
+                {
+                    double ge = input.centerE + x, gn = input.centerN + z;
+                    if (input.town.gardens.Near(ge, gn, 2.2f))
+                    {
+                        bool inGarden = input.town.gardens.Inside(ge, gn);
+                        if (inGarden && kind != WorldCell.Plot) { kind = WorldCell.Plot; cell = WorldCell.Plot; }
+                        else if (!inGarden && kind == WorldCell.Plot) { cell = NotGardenNear(x, z); kind = Base(cell); }
+                    }
+                }
                 float f = TvRandom.Patches(ax * 0.12f, az * 0.12f), f2 = TvRandom.Noise(ax * 0.9f, az * 0.9f);
                 TvColor c;
                 bool hard = false;
@@ -1012,7 +1040,8 @@ public partial class TvWorldBuilder
                         hard = true;
                         if (pavedCorner != null) pavedCorner[k] = true;
                         break;
-                    case WorldCell.Plot: c = Plot.Lerp(OpenGreen, f); break;
+                    // A garden: in a town a mown lawn (2026-11-23)
+                    case WorldCell.Plot: c = input.town != null ? Lawn.Lerp(LawnLight, f) : Plot.Lerp(OpenGreen, f); break;
                     default:
                         c = floor.a.Lerp(floor.b, Sm(0.35f, 0.7f, f)).Lerp(floor.c, Sm(0.55f, 0.8f, TvRandom.Noise(ax * 0.2f + 40f, az * 0.2f)) * 0.7f);
                         break;

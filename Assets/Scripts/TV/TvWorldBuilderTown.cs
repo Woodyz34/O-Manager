@@ -345,12 +345,15 @@ public partial class TvWorldBuilder
         // After a passage is cut out, the parts on each side are houses of their own
         // The houses get the map's own outline (TvTownHouses): cut first, then built together so they meet exactly
         blockHouses = new List<(List<(float x, float z)> pts, TvCityShapes.Kind kind)>();
+        blockGroup = new List<int>();
+        blockFloors = new List<int>();
+        groups = new List<HouseGroup>();
         try
         {
             foreach (var part in Parts(pts)) SplitHouses(part, 0);
             BuildBlockHouses(blockHouses);
         }
-        finally { blockHouses = null; }
+        finally { blockHouses = null; blockGroup = null; blockFloors = null; groups = null; }
     }
 
     // The joined parts of a set of cells
@@ -452,6 +455,14 @@ public partial class TvWorldBuilder
         float area = f.len * f.wid;
         if (!Old && depth == 0)
         {
+            // A big house is one house (2026-11-23, Anders: "om det är ett gigantiskt hus så blir det alltid bara radhus
+            // överallt ... men det kan ju vara en jättestor skola, kyrka eller lägenhetshus"): a school, a block of flats
+            // or a hall, in wings of their own height where its outline turns. Only the blocks along a shopping street
+            // (paving all round) are still cut into narrow town houses.
+            float cellsArea = pts.Count * layer.cell * layer.cell;
+            if (cellsArea >= 420f && PavedRound(f) < 0.7f) { BigHouse(pts, f, cellsArea); return; }
+            // A long low row in gardens: terraced houses, all alike, one or two floors
+            if (f.wid <= 13f && f.len >= 18f && cellsArea >= 120f && f.fill >= 0.75f && GardenNear(f)) { RowHouses(pts, f); return; }
             // A long slab is a block of flats, a big plain house a hall
             if (f.fill >= 0.82f && f.wid >= 9.5f && f.wid <= 18f && f.len <= 75f && area >= 330f) { PlaceHouse(pts, TvCityShapes.Kind.Apartments, f); return; }
             if (f.fill >= 0.8f && f.wid > 18f && area >= 650f && f.len <= 90f) { PlaceHouse(pts, TvCityShapes.Kind.Hall, f); return; }
@@ -484,11 +495,168 @@ public partial class TvWorldBuilder
         foreach (var part in Parts(b)) SplitHouses(part, depth + 1, f.angle);
     }
 
+    // ---- One big house in wings, a row of terraced houses ----
+
+    // Houses that belong together: the wings of one big house, the homes of one row. They share a look (the same
+    // walls and roof) and take their floors from it.
+    class HouseGroup
+    {
+        public int look, floors;
+        public TvCityShapes.Kind kind;
+        public bool row;
+    }
+    List<HouseGroup> groups;
+    List<int> blockGroup, blockFloors;
+    int placingGroup = -1, placingFloors;
+
+    // How much of the ground round a block is street or square (0..1)
+    float PavedRound(Fit f)
+    {
+        int hits = 0, all = 0;
+        for (int a = 0; a < 16; a++)
+        {
+            float ang = a * 0.3927f, cu = (float)Math.Cos(ang), cv = (float)Math.Sin(ang);
+            // On the fitted rectangle's edge, 3 m out
+            float su = Math.Abs(cu) > 1e-3f ? (f.len / 2f) / Math.Abs(cu) : float.MaxValue, sv = Math.Abs(cv) > 1e-3f ? (f.wid / 2f) / Math.Abs(cv) : float.MaxValue;
+            float r = Math.Min(su, sv) + 3f, u = cu * r, v = cv * r;
+            float x = f.cx + f.ux * u - f.uz * v, z = f.cz + f.uz * u + f.ux * v;
+            int b = Base(CellAt(x, z));
+            if (b == WorldCell.Building) continue;
+            all++;
+            if (b == WorldCell.Paved) hits++;
+        }
+        return all == 0 ? 1f : hits / (float)all;
+    }
+
+    // A school stands by its playground and bicycle sheds (Anders: "om det är lekplatser runt om ... cykelförråd ...
+    // då kanske det är en skola"): canopies or odd man-made things (the X of the map: here a playground) within 40 m,
+    // and room round it
+    bool SchoolNear(Fit f)
+    {
+        float reach = Math.Max(f.len, f.wid) / 2f + 40f;
+        int canopy = 0, open = 0, all = 0;
+        for (float a = -reach; a <= reach; a += 4f)
+            for (float b = -reach; b <= reach; b += 4f)
+            {
+                float x = f.cx + a, z = f.cz + b;
+                int k = Base(CellAt(x, z));
+                if (k == WorldCell.Building) continue;
+                all++;
+                if (k == WorldCell.Paved || k == WorldCell.Open || k == WorldCell.OpenTrees) open++;
+                if (CanopyCell(x, z) || InsideCanopy(x, z)) canopy++;
+            }
+        int odd = 0;
+        double e0 = input.centerE + f.cx - reach, e1 = input.centerE + f.cx + reach, n0 = input.centerN + f.cz - reach, n1 = input.centerN + f.cz + reach;
+        foreach (WorldPoint p in layer.points)
+            if ((p.kind == WorldPointKind.ManMade || p.kind == WorldPointKind.Feature) && p.e >= e0 && p.e <= e1 && p.n >= n0 && p.n <= n1) odd++;
+        return (canopy >= 2 || odd >= 1) && open >= all * 0.45f;
+    }
+
+    void BigHouse(List<(float x, float z)> pts, Fit f, float area)
+    {
+        int hx = (int)Math.Floor((f.cx + ox) * 0.5f), hz = (int)Math.Floor((f.cz + oz) * 0.5f);
+        float h1 = TvRandom.Hash(hx + 17, hz - 5), h2 = TvRandom.Hash(hx - 3, hz + 91);
+        TvCityShapes.Kind kind;
+        int floors;
+        if (area >= 600f && SchoolNear(f)) { kind = TvCityShapes.Kind.School; floors = 2; }
+        else if (f.fill >= 0.8f && f.wid > 20f && area >= 900f) { kind = TvCityShapes.Kind.Hall; floors = 1; }
+        else { kind = TvCityShapes.Kind.Apartments; floors = 3 + (int)(h2 * 3f); }
+        var g = new HouseGroup { look = (int)(h1 * 997f), floors = floors, kind = kind };
+        groups.Add(g);
+        int id = groups.Count - 1;
+        var wings = new List<List<(float x, float z)>>();
+        SplitWings(pts, 0, wings);
+        // The biggest wing has the house's floors, the others one less now and then (a lower wing, an entrance hall)
+        int biggest = 0;
+        for (int w = 1; w < wings.Count; w++) if (wings[w].Count > wings[biggest].Count) biggest = w;
+        for (int w = 0; w < wings.Count; w++)
+        {
+            Fit wf = FitCells(wings[w]);
+            float wingArea = wings[w].Count * layer.cell * layer.cell;
+            int fl = floors;
+            if (w != biggest && kind != TvCityShapes.Kind.Hall)
+            {
+                float hw = TvRandom.Hash((int)Math.Floor((wf.cx + ox) * 0.5f) + 5, (int)Math.Floor((wf.cz + oz) * 0.5f) - 9);
+                if (wingArea < 160f || hw < 0.4f) fl = Math.Max(1, floors - 1);
+                else if (hw > 0.85f && kind == TvCityShapes.Kind.Apartments) fl = floors + 1;
+            }
+            placingGroup = id;
+            placingFloors = fl;
+            try { PlaceHouse(wings[w], kind, wf); }
+            finally { placingGroup = -1; }
+        }
+    }
+
+    // Cuts a big outline where it turns (an L, a T, a U) into wings that each fill their rectangle well
+    void SplitWings(List<(float x, float z)> pts, int depth, List<List<(float x, float z)>> into)
+    {
+        Fit f = FitCells(pts);
+        float c = layer.cell, area = pts.Count * c * c;
+        if (f.fill >= 0.82f || depth >= 3 || area < 140f) { into.Add(pts); return; }
+        float bestScore = f.fill + 0.06f;
+        List<(float x, float z)> bestA = null, bestB = null;
+        for (int axis = 0; axis < 2; axis++)
+        {
+            float half = (axis == 0 ? f.len : f.wid) / 2f;
+            for (float cut = -half + 4f; cut <= half - 4f; cut += c)
+            {
+                var a = new List<(float x, float z)>();
+                var b = new List<(float x, float z)>();
+                foreach (var p in pts)
+                {
+                    float dx = p.x - f.cx, dz = p.z - f.cz;
+                    float w = axis == 0 ? dx * f.ux + dz * f.uz : -dx * f.uz + dz * f.ux;
+                    (w < cut ? a : b).Add(p);
+                }
+                if (a.Count * c * c < 60f || b.Count * c * c < 60f) continue;
+                float fa = FitCells(a).fill, fb = FitCells(b).fill;
+                float score = (fa * a.Count + fb * b.Count) / pts.Count;
+                if (score > bestScore) { bestScore = score; bestA = a; bestB = b; }
+            }
+        }
+        if (bestA == null) { into.Add(pts); return; }
+        foreach (var part in Parts(bestA)) SplitWings(part, depth + 1, into);
+        foreach (var part in Parts(bestB)) SplitWings(part, depth + 1, into);
+    }
+
+    // A row of terraced houses: homes of 6 to 7.5 m along the row, one look for the row, one or two floors
+    void RowHouses(List<(float x, float z)> pts, Fit f)
+    {
+        int hx = (int)Math.Floor((f.cx + ox) * 0.5f), hz = (int)Math.Floor((f.cz + oz) * 0.5f);
+        float h1 = TvRandom.Hash(hx + 41, hz + 7), h2 = TvRandom.Hash(hx - 19, hz - 63);
+        var g = new HouseGroup { look = (int)(h1 * 997f), floors = h2 < 0.55f ? 1 : 2, kind = TvCityShapes.Kind.TownHouse, row = true };
+        groups.Add(g);
+        int id = groups.Count - 1;
+        int homes = Math.Max(1, (int)Math.Round(f.len / (6f + h2 * 1.5f)));
+        var parts = new List<(float x, float z)>[homes];
+        for (int k = 0; k < homes; k++) parts[k] = new List<(float x, float z)>();
+        foreach (var p in pts)
+        {
+            float u = (p.x - f.cx) * f.ux + (p.z - f.cz) * f.uz + f.len / 2f;
+            int k = Math.Max(0, Math.Min(homes - 1, (int)(u / f.len * homes)));
+            parts[k].Add(p);
+        }
+        foreach (var part in parts)
+        {
+            if (part.Count == 0) continue;
+            placingGroup = id;
+            placingFloors = g.floors;
+            try { PlaceHouse(part, TvCityShapes.Kind.TownHouse, FitCells(part, f.angle)); }
+            finally { placingGroup = -1; }
+        }
+    }
+
     void PlaceHouse(List<(float x, float z)> pts, TvCityShapes.Kind kind) => PlaceHouse(pts, kind, FitCells(pts));
 
     void PlaceHouse(List<(float x, float z)> pts, TvCityShapes.Kind kind, Fit f)
     {
-        if (blockHouses != null) { blockHouses.Add((pts, kind)); return; }
+        if (blockHouses != null)
+        {
+            blockHouses.Add((pts, kind));
+            blockGroup.Add(placingGroup);
+            blockFloors.Add(placingGroup >= 0 ? placingFloors : 0);
+            return;
+        }
         if (!Inside(f.cx, f.cz, 0f)) return;
         float len = Math.Max(f.len, 4f), wid = Math.Max(f.wid, 3.5f), area = len * wid;
         int hx = (int)Math.Floor((f.cx + ox) * 0.5f), hz = (int)Math.Floor((f.cz + oz) * 0.5f);
@@ -568,6 +736,8 @@ public partial class TvWorldBuilder
         townFarMesh = new TvMesh { name = "Town houses far", group = TvMesh.Far };
         townThingMesh = new TvMesh { name = "Town things", group = TvMesh.Near };
         townBuiltMesh = new TvMesh { name = "Town bridges" };
+        // The garden edges (TvWorldBuilderYards): drawn near and far, they show where the gardens are
+        yardMesh = new TvMesh { name = "Town gardens" };
     }
 
     // ---- The town's small things, made once and shared by every piece ----
@@ -624,6 +794,7 @@ public partial class TvWorldBuilder
         TownLines();
         EnsureTownMeshes();
         TownStructures();
+        TownYards();
         var style = input.town.style;
         const float Step = 2f;
         // Spots on a lattice of whole map metres, so a spot is the same in every piece that sees it
@@ -1251,6 +1422,7 @@ public partial class TvWorldBuilder
             Keep(townFarMesh);
             Keep(townThingMesh);
             Keep(townBuiltMesh);
+            Keep(yardMesh);
         }
     }
 }
