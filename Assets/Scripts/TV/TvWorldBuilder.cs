@@ -123,6 +123,10 @@ public class TvWorld
     // The outside walls of a town's houses (run yourself): ax, az, bx, bz for each; the runner keeps its reach from them
     public readonly List<float> walls = new List<float>();
 
+    // A town's tunnels near the piece (run yourself: in the tunnel or up on its roof, two levels): ax, az, ux, uz,
+    // length, half width, floor height at the start and at the end, for each
+    public readonly List<float> tunnels = new List<float>();
+
     public void AddWall(float ax, float az, float bx, float bz)
     {
         walls.Add(ax); walls.Add(az); walls.Add(bx); walls.Add(bz);
@@ -392,6 +396,7 @@ public partial class TvWorldBuilder
         world.size = N;
         lines = NearLines(12f);
         points = NearPoints(6f);
+        ClearTunnels();
         F = new float[N * N];
         rock = new float[N * N];
         trackBlend = new float[N * N];
@@ -487,6 +492,7 @@ public partial class TvWorldBuilder
         world.hasUnit = false;
         lines = NearLines(14f);
         points = NearPoints(12f);
+        ClearTunnels();
         F = new float[N * N];
         rock = new float[N * N];
         trackBlend = new float[N * N];
@@ -519,6 +525,9 @@ public partial class TvWorldBuilder
         Heights();
         Tracks();
         world.ground = F;
+        if (tunnelPlans != null)
+            foreach (TunnelPlan tp in tunnelPlans)
+                world.tunnels.AddRange(new[] { tp.ax, tp.az, tp.ux, tp.uz, tp.len, tp.half, tp.fa, tp.fb });
         if (input.chunkDetail)
         {
             if (input.baseSolids != null) world.solids.AddRange(input.baseSolids);
@@ -1697,6 +1706,7 @@ public partial class TvWorldBuilder
     void AddRock(float x, float z, float s, float sink, bool solid, float tint = -1f)
     {
         if (!Inside(x, z, 1.5f)) return;
+        if (InTunnel(x, z, 0.6f + s * 0.5f) != null) return;
         rockMesh.Add(RockFor(x, z, s), x, H(x, z) - sink * s, z, s, s * Rr(0.85f, 1.15f), s, Rr(0f, 6.283f), tint < 0f ? Rr(0.9f, 1.08f) : tint);
         world.rocks++;
         if (solid) world.solids.Add(new TvSolid { x = x, z = z, r = s * 0.95f });

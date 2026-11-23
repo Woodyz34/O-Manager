@@ -186,7 +186,11 @@ public partial class TvWorldBuilder
             StairPlan plan = PlanStairs(l.xz, l.w);
             if (plan != null) plans.Add(plan);
         }
+        PlanTunnels();
         JoinStairs(plans);
+        // Every end's ground first, then every flight: one stairs' way in never digs under another flight
+        // (2026-11-23, Anders: a flight hung in the air over the dug way of the stairs below it)
+        foreach (StairPlan plan in plans) ShapeStairEnds(plan);
         foreach (StairPlan plan in plans) ApplyStairs(plan);
         foreach (var l in townLines)
         {
@@ -211,6 +215,203 @@ public partial class TvWorldBuilder
                     F[k] = Lerp(deck, F[k], Sm(bh - 0.05f, bh + 0.4f, d));
                 });
             }
+        }
+        TunnelHeights();
+    }
+
+    // ---- Tunnels (2026-11-23, Anders: junk and steps inside a tunnel, a fence across its mouth, and the road over it
+    // down at the tunnel's floor, so a runner went in and out onto the road sideways) ----
+    // A tunnel has a clean floor, straight from one mouth to the other; nothing stands in it (no cliff, wall, fence or
+    // stone of the map crossing it); the road or path over it lies on its roof, easing back down to the land along
+    // the road; and wing walls hold the raised road at its mouths. The runner is either in the tunnel or up on its roof
+    // (RunWorld.Tunnel, RunPlayer): two levels.
+
+    public const float TunnelRoof = 3.4f;     // the roof's top over the floor: the walls are 2.8 m, the slab 0.6 m
+
+    class TunnelPlan
+    {
+        public float ax, az, ux, uz, len, half, fa, fb;
+        public bool underHouse;         // a passage through a house: the house stands over it, no road is raised
+        public float FloorAt(float t) => fa + (fb - fa) * Math.Max(0f, Math.Min(1f, t / Math.Max(0.1f, len)));
+    }
+    List<TunnelPlan> tunnelPlans;
+
+    void PlanTunnels()
+    {
+        if (tunnelPlans != null) return;
+        tunnelPlans = new List<TunnelPlan>();
+        TownLines();
+        foreach (var l in townLines)
+        {
+            if (l.kind != 2) continue;
+            float[] c = l.xz;
+            float ax = c[0], az = c[1], bx = c[c.Length - 2], bz = c[c.Length - 1];
+            float len = (float)Math.Sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
+            if (len < 2f) continue;
+            var p = new TunnelPlan { ax = ax, az = az, ux = (bx - ax) / len, uz = (bz - az) / len, len = len, half = TunnelWidth(l.w) / 2f };
+            // The floor: a straight line through the map's heights along its middle, at most 1 in 8
+            float sw = 0f, st = 0f, sy = 0f, stt = 0f, sty = 0f;
+            for (float t = len * 0.15f; t <= len * 0.85f + 0.01f; t += 0.5f)
+            {
+                float y = Plain(ax + p.ux * t, az + p.uz * t);
+                sw += 1f; st += t; sy += y; stt += t * t; sty += t * y;
+            }
+            int houseCells = 0, all = 0;
+            for (float t = len * 0.2f; t <= len * 0.8f + 0.01f; t += 1f, all++)
+                if (Base(CellAt(ax + p.ux * t, az + p.uz * t)) == WorldCell.Building) houseCells++;
+            p.underHouse = houseCells * 3 >= all;
+            float den = sw * stt - st * st;
+            float slope = Math.Abs(den) > 1e-4f ? (sw * sty - st * sy) / den : 0f;
+            slope = Math.Max(-0.125f, Math.Min(0.125f, slope));
+            float mid = (sy - slope * st) / Math.Max(1f, sw);
+            p.fa = mid;
+            p.fb = mid + slope * len;
+            tunnelPlans.Add(p);
+        }
+    }
+
+    // The tunnel whose inside (pad metres more all round) holds this point, or null
+    TunnelPlan InTunnel(float x, float z, float pad)
+    {
+        if (input.town == null) return null;
+        PlanTunnels();
+        foreach (TunnelPlan p in tunnelPlans)
+        {
+            float dx = x - p.ax, dz = z - p.az, t = dx * p.ux + dz * p.uz, a = Math.Abs(-dx * p.uz + dz * p.ux);
+            if (t >= -pad && t <= p.len + pad && a <= p.half + pad) return p;
+        }
+        return null;
+    }
+
+    // Takes out of the map's lines and points near the piece whatever lies inside a tunnel: the mouths stay open and
+    // the inside clean (the map draws the road's walls, fences and banks right across a tunnel's mouths)
+    void ClearTunnels()
+    {
+        if (input.town == null) return;
+        PlanTunnels();
+        if (tunnelPlans.Count == 0) return;
+        for (int i = lines.Count - 1; i >= 0; i--)
+        {
+            switch (lines[i].kind)
+            {
+                case WorldLineKind.Fence: case WorldLineKind.HighFence: case WorldLineKind.Wall: case WorldLineKind.HighWall:
+                case WorldLineKind.RuinedWall: case WorldLineKind.RuinedFence: case WorldLineKind.Hedge: case WorldLineKind.Cliff:
+                case WorldLineKind.SmallCliff: case WorldLineKind.EarthBank: case WorldLineKind.EarthWall: case WorldLineKind.Log:
+                    break;
+                default:
+                    continue;
+            }
+            List<float[]> parts = null;
+            foreach (TunnelPlan p in tunnelPlans)
+            {
+                var next = new List<float[]>();
+                foreach (float[] part in parts ?? new List<float[]> { lines[i].xz }) next.AddRange(ClipOut(part, p, 0.3f));
+                parts = next;
+            }
+            if (parts.Count == 1 && parts[0] == lines[i].xz) continue;
+            var kind = lines[i].kind;
+            lines.RemoveAt(i);
+            foreach (float[] part in parts) if (part.Length >= 4) lines.Insert(i, (kind, part));
+        }
+        points.RemoveAll(q => InTunnel(q.x, q.z, 0.8f) != null);
+    }
+
+    // The parts of a polyline outside a tunnel's inside (pad metres more all round)
+    static List<float[]> ClipOut(float[] c, TunnelPlan p, float pad)
+    {
+        var result = new List<float[]>();
+        var cur = new List<float>();
+        bool cut = false;
+        float t0 = -pad, t1 = p.len + pad, a1 = p.half + pad;
+        for (int q = 0; q + 3 < c.Length; q += 2)
+        {
+            float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
+            // The stretch of this segment inside the box, in the tunnel's frame (Liang-Barsky)
+            float sa = (ax - p.ax) * p.ux + (az - p.az) * p.uz, va = -(ax - p.ax) * p.uz + (az - p.az) * p.ux;
+            float sb = (bx - p.ax) * p.ux + (bz - p.az) * p.uz, vb = -(bx - p.ax) * p.uz + (bz - p.az) * p.ux;
+            float lo = 0f, hi = 1f;
+            bool hit = Clip(sb - sa, t0 - sa, ref lo, ref hi) && Clip(sa - sb, sa - t1, ref lo, ref hi)
+                       && Clip(vb - va, -a1 - va, ref lo, ref hi) && Clip(va - vb, va - a1, ref lo, ref hi) && hi > lo;
+            if (cur.Count == 0) { cur.Add(ax); cur.Add(az); }
+            if (!hit) { cur.Add(bx); cur.Add(bz); continue; }
+            cut = true;
+            if (lo > 0f) { cur.Add(ax + (bx - ax) * lo); cur.Add(az + (bz - az) * lo); }
+            if (cur.Count >= 4) result.Add(cur.ToArray());
+            cur = new List<float>();
+            if (hi < 1f) { cur.Add(ax + (bx - ax) * hi); cur.Add(az + (bz - az) * hi); cur.Add(bx); cur.Add(bz); }
+        }
+        if (!cut) return new List<float[]> { c };
+        if (cur.Count >= 4) result.Add(cur.ToArray());
+        return result;
+    }
+
+    static bool Clip(float d, float n, ref float lo, ref float hi)
+    {
+        // Keeps the part where d * u >= n
+        if (Math.Abs(d) < 1e-6f) return n <= 0f;
+        float u = n / d;
+        if (d > 0f) { if (u > lo) lo = u; }
+        else if (u < hi) hi = u;
+        return lo <= hi;
+    }
+
+    // At each mouth of a tunnel, a wall across holding the raised road, out to where the road is down at the land
+    void TunnelPortals(float[] c, float W, TvColor concrete)
+    {
+        TunnelPlan p = InTunnel((c[0] + c[c.Length - 2]) / 2f, (c[1] + c[c.Length - 1]) / 2f, 0f);
+        if (p == null || p.underHouse) return;
+        foreach (float tEnd in new[] { 0f, p.len })
+        {
+            float out0 = tEnd == 0f ? -1f : 1f;
+            float mx = p.ax + p.ux * tEnd, mz = p.az + p.uz * tEnd;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                for (float a = W / 2f + 0.2f; a < W / 2f + 40f; a += 1f)
+                {
+                    float nx = -p.uz * side, nz = p.ux * side;
+                    float x = mx + nx * (a + 0.5f), z = mz + nz * (a + 0.5f);
+                    if (!Inside(x, z, 0f)) continue;
+                    float ix = x - p.ux * out0 * 0.6f, iz = z - p.uz * out0 * 0.6f;
+                    float top = H(ix, iz), low = H(x + p.ux * out0 * 0.8f, z + p.uz * out0 * 0.8f);
+                    // Only where the road was raised over the tunnel (a wall of the map holds its own drop)
+                    if (top - low < 0.4f || top - Plain(ix, iz) < 0.4f) break;
+                    var b = new TvShapeBuilder(random);
+                    b.Box(-0.52f, low - 0.4f - top, -0.2f, 0.52f, 0.15f, 0.2f, concrete);
+                    townBuiltMesh.Add(b.Done(), x, top, z, 1f, 1f, 1f, (float)Math.Atan2(-nz, nx));
+                    world.solids.Add(new TvSolid { x = x, z = z, r = 0.3f });
+                }
+            }
+        }
+    }
+
+    // The tunnel's floor, and the road over it raised to its roof
+    void TunnelHeights()
+    {
+        foreach (TunnelPlan p in tunnelPlans)
+        {
+            float ex = p.ax + p.ux * p.len, ez = p.az + p.uz * p.len;
+            ForNear(p.ax, p.az, ex, ez, p.half + 45f, (k, d, qx, qz) =>
+            {
+                float x = k % N - R, z = k / N - R;
+                float dx = x - p.ax, dz = z - p.az, t = dx * p.ux + dz * p.uz, a = Math.Abs(-dx * p.uz + dz * p.ux);
+                float floor = p.FloorAt(t);
+                if (t < 0f || t > p.len)
+                {
+                    // In front of a mouth: the floor runs out into the ground over 4 m
+                    float out0 = t < 0f ? -t : t - p.len;
+                    if (a <= p.half + 0.5f && out0 < 4f) F[k] = Lerp(floor, F[k], Sm(0.3f, 4f, out0));
+                    return;
+                }
+                if (a <= p.half + 0.15f) { F[k] = floor; return; }
+                if (p.underHouse) return;
+                if (Base(CellAt(x, z)) == WorldCell.Building || Base(CellAt(x, z)) == WorldCell.Water) return;
+                if (wLvl != null && wLvl[k] > -0.6f) return;
+                // Over the tunnel: the road on its roof, down to the land along the road at about 1 in 10
+                float roof = floor + TunnelRoof, rise = roof - F[k];
+                if (rise <= 0f) return;
+                float ramp = Math.Max(6f, Math.Min(40f, rise * 10f));
+                F[k] = Math.Max(F[k], Lerp(roof, F[k], Sm(p.half + 0.4f, p.half + 0.4f + ramp, a)));
+            });
         }
     }
 
@@ -400,17 +601,19 @@ public partial class TvWorldBuilder
                 }
     }
 
+    void ShapeStairEnds(StairPlan p)
+    {
+        if (p.door) return;
+        // The low end: dug down to its height (a flat way in), or raised a little to it
+        float atLow = Plain(p.lx, p.lz), atTop = Plain(p.tx, p.tz);
+        float digLen = Math.Max(p.dig, Math.Max(2f, Math.Abs(atLow - p.hLow) * 1.5f));
+        Shape(p.lx, p.lz, p.lux, p.luz, p.half, digLen, p.hLow);
+        float raiseLen = Math.Max(2f, Math.Abs(p.hHigh - atTop) * 1.5f);
+        Shape(p.tx, p.tz, p.tux, p.tuz, p.half, raiseLen, p.hHigh);
+    }
+
     void ApplyStairs(StairPlan p)
     {
-        if (!p.door)
-        {
-            // The low end: dug down to its height (a flat way in), or raised a little to it
-            float atLow = Plain(p.lx, p.lz), atTop = Plain(p.tx, p.tz);
-            float digLen = Math.Max(p.dig, Math.Max(2f, Math.Abs(atLow - p.hLow) * 1.5f));
-            Shape(p.lx, p.lz, p.lux, p.luz, p.half, digLen, p.hLow);
-            float raiseLen = Math.Max(2f, Math.Abs(p.hHigh - atTop) * 1.5f);
-            Shape(p.tx, p.tz, p.tux, p.tuz, p.half, raiseLen, p.hHigh);
-        }
         float[] c = p.c;
         float rise = p.hHigh - p.hLow;
         for (int q = 0; q + 3 < c.Length; q += 2)
@@ -418,7 +621,7 @@ public partial class TvWorldBuilder
             int seg = q / 2;
             float sx = c[q], sz = c[q + 1], ex = c[q + 2], ez = c[q + 3];
             float segLen = p.along[seg + 1] - p.along[seg];
-            ForNear(sx, sz, ex, ez, p.half + 0.9f, (k, d, qx, qz) =>
+            ForNear(sx, sz, ex, ez, p.half + 2f, (k, d, qx, qz) =>
             {
                 float x = k % N - R, z = k / N - R;
                 if (d > p.half + 0.1f && AcrossWall(qx, qz, x, z)) return;
@@ -426,7 +629,7 @@ public partial class TvWorldBuilder
                 float f = (p.along[seg] + t * segLen) / p.total;
                 if (p.sign < 0) f = 1f - f;
                 float y = p.hLow + rise * f;
-                F[k] = Lerp(y, F[k], Sm(p.half + 0.15f, p.half + 0.9f, d));
+                F[k] = Lerp(y, F[k], Sm(p.half + 0.15f, p.half + 2f, d));
             });
         }
     }
@@ -456,7 +659,14 @@ public partial class TvWorldBuilder
     static float TunnelWidth(float w) => w > 0.5f ? Math.Max(2.4f, Math.Min(10f, w - 0.4f)) : 3.2f;
 
     // The height of a bridge's deck at a point on it
-    float DeckAt(float x, float z) => H(x, z);
+    // (over a tunnel: on its roof)
+    float DeckAt(float x, float z)
+    {
+        TunnelPlan p = InTunnel(x, z, 0f);
+        if (p == null) return H(x, z);
+        float t = (x - p.ax) * p.ux + (z - p.az) * p.uz;
+        return Math.Max(H(x, z), p.FloorAt(t) + TunnelRoof);
+    }
 
     // ---- Houses ----
 
@@ -487,14 +697,18 @@ public partial class TvWorldBuilder
         foreach (var a in arch)
         {
             if (input.chunkDetail || !Inside(a.x, a.z, 0f)) continue;
-            float y = H(a.x, a.z);
-            int look = (int)(TvRandom.Hash((int)Math.Floor((a.x + ox) / 6f), (int)Math.Floor((a.z + oz) / 6f)) * 97f);
+            // The house over the passage: from the tunnel's roof up, all one colour along one tunnel (2026-11-23, Anders:
+            // the cells' boxes in many colours at many heights looked like a house cut to pieces)
+            float y = H(a.x, a.z), from = y + 3.0f;
+            TunnelPlan tp = InTunnel(a.x, a.z, 1.5f);
+            int lookKey = tp != null ? (int)Math.Floor(tp.ax + ox) * 31 + (int)Math.Floor(tp.az + oz) : (int)Math.Floor((a.x + ox) / 6f) * 31 + (int)Math.Floor((a.z + oz) / 6f);
+            if (tp != null) from = tp.FloorAt((a.x - tp.ax) * tp.ux + (a.z - tp.az) * tp.uz) + TunnelRoof;
+            int look = (int)(TvRandom.Hash(lookKey, 7) * 97f);
             TvColor wall = Old ? TvColor.Hex("#ece6d6") : TvCityShapes.Facades[look % TvCityShapes.Facades.Length];
-            float top = Old ? 5.9f : 6.8f;
+            float to = Math.Max(from + 2.5f, y + (Old ? 5.9f : 6.8f));
             // With the bridges: the houses near the runner are swapped for the detail build's, which has no arches
-            townBuiltMesh.Add(Box(layer.cell + 0.04f, top - 3.0f, layer.cell + 0.04f, wall), a.x, y + 3.0f, a.z, 1f, 1f, 1f, 0f);
-            townBuiltMesh.Add(Box(layer.cell + 0.04f, 0.1f, layer.cell + 0.04f, TvColor.Hex("#3e3a36")), a.x, y + 2.95f, a.z, 1f, 1f, 1f, 0f);
-            townFarMesh.Add(Box(layer.cell + 0.04f, top - 3.0f, layer.cell + 0.04f, wall), a.x, y + 3.0f, a.z, 1f, 1f, 1f, 0f);
+            townBuiltMesh.Add(Box(layer.cell + 0.04f, to - from, layer.cell + 0.04f, wall), a.x, from, a.z, 1f, 1f, 1f, 0f);
+            townFarMesh.Add(Box(layer.cell + 0.04f, to - from, layer.cell + 0.04f, wall), a.x, from, a.z, 1f, 1f, 1f, 0f);
         }
         if (pts.Count == 0) return;
         bool isChurch = church >= 0 && group.Contains(church), isHall = !isChurch && hall >= 0 && group.Contains(hall);
@@ -1228,19 +1442,30 @@ public partial class TvWorldBuilder
                         b.Box(-pl / 2f, Top - 0.05f, -W / 2f, pl / 2f, Top, W / 2f, dark);
                         townBuiltMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, yaw);
                     }
+                    if (q == 0) TunnelPortals(c, W, concrete);
                 }
                 else if (l.kind == 3)
                 {
-                    // Stairs: a step every 0.35 m, each as high as the ground there, with low cheeks
+                    // Stairs: a step every 0.35 m, each as high as the ground there, with low cheeks. Each step and
+                    // cheek reaches down to the lowest ground under it, so a flight never hangs in the air where the
+                    // ground beside it lies lower (2026-11-23, Anders: flying stairs)
                     float w = l.w > 0.5f ? l.w : 2f;
                     int steps = Math.Max(1, (int)(len / 0.35f));
                     for (int p = 0; p < steps; p++)
                     {
                         float t = (p + 0.5f) / steps, x = ax + dx * len * t, z = az + dz * len * t, y = H(x, z) + 0.06f, sl = len / steps + 0.02f;
+                        float foot = 0f;
+                        for (float o = 0f; o <= w / 2f + 0.3f; o += 0.5f)
+                            for (float a = -0.5f; a <= 0.5f; a += 1f)
+                            {
+                                float fx = x + dx * sl * a, fz = z + dz * sl * a;
+                                foot = Math.Min(foot, Math.Min(H(fx - dz * o, fz + dx * o), H(fx + dz * o, fz - dx * o)) - y);
+                            }
+                        float down = Math.Max(-8f, Math.Min(-0.5f, foot - 0.15f));
                         var b = new TvShapeBuilder(random);
-                        b.Box(-sl / 2f, -0.5f, -w / 2f, sl / 2f, 0f, w / 2f, stepC.Shade(p % 2 == 0 ? 1f : 0.94f));
-                        b.Box(-sl / 2f, -0.5f, -w / 2f - 0.25f, sl / 2f, 0.3f, -w / 2f, concrete);
-                        b.Box(-sl / 2f, -0.5f, w / 2f, sl / 2f, 0.3f, w / 2f + 0.25f, concrete);
+                        b.Box(-sl / 2f, down, -w / 2f, sl / 2f, 0f, w / 2f, stepC.Shade(p % 2 == 0 ? 1f : 0.94f));
+                        b.Box(-sl / 2f, down, -w / 2f - 0.25f, sl / 2f, 0.3f, -w / 2f, concrete);
+                        b.Box(-sl / 2f, down, w / 2f, sl / 2f, 0.3f, w / 2f + 0.25f, concrete);
                         townBuiltMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, yaw);
                     }
                 }
