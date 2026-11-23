@@ -25,6 +25,7 @@ MonoBehaviour:
   cols: 335
   pointsPath: MapPackages/nya-slogebo/points
   linesPath: MapPackages/nya-slogebo/lines
+  editedAt: 1795434736
   defaultBackground: map
   backgrounds:
   - id: map
@@ -34,6 +35,6 @@ MonoBehaviour:
     rotation: 0
     scale: 1
     courseInPicture: 0
-    pixelSize: {x: 5360, y: 6400}
-    pivotPixels: {x: 2680, y: 3200}
-    pixelsPerUnit: 160
+    pixelSize: {x: 3576, y: 4268}
+    pivotPixels: {x: 1786.6666, y: 2133.3333}
+    pixelsPerUnit: 106.66667

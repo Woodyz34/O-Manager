@@ -25,6 +25,7 @@ MonoBehaviour:
   cols: 670
   pointsPath: MapPackages/illern/points
   linesPath: MapPackages/illern/lines
+  editedAt: 1795434727
   defaultBackground: map
   backgrounds:
   - id: map
@@ -34,6 +35,6 @@ MonoBehaviour:
     rotation: 0
     scale: 1
     courseInPicture: 0
-    pixelSize: {x: 10720, y: 9488}
-    pivotPixels: {x: 5360, y: 4744}
-    pixelsPerUnit: 160
+    pixelSize: {x: 7148, y: 6328}
+    pivotPixels: {x: 3573.3333, y: 3162.6667}
+    pixelsPerUnit: 106.66667

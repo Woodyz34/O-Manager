@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdf7c09cbde9a0e429736d1cbce57569, type: 3}
+  m_Name: bergen-sentrum-base-map-nof-saml
+  m_EditorClassIdentifier: Assembly-CSharp::MapDefinition
+  id: bergen-sentrum-base-map-nof-saml
+  displayName: Bergen sentrum base map NOF saml
+  mapType: sprint
+  gridName: MapPackages/bergen-sentrum-base-map-nof-saml/grid
+  minx: 1001.2764
+  miny: 1001.16
+  maxx: 4603.2764
+  maxy: 5651.16
+  gridSize: 2
+  rows: 2326
+  cols: 1802
+  pointsPath: MapPackages/bergen-sentrum-base-map-nof-saml/points
+  linesPath: MapPackages/bergen-sentrum-base-map-nof-saml/lines
+  editedAt: 0
+  defaultBackground: map
+  backgrounds:
+  - id: map
+    spritePath: MapPackages/bergen-sentrum-base-map-nof-saml/picture
+    thumbnailPath: MapPackages/bergen-sentrum-base-map-nof-saml/thumb
+    position: {x: 0, y: 0, z: 0}
+    rotation: 0
+    scale: 1
+    courseInPicture: 0
+    pixelSize: {x: 12692, y: 16380}
+    pivotPixels: {x: 6344.9614, y: 8190}
+    pixelsPerUnit: 352.10663

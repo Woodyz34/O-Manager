@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdf7c09cbde9a0e429736d1cbce57569, type: 3}
+  m_Name: delsjon
+  m_EditorClassIdentifier: Assembly-CSharp::MapDefinition
+  id: delsjon
+  displayName: "Delsj\xF6n"
+  mapType: forest
+  gridName: MapPackages/delsjon/grid
+  minx: 1005.35
+  miny: 1005.95
+  maxx: 9735.35
+  maxy: 9235.95
+  gridSize: 10
+  rows: 824
+  cols: 874
+  pointsPath: MapPackages/delsjon/points
+  linesPath: MapPackages/delsjon/lines
+  editedAt: 0
+  defaultBackground: map
+  backgrounds:
+  - id: map
+    spritePath: MapPackages/delsjon/picture
+    thumbnailPath: MapPackages/delsjon/thumb
+    position: {x: 0, y: 0, z: 0}
+    rotation: 0
+    scale: 1
+    courseInPicture: 0
+    pixelSize: {x: 9324, y: 8792}
+    pivotPixels: {x: 4661.3335, y: 4394.6665}
+    pixelsPerUnit: 106.66667

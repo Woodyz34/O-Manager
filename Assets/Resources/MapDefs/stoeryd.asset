@@ -25,6 +25,7 @@ MonoBehaviour:
   cols: 150
   pointsPath: MapPackages/stoeryd/points
   linesPath: MapPackages/stoeryd/lines
+  editedAt: 1795434747
   defaultBackground: map
   backgrounds:
   - id: map
@@ -34,6 +35,6 @@ MonoBehaviour:
     rotation: 0
     scale: 1
     courseInPicture: 0
-    pixelSize: {x: 4800, y: 6688}
-    pivotPixels: {x: 2400, y: 3344}
-    pixelsPerUnit: 320
+    pixelSize: {x: 3200, y: 4460}
+    pivotPixels: {x: 1600, y: 2229.3333}
+    pixelsPerUnit: 213.33334
