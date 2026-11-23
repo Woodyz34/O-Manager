@@ -126,6 +126,10 @@ public class SceneLoader : MonoBehaviour
         float shownAt = Time.unscaledTime;
         yield return null;   // let the page draw before the loading starts
 
+        // Let the loading thread work in the background without starving the frames that draw the page, so the
+        // spinner keeps turning while the scene loads (2026-11-23)
+        ThreadPriority before = Application.backgroundLoadingPriority;
+        Application.backgroundLoadingPriority = ThreadPriority.Low;
         AsyncOperation operation = SceneManager.LoadSceneAsync(scene, mode);
         operation.allowSceneActivation = false;
         while (operation.progress < 0.9f)
@@ -140,6 +144,7 @@ public class SceneLoader : MonoBehaviour
         }
         operation.allowSceneActivation = true;
         while (!operation.isDone) yield return null;
+        Application.backgroundLoadingPriority = before;
         if (slider != null) slider.value = 1f;
         yield return null;   // one frame for the new scene's Start methods
         if (page != null) page.SetActive(false);

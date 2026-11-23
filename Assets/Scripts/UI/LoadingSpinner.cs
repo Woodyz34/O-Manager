@@ -8,6 +8,7 @@ public class LoadingSpinner : MonoBehaviour
     const int Dots = 12;
     Image[] images;
     Color color;
+    int shownHead = -1;
 
     // anchor is where on the parent the middle of the ring sits, position is the offset from there
     public static LoadingSpinner Add(Transform parent, Vector2 anchor, Vector2 position, float radius = 36f, float dotSize = 12f, Color? colour = null)
@@ -32,6 +33,8 @@ public class LoadingSpinner : MonoBehaviour
     void Update()
     {
         int head = Mathf.FloorToInt(Time.unscaledTime * 12f) % Dots;
+        if (head == shownHead) return;   // only redraw when the ring has moved on: costs next to nothing
+        shownHead = head;
         for (int i = 0; i < Dots; i++)
         {
             int behind = (head - i + Dots) % Dots;
