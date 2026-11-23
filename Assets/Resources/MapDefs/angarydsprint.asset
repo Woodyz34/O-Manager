@@ -17,7 +17,7 @@ MonoBehaviour:
   mapType: sprint
   gridName: MapPackages/angarydsprint/grid
   minx: 1023.652
-  miny: 1427.2839
+  miny: 1427.284
   maxx: 2233.652
   maxy: 3827.284
   gridSize: 2
@@ -25,6 +25,7 @@ MonoBehaviour:
   cols: 606
   pointsPath: MapPackages/angarydsprint/points
   linesPath: MapPackages/angarydsprint/lines
+  editedAt: 1795434703
   defaultBackground: map
   backgrounds:
   - id: map

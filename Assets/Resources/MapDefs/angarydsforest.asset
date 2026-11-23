@@ -25,6 +25,7 @@ MonoBehaviour:
   cols: 219
   pointsPath: MapPackages/angarydsforest/points
   linesPath: MapPackages/angarydsforest/lines
+  editedAt: 1795434757
   defaultBackground: map
   backgrounds:
   - id: map

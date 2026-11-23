@@ -31,13 +31,14 @@
   "sender": "Anders Skoglund",
   "ownerClub": "SOL Tranås",
   "contact": "anders.skoglund.tranas@gmail.com",
-  "created": "2026-11-14",
+  "created": "2026-11-23",
+  "editedAt": 1795434757,
   "sharedBy": "",
   "sharedAt": 0,
   "isPrivate": false,
   "privateSourceKey": "",
+  "rulesVersion": 6,
   "terrain": {"overall": 0.5, "roads": 0.5, "paths": 0.5, "forest": 0.5, "lightGreen": 0.5, "midGreen": 0.5, "darkGreen": 0.5, "marsh": 0.5, "stony": 0.5, "open": 0.5, "roughOpen": 0.5, "paved": 0.5},
-  "look": {"ground": "sand", "forest": "beech", "undergrowth": 0.784, "text": ""},
-  "rulesVersion": 3,
+  "look": {"ground": "sand", "forest": "beech", "town": "swedish", "undergrowth": 0.784, "text": ""},
   "permissionConfirmed": true
 }
