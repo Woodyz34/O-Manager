@@ -18,10 +18,11 @@ public partial class TvWorldBuilder
 {
     bool[] pavedCorner;                 // the ground corners on streets, squares and under houses (Ground)
     TvMesh townMesh, townFarMesh, townThingMesh, townBuiltMesh, pavedMesh;
-    List<(int kind, float[] xz, float w)> townLines;    // 1 bridge, 2 tunnel, 3 stairs, 4 canopy outline; the piece's metres
+    List<(int kind, float[] xz, float w, int flags)> townLines;    // 1 bridge, 2 tunnel, 3 stairs, 4 canopy outline; the piece's metres; flags: TvBridges
+    List<(float[] xz, float w, bool paved)> townPaths;              // the town's paths and paved ways near the piece
     readonly List<(float x, float z, float r, int kind)> townPlaced = new List<(float, float, float, int)>();
 
-    bool Old => input.town.style == TvCityShapes.Style.OldStone;
+    bool Old => input.town != null && input.town.style == TvCityShapes.Style.OldStone;
 
     static readonly TvColor AsphaltA = TvColor.Hex("#6c6b69"), AsphaltB = TvColor.Hex("#7b7a76"),
         CobbleA = TvColor.Hex("#a39a8a"), CobbleB = TvColor.Hex("#8e8676");
@@ -38,29 +39,62 @@ public partial class TvWorldBuilder
     void TownLines()
     {
         if (townLines != null) return;
-        townLines = new List<(int, float[], float)>();
+        townLines = new List<(int, float[], float, int)>();
+        townPaths = new List<(float[], float, bool)>();
         TvTown t = input.town;
-        void Take(List<float[]> src, int kind, List<float> widths = null)
+        float[] Local(float[] xy)
+        {
+            var xz = new float[xy.Length];
+            float lo = float.MaxValue, hi = float.MinValue, lo2 = float.MaxValue, hi2 = float.MinValue;
+            for (int i = 0; i + 1 < xy.Length; i += 2)
+            {
+                xz[i] = (float)(xy[i] - input.centerE);
+                xz[i + 1] = (float)(xy[i + 1] - input.centerN);
+                lo = Math.Min(lo, xz[i]); hi = Math.Max(hi, xz[i]); lo2 = Math.Min(lo2, xz[i + 1]); hi2 = Math.Max(hi2, xz[i + 1]);
+            }
+            if (hi < -R - 100 || lo > R + 100 || hi2 < -R - 100 || lo2 > R + 100) return null;   // as far as Buildings looks
+            return xz;
+        }
+        void Take(List<float[]> src, int kind, List<float> widths = null, List<int> flags = null)
         {
             for (int s = 0; s < src.Count; s++)
             {
-                float[] xy = src[s];
-                var xz = new float[xy.Length];
-                float lo = float.MaxValue, hi = float.MinValue, lo2 = float.MaxValue, hi2 = float.MinValue;
-                for (int i = 0; i + 1 < xy.Length; i += 2)
-                {
-                    xz[i] = (float)(xy[i] - input.centerE);
-                    xz[i + 1] = (float)(xy[i + 1] - input.centerN);
-                    lo = Math.Min(lo, xz[i]); hi = Math.Max(hi, xz[i]); lo2 = Math.Min(lo2, xz[i + 1]); hi2 = Math.Max(hi2, xz[i + 1]);
-                }
-                if (hi < -R - 100 || lo > R + 100 || hi2 < -R - 100 || lo2 > R + 100) continue;   // as far as Buildings looks
-                townLines.Add((kind, xz, widths != null && s < widths.Count ? widths[s] : 0f));
+                float[] xz = Local(src[s]);
+                if (xz == null) continue;
+                townLines.Add((kind, xz, widths != null && s < widths.Count ? widths[s] : 0f, flags != null && s < flags.Count ? flags[s] : 0));
             }
         }
-        Take(t.bridges, 1, t.bridgeWidths);
+        if (t == null)
+        {
+            // A forest map: only its footbridges (TvBridges)
+            foreach (TvBridges.Span span in TvBridges.Forest(layer))
+            {
+                float[] xz = Local(span.xy);
+                if (xz != null) townLines.Add((1, xz, span.width, span.flags));
+            }
+            return;
+        }
+        Take(t.bridges, 1, t.bridgeWidths, t.bridgeFlags);
         Take(t.tunnels, 2, t.tunnelWidths);
         Take(t.stairs, 3, t.stairWidths);
         Take(t.canopies, 4);
+        foreach (TvBridges.PathLine path in t.paths)
+        {
+            float[] xz = Local(path.xy);
+            if (xz != null) townPaths.Add((xz, path.width, path.paved));
+        }
+    }
+
+    // Beside the deck of a bridge made from a path over water (TvBridges.OverWater): water, whatever the 2 m cells say
+    bool BridgeWater(float x, float z)
+    {
+        if (townLines == null) return false;
+        foreach (var l in townLines)
+        {
+            if (l.kind != 1 || (l.flags & TvBridges.OverWater) == 0) continue;
+            if (TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, 3f)) return true;
+        }
+        return false;
     }
 
     // Metres to the nearest line of a kind (99 when none is near)
@@ -153,10 +187,16 @@ public partial class TvWorldBuilder
         }
     }
 
-    // Stairs always climb (2026-11-20, Anders: flat stairs looked wrong). Which way and how much: the map's heights
-    // a little beyond each end when they differ; else up to the house the stairs lead to (steps up to a door); else
-    // the way the land rises round them; else up along the line as drawn. The ground along the stairs is set to
-    // the slope, and the steps (TownStructures) follow it.
+    // Stairs always climb (2026-11-20, Anders: flat stairs looked wrong), and at a real stair angle (2026-11-23,
+    // Anders: a street climbed evenly up to a flat stair; it should be flat up to the stairs and then steeply up them,
+    // digging the ground down a little in front of them if that is what it takes). Which way they climb: the map's
+    // heights a little beyond each end when they differ; else up to the house the stairs lead to (steps up to a
+    // door); else the way the land rises round them; else up along the line as drawn.
+    // When the land rises towards the stairs, the top keeps its height and the low end goes down to a real stair
+    // angle (StairGrade): the ground in front of the stairs is dug down to a flat way in, as far out as the map's
+    // own ground is that low. The ground along the stairs is set to the slope, and the steps (TownStructures) follow it.
+    const float StairGrade = 0.55f;
+
     void StairSlope(float[] c, float width)
     {
         int n = c.Length / 2;
@@ -171,26 +211,52 @@ public partial class TvWorldBuilder
         float adx = c[0] - c[2], adz = c[1] - c[3], al = Math.Max(0.01f, (float)Math.Sqrt(adx * adx + adz * adz));
         float bdx = c[c.Length - 2] - c[c.Length - 4], bdz = c[c.Length - 1] - c[c.Length - 3], bl = Math.Max(0.01f, (float)Math.Sqrt(bdx * bdx + bdz * bdz));
         adx /= al; adz /= al; bdx /= bl; bdz /= bl;
+        float half = (width > 0.5f ? width : 2f) / 2f;
         float hA = Plain(ax + adx * 2.5f, az + adz * 2.5f), hB = Plain(bx + bdx * 2.5f, bz + bdz * 2.5f);
         float dh = hB - hA, usual = Math.Max(0.45f, Math.Min(total * 0.5f, 3f));
-        float rise;
-        if (Math.Abs(dh) >= 0.3f) rise = Math.Sign(dh) * Math.Max(Math.Abs(dh), Math.Min(usual, Math.Abs(dh) * 1.5f));
+        float need = Math.Max(0.45f, Math.Min(total * StairGrade, 6f));
+        int sign;
+        if (Math.Abs(dh) >= 0.3f) sign = Math.Sign(dh);
         else
         {
             bool houseA = Base(CellAt(ax + adx * 1.2f, az + adz * 1.2f)) == WorldCell.Building;
             bool houseB = Base(CellAt(bx + bdx * 1.2f, bz + bdz * 1.2f)) == WorldCell.Building;
-            float door = Math.Max(0.45f, Math.Min(total * 0.5f, 1.4f));
-            if (houseB && !houseA) rise = door;
-            else if (houseA && !houseB) rise = -door;
+            if (houseB && !houseA) sign = 1;
+            else if (houseA && !houseB) sign = -1;
             else
             {
                 float wide = Plain(bx + bdx * 9f, bz + bdz * 9f) - Plain(ax + adx * 9f, az + adz * 9f);
-                rise = Math.Abs(wide) > 0.1f ? Math.Sign(wide) * usual : usual;
+                sign = Math.Abs(wide) > 0.1f ? Math.Sign(wide) : 1;
             }
         }
-        float h0 = Plain(ax, az);
-        if (rise < 0f) { h0 = Plain(bx, bz) - rise; }   // keep the low end on the ground there
-        float half = (width > 0.5f ? width : 2f) / 2f;
+        // The low end (lx, lz, out lux, luz) and the high one
+        float lx = sign > 0 ? ax : bx, lz = sign > 0 ? az : bz, lux = sign > 0 ? adx : bdx, luz = sign > 0 ? adz : bdz;
+        float tx = sign > 0 ? bx : ax, tz = sign > 0 ? bz : az, tux = sign > 0 ? bdx : adx, tuz = sign > 0 ? bdz : adz;
+        float hTop = Plain(tx + tux, tz + tuz);
+        // Out from the low end: the first place low enough for a real stair angle, else the lowest within 30 m
+        float lowest = float.MaxValue, lowestAt = 0f, dig = -1f;
+        for (float d = 0.5f; d <= 30f; d += 1f)
+        {
+            float h = Plain(lx + lux * d, lz + luz * d);
+            if (hTop - h >= need) { dig = d; lowest = h; break; }
+            if (h < lowest) { lowest = h; lowestAt = d; }
+        }
+        if (dig < 0f && hTop - lowest >= 0.3f) dig = lowestAt;
+        float h0, rise;
+        if (dig >= 0f)
+        {
+            h0 = lowest;
+            rise = hTop - lowest;
+            if (dig > 1.6f) DigInFront(lx, lz, lux, luz, half, dig, h0);
+        }
+        else
+        {
+            // Flat round them: as before, up from the low end's ground (to a door: a little; else the usual)
+            bool door = Base(CellAt(tx + tux * 1.2f, tz + tuz * 1.2f)) == WorldCell.Building;
+            rise = door ? Math.Max(0.45f, Math.Min(total * 0.5f, 1.4f)) : usual;
+            h0 = Plain(lx, lz);
+        }
+        // Along the line from the low end (f = 0) to the high one
         for (int q = 0; q + 3 < c.Length; q += 2)
         {
             int seg = q / 2;
@@ -200,14 +266,33 @@ public partial class TvWorldBuilder
             {
                 float t = segLen > 0.01f ? (float)Math.Sqrt((qx - sx) * (qx - sx) + (qz - sz) * (qz - sz)) / segLen : 0f;
                 float f = (along[seg] + t * segLen) / total;
+                if (sign < 0) f = 1f - f;
                 float y = h0 + rise * f;
                 F[k] = Lerp(y, F[k], Sm(half + 0.15f, half + 0.9f, d));
             });
         }
     }
 
+    // The ground in front of the low end of stairs, out to dig metres, dug down to the level floor (never raised),
+    // a little wider than the stairs, easing back into the land beyond
+    void DigInFront(float lx, float lz, float ux, float uz, float half, float dig, float floor)
+    {
+        float reach = half + 5f;
+        ForNear(lx, lz, lx + ux * (dig + 4f), lz + uz * (dig + 4f), reach, (k, d, qx, qz) =>
+        {
+            float x = k % N - R, z = k / N - R;
+            float along = (x - lx) * ux + (z - lz) * uz;
+            if (along < -0.3f) return;
+            float side = Math.Abs(-(x - lx) * uz + (z - lz) * ux);
+            if (Base(CellAt(x, z)) == WorldCell.Building) return;
+            float w = (1f - Sm(dig, dig + 4f, along)) * (1f - Sm(half + 1.5f, reach, side));
+            if (w <= 0f || F[k] <= floor) return;
+            F[k] -= w * (F[k] - floor);
+        });
+    }
+
     // A bridge's deck across, from the metres between its side lines (0: drawn as one line)
-    static float BridgeWidth(float w) => w > 0.5f ? Math.Max(2f, Math.Min(10f, w)) : 2.6f;
+    static float BridgeWidth(float w) => w > 0.5f ? Math.Max(1.2f, Math.Min(10f, w)) : 2.6f;
     static float TunnelWidth(float w) => w > 0.5f ? Math.Max(2.4f, Math.Min(10f, w - 0.4f)) : 3.2f;
 
     // The height of a bridge's deck at a point on it
@@ -770,8 +855,7 @@ public partial class TvWorldBuilder
     void TownStructures()
     {
         bool old = Old;
-        TvColor deckC = old ? TvColor.Hex("#9d968a") : TvColor.Hex("#7a6a58"), rail = old ? TvColor.Hex("#b9b1a1") : TvColor.Hex("#3f5e48"),
-            concrete = old ? TvColor.Hex("#a69d8c") : TvColor.Hex("#9a9893"), dark = TvColor.Hex("#3b3936"),
+        TvColor concrete = old ? TvColor.Hex("#a69d8c") : TvColor.Hex("#9a9893"), dark = TvColor.Hex("#3b3936"),
             stepC = old ? TvColor.Hex("#a49c8e") : TvColor.Hex("#8f8d88");
         CanopyAreas();
         foreach (var l in townLines)
@@ -793,32 +877,7 @@ public partial class TvWorldBuilder
                 int parts = Math.Max(1, (int)Math.Ceiling(len / 1.5f));
                 if (l.kind == 1)
                 {
-                    // A bridge: a deck in short level pieces that follow the ramp, railings or stone parapets, piers at the ends
-                    float W = BridgeWidth(l.w);
-                    for (int p = 0; p < parts; p++)
-                    {
-                        float t = (p + 0.5f) / parts, x = ax + dx * len * t, z = az + dz * len * t, y = DeckAt(x, z), pl = len / parts + 0.05f;
-                        var b = new TvShapeBuilder(random);
-                        b.Box(-pl / 2f, -0.3f, -W / 2f, pl / 2f, 0.03f, W / 2f, deckC);
-                        b.Box(-pl / 2f, -0.55f, -W / 2f + 0.2f, pl / 2f, -0.3f, W / 2f - 0.2f, dark);
-                        foreach (float s in new[] { -1f, 1f })
-                        {
-                            if (old)
-                            {
-                                b.Box(-pl / 2f, -0.35f, s * W / 2f - 0.17f, pl / 2f, 0.95f, s * W / 2f + 0.17f, rail);
-                                b.Box(-pl / 2f - 0.02f, 0.95f, s * W / 2f - 0.21f, pl / 2f + 0.02f, 1.05f, s * W / 2f + 0.21f, rail.Shade(1.08f));
-                            }
-                            else
-                            {
-                                b.Box(-0.04f, 0.03f, s * W / 2f - 0.04f, 0.04f, 1.05f, s * W / 2f + 0.04f, rail);
-                                b.Box(-pl / 2f, 1.0f, s * W / 2f - 0.04f, pl / 2f, 1.08f, s * W / 2f + 0.04f, rail);
-                                b.Box(-pl / 2f, 0.5f, s * W / 2f - 0.02f, pl / 2f, 0.55f, s * W / 2f + 0.02f, rail);
-                            }
-                        }
-                        townBuiltMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, yaw);
-                    }
-                    if (q == 0) BridgePier(ax, az, yaw, W, concrete);
-                    if (q + 4 >= c.Length) BridgePier(bx, bz, yaw, W, concrete);
+                    BridgePiece(l.w, l.flags, ax, az, bx, bz, len, dx, dz, yaw, q == 0, q + 4 >= c.Length);
                 }
                 else if (l.kind == 2)
                 {
@@ -856,6 +915,109 @@ public partial class TvWorldBuilder
                 }
             }
         }
+    }
+
+    // The bridges of a forest map (TvBridges.Forest): footbridges over streams and lakes, and the map's own bridges
+    void ForestBridges()
+    {
+        TownLines();
+        foreach (var l in townLines)
+        {
+            if (l.kind != 1) continue;
+            float[] c = l.xz;
+            for (int q = 0; q + 3 < c.Length; q += 2)
+            {
+                float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
+                float dx = bx - ax, dz = bz - az, len = (float)Math.Sqrt(dx * dx + dz * dz);
+                if (len < 0.2f || !Inside((ax + bx) / 2f, (az + bz) / 2f, 0f)) continue;
+                dx /= len; dz /= len;
+                BridgePiece(l.w, l.flags, ax, az, bx, bz, len, dx, dz, (float)Math.Atan2(-dz, dx), q == 0, q + 4 >= c.Length);
+            }
+        }
+    }
+
+    // One straight stretch of a bridge, in short level pieces that follow the ramp between its ends (TownHeights).
+    // A paved way: a concrete bridge with an asphalt deck, railings or stone parapets and piers at the ends. A path:
+    // a wooden footbridge of planks on two beams, with a handrail when it crosses a lake, posts down into the water.
+    // Between fences or walls (TvBridges.Fenced) the fences are its sides and it has no railings of its own.
+    void BridgePiece(float w, int flags, float ax, float az, float bx, float bz, float len, float dx, float dz, float yaw, bool first, bool last)
+    {
+        if (townBuiltMesh == null) townBuiltMesh = new TvMesh { name = "Town bridges" };
+        bool old = Old, wood = (flags & TvBridges.Wood) != 0, fenced = (flags & TvBridges.Fenced) != 0, lake = (flags & TvBridges.OverWater) != 0;
+        float W = BridgeWidth(w);
+        if (wood)
+        {
+            TvColor plank = TvColor.Hex("#8a6a48"), beam = TvColor.Hex("#5a4632"), post = TvColor.Hex("#6b5038");
+            int planks = Math.Max(1, (int)Math.Round(len / 0.26f));
+            float pl = len / planks;
+            // In pieces of about 1.5 m, each level at its own height
+            int per = Math.Max(1, (int)Math.Round(1.5f / pl));
+            for (int p0 = 0; p0 < planks; p0 += per)
+            {
+                int count = Math.Min(per, planks - p0);
+                float t = (p0 + count / 2f) / planks, x = ax + dx * len * t, z = az + dz * len * t, y = DeckAt(x, z);
+                float half = count * pl / 2f;
+                var b = new TvShapeBuilder(random);
+                // Two beams under the planks
+                foreach (float s in new[] { -1f, 1f })
+                    b.Box(-half - 0.01f, -0.32f, s * (W / 2f - 0.18f) - 0.08f, half + 0.01f, -0.06f, s * (W / 2f - 0.18f) + 0.08f, beam);
+                for (int k = 0; k < count; k++)
+                {
+                    float x0 = -half + k * pl;
+                    float h = TvRandom.Hash(p0 + k + (int)(ax * 7f), (int)(az * 7f));
+                    b.Box(x0 + 0.015f, -0.06f, -W / 2f, x0 + pl - 0.015f, 0.03f + h * 0.015f, W / 2f, plank.Shade(0.88f + h * 0.22f));
+                }
+                if (lake && !fenced)
+                {
+                    // A handrail on posts on both sides
+                    foreach (float s in new[] { -1f, 1f })
+                    {
+                        b.Box(-0.05f, -0.1f, s * W / 2f - 0.05f, 0.05f, 1.0f, s * W / 2f + 0.05f, post);
+                        b.Box(-half - 0.01f, 0.92f, s * W / 2f - 0.04f, half + 0.01f, 1.0f, s * W / 2f + 0.04f, post.Shade(1.1f));
+                    }
+                }
+                if (lake)
+                {
+                    // Posts down into the water
+                    foreach (float s in new[] { -1f, 1f })
+                        b.Box(-0.08f, -1.6f, s * (W / 2f - 0.18f) - 0.08f, 0.08f, -0.3f, s * (W / 2f - 0.18f) + 0.08f, beam.Shade(0.85f));
+                }
+                townBuiltMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, yaw);
+            }
+            return;
+        }
+        TvColor deckC = old ? TvColor.Hex("#9d968a") : AsphaltA, rail = old ? TvColor.Hex("#b9b1a1") : TvColor.Hex("#3f5e48"),
+            concrete = old ? TvColor.Hex("#a69d8c") : TvColor.Hex("#9a9893"), dark = TvColor.Hex("#3b3936");
+        int parts = Math.Max(1, (int)Math.Ceiling(len / 1.5f));
+        for (int p = 0; p < parts; p++)
+        {
+            float t = (p + 0.5f) / parts, x = ax + dx * len * t, z = az + dz * len * t, y = DeckAt(x, z), pl = len / parts + 0.05f;
+            var b = new TvShapeBuilder(random);
+            b.Box(-pl / 2f, -0.3f, -W / 2f, pl / 2f, 0.03f, W / 2f, deckC);
+            b.Box(-pl / 2f, -0.55f, -W / 2f + 0.2f, pl / 2f, -0.3f, W / 2f - 0.2f, dark);
+            if (!fenced)
+                foreach (float s in new[] { -1f, 1f })
+                {
+                    if (old)
+                    {
+                        b.Box(-pl / 2f, -0.35f, s * W / 2f - 0.17f, pl / 2f, 0.95f, s * W / 2f + 0.17f, rail);
+                        b.Box(-pl / 2f - 0.02f, 0.95f, s * W / 2f - 0.21f, pl / 2f + 0.02f, 1.05f, s * W / 2f + 0.21f, rail.Shade(1.08f));
+                    }
+                    else
+                    {
+                        b.Box(-0.04f, 0.03f, s * W / 2f - 0.04f, 0.04f, 1.05f, s * W / 2f + 0.04f, rail);
+                        b.Box(-pl / 2f, 1.0f, s * W / 2f - 0.04f, pl / 2f, 1.08f, s * W / 2f + 0.04f, rail);
+                        b.Box(-pl / 2f, 0.5f, s * W / 2f - 0.02f, pl / 2f, 0.55f, s * W / 2f + 0.02f, rail);
+                    }
+                }
+            else
+                // Low concrete edges under the fences
+                foreach (float s in new[] { -1f, 1f })
+                    b.Box(-pl / 2f, -0.3f, s * W / 2f - 0.12f, pl / 2f, 0.12f, s * W / 2f + 0.12f, concrete);
+            townBuiltMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, yaw);
+        }
+        if (first) BridgePier(ax, az, yaw, W, concrete);
+        if (last) BridgePier(bx, bz, yaw, W, concrete);
     }
 
     void BridgePier(float x, float z, float yaw, float w, TvColor color)
