@@ -179,6 +179,10 @@ public partial class RunSession : MonoBehaviour
             Safe(mapId) + "-" + (linesJson != null ? linesJson.Length : 0) + "-" + (pointsJson != null ? pointsJson.Length : 0) + "-v4.bytes");
         TvWorldData.Data plain = data;
         TvHeights detailed = plain.heights;
+        // The map's edge lines of areas (banks, boundaries, paved edges): the 3D ground follows them up close
+        try { await Task.Run(() => TvEdges.Attach(plain.layer, linesJson)); }
+        catch (Exception e) { Debug.LogWarning("RunSession: edges: " + e); }
+        if (this == null) return;
         try { detailed = await Task.Run(() => RunContours.Detailed(mapId, plain.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile)); }
         catch (Exception e) { Debug.LogWarning("RunSession: contours: " + e); }
         if (this == null) return;
