@@ -371,8 +371,18 @@ namespace MapImport
                 {
                     if (!firstPoint) points.Append(',');
                     firstPoint = false;
-                    points.Append("{\"type\":\"Feature\",\"properties\":{\"Layer\":\"").Append(layer)
-                          .Append("\"},\"geometry\":{\"type\":\"Point\",\"coordinates\":[");
+                    points.Append("{\"type\":\"Feature\",\"properties\":{\"Layer\":\"").Append(layer).Append('"');
+                    // A slope tick of a contour or form line: the way it points (downhill), so the 3D ground knows a
+                    // knoll from a hollow (2026-11-23, Anders wanted the heights right everywhere)
+                    if (o.symbol != null && (o.symbol.major == 101 || o.symbol.major == 102 || o.symbol.major == 103)
+                        && ContourHeights.TickDirection(o.symbol, out double tx, out double ty))
+                    {
+                        double a = o.angle * Math.PI / 180;
+                        double dx = tx * Math.Cos(a) - ty * Math.Sin(a), dy = tx * Math.Sin(a) + ty * Math.Cos(a);
+                        points.Append(",\"Down\":[").Append(dx.ToString("0.###", CultureInfo.InvariantCulture)).Append(',')
+                              .Append(dy.ToString("0.###", CultureInfo.InvariantCulture)).Append(']');
+                    }
+                    points.Append("},\"geometry\":{\"type\":\"Point\",\"coordinates\":[");
                     AppendCoord(points, o.parts[0][0] * mpm + offsetEast, o.parts[0][1] * mpm + offsetNorth);
                     points.Append("]}}");
                 }

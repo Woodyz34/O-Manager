@@ -12,8 +12,9 @@ using MapImport;
 //   - contours and index contours get their level by the same least-squares solver as the import,
 //   - every contour is fixed at its level on the fine grid and the ground in between is filled smoothly,
 //   - form lines then get the half level between the contours round them, are fixed too, and the fill is redone.
-// Slope ticks in points.json carry no direction, so a tick on a closed contour marks a hollow and other ticks are
-// not used (the import also used their direction); the slope direction spreads from the neighbours as in the import.
+// Slope ticks in points.json carry their direction ("Down") on maps imported from 2026-11-23; on older maps they carry
+// none, so a tick on a closed contour marks a hollow and the import's 10 m heights help; the slope direction spreads
+// from the neighbours as in the import.
 // Plain C#, for a background thread. Illern (6.7 x 5.9 km) takes a few seconds; the result is kept per map.
 public static class RunContourField
 {
@@ -61,11 +62,32 @@ public static class RunContourField
                 GridBuilder.Supercover(c.p[i], c.p[i + 1], c.p[i + 2], c.p[i + 3], C, R, (x, y) => ids[y * C + x] = c.id);
 
         // ---- Which way is up: a closed contour is a hill, unless it has a tick (a hollow) ----
+        // A tick with its direction (maps imported from 2026-11-23) says for certain which side is down
+        var directed = new bool[contours.Count + 1];
+        foreach (double[] t in ticks)
+        {
+            if (t.Length < 5 || t[2] > 0 || double.IsNaN(t[3])) continue;
+            double px = (t[0] - ox) / res, py = (t[1] - oy) / res;
+            int cid = ContourHeights.Nearest(ids, C, R, px, py, 2);
+            if (cid == 0) continue;
+            int side = ContourHeights.SideOf(contours[cid - 1].p, px + t[3] * 0.8, py + t[4] * 0.8);
+            if (side > 0) contours[cid - 1].votesDown += 5;   // the tick's side is downhill
+            else if (side < 0) contours[cid - 1].votesUp += 5;
+            directed[cid] = true;
+        }
+        foreach (Contour c in contours)
+        {
+            if (!directed[c.id] || !c.line.closed || c.votesUp == c.votesDown) continue;
+            bool insideLeft = MapGeometry.SignedArea(c.p) > 0, leftUp = c.votesUp > c.votesDown;
+            c.line.hollow = insideLeft != leftUp;
+        }
+        // Without its direction, a tick on a closed contour marks a hollow
         foreach (double[] t in ticks)
         {
             if (t.Length > 2 && t[2] > 0) continue;   // a form line's tick (below)
+            if (t.Length >= 5 && !double.IsNaN(t[3])) continue;
             int cid = ContourHeights.Nearest(ids, C, R, (t[0] - ox) / res, (t[1] - oy) / res, 2);
-            if (cid == 0 || !contours[cid - 1].line.closed) continue;
+            if (cid == 0 || !contours[cid - 1].line.closed || directed[cid]) continue;
             contours[cid - 1].line.hollow = true;
         }
         // A tick carries no direction here, and a tick by a large ring can belong to the hill's own outside or to the
@@ -73,7 +95,7 @@ public static class RunContourField
         // inside: then it is a hill (2026-11-22: on Stora Stöeryd whole hillsides of 300 m sank into hollows)
         foreach (Contour c in contours)
         {
-            if (!c.line.closed || grid.h == null) continue;
+            if (!c.line.closed || grid.h == null || directed[c.id]) continue;
             double rise = RiseInside(grid, c.line.xy, out bool large);
             if (c.line.hollow && rise > (large ? 1.5 : 0.6)) c.line.hollow = false;
             // A small ring whose tick was not found next to it (drawn a little off, or on a piece of the ring the
@@ -82,7 +104,8 @@ public static class RunContourField
         }
         foreach (Contour c in contours)
         {
-            if (c.line.closed)
+            if (directed[c.id]) { }
+            else if (c.line.closed)
             {
                 // The inside is on the left when the ring runs counter-clockwise
                 bool insideLeft = MapGeometry.SignedArea(c.p) > 0;
@@ -249,7 +272,13 @@ public static class RunContourField
         {
             if (!l.formLine || !l.closed) continue;
             foreach (double[] t in ticks)
-                if (NearLine(l.xy, t[0], t[1], 2.5)) { l.hollow = true; break; }
+            {
+                if (!NearLine(l.xy, t[0], t[1], 2.5)) continue;
+                // With its direction: a hollow when the tick points into the ring, a knoll when it points out
+                if (t.Length >= 5 && !double.IsNaN(t[3])) l.hollow = Inside(l.xy, t[0] + t[3] * 2, t[1] + t[4] * 2);
+                else l.hollow = true;
+                break;
+            }
         }
         var rings = new List<Ring>();
         foreach (Contour c in contours)
@@ -550,7 +579,7 @@ public static class RunContourField
         if (json == null) return list;
         var contours = new List<double[]>();
         var forms = new List<double[]>();
-        foreach (var (code, xy) in Features(json))
+        foreach (var (code, xy, _) in Features(json))
         {
             if (code.Length < 3 || xy.Count < 4) continue;
             string major = code.Substring(0, 3);
@@ -585,26 +614,26 @@ public static class RunContourField
         return q;
     }
 
-    // Slope ticks: points of the contour and form line symbols with a sub-number (101.1, 103.1): x, y, and 1 for a
-    // form line's tick
+    // Slope ticks: points of the contour and form line symbols: x, y, 1 for a form line's tick, and the way the tick
+    // points downhill (x, y; NaN for a map imported before 2026-11-23, which did not save it)
     public static List<double[]> ReadTicks(byte[] json)
     {
         var list = new List<double[]>();
         if (json == null) return list;
-        foreach (var (code, xy) in Features(json))
+        foreach (var (code, xy, down) in Features(json))
         {
             if (code.Length < 6 || xy.Count < 2) continue;
             string major = code.Substring(0, 3);
             // Any point of the contour symbols is a tick: most maps number it 101.1 or 103.1, but some (Stora Stöeryd,
             // Ängaryd) draw it as a point of 101.0 itself, and those ticks were not read before (2026-11-22)
             if (major == "101" || major == "102" || major == "103")
-                list.Add(new[] { xy[0], xy[1], major == "103" ? 1.0 : 0.0 });
+                list.Add(new[] { xy[0], xy[1], major == "103" ? 1.0 : 0.0, down != null ? down[0] : double.NaN, down != null ? down[1] : double.NaN });
         }
         return list;
     }
 
     // Every feature's symbol number ("101000") and coordinates, from the GeoJSON the import writes
-    static IEnumerable<(string code, List<double> xy)> Features(byte[] bytes)
+    static IEnumerable<(string code, List<double> xy, double[] down)> Features(byte[] bytes)
     {
         string text = System.Text.Encoding.UTF8.GetString(bytes);
         int at = 0;
@@ -621,6 +650,17 @@ public static class RunContourField
             int next = text.IndexOf("\"Layer\":\"", at, StringComparison.Ordinal);
             if (next >= 0 && coords > next) continue;
             int end = next >= 0 ? next : text.Length;
+            // A tick's way downhill ("Down":[x, y], written by imports from 2026-11-23)
+            double[] down = null;
+            int d = text.IndexOf("\"Down\":[", at, StringComparison.Ordinal);
+            if (d >= 0 && d < coords)
+            {
+                int close = text.IndexOf(']', d);
+                string[] parts = close > d ? text.Substring(d + 8, close - d - 8).Split(',') : new string[0];
+                if (parts.Length == 2 && double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double dx)
+                    && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double dy))
+                    down = new[] { dx, dy };
+            }
             var xy = new List<double>();
             int i = coords + 14;
             while (i < end)
@@ -635,7 +675,7 @@ public static class RunContourField
                 else i++;
             }
             at = end;
-            yield return (code, xy);
+            yield return (code, xy, down);
         }
     }
 }

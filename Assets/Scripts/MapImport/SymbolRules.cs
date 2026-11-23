@@ -41,7 +41,9 @@ namespace MapImport
         // 707 marked route (not a barrier), 708 out-of-bounds boundary, 710 crossing, green minimum-width lines.
         // 3 (2026-11-20): stairs as quick as a road going up, 0.6 going down (GroundKind.Stairs, StairsSlopes).
         // 4 (2026-11-20): contour heights: hilltops no longer turned into hollows (ContourHeights), the grid's heights change.
-        public const int RulesVersion = 4;
+        // 5 (2026-11-23): slope ticks keep their direction in points.json (the run-yourself ground knows knolls from
+        //    hollows everywhere), and ticks drawn as a point of 101.0 itself count for the grid's heights too.
+        public const int RulesVersion = 5;
 
         // Stairs: up (and on the flat) as quick as a road (Anders, 2026-11-20: running up stairs is quick), down slowly.
         // Which way is down is worked out from the heights when the grid is loaded (StairsSlopes).
@@ -546,7 +548,8 @@ namespace MapImport
         // Contours and slope lines used for heights
         public static bool IsContour(MapSymbol s) => s != null && s.kind == SymbolKind.Line && (s.major == 101 || s.major == 102);
         public static bool IsIndexContour(MapSymbol s) => s != null && s.major == 102 && s.kind == SymbolKind.Line;
-        public static bool IsSlopeTick(MapSymbol s) => s != null && s.kind == SymbolKind.Point && (s.major == 101 || s.major == 102) && s.minor > 0;
+        // A point symbol of a contour is its slope tick, also when the map draws it as 101.0 itself (Stöeryd, Ängaryd)
+        public static bool IsSlopeTick(MapSymbol s) => s != null && s.kind == SymbolKind.Point && (s.major == 101 || s.major == 102);
         public static bool IsWater(MapSymbol s) => s != null && s.kind == SymbolKind.Area && (s.major == 301 || s.major == 302);
 
         // Guess sprint or forest from the symbols: sprint maps (ISSprOM) are drawn at 1:4000 or 1:5000
