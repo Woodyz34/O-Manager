@@ -34,7 +34,7 @@ public partial class TvWorldBuilder
 
     static readonly TvColor HedgeA = TvColor.Hex("#3b6328"), HedgeB = TvColor.Hex("#4d7631"), HedgeTop = TvColor.Hex("#5a8436"),
         PicketWhite = TvColor.Hex("#f1efe8"), BrickPost = TvColor.Hex("#8a4a3a"), StoneA = TvColor.Hex("#9b958c"), StoneB = TvColor.Hex("#7e7a72"),
-        BlockA = TvColor.Hex("#a39a8c"), BlockB = TvColor.Hex("#8f877a"), Bark = TvColor.Hex("#5a3e2c"), Gravel = TvColor.Hex("#8c8781"),
+        BlockA = TvColor.Hex("#a39a8c"), BlockB = TvColor.Hex("#8f877a"), Bark = TvColor.Hex("#5a3e2c"), YardGravel = TvColor.Hex("#8c8781"),
         PlankA = TvColor.Hex("#8a7a66"), PlankB = TvColor.Hex("#6e6152"), Edging = TvColor.Hex("#a8a59f");
     static readonly TvColor[] PicketColours = { TvColor.Hex("#8f2f2a"), TvColor.Hex("#2f4a3a"), TvColor.Hex("#2c3e56"), TvColor.Hex("#d9c27a") };
     static readonly TvColor[] YardFlowers =
@@ -332,7 +332,7 @@ public partial class TvWorldBuilder
                     YardBox(x0 - lx * 0.005f, z0 - lz * 0.005f, x1 - lx * 0.005f, z1 - lz * 0.005f, 0.335f, cy - 0.01f, 0.02f, BlockB.Shade(0.8f), BlockB.Shade(0.8f));
                 // The bed behind: bark or gravel, shrubs, flowers
                 Back(0.95f, out float b0x, out float b0z, out float b1x, out float b1z);
-                YardBox(b0x, b0z, b1x, b1z, 1.2f, -0.1f, 0.15f, gravel ? Gravel : Bark, gravel ? Gravel.Shade(1.05f) : Bark);
+                YardBox(b0x, b0z, b1x, b1z, 1.2f, -0.1f, 0.15f, gravel ? YardGravel : Bark, gravel ? YardGravel.Shade(1.05f) : Bark);
                 int plants = Math.Max(1, (int)(len / 0.7f));
                 for (int q = 0; q < plants; q++)
                 {
