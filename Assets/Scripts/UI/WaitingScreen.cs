@@ -75,6 +75,7 @@ public class WaitingScreen : MonoBehaviour
         card = cardImage.gameObject;
         CourseUI.Place(cardImage.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760, 420));
 
+        LoadingSpinner.Add(card.transform, new Vector2(1f, 1f), new Vector2(-56f, -56f), 20f, 8f);
         heading = CourseUI.Text("Heading", card.transform, "Waiting for the others", 46, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Place(heading.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -36), new Vector2(700, 64));
 

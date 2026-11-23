@@ -30,8 +30,16 @@ public class LoadingScreenUI : MonoBehaviour
     int shownPercent = -1;
     int shownDots = -1;
 
+    bool spinnerAdded;
+
     void OnEnable()
     {
+        // A circle that always turns in the corner: when the page is busy and the rest stands still, it shows the game is alive
+        if (!spinnerAdded)
+        {
+            spinnerAdded = true;
+            LoadingSpinner.Add(transform, new Vector2(1f, 1f), new Vector2(-100f, -100f), 34f, 12f, new Color(0.96f, 0.94f, 0.86f));
+        }
         if (tipText != null)
         {
             tipText.text = Tips[Random.Range(0, Tips.Length)];

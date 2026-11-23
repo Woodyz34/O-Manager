@@ -114,6 +114,9 @@ public class PackOpening : MonoBehaviour
     Phase phase;
     RunnerTier tier;
     Color tierColor;
+    // The colour of the light and sparks. Neutral until the overall rating lands, so the glow never gives away
+    // whether the pack holds a bronze, silver, gold or elite runner (2026-11-23).
+    Color showColor = Neutral;
     bool openRequested;
     float clock;
     float shake;
@@ -153,6 +156,7 @@ public class PackOpening : MonoBehaviour
         onClosed = closed;
         tier = RunnerCards.Tier(result.card);
         tierColor = RunnerCards.TierColor(tier);
+        showColor = Neutral;
         card.Show(result.card);
         Prepare();
         StartCoroutine(Sequence());
@@ -189,7 +193,7 @@ public class PackOpening : MonoBehaviour
         flash.color = UIAnim.WithAlpha(Color.white, 0f);
         pillar.gameObject.SetActive(false);
         streak.gameObject.SetActive(false);
-        seamGlow.color = UIAnim.WithAlpha(tierColor, 0f);
+        seamGlow.color = UIAnim.WithAlpha(showColor, 0f);
         hint.alpha = 0f;
 
         packButton.interactable = false;
@@ -206,6 +210,17 @@ public class PackOpening : MonoBehaviour
         skipButton.gameObject.SetActive(false);
         if (moneyPill != null) moneyPill.SetActive(false);
 
+        foreach (Graphic graphic in tierTinted)
+        {
+            if (graphic != null) graphic.color = UIAnim.WithAlpha(showColor, graphic.color.a);
+        }
+    }
+
+    // From here the light shows the runner's tier
+    void RevealTier()
+    {
+        showColor = tierColor;
+        lightTarget = tierColor;
         foreach (Graphic graphic in tierTinted)
         {
             if (graphic != null) graphic.color = UIAnim.WithAlpha(tierColor, graphic.color.a);
@@ -279,12 +294,12 @@ public class PackOpening : MonoBehaviour
         {
             float p = t * t;
             shake = 2f + 20f * p;
-            lightTarget = Color.Lerp(Neutral, tierColor, t);
+            lightTarget = Color.Lerp(Neutral, showColor, t);
             glowTarget = Mathf.Lerp(0.32f, 0.95f, t);
             raysTarget = Mathf.Lerp(0.10f, 0.55f, t);
             raysSpeed = Mathf.Lerp(8f, 150f, p);
             Place(pack, new Vector2(0, PackY), 1f + 0.1f * t, Mathf.Sin(clock * 31f) * 5f * t, Mathf.Sin(clock * 47f) * 3.5f * t);
-            seamGlow.color = UIAnim.WithAlpha(tierColor, t);
+            seamGlow.color = UIAnim.WithAlpha(showColor, t);
             seamGlow.rectTransform.localScale = new Vector3(0.3f + 1.0f * t, 0.5f + 1.3f * t, 1f);
             float zoom = 1f + 0.06f * t;
             shaker.localScale = new Vector3(zoom, zoom, 1f);
@@ -300,7 +315,7 @@ public class PackOpening : MonoBehaviour
                     angleMin = 55f, angleMax = 125f, speedMin = 200f, speedMax = 620f,
                     sizeMin = 12f, sizeMax = 34f, endSize = 0.2f, lifeMin = 0.4f, lifeMax = 1.0f,
                     gravity = 420f, drag = 0.8f, spin = 200f, twinkle = 0.5f,
-                    colorA = tierColor, colorB = Color.white
+                    colorA = showColor, colorB = Color.white
                 });
             }
         });
@@ -314,7 +329,7 @@ public class PackOpening : MonoBehaviour
         shake = 48f;
         shaker.localScale = Vector3.one;
         flash.color = Color.white;
-        lightTarget = tierColor;
+        lightTarget = showColor;
         beamTarget = 0.45f;
         raysTarget = 0.16f;
         raysSpeed = 12f;
@@ -334,9 +349,9 @@ public class PackOpening : MonoBehaviour
             float drop = UIAnim.InCubic(Mathf.Clamp01(t * 1.3f));
             Place(pack, new Vector2(0, PackY - 1300f * drop), 1.1f - 0.2f * drop);
             packBody.color = UIAnim.WithAlpha(Color.white, 1f - drop);
-            seamGlow.color = UIAnim.WithAlpha(tierColor, 1f - t);
+            seamGlow.color = UIAnim.WithAlpha(showColor, 1f - t);
 
-            pillar.color = UIAnim.WithAlpha(tierColor, 1f - t);
+            pillar.color = UIAnim.WithAlpha(showColor, 1f - t);
             pillar.rectTransform.localScale = new Vector3(0.5f + 2.2f * t, 1f + 0.6f * t, 1f);
         });
         pack.gameObject.SetActive(false);
@@ -499,6 +514,7 @@ public class PackOpening : MonoBehaviour
         yield return UIAnim.Wait(0.35f);
 
         // The overall rating tells you how good the runner is, so it lands hardest
+        RevealTier();
         Hit(1.12f, 24f);
         Flare(Vector2.zero);
         sparks.Emit(Radial(Vector2.zero, 50, 200f, 800f));
@@ -699,7 +715,7 @@ public class PackOpening : MonoBehaviour
         phase = Phase.Done;
         Sound(reveal, 1f);
         if (tier == RunnerTier.Elite) Sound(boom, 0.7f);
-        lightTarget = tierColor;
+        RevealTier();
         beamTarget = 0.45f;
         raysTarget = 0f;
         glowTarget = 0.45f;
@@ -956,7 +972,7 @@ public class PackOpening : MonoBehaviour
             count = count, origin = origin, spread = new Vector2(30f, 30f), angleMin = 0f, angleMax = 360f,
             speedMin = speedMin, speedMax = speedMax, sizeMin = 18f, sizeMax = 72f, endSize = 0.2f,
             lifeMin = 0.6f, lifeMax = 1.7f, gravity = 380f, drag = 1.5f, spin = 220f, twinkle = 0.5f,
-            colorA = tierColor, colorB = Color.white
+            colorA = showColor, colorB = Color.white
         };
     }
 
@@ -972,7 +988,7 @@ public class PackOpening : MonoBehaviour
         streak.rectTransform.anchoredPosition = position;
         yield return UIAnim.Run(0.55f, t =>
         {
-            streak.color = UIAnim.WithAlpha(Color.Lerp(Color.white, tierColor, t), 1f - t);
+            streak.color = UIAnim.WithAlpha(Color.Lerp(Color.white, showColor, t), 1f - t);
             streak.rectTransform.localScale = new Vector3(0.4f + 1.9f * UIAnim.OutCubic(t), 1f + 1.5f * (1f - t), 1f);
         });
         streak.gameObject.SetActive(false);
