@@ -245,7 +245,7 @@ public class MapEditPanel : MonoBehaviour
         CourseUI.SetButtonColor(sprintButton, sprint ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
         typeText.text = (sprint ? "Sprint map: 2 m cells, sprint courses." : "Forest map.")
                         + (TypeChanged ? " The map is built again when you save."
-                           : OldRules ? " Built with older rules for walls, fences, hedges and stairs: Save builds it again with the new ones." : "");
+                           : OldRules ? " Built with older rules for walls, fences, hedges, stairs and heights: Save builds it again with the new ones." : "");
         typeText.color = TypeChanged || OldRules ? CourseUI.Accent : CourseUI.InkMuted;
         bool confirming = Time.unscaledTime < deleteConfirmUntil;
         CourseUI.SetButtonText(deleteButton, confirming ? "Sure? Click again" : "Delete map");

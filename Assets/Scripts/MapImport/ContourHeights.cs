@@ -408,9 +408,10 @@ namespace MapImport
         }
 
         // The direction a slope tick points, from its symbol: towards its element point furthest from the origin
-        static bool TickDirection(MapSymbol s, out double x, out double y)
+        internal static bool TickDirection(MapSymbol s, out double x, out double y)
         {
             x = y = 0;
+            if (s == null || s.point == null) return false;
             double best = 0;
             foreach (SymbolElement e in s.point)
             {
