@@ -17,6 +17,12 @@ public partial class RunSession
     float nextWatchRefresh;
     float watchedDoneSince = -1f;
     float shownPitch;
+    RectTransform watchCard;
+    TextMeshProUGUI watchTabText;
+    static readonly float[] WatchWidths = { 300f, 400f, 520f, 640f };
+    int watchWidthStep = 1;
+    bool watchOpen = true;
+    float watchSlide = 1f;       // 1 = pushed out, 0 = pushed in
     int inOrder;                 // controls punched in order so far (for "Leg 3 of 7" on the others' lists)
 
     bool Watching => watching != null && remotes.ContainsKey(watching);
@@ -32,17 +38,37 @@ public partial class RunSession
         own.Add(watchCanvas);
         ScreenSettings.Fit(watchCanvas.GetComponent<CanvasScaler>());
 
+        // Flush against the left edge like a leaderboard (2026-11-23): can be pushed in and out with the tab on its
+        // right edge, and made narrower or wider with the - and + buttons
         Image card = CourseUI.CardPanel("Runners", watchCanvas.transform);
-        RectTransform rect = card.rectTransform;
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0f, 0.5f);
-        rect.sizeDelta = new Vector2(400f, -200f);
-        rect.anchoredPosition = new Vector2(20f, 0f);
+        watchCard = card.rectTransform;
+        watchCard.anchorMin = new Vector2(0f, 0f);
+        watchCard.anchorMax = new Vector2(0f, 1f);
+        watchCard.pivot = new Vector2(0f, 0.5f);
+        watchCard.sizeDelta = new Vector2(WatchWidths[watchWidthStep], -200f);
+        watchCard.anchoredPosition = new Vector2(watchOpen ? 0f : -WatchWidths[watchWidthStep], 0f);
+        watchSlide = watchOpen ? 1f : 0f;
 
         watchTitle = CourseUI.Text("Title", card.transform, "Watch a runner", 28, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Place(watchTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -16f), new Vector2(360f, 70f));
+        RectTransform titleRect = watchTitle.rectTransform;
+        titleRect.anchorMin = new Vector2(0f, 1f);
+        titleRect.anchorMax = new Vector2(1f, 1f);
+        titleRect.pivot = new Vector2(0.5f, 1f);
+        titleRect.offsetMin = new Vector2(18f, -86f);
+        titleRect.offsetMax = new Vector2(-104f, -14f);
         watchTitle.richText = true;
+
+        Button smaller = CourseUI.Button("Smaller", card.transform, "-", CourseUI.ButtonKind.Light, () => ResizeWatch(-1), 28);
+        CourseUI.Place((RectTransform)smaller.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-54f, -22f), new Vector2(42f, 42f));
+        HoverTip.Add(smaller, "Make the list narrower");
+        Button larger = CourseUI.Button("Larger", card.transform, "+", CourseUI.ButtonKind.Light, () => ResizeWatch(1), 28);
+        CourseUI.Place((RectTransform)larger.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-8f, -22f), new Vector2(42f, 42f));
+        HoverTip.Add(larger, "Make the list wider");
+
+        Button tab = CourseUI.Button("Tab", card.transform, "<", CourseUI.ButtonKind.Secondary, () => { watchOpen = !watchOpen; }, 30);
+        watchTabText = tab.GetComponentInChildren<TextMeshProUGUI>();
+        CourseUI.Place((RectTransform)tab.transform, new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(46f, 120f));
+        HoverTip.Add(tab, "Show or hide the list");
 
         watchList = CourseUI.ScrollList("List", card.transform, out ScrollRect scroll);
         RectTransform viewport = scroll.GetComponent<RectTransform>();
@@ -55,6 +81,22 @@ public partial class RunSession
         nextWatchRefresh = 0f;
     }
 
+    void ResizeWatch(int by)
+    {
+        watchWidthStep = Mathf.Clamp(watchWidthStep + by, 0, WatchWidths.Length - 1);
+        if (watchCard != null) watchCard.sizeDelta = new Vector2(WatchWidths[watchWidthStep], watchCard.sizeDelta.y);
+    }
+
+    // Slides the list in and out of the screen edge
+    void SlideWatch()
+    {
+        if (watchCard == null) return;
+        watchSlide = Mathf.MoveTowards(watchSlide, watchOpen ? 1f : 0f, Time.unscaledDeltaTime * 5f);
+        float eased = watchSlide * watchSlide * (3f - 2f * watchSlide);
+        watchCard.anchoredPosition = new Vector2(-WatchWidths[watchWidthStep] * (1f - eased), 0f);
+        if (watchTabText != null) watchTabText.text = watchOpen ? "<" : ">";
+    }
+
     void CloseWatchList()
     {
         StopWatching();
@@ -64,6 +106,7 @@ public partial class RunSession
             Destroy(watchCanvas.gameObject);
         }
         watchCanvas = null;
+        watchCard = null;
     }
 
     double ownE, ownN;
@@ -109,6 +152,7 @@ public partial class RunSession
     void WatchTick(float dt)
     {
         if (watchCanvas == null) return;
+        SlideWatch();
         if (Time.unscaledTime >= nextWatchRefresh)
         {
             nextWatchRefresh = Time.unscaledTime + 0.5f;

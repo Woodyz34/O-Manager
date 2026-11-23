@@ -698,6 +698,8 @@ public partial class RunSession : MonoBehaviour
         loadingTitle.richText = true;
         CourseUI.Place(loadingTitle.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 80f), new Vector2(1400f, 240f));
 
+        LoadingSpinner.Add(backdrop.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -110f), 40f, 14f, new Color(0.96f, 0.94f, 0.86f));
+
         Image clockBack = CourseUI.Panel("Clock", hud.transform, new Color(0.1f, 0.14f, 0.12f, 0.7f));
         CourseUI.Place(clockBack.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(220f, 64f));
         clockText = CourseUI.Text("Time", clockBack.transform, "0:00", 40, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);

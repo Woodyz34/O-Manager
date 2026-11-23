@@ -3519,10 +3519,11 @@ public class CourseBuilder : MonoBehaviour
             Image dim = CourseUI.Panel("Loading", canvasObject.transform, new Color(0.08f, 0.14f, 0.1f, 0.55f), false);
             CourseUI.Stretch(dim.rectTransform);
             Image card = CourseUI.CardPanel("Card", dim.transform);
-            CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 170));
+            CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 230));
+            LoadingSpinner.Add(card.transform, new Vector2(0.5f, 1f), new Vector2(0f, -56f), 28f, 10f);
             loadingText = CourseUI.Text("Text", card.transform, "", 30, CourseUI.Ink, FontStyles.Bold);
             loadingText.alignment = TextAlignmentOptions.Center;
-            CourseUI.Stretch(loadingText.rectTransform, 24, 24, 20, 20);
+            CourseUI.Stretch(loadingText.rectTransform, 24, 24, 100, 20);
             loadingOverlay = dim.gameObject;
         }
         loadingOverlay.SetActive(true);

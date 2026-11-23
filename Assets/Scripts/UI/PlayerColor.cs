@@ -287,6 +287,7 @@ public class UIProgressCard
         card.fill.anchorMax = new Vector2(0f, 1f);
         card.fill.offsetMin = card.fill.offsetMax = Vector2.zero;
 
+        LoadingSpinner.Add(panel.transform, new Vector2(0f, 1f), new Vector2(54f, -44f), 18f, 7f);
         card.status = CourseUI.Text("Time left", panel.transform, "Starting...", 22, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
         CourseUI.Place(card.status.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-40, 22), new Vector2(260, 42));
         card.root = go;
