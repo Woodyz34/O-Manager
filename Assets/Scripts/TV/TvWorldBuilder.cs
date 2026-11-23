@@ -397,7 +397,9 @@ public partial class TvWorldBuilder
         trackBlend = new float[N * N];
         trackColor = new TvColor[N * N];
         asphaltCorner = null;
+        asphaltLevel = null;
         pavedCorner = null;
+        paveLevel = null;
         clear = new float[N * N];
         water = new float[N * N];
         bog = new float[N * N];
@@ -486,7 +488,9 @@ public partial class TvWorldBuilder
         trackBlend = new float[N * N];
         trackColor = new TvColor[N * N];
         asphaltCorner = null;
+        asphaltLevel = null;
         pavedCorner = null;
+        paveLevel = null;
         clear = new float[N * N];
         water = new float[N * N];
         bog = new float[N * N];
@@ -886,13 +890,12 @@ public partial class TvWorldBuilder
             }
             float[] c = line.xz;
             bool tarmac = line.kind == WorldLineKind.WideRoad || line.kind == WorldLineKind.Road;
-            if (tarmac && asphaltCorner == null) asphaltCorner = new bool[N * N];
             for (int q = 0; q + 3 < c.Length; q += 2)
             {
                 ForNear(c[q], c[q + 1], c[q + 2], c[q + 3], half + 3f, (k, d, qx, qz) =>
                 {
                     clear[k] = Math.Min(clear[k], d - half);
-                    if (tarmac && d <= half) asphaltCorner[k] = true;
+                    if (tarmac) AsphaltAt(k, half - d);
                     if (strength <= 0f) return;
                     float blend = (1f - Sm(half * 0.45f, half + 0.35f, d)) * strength;
                     if (blend > trackBlend[k])
@@ -915,7 +918,6 @@ public partial class TvWorldBuilder
         foreach (var (c, w, paved) in townPaths)
         {
             float half = Math.Max(0.6f, Math.Min(3f, w / 2f));
-            if (paved && asphaltCorner == null) asphaltCorner = new bool[N * N];
             for (int q = 0; q + 3 < c.Length; q += 2)
             {
                 ForNear(c[q], c[q + 1], c[q + 2], c[q + 3], half + 2f, (k, d, qx, qz) =>
@@ -925,7 +927,7 @@ public partial class TvWorldBuilder
                     if (b == WorldCell.Paved || b == WorldCell.Building || b == WorldCell.Water) return;
                     if (paved)
                     {
-                        if (d <= half) asphaltCorner[k] = true;
+                        AsphaltAt(k, half - d);
                         return;
                     }
                     float blend = 1f - Sm(half * 0.6f, half + 0.3f, d);
@@ -974,6 +976,21 @@ public partial class TvWorldBuilder
         Paved = TvColor.Hex("#8a8782"), Plot = TvColor.Hex("#8f9a4e"), MarshColor = TvColor.Hex("#6f7440"), Wet = TvColor.Hex("#4a4a2e"),
         Soil = TvColor.Hex("#6b563c");
 
+    // How far inside a tarmac road a ground corner is (metres, below 0 outside), for the road's smooth edge
+    float[] asphaltLevel;
+
+    void AsphaltAt(int k, float level)
+    {
+        if (asphaltCorner == null)
+        {
+            asphaltCorner = new bool[N * N];
+            asphaltLevel = new float[N * N];
+            for (int i = 0; i < asphaltLevel.Length; i++) asphaltLevel[i] = -9f;
+        }
+        if (level > asphaltLevel[k]) asphaltLevel[k] = level;
+        if (level >= 0f) asphaltCorner[k] = true;
+    }
+
     bool[] asphaltCorner;               // the ground corners on a tarmac road (Tracks), kept with the paved ground
     static readonly TvColor Lawn = TvColor.Hex("#5f8a36"), LawnLight = TvColor.Hex("#76a043");
 
@@ -992,10 +1009,90 @@ public partial class TvWorldBuilder
         return WorldCell.Open;
     }
 
+    float[] paveLevel;                  // how far inside the paving each ground corner is (metres; below 0 outside)
+
+    // The share of paved cells (houses count) round a point, with the same cubic B-spline weights as SmoothCell
+    float PavedWeight(float x, float z)
+    {
+        double fe = (input.centerE + x - layer.minE) / layer.cell - 0.5, fn = (input.centerN + z - layer.minN) / layer.cell - 0.5;
+        int i0 = (int)Math.Floor(fe), j0 = (int)Math.Floor(fn);
+        Span4((float)(fe - i0), out float x0, out float x1, out float x2, out float x3);
+        Span4((float)(fn - j0), out float z0, out float z1, out float z2, out float z3);
+        float wx0 = x0, wx1 = x1, wx2 = x2, wx3 = x3;
+        float w = 0f;
+        for (int dj = 0; dj < 4; dj++)
+        {
+            float wz = dj == 0 ? z0 : dj == 1 ? z1 : dj == 2 ? z2 : z3;
+            for (int di = 0; di < 4; di++)
+            {
+                int b = Base(layer.At(layer.minE + (i0 + di - 1 + 0.5) * layer.cell, layer.minN + (j0 + dj - 1 + 0.5) * layer.cell));
+                if (b == WorldCell.Paved || b == WorldCell.Building) w += (di == 0 ? wx0 : di == 1 ? wx1 : di == 2 ? wx2 : wx3) * wz;
+            }
+        }
+        return w;
+    }
+
+    // The ground next to paving that is not paving (for a corner the paving's exact edge leaves outside)
+    byte NotPavedNear(float x, float z)
+    {
+        for (float d = 1f; d <= 4.1f; d += 1.5f)
+            for (int a = 0; a < 8; a++)
+            {
+                float ang = a * 0.785398f;
+                byte c = CellAt(x + (float)Math.Cos(ang) * d, z + (float)Math.Sin(ang) * d);
+                int b = Base(c);
+                if (b != WorldCell.Paved && b != WorldCell.Building && b != WorldCell.Water) return c;
+            }
+        return WorldCell.Open;
+    }
+
+    // The map's edge lines of paved areas near each corner (TvTown.pavedEdges): the distance to the nearest, and the
+    // corner's level by it (+ on the paved side, - off it). The paved side of a stretch is the side with more paved
+    // cells; a stretch with paving (or none) on both sides, a step inside a square, is left out.
+    void PavedEdges(out float[] dist, out float[] level)
+    {
+        dist = null;
+        level = null;
+        if (townEdges == null || townEdges.Count == 0) return;
+        var d0 = new float[N * N];
+        var l0 = new float[N * N];
+        for (int i = 0; i < d0.Length; i++) d0[i] = 99f;
+        foreach (float[] c in townEdges)
+        {
+            for (int q = 0; q + 3 < c.Length; q += 2)
+            {
+                float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
+                float sx = bx - ax, sz = bz - az, sl = (float)Math.Sqrt(sx * sx + sz * sz);
+                if (sl < 0.05f) continue;
+                if (Math.Max(ax, bx) < -R - 2 || Math.Min(ax, bx) > R + 2 || Math.Max(az, bz) < -R - 2 || Math.Min(az, bz) > R + 2) continue;
+                float nx = -sz / sl, nz = sx / sl, mx = (ax + bx) / 2f, mz = (az + bz) / 2f;
+                float left = PavedWeight(mx + nx * 1.3f, mz + nz * 1.3f), right = PavedWeight(mx - nx * 1.3f, mz - nz * 1.3f);
+                if (Math.Abs(left - right) < 0.3f) continue;
+                float side = left > right ? 1f : -1f;
+                ForNear(ax, az, bx, bz, 1.6f, (k, d, qx, qz) =>
+                {
+                    if (d >= d0[k]) return;
+                    float vx = k % N - R, vz = k / N - R;
+                    float s = (vx - qx) * nx + (vz - qz) * nz;
+                    d0[k] = d;
+                    l0[k] = (s >= 0f ? side : -side) * Math.Max(d, 0.02f);
+                });
+            }
+        }
+        dist = d0;
+        level = l0;
+    }
+
     void Ground()
     {
         GroundLook floor = ForestFloor();
-        if (input.town != null || asphaltCorner != null) pavedCorner = new bool[N * N];
+        if (input.town != null || asphaltCorner != null)
+        {
+            pavedCorner = new bool[N * N];
+            paveLevel = new float[N * N];
+        }
+        float[] edgeDist = null, edgeLevel = null;
+        if (input.town != null) PavedEdges(out edgeDist, out edgeLevel);
         for (int j = 0; j < N; j++)
         {
             for (int i = 0; i < N; i++)
@@ -1052,6 +1149,39 @@ public partial class TvWorldBuilder
                     c = Asphalt.Shade(0.95f + f2 * 0.08f);
                     hard = true;
                     pavedCorner[k] = true;
+                }
+                if (paveLevel != null)
+                {
+                    // How far inside the paving the corner is: the paved ground is cut along where this is 0, so its
+                    // edge runs smooth between the corners, not as the 1 m squares (2026-11-23, Anders: the paths
+                    // still zigzagged). The map's own edge lines of paved areas give the edge exactly.
+                    float level;
+                    if (Base(CellAt(x, z)) == WorldCell.Building && kind == WorldCell.Building) level = 9f;
+                    else if (kind == WorldCell.Water) level = -9f;
+                    else
+                    {
+                        level = input.town != null ? (PavedWeight(x, z) - 0.5f) * 2.5f : -9f;
+                        if (edgeDist != null && edgeDist[k] < 1.6f) level = edgeLevel[k];
+                        if (kind == WorldCell.Plot) level = Math.Min(level, -0.3f);
+                        if (asphaltLevel != null) level = Math.Max(level, asphaltLevel[k]);
+                    }
+                    paveLevel[k] = level;
+                    if (level >= 0f && !pavedCorner[k])
+                    {
+                        c = (input.town == null ? Asphalt : TownPaved(ax, az)).Shade(0.95f + f2 * 0.08f);
+                        hard = true;
+                        pavedCorner[k] = true;
+                    }
+                    else if (level < 0f && pavedCorner[k])
+                    {
+                        cell = NotPavedNear(x, z);
+                        kind = Base(cell);
+                        c = kind == WorldCell.Plot ? Lawn.Lerp(LawnLight, f) : kind == WorldCell.RoughOpen || kind == WorldCell.RoughOpenTrees ? Rough.Lerp(RoughGreen, f)
+                            : kind == WorldCell.Open || kind == WorldCell.OpenTrees ? Open.Lerp(OpenGreen, f)
+                            : floor.a.Lerp(floor.b, Sm(0.35f, 0.7f, f));
+                        hard = false;
+                        pavedCorner[k] = false;
+                    }
                 }
                 if (!hard)
                 {

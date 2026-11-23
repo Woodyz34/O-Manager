@@ -19,7 +19,8 @@ public partial class TvWorldBuilder
     bool[] pavedCorner;                 // the ground corners on streets, squares and under houses (Ground)
     TvMesh townMesh, townFarMesh, townThingMesh, townBuiltMesh, pavedMesh;
     List<(int kind, float[] xz, float w, int flags)> townLines;    // 1 bridge, 2 tunnel, 3 stairs, 4 canopy outline; the piece's metres; flags: TvBridges
-    List<(float[] xz, float w, bool paved)> townPaths;              // the town's paths and paved ways near the piece
+    List<(float[] xz, float w, bool paved)> townPaths;
+    List<float[]> townEdges;                                         // the map's edge lines of paved areas near the piece              // the town's paths and paved ways near the piece
     readonly List<(float x, float z, float r, int kind)> townPlaced = new List<(float, float, float, int)>();
 
     bool Old => input.town != null && input.town.style == TvCityShapes.Style.OldStone;
@@ -41,6 +42,7 @@ public partial class TvWorldBuilder
         if (townLines != null) return;
         townLines = new List<(int, float[], float, int)>();
         townPaths = new List<(float[], float, bool)>();
+        townEdges = new List<float[]>();
         TvTown t = input.town;
         float[] Local(float[] xy)
         {
@@ -82,6 +84,11 @@ public partial class TvWorldBuilder
         {
             float[] xz = Local(path.xy);
             if (xz != null) townPaths.Add((xz, path.width, path.paved));
+        }
+        foreach (float[] edge in t.pavedEdges)
+        {
+            float[] xz = Local(edge);
+            if (xz != null) townEdges.Add(xz);
         }
     }
 
@@ -1400,6 +1407,18 @@ public partial class TvWorldBuilder
 
     // ---- Keeping it: the paved ground as a mesh of its own (asphalt or cobble grain), and the town's meshes ----
 
+    // A new corner in "into": the ground corners a and b mixed by t (position and normal), coloured as corner "colour"
+    static int CopyVertex(TvMesh from, int a, TvMesh into, int b, int colour, float t)
+    {
+        List<float> p = from.positions, n = from.normals;
+        float x = p[a * 3] + (p[b * 3] - p[a * 3]) * t, y = p[a * 3 + 1] + (p[b * 3 + 1] - p[a * 3 + 1]) * t, z = p[a * 3 + 2] + (p[b * 3 + 2] - p[a * 3 + 2]) * t;
+        float nx = n[a * 3] + (n[b * 3] - n[a * 3]) * t, ny = n[a * 3 + 1] + (n[b * 3 + 1] - n[a * 3 + 1]) * t, nz = n[a * 3 + 2] + (n[b * 3 + 2] - n[a * 3 + 2]) * t;
+        float nl = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+        if (nl < 1e-5f) { nx = 0f; ny = 1f; nz = 0f; nl = 1f; }
+        var c = new TvColor(from.colors[colour * 3], from.colors[colour * 3 + 1], from.colors[colour * 3 + 2]);
+        return into.Vertex(x, y, z, nx / nl, ny / nl, nz / nl, c);
+    }
+
     void KeepTown()
     {
         if (pavedCorner != null && groundMesh != null)
@@ -1409,27 +1428,61 @@ public partial class TvWorldBuilder
             for (int i = 0; i < map.Length; i++) map[i] = -1;
             var kept = new List<int>(groundMesh.triangles.Count);
             var t = groundMesh.triangles;
-            for (int q = 0; q + 5 < t.Count; q += 6)
+            float Lv(int v) => paveLevel != null ? paveLevel[v] : (pavedCorner[v] ? 1f : -1f);
+            int PavedVertex(int v)
             {
-                // One square of ground is two triangles: a, a+N, a+1 and a+1, a+N, a+N+1
-                int a = t[q];
-                bool paved = a + N + 1 < pavedCorner.Length && pavedCorner[a] && pavedCorner[a + 1] && pavedCorner[a + N] && pavedCorner[a + N + 1];
-                if (!paved)
+                if (map[v] < 0) map[v] = CopyVertex(groundMesh, v, pavedMesh, v, v, 0f);
+                return map[v];
+            }
+            // Each triangle whole on one side, or cut where the level is 0: the part inside the paving to the paved
+            // mesh, the rest stays ground. A new corner on the cut takes the colour of the side it is drawn with.
+            int baseCount = N * N;
+            var poly = new List<(int v, int a, int b, float t)>(5);
+            for (int q = 0; q + 2 < t.Count; q += 3)
+            {
+                int v0 = t[q], v1 = t[q + 1], v2 = t[q + 2];
+                if (v0 >= baseCount || v1 >= baseCount || v2 >= baseCount) { kept.Add(v0); kept.Add(v1); kept.Add(v2); continue; }
+                float l0 = Lv(v0), l1 = Lv(v1), l2 = Lv(v2);
+                bool p0 = l0 >= 0f, p1 = l1 >= 0f, p2 = l2 >= 0f;
+                if (!p0 && !p1 && !p2) { kept.Add(v0); kept.Add(v1); kept.Add(v2); continue; }
+                if (p0 && p1 && p2)
                 {
-                    for (int k = 0; k < 6; k++) kept.Add(t[q + k]);
+                    pavedMesh.triangles.Add(PavedVertex(v0)); pavedMesh.triangles.Add(PavedVertex(v1)); pavedMesh.triangles.Add(PavedVertex(v2));
                     continue;
                 }
-                for (int k = 0; k < 6; k++)
+                int[] vs = { v0, v1, v2 };
+                float[] ls = { l0, l1, l2 };
+                for (int side = 0; side < 2; side++)
                 {
-                    int v = t[q + k];
-                    if (map[v] < 0)
+                    bool wantPaved = side == 0;
+                    poly.Clear();
+                    for (int e = 0; e < 3; e++)
                     {
-                        map[v] = pavedMesh.VertexCount;
-                        pavedMesh.positions.Add(groundMesh.positions[v * 3]); pavedMesh.positions.Add(groundMesh.positions[v * 3 + 1]); pavedMesh.positions.Add(groundMesh.positions[v * 3 + 2]);
-                        pavedMesh.normals.Add(groundMesh.normals[v * 3]); pavedMesh.normals.Add(groundMesh.normals[v * 3 + 1]); pavedMesh.normals.Add(groundMesh.normals[v * 3 + 2]);
-                        pavedMesh.colors.Add(groundMesh.colors[v * 3]); pavedMesh.colors.Add(groundMesh.colors[v * 3 + 1]); pavedMesh.colors.Add(groundMesh.colors[v * 3 + 2]);
+                        int a = vs[e], b = vs[(e + 1) % 3];
+                        float la = ls[e], lb = ls[(e + 1) % 3];
+                        if ((la >= 0f) == wantPaved) poly.Add((a, a, a, 0f));
+                        if ((la >= 0f) != (lb >= 0f))
+                        {
+                            float tt = la / (la - lb);
+                            poly.Add((-1, a, b, Math.Max(0.02f, Math.Min(0.98f, tt))));
+                        }
                     }
-                    pavedMesh.triangles.Add(map[v]);
+                    if (poly.Count < 3) continue;
+                    TvMesh into = wantPaved ? pavedMesh : groundMesh;
+                    var ids = new int[poly.Count];
+                    for (int m = 0; m < poly.Count; m++)
+                    {
+                        var (v, a, b, tt) = poly[m];
+                        if (v >= 0) ids[m] = wantPaved ? PavedVertex(v) : v;
+                        else
+                        {
+                            // The colour from the end on this side
+                            int own = ((Lv(a) >= 0f) == wantPaved) ? a : b;
+                            ids[m] = CopyVertex(groundMesh, a, into, b, own, tt);
+                        }
+                    }
+                    var list = wantPaved ? pavedMesh.triangles : kept;
+                    for (int m = 1; m + 1 < ids.Length; m++) { list.Add(ids[0]); list.Add(ids[m]); list.Add(ids[m + 1]); }
                 }
             }
             groundMesh.triangles.Clear();
