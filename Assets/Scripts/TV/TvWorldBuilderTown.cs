@@ -176,9 +176,20 @@ public partial class TvWorldBuilder
     void TownHeights()
     {
         TownLines();
+        WallSegments();
+        // Retaining walls first: the stairs then see the ground as it stands by the walls
+        if (input.town != null) WallSteps();
+        var plans = new List<StairPlan>();
         foreach (var l in townLines)
         {
-            if (l.kind == 3) { StairSlope(l.xz, l.w); continue; }
+            if (l.kind != 3) continue;
+            StairPlan plan = PlanStairs(l.xz, l.w);
+            if (plan != null) plans.Add(plan);
+        }
+        JoinStairs(plans);
+        foreach (StairPlan plan in plans) ApplyStairs(plan);
+        foreach (var l in townLines)
+        {
             if (l.kind != 1) continue;
             float[] c = l.xz;
             float bh = BridgeWidth(l.w) / 2f;
@@ -203,118 +214,240 @@ public partial class TvWorldBuilder
         }
     }
 
+    // ---- Walls in a town: a step in the ground, not a slope down to their foot ----
+
+    List<float[]> wallSegs;             // the walls and fences near the piece (ax, az, bx, bz): the stairs' digging stops at them
+
+    void WallSegments()
+    {
+        if (wallSegs != null) return;
+        wallSegs = new List<float[]>();
+        foreach (var line in lines)
+        {
+            switch (line.kind)
+            {
+                case WorldLineKind.Wall: case WorldLineKind.HighWall: case WorldLineKind.Fence: case WorldLineKind.HighFence:
+                case WorldLineKind.Hedge: case WorldLineKind.Cliff: case WorldLineKind.SmallCliff:
+                    break;
+                default:
+                    continue;
+            }
+            float[] c = line.xz;
+            for (int q = 0; q + 3 < c.Length; q += 2) wallSegs.Add(new[] { c[q], c[q + 1], c[q + 2], c[q + 3] });
+        }
+    }
+
+    // A straight from (ax, az) to (bx, bz) crosses a wall or fence
+    bool AcrossWall(float ax, float az, float bx, float bz)
+    {
+        if (wallSegs == null) return false;
+        foreach (float[] w in wallSegs)
+        {
+            if (Math.Max(w[0], w[2]) < Math.Min(ax, bx) || Math.Min(w[0], w[2]) > Math.Max(ax, bx)
+                || Math.Max(w[1], w[3]) < Math.Min(az, bz) || Math.Min(w[1], w[3]) > Math.Max(az, bz)) continue;
+            float d1x = bx - ax, d1z = bz - az, d2x = w[2] - w[0], d2z = w[3] - w[1];
+            float den = d1x * d2z - d1z * d2x;
+            if (Math.Abs(den) < 1e-6f) continue;
+            float t = ((w[0] - ax) * d2z - (w[1] - az) * d2x) / den, u = ((w[0] - ax) * d1z - (w[1] - az) * d1x) / den;
+            if (t > 0.02f && t < 0.98f && u >= 0f && u <= 1f) return true;
+        }
+        return false;
+    }
+
+    // A wall with the ground higher on one side (2026-11-23, Anders: a town map draws a drop as a wall, not as a
+    // cliff; the ground on the high side is level with the wall's top, it does not slope down to the wall's foot):
+    // the ground beside it is flat at each side's own height, from the map's heights 4 m out, so the wall stands as
+    // a step. Worked out from the map's heights alone, so neighbouring pieces agree.
+    void WallSteps()
+    {
+        foreach (var line in lines)
+        {
+            if (line.kind != WorldLineKind.HighWall && line.kind != WorldLineKind.Wall) continue;
+            float[] c = line.xz;
+            for (int q = 0; q + 3 < c.Length; q += 2)
+            {
+                float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
+                float sx = bx - ax, sz = bz - az, sl = (float)Math.Sqrt(sx * sx + sz * sz);
+                if (sl < 0.3f) continue;
+                float nx = -sz / sl, nz = sx / sl;
+                ForNear(ax, az, bx, bz, 3.5f, (k, d, qx, qz) =>
+                {
+                    float x = k % N - R, z = k / N - R;
+                    float side = (x - qx) * nx + (z - qz) * nz >= 0f ? 1f : -1f;
+                    float hThis = Plain(qx + nx * side * 4f, qz + nz * side * 4f), hOther = Plain(qx - nx * side * 4f, qz - nz * side * 4f);
+                    if (Math.Abs(hThis - hOther) < 0.5f) return;
+                    if (Base(CellAt(x, z)) == WorldCell.Building) return;
+                    float w = 1f - Sm(2.4f, 3.5f, d);
+                    if (hThis > hOther) F[k] = Math.Max(F[k], Lerp(F[k], hThis, w));      // the high side: flat up to the top
+                    else F[k] = Math.Min(F[k], Lerp(F[k], hThis, w));                     // the low side: flat to the foot
+                });
+            }
+        }
+    }
+
+    // ---- Stairs ----
+
     // Stairs always climb (2026-11-20, Anders: flat stairs looked wrong), and at a real stair angle (2026-11-23,
-    // Anders: a street climbed evenly up to a flat stair; it should be flat up to the stairs and then steeply up them,
-    // digging the ground down a little in front of them if that is what it takes). Which way they climb: the map's
-    // heights a little beyond each end when they differ; else up to the house the stairs lead to (steps up to a
-    // door); else the way the land rises round them; else up along the line as drawn.
-    // When the land rises towards the stairs, the top keeps its height and the low end goes down to a real stair
-    // angle (StairGrade): the ground in front of the stairs is dug down to a flat way in, as far out as the map's
-    // own ground is that low. The ground along the stairs is set to the slope, and the steps (TownStructures) follow it.
+    // Anders: a street climbed evenly up to a flat stair; it should be flat up to the stairs and then steeply up them).
+    // Which way they climb: the map's heights a little beyond each end when they differ; else up to the house the
+    // stairs lead to (steps up to a door); else the way the land rises round them; else up along the line as drawn.
+    // When the land falls away from the low end, the ground in front is dug to a flat way in, as far as the map's own
+    // ground is that low. Where the land is flat they go a little down at the low end and a little up at the top
+    // (2026-11-23, Anders: no deep pit like a bomb crater, half steep at both ends), and stairs whose ends are near
+    // each other share those ends' heights, so stairs that belong together work together (a sunken yard, a terrace).
+    // The digging and raising stay narrow and stop at walls, fences and houses.
     const float StairGrade = 0.55f;
 
-    void StairSlope(float[] c, float width)
+    class StairPlan
+    {
+        public float[] c;
+        public float[] along;
+        public float total, half;
+        public int sign;                                // +1: climbs from the line's first point
+        public float lx, lz, lux, luz, tx, tz, tux, tuz; // the low and the high end, each with its way out
+        public float hLow, hHigh;                       // the heights of the low and the high end
+        public float dig;                               // a flat way in dug out this far in front of the low end (0: none)
+        public bool door;                               // steps up to a door: nothing dug or raised
+    }
+
+    StairPlan PlanStairs(float[] c, float width)
     {
         int n = c.Length / 2;
-        if (n < 2) return;
+        if (n < 2) return null;
         var along = new float[n];
         for (int i = 1; i < n; i++)
             along[i] = along[i - 1] + (float)Math.Sqrt((c[i * 2] - c[i * 2 - 2]) * (c[i * 2] - c[i * 2 - 2]) + (c[i * 2 + 1] - c[i * 2 - 1]) * (c[i * 2 + 1] - c[i * 2 - 1]));
         float total = along[n - 1];
-        if (total < 0.6f || total > 80f) return;
+        if (total < 0.6f || total > 80f) return null;
         float ax = c[0], az = c[1], bx = c[c.Length - 2], bz = c[c.Length - 1];
-        // The way out of each end
         float adx = c[0] - c[2], adz = c[1] - c[3], al = Math.Max(0.01f, (float)Math.Sqrt(adx * adx + adz * adz));
         float bdx = c[c.Length - 2] - c[c.Length - 4], bdz = c[c.Length - 1] - c[c.Length - 3], bl = Math.Max(0.01f, (float)Math.Sqrt(bdx * bdx + bdz * bdz));
         adx /= al; adz /= al; bdx /= bl; bdz /= bl;
-        float half = (width > 0.5f ? width : 2f) / 2f;
+        var p = new StairPlan { c = c, along = along, total = total, half = (width > 0.5f ? width : 2f) / 2f };
         float hA = Plain(ax + adx * 2.5f, az + adz * 2.5f), hB = Plain(bx + bdx * 2.5f, bz + bdz * 2.5f);
-        float dh = hB - hA, usual = Math.Max(0.45f, Math.Min(total * 0.5f, 3f));
+        float dh = hB - hA;
         float need = Math.Max(0.45f, Math.Min(total * StairGrade, 6f));
-        int sign;
-        if (Math.Abs(dh) >= 0.3f) sign = Math.Sign(dh);
+        if (Math.Abs(dh) >= 0.3f) p.sign = Math.Sign(dh);
         else
         {
             bool houseA = Base(CellAt(ax + adx * 1.2f, az + adz * 1.2f)) == WorldCell.Building;
             bool houseB = Base(CellAt(bx + bdx * 1.2f, bz + bdz * 1.2f)) == WorldCell.Building;
-            if (houseB && !houseA) sign = 1;
-            else if (houseA && !houseB) sign = -1;
+            if (houseB && !houseA) p.sign = 1;
+            else if (houseA && !houseB) p.sign = -1;
             else
             {
                 float wide = Plain(bx + bdx * 9f, bz + bdz * 9f) - Plain(ax + adx * 9f, az + adz * 9f);
-                sign = Math.Abs(wide) > 0.1f ? Math.Sign(wide) : 1;
+                p.sign = Math.Abs(wide) > 0.1f ? Math.Sign(wide) : 1;
             }
         }
-        // The low end (lx, lz, out lux, luz) and the high one
-        float lx = sign > 0 ? ax : bx, lz = sign > 0 ? az : bz, lux = sign > 0 ? adx : bdx, luz = sign > 0 ? adz : bdz;
-        float tx = sign > 0 ? bx : ax, tz = sign > 0 ? bz : az, tux = sign > 0 ? bdx : adx, tuz = sign > 0 ? bdz : adz;
-        float hTop = Plain(tx + tux, tz + tuz);
+        bool up = p.sign > 0;
+        p.lx = up ? ax : bx; p.lz = up ? az : bz; p.lux = up ? adx : bdx; p.luz = up ? adz : bdz;
+        p.tx = up ? bx : ax; p.tz = up ? bz : az; p.tux = up ? bdx : adx; p.tuz = up ? bdz : adz;
+        float hTop = Plain(p.tx + p.tux, p.tz + p.tuz);
         // Out from the low end: the first place low enough for a real stair angle, else the lowest within 30 m
         float lowest = float.MaxValue, lowestAt = 0f, dig = -1f;
         for (float d = 0.5f; d <= 30f; d += 1f)
         {
-            float h = Plain(lx + lux * d, lz + luz * d);
+            float h = Plain(p.lx + p.lux * d, p.lz + p.luz * d);
             if (hTop - h >= need) { dig = d; lowest = h; break; }
             if (h < lowest) { lowest = h; lowestAt = d; }
         }
         if (dig < 0f && hTop - lowest >= 0.3f) dig = lowestAt;
-        float h0, rise;
         if (dig >= 0f)
         {
-            h0 = lowest;
-            rise = hTop - lowest;
-            if (dig > 1.6f) DigInFront(lx, lz, lux, luz, half, dig, h0);
+            p.hHigh = hTop;
+            p.hLow = lowest;
+            p.dig = dig > 1.6f ? dig : 0f;
+            return p;
         }
-        else
+        p.door = Base(CellAt(p.tx + p.tux * 1.2f, p.tz + p.tuz * 1.2f)) == WorldCell.Building;
+        if (p.door)
         {
-            // Flat round them. Steps up to a door: up from the ground a little. Else the top stays on the ground and
-            // the low end goes down into a dug hollow, so the stairs never stand up out of the ground (2026-11-23,
-            // Anders: "den får inte sticka upp så där ... så det är liksom en grop här nere istället")
-            bool door = Base(CellAt(tx + tux * 1.2f, tz + tuz * 1.2f)) == WorldCell.Building;
-            if (door)
-            {
-                rise = Math.Max(0.45f, Math.Min(total * 0.5f, 1.4f));
-                h0 = Plain(lx, lz);
-            }
-            else
-            {
-                rise = need;
-                h0 = Plain(tx, tz) - rise;
-                DigInFront(lx, lz, lux, luz, half, Math.Max(3f, rise * 2.5f), h0);
-            }
+            p.hLow = Plain(p.lx, p.lz);
+            p.hHigh = p.hLow + Math.Max(0.45f, Math.Min(total * 0.5f, 1.4f));
+            return p;
         }
-        // Along the line from the low end (f = 0) to the high one
+        // Flat land: half steep, a little down at the low end and a little up at the top
+        float rise = Math.Max(0.45f, Math.Min(total * 0.3f, 2.4f));
+        float mid = (Plain(p.lx, p.lz) + Plain(p.tx, p.tz)) / 2f;
+        p.hLow = mid - rise / 2f;
+        p.hHigh = mid + rise / 2f;
+        return p;
+    }
+
+    // Stairs with ends near each other (6 m) share those ends' heights
+    static void JoinStairs(List<StairPlan> plans)
+    {
+        const float Near = 6f;
+        for (int pass = 0; pass < 2; pass++)
+            for (int i = 0; i < plans.Count; i++)
+                for (int j = i + 1; j < plans.Count; j++)
+                {
+                    StairPlan a = plans[i], b = plans[j];
+                    if (a.door || b.door) continue;
+                    for (int ea = 0; ea < 2; ea++)
+                        for (int eb = 0; eb < 2; eb++)
+                        {
+                            float axp = ea == 0 ? a.lx : a.tx, azp = ea == 0 ? a.lz : a.tz, bxp = eb == 0 ? b.lx : b.tx, bzp = eb == 0 ? b.lz : b.tz;
+                            if ((axp - bxp) * (axp - bxp) + (azp - bzp) * (azp - bzp) > Near * Near) continue;
+                            float ha = ea == 0 ? a.hLow : a.hHigh, hb = eb == 0 ? b.hLow : b.hHigh, h = (ha + hb) / 2f;
+                            if (ea == 0) a.hLow = h; else a.hHigh = h;
+                            if (eb == 0) b.hLow = h; else b.hHigh = h;
+                        }
+                    // Always a climb
+                    foreach (StairPlan s in new[] { a, b })
+                        if (s.hHigh - s.hLow < 0.45f) { float m = (s.hHigh + s.hLow) / 2f; s.hLow = m - 0.225f; s.hHigh = m + 0.225f; }
+                }
+    }
+
+    void ApplyStairs(StairPlan p)
+    {
+        if (!p.door)
+        {
+            // The low end: dug down to its height (a flat way in), or raised a little to it
+            float atLow = Plain(p.lx, p.lz), atTop = Plain(p.tx, p.tz);
+            float digLen = Math.Max(p.dig, Math.Max(2f, Math.Abs(atLow - p.hLow) * 1.5f));
+            Shape(p.lx, p.lz, p.lux, p.luz, p.half, digLen, p.hLow);
+            float raiseLen = Math.Max(2f, Math.Abs(p.hHigh - atTop) * 1.5f);
+            Shape(p.tx, p.tz, p.tux, p.tuz, p.half, raiseLen, p.hHigh);
+        }
+        float[] c = p.c;
+        float rise = p.hHigh - p.hLow;
         for (int q = 0; q + 3 < c.Length; q += 2)
         {
             int seg = q / 2;
             float sx = c[q], sz = c[q + 1], ex = c[q + 2], ez = c[q + 3];
-            float segLen = along[seg + 1] - along[seg];
-            ForNear(sx, sz, ex, ez, half + 0.9f, (k, d, qx, qz) =>
+            float segLen = p.along[seg + 1] - p.along[seg];
+            ForNear(sx, sz, ex, ez, p.half + 0.9f, (k, d, qx, qz) =>
             {
+                float x = k % N - R, z = k / N - R;
+                if (d > p.half + 0.1f && AcrossWall(qx, qz, x, z)) return;
                 float t = segLen > 0.01f ? (float)Math.Sqrt((qx - sx) * (qx - sx) + (qz - sz) * (qz - sz)) / segLen : 0f;
-                float f = (along[seg] + t * segLen) / total;
-                if (sign < 0) f = 1f - f;
-                float y = h0 + rise * f;
-                F[k] = Lerp(y, F[k], Sm(half + 0.15f, half + 0.9f, d));
+                float f = (p.along[seg] + t * segLen) / p.total;
+                if (p.sign < 0) f = 1f - f;
+                float y = p.hLow + rise * f;
+                F[k] = Lerp(y, F[k], Sm(p.half + 0.15f, p.half + 0.9f, d));
             });
         }
     }
 
-    // The ground in front of the low end of stairs, out to dig metres, dug down to the level floor (never raised),
-    // a little wider than the stairs, easing back into the land beyond
-    void DigInFront(float lx, float lz, float ux, float uz, float half, float dig, float floor)
+    // The ground out from an end of stairs (from lx, lz along ux, uz) brought to level: flat for len metres a little
+    // wider than the stairs, easing back into the land over 3 m beyond and 1.5 m to the sides. Not on houses, and not
+    // past a wall or fence (that ground keeps its own height).
+    void Shape(float lx, float lz, float ux, float uz, float half, float len, float level)
     {
-        float reach = half + 5f;
-        ForNear(lx, lz, lx + ux * (dig + 4f), lz + uz * (dig + 4f), reach, (k, d, qx, qz) =>
+        float wide = half + 0.6f, reach = wide + 1.5f;
+        ForNear(lx, lz, lx + ux * (len + 3f), lz + uz * (len + 3f), reach, (k, d, qx, qz) =>
         {
             float x = k % N - R, z = k / N - R;
             float along = (x - lx) * ux + (z - lz) * uz;
             if (along < -0.3f) return;
             float side = Math.Abs(-(x - lx) * uz + (z - lz) * ux);
             if (Base(CellAt(x, z)) == WorldCell.Building) return;
-            float w = (1f - Sm(dig, dig + 4f, along)) * (1f - Sm(half + 1.5f, reach, side));
-            if (w <= 0f || F[k] <= floor) return;
-            F[k] -= w * (F[k] - floor);
+            if (AcrossWall(lx + ux * 0.3f, lz + uz * 0.3f, x, z)) return;
+            float w = (1f - Sm(len, len + 3f, along)) * (1f - Sm(wide, reach, side));
+            if (w <= 0f) return;
+            F[k] += w * (level - F[k]);
         });
     }
 
@@ -1349,9 +1482,18 @@ public partial class TvWorldBuilder
         float len = u1 - u0, wid = v1 - v0;
         if (len < 1f || wid < 1f || len > 80f || wid > 80f) return;
         float cx = mx + ux * (u0 + u1) / 2f - uz * (v0 + v1) / 2f, cz = mz + uz * (u0 + u1) / 2f + ux * (v0 + v1) / 2f;
-        float lowest = float.MaxValue;
-        foreach (var p in pts) lowest = Math.Min(lowest, H(p.x, p.z));
-        lowest = Math.Min(lowest, H(cx, cz));
+        float lowest = float.MaxValue, highest = float.MinValue;
+        foreach (var p in pts) { float h = H(p.x, p.z); lowest = Math.Min(lowest, h); highest = Math.Max(highest, h); }
+        // The ground under it, not only at its corners (a long one on a slope)
+        for (float su = -0.5f; su <= 0.5f; su += 0.125f)
+            for (float sv = -0.4f; sv <= 0.4f; sv += 0.4f)
+            {
+                float h = H(cx + ux * su * (u1 - u0) - uz * sv * (v1 - v0), cz + uz * su * (u1 - u0) + ux * sv * (v1 - v0));
+                lowest = Math.Min(lowest, h);
+                highest = Math.Max(highest, h);
+            }
+        // Room to run under the roof everywhere (2026-11-23, Anders: a long bicycle shelter's roof was below head height)
+        float roofAt = Math.Max(2.9f, highest - lowest + 2.6f);
         // Houses on two sides: a passage under a house
         int houses = 0;
         foreach (float s in new[] { -1f, 1f })
@@ -1384,11 +1526,11 @@ public partial class TvWorldBuilder
             foreach (float s in new[] { -1f, 1f })
             {
                 float v = s * (hw - 0.15f);
-                b.Box(u - 0.08f, 0f, v - 0.08f, u + 0.08f, 2.9f, v + 0.08f, post);
+                b.Box(u - 0.08f, 0f, v - 0.08f, u + 0.08f, roofAt, v + 0.08f, post);
                 world.solids.Add(new TvSolid { x = cx + ux * u - uz * v, z = cz + uz * u + ux * v, r = 0.15f });
             }
         }
-        b.Box(-hl - 0.2f, 2.9f, -hw - 0.2f, hl + 0.2f, 3.1f, hw + 0.2f, roof);
+        b.Box(-hl - 0.2f, roofAt, -hw - 0.2f, hl + 0.2f, roofAt + 0.2f, hw + 0.2f, roof);
         townBuiltMesh.Add(b.Done(), cx, lowest, cz, 1f, 1f, 1f, -angle);
         // A canopy standing alone on the paving is most often a bicycle shelter (2026-11-20, Anders): a row of bikes
         // under it along its back
