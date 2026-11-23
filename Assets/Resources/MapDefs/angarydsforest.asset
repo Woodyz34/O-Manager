@@ -35,6 +35,6 @@ MonoBehaviour:
     rotation: 0
     scale: 1
     courseInPicture: 0
-    pixelSize: {x: 3504, y: 6016}
-    pivotPixels: {x: 1752, y: 3008}
-    pixelsPerUnit: 160
+    pixelSize: {x: 5256, y: 9024}
+    pivotPixels: {x: 2628, y: 4512}
+    pixelsPerUnit: 240.00002
