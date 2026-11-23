@@ -268,7 +268,7 @@ public class TvTown
     }
 
     // The arrays of [x, y] pairs from an opening bracket: a LineString's points, or each line of a MultiLineString
-    static List<List<float>> Parse(string s, int open, out int end)
+    internal static List<List<float>> Parse(string s, int open, out int end)
     {
         var parts = new List<List<float>>();
         List<float> current = null;

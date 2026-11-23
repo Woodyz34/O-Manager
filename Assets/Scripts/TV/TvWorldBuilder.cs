@@ -400,6 +400,10 @@ public partial class TvWorldBuilder
         asphaltLevel = null;
         pavedCorner = null;
         paveLevel = null;
+        eDist = eLvl = wLvl = pDist = pLvl = null;
+        eId = null;
+        eCell = null;
+        gKind = null;
         clear = new float[N * N];
         water = new float[N * N];
         bog = new float[N * N];
@@ -491,6 +495,10 @@ public partial class TvWorldBuilder
         asphaltLevel = null;
         pavedCorner = null;
         paveLevel = null;
+        eDist = eLvl = wLvl = pDist = pLvl = null;
+        eId = null;
+        eCell = null;
+        gKind = null;
         clear = new float[N * N];
         water = new float[N * N];
         bog = new float[N * N];
@@ -541,6 +549,7 @@ public partial class TvWorldBuilder
         Trees();
         OpenPassages(treeSolids, world.solids.Count);
         if (pavedCorner != null) KeepTown();
+        CutGroundEdges();
         if (input.town == null) Keep(townBuiltMesh);
         Keep(groundMesh);
         Keep(GroundFar());
@@ -729,19 +738,23 @@ public partial class TvWorldBuilder
             }
         }
 
-        // Lakes and ponds lie a little lower than their shores
+        // Lakes and ponds lie a little lower than their shores: lowered by how far inside the water's edge a corner
+        // is, so the shore where the ground meets the water follows the map's bank line
+        TownLines();
+        EdgeField();
         for (int j = 0; j < N; j++)
         {
             for (int i = 0; i < N; i++)
             {
+                int k = j * N + i;
                 byte cell = input.town != null ? SmoothCell(i - R, j - R) : CellAt(i - R, j - R);
-                if (Base(cell) == WorldCell.Water || BridgeWater(i - R, j - R)) F[j * N + i] -= 0.45f;
+                float inside = Math.Max(0f, Math.Min(1f, (wLvl[k] + 0.5f) / 1f));
+                if (inside > 0f) F[k] -= 0.45f * inside;
                 // Pools in a marsh are hollows with water in them
-                else if (MarshPool(i - R - 0.5f, j - R - 0.5f, (cell & WorldCell.Marsh) != 0, bog[j * N + i])) F[j * N + i] -= 0.3f;
+                else if (Base(cell) != WorldCell.Water && MarshPool(i - R - 0.5f, j - R - 0.5f, (cell & WorldCell.Marsh) != 0, bog[k])) F[k] -= 0.3f;
             }
         }
         // The town's bridges, tunnels and stairs; on a forest map its footbridges (TvBridges)
-        TownLines();
         TownHeights();
     }
 
@@ -1009,31 +1022,107 @@ public partial class TvWorldBuilder
         return WorldCell.Open;
     }
 
+
+    // ---- The map's edge lines (TvEdges): the ground follows them up close ----
+
     float[] paveLevel;                  // how far inside the paving each ground corner is (metres; below 0 outside)
 
-    // The share of paved cells (houses count) round a point, with the same cubic B-spline weights as SmoothCell
-    float PavedWeight(float x, float z)
+    float[] eDist, eLvl;                // the nearest edge line round each corner: distance, and signed (+ on its left)
+    int[] eId;                          // which line (-1: none within reach)
+    byte[] eCell;                       // the ground on the corner's side of it
+    float[] wLvl;                       // how far inside the water each corner is (metres; below 0 on land)
+    float[] pDist, pLvl;                // the nearest edge line with paving on one side only: distance, + on the paved side
+    const float EdgeReach = 1.6f;
+    byte[] gKind;                       // a town: the ground kind each corner got (houses as paving)
+
+    static int Kind2(byte cell) { int b = cell & WorldCell.BaseMask; return b == WorldCell.Building ? WorldCell.Paved : b; }
+
+    // The ground kind of a point for the edge lines' sides (houses as paving)
+    byte SideCell(float x, float z) => input.town != null ? SmoothCell(x, z) : CellAt(x, z);
+
+    // The share of cells of one kind round a point, with the same cubic B-spline weights as SmoothCell
+    float KindWeight(float x, float z, int kind)
     {
         double fe = (input.centerE + x - layer.minE) / layer.cell - 0.5, fn = (input.centerN + z - layer.minN) / layer.cell - 0.5;
         int i0 = (int)Math.Floor(fe), j0 = (int)Math.Floor(fn);
         Span4((float)(fe - i0), out float x0, out float x1, out float x2, out float x3);
         Span4((float)(fn - j0), out float z0, out float z1, out float z2, out float z3);
-        float wx0 = x0, wx1 = x1, wx2 = x2, wx3 = x3;
         float w = 0f;
         for (int dj = 0; dj < 4; dj++)
         {
             float wz = dj == 0 ? z0 : dj == 1 ? z1 : dj == 2 ? z2 : z3;
             for (int di = 0; di < 4; di++)
             {
-                int b = Base(layer.At(layer.minE + (i0 + di - 1 + 0.5) * layer.cell, layer.minN + (j0 + dj - 1 + 0.5) * layer.cell));
-                if (b == WorldCell.Paved || b == WorldCell.Building) w += (di == 0 ? wx0 : di == 1 ? wx1 : di == 2 ? wx2 : wx3) * wz;
+                int b = Kind2(layer.At(layer.minE + (i0 + di - 1 + 0.5) * layer.cell, layer.minN + (j0 + dj - 1 + 0.5) * layer.cell));
+                if (b == kind) w += (di == 0 ? x0 : di == 1 ? x1 : di == 2 ? x2 : x3) * wz;
             }
         }
         return w;
     }
 
-    // The ground next to paving that is not paving (for a corner the paving's exact edge leaves outside)
-    byte NotPavedNear(float x, float z)
+    float PavedWeight(float x, float z) => KindWeight(x, z, WorldCell.Paved);
+
+    // For every ground corner: the nearest edge line and the ground on its side, and the water's and paving's levels.
+    // A stretch of line is used where its two sides (1.3 m off its middle) differ; a stretch with the same ground on
+    // both sides (a step inside a square, a boundary the cells do not show) is left out.
+    void EdgeField()
+    {
+        int n = N * N;
+        eDist = new float[n]; eLvl = new float[n]; eId = new int[n]; eCell = new byte[n];
+        pDist = new float[n]; pLvl = new float[n]; wLvl = new float[n];
+        var wDist = new float[n];
+        for (int k = 0; k < n; k++) { eDist[k] = pDist[k] = wDist[k] = 99f; eId[k] = -1; }
+        TvEdges edges = TvEdges.Of(layer);
+        if (edges != null)
+        {
+            float lo = -R - 3f, hi = R + 3f;
+            for (int li = 0; li < edges.lines.Count; li++)
+            {
+                float[] b = edges.bounds[li];
+                if (b[2] - cE < lo || b[0] - cE > hi || b[3] - cN < lo || b[1] - cN > hi) continue;
+                float[] xy = edges.lines[li];
+                for (int q = 0; q + 3 < xy.Length; q += 2)
+                {
+                    float ax = (float)(xy[q] - input.centerE), az = (float)(xy[q + 1] - input.centerN);
+                    float bx = (float)(xy[q + 2] - input.centerE), bz = (float)(xy[q + 3] - input.centerN);
+                    if (Math.Max(ax, bx) < lo || Math.Min(ax, bx) > hi || Math.Max(az, bz) < lo || Math.Min(az, bz) > hi) continue;
+                    float sx = bx - ax, sz = bz - az, sl = (float)Math.Sqrt(sx * sx + sz * sz);
+                    if (sl < 0.05f) continue;
+                    float nx = -sz / sl, nz = sx / sl, mx = (ax + bx) / 2f, mz = (az + bz) / 2f;
+                    byte left = SideCell(mx + nx * 1.3f, mz + nz * 1.3f), right = SideCell(mx - nx * 1.3f, mz - nz * 1.3f);
+                    int kl = Kind2(left), kr = Kind2(right);
+                    if (kl == kr) continue;
+                    // A house's cell keeps the house (its walls stand there): the side takes the paving round it
+                    if (Base(left) == WorldCell.Building) left = (byte)((left & ~WorldCell.BaseMask) | WorldCell.Paved);
+                    if (Base(right) == WorldCell.Building) right = (byte)((right & ~WorldCell.BaseMask) | WorldCell.Paved);
+                    bool water = kl == WorldCell.Water || kr == WorldCell.Water, paved = kl == WorldCell.Paved || kr == WorldCell.Paved;
+                    float wSide = kl == WorldCell.Water ? 1f : -1f, pSide = kl == WorldCell.Paved ? 1f : -1f;
+                    int id = li;
+                    ForNear(ax, az, bx, bz, EdgeReach, (k, d, qx, qz) =>
+                    {
+                        float vx = k % N - R, vz = k / N - R;
+                        float side = (vx - qx) * nx + (vz - qz) * nz >= 0f ? 1f : -1f;
+                        float dd = Math.Max(d, 0.02f);
+                        if (d < eDist[k])
+                        {
+                            eDist[k] = d; eLvl[k] = side * dd; eId[k] = id; eCell[k] = side > 0f ? left : right;
+                        }
+                        if (water && d < wDist[k]) { wDist[k] = d; wLvl[k] = side * wSide * dd; }
+                        if (paved && d < pDist[k]) { pDist[k] = d; pLvl[k] = side * pSide * dd; }
+                    });
+                }
+            }
+        }
+        for (int k = 0; k < n; k++)
+        {
+            float x = k % N - R, z = k / N - R;
+            if (wDist[k] >= EdgeReach) wLvl[k] = (KindWeight(x, z, WorldCell.Water) - 0.5f) * 2.5f;
+            if (BridgeWater(x, z)) wLvl[k] = Math.Max(wLvl[k], 1f);
+        }
+    }
+
+    // The ground near a point that is not of one kind (a corner the exact edge leaves outside the water or paving)
+    byte NotKindNear(float x, float z, int kind)
     {
         for (float d = 1f; d <= 4.1f; d += 1.5f)
             for (int a = 0; a < 8; a++)
@@ -1041,46 +1130,67 @@ public partial class TvWorldBuilder
                 float ang = a * 0.785398f;
                 byte c = CellAt(x + (float)Math.Cos(ang) * d, z + (float)Math.Sin(ang) * d);
                 int b = Base(c);
-                if (b != WorldCell.Paved && b != WorldCell.Building && b != WorldCell.Water) return c;
+                if (b != kind && b != WorldCell.Building && b != WorldCell.Water && !(kind == WorldCell.Paved && b == WorldCell.Paved)) return c;
             }
         return WorldCell.Open;
     }
 
-    // The map's edge lines of paved areas near each corner (TvTown.pavedEdges): the distance to the nearest, and the
-    // corner's level by it (+ on the paved side, - off it). The paved side of a stretch is the side with more paved
-    // cells; a stretch with paving (or none) on both sides, a step inside a square, is left out.
-    void PavedEdges(out float[] dist, out float[] level)
+    // The ground cut along the edge lines: a triangle whose three corners have the same line nearest and lie on both
+    // sides of it is split there, each part with its own side's colour, so the edge is the map's line and not a blend
+    // across the 1 m squares. Up close only (the near ground); the far ground keeps its corners.
+    void CutGroundEdges()
     {
-        dist = null;
-        level = null;
-        if (townEdges == null || townEdges.Count == 0) return;
-        var d0 = new float[N * N];
-        var l0 = new float[N * N];
-        for (int i = 0; i < d0.Length; i++) d0[i] = 99f;
-        foreach (float[] c in townEdges)
+        if (eId == null || groundMesh == null) return;
+        var t = groundMesh.triangles;
+        var kept = new List<int>(t.Count + 64);
+        int baseCount = N * N;
+        var poly = new List<int>(5);
+        for (int q = 0; q + 2 < t.Count; q += 3)
         {
-            for (int q = 0; q + 3 < c.Length; q += 2)
+            int v0 = t[q], v1 = t[q + 1], v2 = t[q + 2];
+            if (v0 >= baseCount || v1 >= baseCount || v2 >= baseCount) { kept.Add(v0); kept.Add(v1); kept.Add(v2); continue; }
+            bool cut = eId[v0] >= 0 && eId[v0] == eId[v1] && eId[v0] == eId[v2]
+                       && !((eLvl[v0] >= 0f) == (eLvl[v1] >= 0f) && (eLvl[v0] >= 0f) == (eLvl[v2] >= 0f));
+            int[] vs = { v0, v1, v2 };
+            float[] lv = { eLvl[v0], eLvl[v1], eLvl[v2] };
+            if (!cut && gKind != null)
             {
-                float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
-                float sx = bx - ax, sz = bz - az, sl = (float)Math.Sqrt(sx * sx + sz * sz);
-                if (sl < 0.05f) continue;
-                if (Math.Max(ax, bx) < -R - 2 || Math.Min(ax, bx) > R + 2 || Math.Max(az, bz) < -R - 2 || Math.Min(az, bz) > R + 2) continue;
-                float nx = -sz / sl, nz = sx / sl, mx = (ax + bx) / 2f, mz = (az + bz) / 2f;
-                float left = PavedWeight(mx + nx * 1.3f, mz + nz * 1.3f), right = PavedWeight(mx - nx * 1.3f, mz - nz * 1.3f);
-                if (Math.Abs(left - right) < 0.3f) continue;
-                float side = left > right ? 1f : -1f;
-                ForNear(ax, az, bx, bz, 1.6f, (k, d, qx, qz) =>
+                // A town's ground with no edge line here: two kinds meet in the triangle, cut where their smooth
+                // shares of the cells round are equal, so the edge runs smooth and not as the 1 m squares
+                int ka = gKind[v0], kb = gKind[v1] != ka ? gKind[v1] : gKind[v2];
+                if (ka != kb && (gKind[v2] == ka || gKind[v2] == kb) && ka != WorldCell.Paved && kb != WorldCell.Paved)
                 {
-                    if (d >= d0[k]) return;
-                    float vx = k % N - R, vz = k / N - R;
-                    float s = (vx - qx) * nx + (vz - qz) * nz;
-                    d0[k] = d;
-                    l0[k] = (s >= 0f ? side : -side) * Math.Max(d, 0.02f);
-                });
+                    for (int m = 0; m < 3; m++)
+                    {
+                        int v = vs[m];
+                        float x = v % N - R, z = v / N - R;
+                        float d = KindWeight(x, z, ka) - KindWeight(x, z, kb);
+                        lv[m] = gKind[v] == ka ? Math.Max(d, 0.01f) : Math.Min(d, -0.01f);
+                    }
+                    cut = true;
+                }
+            }
+            if (!cut) { kept.Add(v0); kept.Add(v1); kept.Add(v2); continue; }
+            for (int side = 0; side < 2; side++)
+            {
+                bool plus = side == 0;
+                poly.Clear();
+                for (int e = 0; e < 3; e++)
+                {
+                    int a = vs[e], b = vs[(e + 1) % 3];
+                    float la = lv[e], lb = lv[(e + 1) % 3];
+                    if ((la >= 0f) == plus) poly.Add(a);
+                    if ((la >= 0f) != (lb >= 0f))
+                    {
+                        float tt = Math.Max(0.02f, Math.Min(0.98f, la / (la - lb)));
+                        poly.Add(CopyVertex(groundMesh, a, groundMesh, b, (la >= 0f) == plus ? a : b, tt));
+                    }
+                }
+                for (int m = 1; m + 1 < poly.Count; m++) { kept.Add(poly[0]); kept.Add(poly[m]); kept.Add(poly[m + 1]); }
             }
         }
-        dist = d0;
-        level = l0;
+        t.Clear();
+        t.AddRange(kept);
     }
 
     void Ground()
@@ -1091,8 +1201,7 @@ public partial class TvWorldBuilder
             pavedCorner = new bool[N * N];
             paveLevel = new float[N * N];
         }
-        float[] edgeDist = null, edgeLevel = null;
-        if (input.town != null) PavedEdges(out edgeDist, out edgeLevel);
+        gKind = input.town != null ? new byte[N * N] : null;
         for (int j = 0; j < N; j++)
         {
             for (int i = 0; i < N; i++)
@@ -1104,9 +1213,17 @@ public partial class TvWorldBuilder
                 float ragged = input.town != null ? 0.9f : 3f;    // a town's edges are straight
                 byte cell = input.town != null ? SmoothCell(x, z)
                     : CellAt(x + (TvRandom.Noise(ax * 0.4f, az * 0.4f) - 0.5f) * ragged, z + (TvRandom.Noise(ax * 0.4f + 9f, az * 0.4f) - 0.5f) * ragged);
+                // Near an edge line of the map: the ground of the line's side the corner is on
+                if (eId != null && eId[k] >= 0 && Base(cell) != WorldCell.Building) cell = eCell[k];
                 int kind = Base(cell);
-                // A bridge made from a path over water: water round its deck, not the zigzag land strip of the cells
-                if (kind != WorldCell.Water && BridgeWater(x, z)) { kind = WorldCell.Water; cell = WorldCell.Water; }
+                // Water where the corner is inside the water's edge (the map's bank line where near; a bridge made
+                // from a path over water: water round its deck, not the zigzag land strip of the cells)
+                if (wLvl != null)
+                {
+                    if (wLvl[k] >= 0f && kind != WorldCell.Building) { kind = WorldCell.Water; cell = WorldCell.Water; }
+                    else if (wLvl[k] < 0f && kind == WorldCell.Water) { cell = NotKindNear(x, z, WorldCell.Water); kind = Base(cell); }
+                }
+                else if (kind != WorldCell.Water && BridgeWater(x, z)) { kind = WorldCell.Water; cell = WorldCell.Water; }
                 // A garden as the map draws it, straight, not the zigzag of its cells (2026-11-23, Anders)
                 if (input.town != null && input.town.gardens != null && kind != WorldCell.Water && kind != WorldCell.Building)
                 {
@@ -1160,8 +1277,8 @@ public partial class TvWorldBuilder
                     else if (kind == WorldCell.Water) level = -9f;
                     else
                     {
-                        level = input.town != null ? (PavedWeight(x, z) - 0.5f) * 2.5f : -9f;
-                        if (edgeDist != null && edgeDist[k] < 1.6f) level = edgeLevel[k];
+                        level = (PavedWeight(x, z) - 0.5f) * 2.5f;
+                        if (pDist != null && pDist[k] < EdgeReach) level = pLvl[k];
                         if (kind == WorldCell.Plot) level = Math.Min(level, -0.3f);
                         if (asphaltLevel != null) level = Math.Max(level, asphaltLevel[k]);
                     }
@@ -1174,7 +1291,7 @@ public partial class TvWorldBuilder
                     }
                     else if (level < 0f && pavedCorner[k])
                     {
-                        cell = NotPavedNear(x, z);
+                        cell = NotKindNear(x, z, WorldCell.Paved);
                         kind = Base(cell);
                         c = kind == WorldCell.Plot ? Lawn.Lerp(LawnLight, f) : kind == WorldCell.RoughOpen || kind == WorldCell.RoughOpenTrees ? Rough.Lerp(RoughGreen, f)
                             : kind == WorldCell.Open || kind == WorldCell.OpenTrees ? Open.Lerp(OpenGreen, f)
@@ -1192,6 +1309,7 @@ public partial class TvWorldBuilder
                     if (trackBlend[k] > 0f) c = c.Lerp(trackColor[k], trackBlend[k]);
                     if (water[k] > 0f) c = c.Lerp(WaterDeep, water[k]);
                 }
+                if (gKind != null) gKind[k] = (byte)(pavedCorner != null && pavedCorner[k] ? WorldCell.Paved : Kind2(cell));
                 // Steep ground and cliff faces show the rock
                 float sx = F[k + (i < N - 1 ? 1 : 0)] - F[k - (i > 0 ? 1 : 0)], sz = F[k + (j < N - 1 ? N : 0)] - F[k - (j > 0 ? N : 0)];
                 if (chunk)
@@ -1240,16 +1358,11 @@ public partial class TvWorldBuilder
                 int a = j * N + i;
                 float x = i - R, z = j - R;
                 byte cell = CellAt(x + 0.5f, z + 0.5f);
-                // A town: water where all four corners are water by the smooth edges (as the ground's colour)
-                if (input.town != null)
-                {
-                    int lake = 0;
-                    for (int q = 0; q < 4; q++)
-                        if (Base(SmoothCell(x + (q & 1), z + (q >> 1))) == WorldCell.Water || BridgeWater(x + (q & 1), z + (q >> 1))) lake++;
-                    if (lake >= 3) { kind[a] = 1; continue; }
-                    if (Base(cell) == WorldCell.Water) cell = (byte)(cell & ~WorldCell.BaseMask);
-                }
-                else if (Base(cell) == WorldCell.Water || BridgeWater(x + 0.5f, z + 0.5f)) { kind[a] = 1; continue; }
+                // A lake: where a corner is inside the water's edge (a little beyond it, under the bank; the surface
+                // is cut along the edge below)
+                float inside = Math.Max(Math.Max(wLvl[a], wLvl[a + 1]), Math.Max(wLvl[a + N], wLvl[a + N + 1]));
+                if (inside >= -WaterMargin) { kind[a] = 1; continue; }
+                if (Base(cell) == WorldCell.Water) cell = (byte)(cell & ~WorldCell.BaseMask);
                 float wet = Math.Max(Math.Max(water[a], water[a + 1]), Math.Max(water[a + N], water[a + N + 1]));
                 if (wet > 0.55f) { kind[a] = 2; continue; }
                 float strip = Math.Max(Math.Max(bog[a], bog[a + 1]), Math.Max(bog[a + N], bog[a + N + 1]));
@@ -1299,10 +1412,37 @@ public partial class TvWorldBuilder
                     return corner[q];
                 }
                 int v0 = V(i, j), v1 = V(i + 1, j), v2 = V(i, j + 1), v3 = V(i + 1, j + 1);
-                waterMesh.triangles.Add(v0); waterMesh.triangles.Add(v2); waterMesh.triangles.Add(v1);
-                waterMesh.triangles.Add(v1); waterMesh.triangles.Add(v2); waterMesh.triangles.Add(v3);
+                int q0 = a, q1 = a + 1, q2 = a + N, q3 = a + N + 1;
+                if (k != 1 || (wLvl[q0] >= -WaterMargin && wLvl[q1] >= -WaterMargin && wLvl[q2] >= -WaterMargin && wLvl[q3] >= -WaterMargin))
+                {
+                    waterMesh.triangles.Add(v0); waterMesh.triangles.Add(v2); waterMesh.triangles.Add(v1);
+                    waterMesh.triangles.Add(v1); waterMesh.triangles.Add(v2); waterMesh.triangles.Add(v3);
+                    continue;
+                }
+                // The lake's edge square: only the part inside the edge (the map's bank line where near)
+                WaterPart(v0, v2, v1, q0, q2, q1);
+                WaterPart(v1, v2, v3, q1, q2, q3);
             }
         }
+    }
+
+    const float WaterMargin = 0.6f;     // the lake's surface reaches this far beyond its edge, under the bank
+
+    // The part of a triangle of the water's surface inside the lake's edge (vertices a, b, c at corners qa, qb, qc)
+    void WaterPart(int a, int b, int c, int qa, int qb, int qc)
+    {
+        int[] vs = { a, b, c };
+        float[] ls = { wLvl[qa] + WaterMargin, wLvl[qb] + WaterMargin, wLvl[qc] + WaterMargin };
+        var poly = new List<int>(4);
+        for (int e = 0; e < 3; e++)
+        {
+            int u = vs[e], v = vs[(e + 1) % 3];
+            float lu = ls[e], lv = ls[(e + 1) % 3];
+            if (lu >= 0f) poly.Add(u);
+            if ((lu >= 0f) != (lv >= 0f))
+                poly.Add(CopyVertex(waterMesh, u, waterMesh, v, lu >= 0f ? u : v, Math.Max(0.02f, Math.Min(0.98f, lu / (lu - lv)))));
+        }
+        for (int m = 1; m + 1 < poly.Count; m++) { waterMesh.triangles.Add(poly[0]); waterMesh.triangles.Add(poly[m]); waterMesh.triangles.Add(poly[m + 1]); }
     }
 
     // Open water in a marsh or a narrow marsh strip: where the noise is high
