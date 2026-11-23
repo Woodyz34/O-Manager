@@ -83,6 +83,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public bool hasGuessedImposter { get; set; }
     // Secret task mode: the task everyone but the imposter has, set by the host (SecretTasks; 0 = none)
     [Networked] public int secretTask { get; set; }
+    // Secret task mode: a caught imposter's guess at the task, set on the imposter's own player
+    // (0 = not guessed yet, -1 = ran out of time, otherwise a SecretTasks.Task)
+    [Networked] public int secretTaskGuess { get; set; }
 
     // The host's lobby choices, published on the host's own player so everyone can see them
     [Networked] public NetworkString<_128> lobbyGameMode { get; set; }
@@ -118,6 +121,31 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         if (lobbyCourse3.ToString() != Part(2)) lobbyCourse3 = Part(2);
         if (lobbyCourse4.ToString() != Part(3)) lobbyCourse4 = Part(3);
     }
+    // The host's lobby settings (HostSettings: TV production, race speed, bears and moves per leg), "" on the others
+    [Networked] public NetworkString<_64> hostOptions { get; set; }
+    // The player is drawing its route right now (the leaderboard shows the ones who are not done yet)
+    [Networked] public NetworkBool drawingNow { get; set; }
+
+    // A lobby chat message (LobbyChat), sent from the writer's own player to everyone
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_Chat(string text)
+    {
+        LobbyChat.Receive(this, text);
+    }
+
+    // The host kicks a player (2026-11-19, someone went AFK): sent from the host's player to everyone, and the kicked
+    // player leaves for the main menu
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_Kick(PlayerRef who)
+    {
+        if (Runner == null || who != Runner.LocalPlayer) return;
+        UIToast.Show("The host took you out of the game.", 5f);
+        SceneLoader.LeaveSession(Runner, "MainMenu");
+    }
+    // Relays: the host's race clock in game seconds while a leg is under way (RelayClock), so every team's clock
+    // shows exactly the same time once its runner is off; negative = no leg under way
+    [Networked] public float relayRaceClock { get; set; }
+    [Networked] public int relayRaceClockTick { get; set; }
     // The extra game modes the host has turned on in the lobby (ExtraMode flags)
     [Networked] public int lobbyModes { get; set; }
     // Secret task tasks the host has switched off in the lobby (one bit per SecretTasks.Task; 0 = all tasks on)
@@ -127,14 +155,14 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // starts (ExtraMode flags + ExtraModes.KnownBit, 0 = not set)
     [Networked] public int competitionModes { get; set; }
 
-    // Bears mode: where this player hid their bear (BearMode)
-    [Networked] public NetworkBool bearPlaced { get; set; }
-    [Networked] public Vector2 bearPosition { get; set; }
+    // Bears mode: the bears this player hid (BearMode): x and y on the map, z how big (1 = a normal bear, 2 = twice
+    // the reach after saving one on a relay leg, 0 = no bear in that place)
+    [Networked, Capacity(BearMode.MaxBears)] public NetworkArray<Vector3> bears => default;
 
-    // Move a control mode: the control this player moved and where to (MoveControlMode)
-    [Networked] public NetworkBool moveUsed { get; set; }
-    [Networked] public int moveControl { get; set; }
-    [Networked] public Vector2 moveTarget { get; set; }
+    // Move a control mode: the controls this player moved (0 = no move in that place) and where to (MoveControlMode).
+    // Up to three: the host picks how many moves everyone gets (2026-11-19)
+    [Networked, Capacity(MoveControlMode.MaxMoves)] public NetworkArray<int> moveControls => default;
+    [Networked, Capacity(MoveControlMode.MaxMoves)] public NetworkArray<Vector2> moveTargets => default;
 
     // Route analysis: this player's drawn routes, simplified (grid cells packed as row * columns + column), where each
     // leg ends in that list, and the time the standard runner would need on each leg (RouteAnalysis)
@@ -151,6 +179,20 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public int choiceAnswered { get; set; }
     [Networked] public int choiceQuestions { get; set; }
     [Networked] public NetworkBool choiceDone { get; set; }
+    // Run it yourself (3D, RunSession): where the runner is in the 3D world (map metres east, north), the way it
+    // faces (degrees from north), its real-life speed, and RunSession.Flag bits (map up, fallen, in the air, loaded)
+    [Networked] public Vector2 run3dAt { get; set; }
+    [Networked] public float run3dYaw { get; set; }
+    [Networked] public float run3dSpeed { get; set; }
+    [Networked] public int run3dFlags { get; set; }
+    // For watching a runner after the finish: the head's tilt (degrees, down positive), the leg the map shows and
+    // how far it is turned, and how many controls are punched in order (for "Leg 3 of 7")
+    [Networked] public float run3dPitch { get; set; }
+    [Networked] public int run3dMapLeg { get; set; }
+    [Networked] public float run3dMapTurn { get; set; }
+    [Networked] public Vector2 run3dMapAt { get; set; }     // the map point in the middle of the sheet (zoomed and dragged)
+    [Networked] public float run3dMapSize { get; set; }     // how far the map is zoomed out
+    [Networked] public int run3dPunched { get; set; }
     // Per leg (index 1 = start to control 1): the route picked and the points (RouteChoiceGame.WriteLeg / ReadLeg)
     [Networked, Capacity(52)] public NetworkArray<int> choiceLegs => default;
 
@@ -164,18 +206,19 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         choiceQuestions = 0;
         choiceDone = false;
         for (int i = 0; i < choiceLegs.Length; i++) choiceLegs.Set(i, 0);
-        bearPlaced = false;
-        bearPosition = Vector2.zero;
-        moveUsed = false;
-        moveControl = -1;
-        moveTarget = Vector2.zero;
+        for (int i = 0; i < bears.Length; i++) bears.Set(i, Vector3.zero);
+        for (int i = 0; i < moveControls.Length; i++)
+        {
+            moveControls.Set(i, 0);
+            moveTargets.Set(i, Vector2.zero);
+        }
     }
 
     // Sent by a runner who got scared by someone's bear: everyone sees it
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    public void RPC_BearScare(PlayerRef owner, Vector2 where)
+    public void RPC_BearScare(PlayerRef owner, int slot, Vector2 where)
     {
-        BearMode.OnScare(owner, where, this);
+        BearMode.OnScare(owner, slot, where, this);
     }
 
     // Relays: where this team's runner is, so the other runners can run behind it or hang on to it (PackRunning)
@@ -187,6 +230,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Networked] public float relayProgress { get; set; }
     [Networked] public NetworkBool relayRunning { get; set; }
     [Networked] public NetworkBool relayMistake { get; set; }   // the runner is making a mistake right now, shown on the map of a TV production
+    [Networked] public NetworkBool relayLost { get; set; }      // the runner is off the plan right now (no TV punch); relayMistake only once it is a real mistake
     // TV production of a relay with TV controls (TvDirector): what the host puts on TV. 0 = nothing (the race runs at
     // full pace), else TvDirector's number of the TV shot. Everyone slows the race down while something is on.
     [Networked] public int tvShot { get; set; }
@@ -256,6 +300,19 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             return;
         }
+        string options = HostSettings.ToPublish;
+        if (hostOptions.ToString() != options) hostOptions = options;
+        // Still drawing (the others see it on the leaderboard, 2026-11-19)
+        ManualPathDrawer drawing = agentMovement.manualPathDrawer;
+        bool drawingNowValue = ActiveScene.Name != "Lobby" && drawing != null && drawing.timeToDraw
+            && !agentMovement.WaitingForAllPlayersToDraw && !agentMovement.WaitingForAllPlayersToChooseRunner && !CompetitionFlow.ResultsShown;
+        if (drawingNow != drawingNowValue) drawingNow = drawingNowValue;
+        float raceClock = RelayClock.ToPublish;
+        if (relayRaceClock != raceClock)
+        {
+            relayRaceClock = raceClock;
+            relayRaceClockTick = (int)Runner.Tick;
+        }
         Vector3Int stats = agentMovement.RunnerStats;
         int packedStats = stats == Vector3Int.zero ? 0
             : (Mathf.Clamp(stats.x, 0, 255) << 16) | (Mathf.Clamp(stats.y + 1, 0, 255) << 8) | Mathf.Clamp(stats.z, 0, 255);
@@ -266,6 +323,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             relayLeg = -1;
             relayRunning = false;
             relayMistake = false;
+            relayLost = false;
             tvShot = 0;
             return;
         }
@@ -276,8 +334,30 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         relayRunning = agentMovement.canRunNextSegment && !agentMovement.hasFinished && !agentMovement.relayHold
             && !agentMovement.WaitingForAllPlayersToReachKontroll && !agentMovement.WaitingForAllPlayersToDraw
             && drawer != null && !drawer.timeToDraw;
-        relayMistake = relayRunning && agentMovement.IsMissing;
+        bool lost = relayRunning && agentMovement.IsLost;
+        relayLost = lost;
+        relayMistake = MistakeWorthShowing(lost);
         tvShot = TvDirector.Active != null ? TvDirector.Active.ShotToSend : 0;
+    }
+
+    // The "Mistake" label on the map (2026-11-19): only for a real mistake, not every small turn the wrong way that is
+    // put right a second later. The runner must have been off the plan for 3 seconds on the screen and 20 seconds of
+    // race time, and the label goes as soon as the runner knows where it is again.
+    float lostSinceReal = -1f, lostSinceRace;
+
+    bool MistakeWorthShowing(bool lost)
+    {
+        if (!lost)
+        {
+            lostSinceReal = -1f;
+            return false;
+        }
+        if (lostSinceReal < 0f)
+        {
+            lostSinceReal = Time.unscaledTime;
+            lostSinceRace = Time.time;
+        }
+        return Time.unscaledTime - lostSinceReal >= 3f && (Time.time - lostSinceRace) * PackRunning.GameSecondsPerSecond >= 20f;
     }
 
     // The point index in the team's route (0 = start) as common controls: the last common point passed plus the part of
@@ -299,6 +379,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     public override void Despawned(NetworkRunner runner, bool hasState)
     {
         PackRegistry.Remove(this);
+        if (Local == this) RacePace.Normal();
     }
 
 
@@ -336,6 +417,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     void Update()
     {
         if (Object == null || !Object.IsValid || !Object.HasStateAuthority || Runner == null) return;
+        RacePace.Apply(agentMovement);
+        WatchForStuckStart();
         if (Time.unscaledTime < nextSpotCheck) return;
         nextSpotCheck = Time.unscaledTime + 0.5f;
         if (ActiveScene.Name != "Lobby") return;
@@ -580,6 +663,48 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         }
     }
 
+    // A player who never gets a runner (2026-11-19: a new player in their very first game, an Imposter round, sat on
+    // the waiting page while everyone else waited for them). Whatever stopped it, after 10 seconds without a runner
+    // and without the runner picker the picking is started again, a few times at most.
+    float stuckSince = -1f;
+    int stuckRetries;
+
+    void WatchForStuckStart()
+    {
+        if (ActiveScene.Name == "Lobby" || agentMovement == null || manager == null)
+        {
+            stuckSince = -1f;
+            stuckRetries = 0;
+            return;
+        }
+        bool stuck = agentMovement.WaitingForAllPlayersToChooseRunner && !HasChoosenRunner
+            && (manager.ChooseRunnerPanel == null || !manager.ChooseRunnerPanel.activeSelf)
+            && !RouteAnalysis.On && !RouteChoiceGame.On && !RunnerRules.OpenPacksRound && !CompetitionFlow.ResultsShown;
+        if (!stuck)
+        {
+            stuckSince = -1f;
+            return;
+        }
+        if (stuckSince < 0f)
+        {
+            stuckSince = Time.unscaledTime;
+            return;
+        }
+        if (Time.unscaledTime - stuckSince < 10f || stuckRetries >= 3) return;
+        stuckRetries++;
+        stuckSince = Time.unscaledTime;
+        string mode = GetSharedGameMode();
+        Debug.LogWarning("NetworkPlayer: no runner after 10 s, starting the picking again (" + mode + ")");
+        try
+        {
+            ShowChooseRunnerForMode(mode);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("NetworkPlayer: could not start the picking again: " + e);
+        }
+    }
+
     private void InitAfterSpawn()
     {
         Clock clock = GetComponent<Clock>();
@@ -684,6 +809,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         if (Object.HasStateAuthority && ExtraModes.Is(ExtraMode.RouteChoice) && RelayRace.Active == null)
         {
             RouteChoiceGame.Begin(this);
+            return;
+        }
+
+        // Run it yourself (3D): nobody picks a runner; the player is the runner
+        if (Object.HasStateAuthority && RunSession.On)
+        {
+            RunSession.Begin(this);
             return;
         }
 
@@ -826,9 +958,12 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             // A new competition starts: nobody has finished or guessed yet
             raceFinished = false;
+            run3dFlags = 0;
+            run3dPunched = 0;
             ClearRelayResults();
             hasGuessedImposter = false;
             imposterGuess = PlayerRef.None;
+            secretTaskGuess = 0;
             ClearModeChoices();
 
             InitializeAfterSceneLoad();
@@ -853,6 +988,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                 imposterGuess = PlayerRef.None;
                 hasGuessedImposter = false;
                 secretTask = 0;
+                secretTaskGuess = 0;
                 competitionModes = 0;
                 ClearModeChoices();
                 agentMovement.NetPosition = spawnPosition;
@@ -1177,11 +1313,21 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             // Route choice game: questions on the map, nobody draws or runs
             RouteChoiceGame.Start(agent);
         }
+        else if (RunSession.On)
+        {
+            // Run it yourself: the race is run in the 3D world; the 2D runner stands still
+            RunSession.StartRace(agent);
+        }
         else
         {
             drawer.timeToDraw = true;
         }
         Debug.Log($"{name}: Spelet startar nu!");
+        CourseData raced = CourseLibrary.CurrentOrDefault;
+        GameAnalytics.Record("race_started",
+            "mode", RelayRace.Active != null ? "relay" : RouteAnalysis.On ? "route_analysis" : RouteChoiceGame.On ? "route_choice" : "normal",
+            "terrain", raced != null && raced.IsSprint() ? "sprint" : "forest",
+            "players", FindObjectsOfType<NetworkPlayer>().Length);
     }
 
 

@@ -189,7 +189,7 @@ public class GeoJsonSpawner : MonoBehaviour
         }
 
         // The forest mistakes need every point and line object in metres, without rounding to the cell
-        MapFeatureIndex.Clear();
+        int indexGeneration = MapFeatureIndex.Clear();
         {
             var indexFiles = new List<byte[]>();
             if (map != null && !string.IsNullOrEmpty(map.pointsPath) && pathfindingManager.jsonFileName == map.gridName + ".json")
@@ -214,7 +214,7 @@ public class GeoJsonSpawner : MonoBehaviour
                 kinds = MapPackages.LoadBytes(map.gridName.Substring(0, map.gridName.Length - 4) + "kinds", ".bytes");
             Task.Run(() =>
             {
-                try { MapFeatureIndex.Build(indexFiles, indexMap, metresPerUnit, speedGrid, heightGrid, kinds); }
+                try { MapFeatureIndex.Build(indexFiles, indexMap, metresPerUnit, speedGrid, heightGrid, kinds, indexGeneration); }
                 catch (System.Exception e) { Debug.LogError("MapFeatureIndex: " + e); }
             });
         }

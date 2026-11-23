@@ -14,6 +14,7 @@ public class TerrainLookPanel : MonoBehaviour
     Action<TerrainLook> onDone;
     readonly List<(Button button, string value)> groundButtons = new List<(Button, string)>();
     readonly List<(Button button, string value)> forestButtons = new List<(Button, string)>();
+    readonly List<(Button button, string value)> townButtons = new List<(Button, string)>();
     Slider undergrowth;
     TextMeshProUGUI undergrowthText;
     TMP_InputField textField;
@@ -38,7 +39,7 @@ public class TerrainLookPanel : MonoBehaviour
     void Build(Transform root)
     {
         Image card = CourseUI.CardPanel("Card", root);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180, 820));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180, 900));
         CourseUI.Column(card.gameObject, 10, new RectOffset(36, 36, 28, 28));
 
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Terrain look", 34, CourseUI.Ink, FontStyles.Bold), 42);
@@ -55,6 +56,20 @@ public class TerrainLookPanel : MonoBehaviour
 
         CourseUI.Size(CourseUI.Text("Forest title", card.transform, "Trees", 22, CourseUI.Ink, FontStyles.Bold), 30);
         Choices(card.transform, "Forest", TerrainLook.Forests, forestButtons, false);
+
+        CourseUI.Size(CourseUI.Text("Town title", card.transform, "Town (sprint maps)", 22, CourseUI.Ink, FontStyles.Bold), 30);
+        RectTransform townRow = CourseUI.Rect("Town", card.transform);
+        CourseUI.Row(townRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        CourseUI.Size(townRow, 50);
+        foreach (string value in TerrainLook.Towns)
+        {
+            string chosen = value;
+            Button button = CourseUI.Button(value, townRow, TerrainLook.TownName(value), CourseUI.ButtonKind.Light, () => { look.town = chosen; Refresh(); }, 19);
+            townButtons.Add((button, value));
+            HoverTip.Add(button, value == TerrainLook.OldStone
+                ? "An old town of southern Europe, like in Spain or Portugal: cobbled lanes, whitewashed stone houses with granite round doors and windows, tiled roofs, small iron balconies, washing on lines."
+                : "A Swedish town: plastered houses in many colours, shops with awnings, asphalt streets, street lamps, parked cars and bikes.");
+        }
 
         RectTransform row = CourseUI.Rect("Undergrowth", card.transform);
         CourseUI.Row(row.gameObject, 12, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
@@ -110,7 +125,7 @@ public class TerrainLookPanel : MonoBehaviour
         {
             look = new TerrainLook { text = textField.text };
             Refresh();
-        }, 22), "Goes back to the normal look: moss, mixed conifer forest and normal undergrowth. Your own text stays.");
+        }, 22), "Goes back to the normal look: moss, mixed conifer forest, normal undergrowth and a Swedish town. Your own text stays.");
         HoverTip.Add(CourseUI.Button("Cancel", buttons, "Cancel", CourseUI.ButtonKind.Light, () => Destroy(gameObject), 22), "Closes this window and throws away your changes.");
         HoverTip.Add(CourseUI.Button("Done", buttons, "Done", CourseUI.ButtonKind.Primary, Done, 22), "Keeps this look for the map.");
 
@@ -169,6 +184,8 @@ public class TerrainLookPanel : MonoBehaviour
             CourseUI.SetButtonColor(button, value == look.ground ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
         foreach (var (button, value) in forestButtons)
             CourseUI.SetButtonColor(button, value == look.forest ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        foreach (var (button, value) in townButtons)
+            CourseUI.SetButtonColor(button, value == look.town ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
         if (Mathf.Abs(undergrowth.value - look.undergrowth) > 0.0001f) undergrowth.SetValueWithoutNotify(look.undergrowth);
         undergrowthText.text = look.undergrowth < 0.25f ? "Little" : look.undergrowth > 0.75f ? "A lot" : "Normal";
         undergrowthText.color = Mathf.Abs(look.undergrowth - 0.5f) >= 0.005f ? CourseUI.Accent : CourseUI.Forest;

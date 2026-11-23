@@ -43,6 +43,9 @@ namespace MapImport
         public string ownerClub;
         public string contact;
         public string created;                // ISO date
+        // Which version of the map this is (unix seconds of the build or the last edit). A copy newer than the one
+        // built into the game is used and shared until the newer one is built in (2026-11-20). 0: before versions.
+        public long editedAt;
         public bool permissionConfirmed;      // the uploader says the map's owner allows it
         public double[] boundary;             // the edge of the finished map the player chose (paper mm), or empty for all of it
         // How quick the kinds of ground are (the sliders at import). All in the middle = the game's normal speeds.
@@ -59,6 +62,9 @@ namespace MapImport
         // once it has been uploaded (empty before).
         public bool isPrivate;
         public string privateSourceKey;
+        // The version of the passability rules the grid was built with (SymbolRules.RulesVersion); 0 = before 2026-11-20.
+        // A map built with older rules is built again from its file when it is saved in Edit map.
+        public int rulesVersion;
     }
 
     public class MapPackage
@@ -135,6 +141,7 @@ namespace MapImport
                 offsetNorth = offN,
                 name = name,
                 mapType = sprint ? "sprint" : "forest",
+                rulesVersion = SymbolRules.RulesVersion,
                 sourceFormat = (map.format + " " + map.version).Trim(),
                 scale = (float)map.scale,
                 cellSize = cell,
@@ -154,7 +161,8 @@ namespace MapImport
                 terrain = map.terrain != null ? map.terrain.Copy() : new TerrainSpeeds(),
                 look = map.look != null ? map.look.Safe() : new TerrainLook(),
                 crs = map.crsCode,
-                created = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                created = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                editedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
             };
             pkg.info = info;
             pkg.grid = WriteGrid(grid, info);
@@ -164,7 +172,7 @@ namespace MapImport
             try
             {
                 var worldSw = System.Diagnostics.Stopwatch.StartNew();
-                WorldLayer world = WorldLayer.Build(map, extent, offE, offN);
+                WorldLayer world = WorldLayer.Build(map, extent, offE, offN, sprint);
                 pkg.world = world.ToBytes();
                 Log($"World layer: {world.cols} x {world.rows} cells of {world.cell:0.#} m, {world.points.Count} points, {world.lines.Count} lines, {pkg.world.Length / 1024} kB in {worldSw.ElapsedMilliseconds} ms");
             }
@@ -278,9 +286,9 @@ namespace MapImport
                 for (int k = 0; k < i.boundary.Length; k++) sb.Append(k > 0 ? "," : "").Append(i.boundary[k].ToString("0.###", CultureInfo.InvariantCulture));
                 sb.Append("],\n");
             }
-            S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created);
+            S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created); N("editedAt", i.editedAt);
             S("sharedBy", i.sharedBy); N("sharedAt", i.sharedAt);
-            B("isPrivate", i.isPrivate); S("privateSourceKey", i.privateSourceKey);
+            B("isPrivate", i.isPrivate); S("privateSourceKey", i.privateSourceKey); N("rulesVersion", i.rulesVersion);
             TerrainSpeeds t = i.terrain ?? new TerrainSpeeds();
             sb.Append("  \"terrain\": {");
             void T(string k, float v, bool last = false) { sb.Append('"').Append(k).Append("\": ").Append(v.ToString("0.###", CultureInfo.InvariantCulture)).Append(last ? "" : ", "); }
@@ -289,7 +297,7 @@ namespace MapImport
             T("roughOpen", t.roughOpen); T("paved", t.paved, true);
             sb.Append("},\n");
             TerrainLook look = (i.look ?? new TerrainLook()).Safe();
-            sb.Append("  \"look\": {\"ground\": \"").Append(Escape(look.ground)).Append("\", \"forest\": \"").Append(Escape(look.forest))
+            sb.Append("  \"look\": {\"ground\": \"").Append(Escape(look.ground)).Append("\", \"forest\": \"").Append(Escape(look.forest)).Append("\", \"town\": \"").Append(Escape(look.town))
               .Append("\", \"undergrowth\": ").Append(look.undergrowth.ToString("0.###", CultureInfo.InvariantCulture))
               .Append(", \"text\": \"").Append(Escape(look.text)).Append("\"},\n");
             sb.Append("  \"permissionConfirmed\": ").Append(i.permissionConfirmed ? "true" : "false").Append("\n}\n");
@@ -363,8 +371,18 @@ namespace MapImport
                 {
                     if (!firstPoint) points.Append(',');
                     firstPoint = false;
-                    points.Append("{\"type\":\"Feature\",\"properties\":{\"Layer\":\"").Append(layer)
-                          .Append("\"},\"geometry\":{\"type\":\"Point\",\"coordinates\":[");
+                    points.Append("{\"type\":\"Feature\",\"properties\":{\"Layer\":\"").Append(layer).Append('"');
+                    // A slope tick of a contour or form line: the way it points (downhill), so the 3D ground knows a
+                    // knoll from a hollow (2026-11-23, Anders wanted the heights right everywhere)
+                    if (o.symbol != null && (o.symbol.major == 101 || o.symbol.major == 102 || o.symbol.major == 103)
+                        && ContourHeights.TickDirection(o.symbol, out double tx, out double ty))
+                    {
+                        double a = o.angle * Math.PI / 180;
+                        double dx = tx * Math.Cos(a) - ty * Math.Sin(a), dy = tx * Math.Sin(a) + ty * Math.Cos(a);
+                        points.Append(",\"Down\":[").Append(dx.ToString("0.###", CultureInfo.InvariantCulture)).Append(',')
+                              .Append(dy.ToString("0.###", CultureInfo.InvariantCulture)).Append(']');
+                    }
+                    points.Append("},\"geometry\":{\"type\":\"Point\",\"coordinates\":[");
                     AppendCoord(points, o.parts[0][0] * mpm + offsetEast, o.parts[0][1] * mpm + offsetNorth);
                     points.Append("]}}");
                 }

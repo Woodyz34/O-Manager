@@ -63,6 +63,9 @@ public class EndScreenUI : MonoBehaviour
     bool revealRunning;
     bool caught;
     int votersCount;
+    // Secret task mode: the caught imposter guessed the task and wins after all
+    bool taskGuessedRight;
+    const float TaskGuessSeconds = 30f;
 
     public static void Show()
     {
@@ -92,7 +95,34 @@ public class EndScreenUI : MonoBehaviour
         waitingText.text = "";
 
         lobbyButton.onClick.AddListener(CompetitionFlow.HostReturnToLobby);
-        revealNowButton.onClick.AddListener(CompetitionFlow.HostRevealImposter);
+        revealNowButton.onClick.AddListener(ConfirmRevealNow);
+    }
+
+    // The host's "reveal now" asks first (2026-11-19: the host revealed the imposter before the others had guessed,
+    // most likely by pressing this button by mistake)
+    void ConfirmRevealNow()
+    {
+        if (CompetitionFlow.RevealStarted) return;
+        int waiting = 0;
+        CompetitionFlow.TryGetImposter(out PlayerRef imposter);
+        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        {
+            if (player.Object == null || !player.Object.IsValid || player.Object.StateAuthority == imposter) continue;
+            if (!player.hasGuessedImposter) waiting++;
+        }
+        string hint = waiting == 0 ? "Everyone has guessed." : waiting == 1 ? "1 player has not guessed yet." : waiting + " players have not guessed yet.";
+        ChoicePopup.Open("Reveal the imposter now?", new[]
+        {
+            new ChoicePopup.Option
+            {
+                id = "reveal",
+                title = "Yes, reveal now",
+                description = "Nobody can guess after this. Without it the imposter is shown when everyone has guessed or the time is up."
+            }
+        }, null, id =>
+        {
+            if (id == "reveal") CompetitionFlow.HostRevealImposter();
+        }, hint);
     }
 
     void OnDestroy()
@@ -236,15 +266,16 @@ public class EndScreenUI : MonoBehaviour
         if (amImposter)
         {
             voteTitleText.text = "You were the imposter";
+            // Secret task mode: the task stays hidden, a caught imposter gets to guess it
             voteHintText.text = secretTaskMode
-                ? "Their task was: " + SecretTasks.Short(secretTask) + ". The others are guessing now. Keep a straight face."
+                ? "The others are guessing now. Keep a straight face. If they catch you, you get one guess at their task."
                 : "The others are guessing now. Keep a straight face.";
             return;
         }
 
         voteTitleText.text = "Who was the imposter?";
         voteHintText.text = (secretTaskMode ? "One runner didn't know the task." : "One runner was trying to finish last.")
-            + " Guess right for +" + CompetitionRewards.CorrectGuess + " kr.";
+            + " Guess right for +" + MoneyLabel.Format(CompetitionRewards.CorrectGuess) + ".";
         foreach (Standing standing in standings)
         {
             if (standing.isLocal)
@@ -315,6 +346,13 @@ public class EndScreenUI : MonoBehaviour
             CountVotes();
         }
 
+        // Secret task mode: a caught imposter gets one guess at the task, and wins if it is right
+        if (secretTaskMode && caught)
+        {
+            votePanel.SetActive(false);
+            yield return TaskGuessRoutine(overlay);
+        }
+
         voting = false;
         votePanel.SetActive(false);
         if (rows.TryGetValue(imposter, out GameObject imposterRow))
@@ -360,11 +398,84 @@ public class EndScreenUI : MonoBehaviour
         {
             detail = correct + " of " + votersCount + " runners guessed right.";
         }
-        if (secretTaskMode)
+        if (secretTaskMode && caught)
+        {
+            // The task stays secret until the imposter has guessed it
+            detail += "\nBut " + NameOf(imposter) + " gets one guess at the task...";
+        }
+        else if (secretTaskMode)
         {
             detail += "\nThe task was: " + SecretTasks.Short(secretTask);
         }
         return new ImposterOverlay.RevealResult { caught = caught, detail = detail };
+    }
+
+    // ---- Secret task: the caught imposter guesses the task ----
+
+    IEnumerator TaskGuessRoutine(ImposterOverlay overlay)
+    {
+        SecretTasks.Task real = SecretTasks.TaskOf(secretTask);
+        Standing me = LocalStanding();
+        bool amImposter = me != null && me.player == imposter;
+        string imposterName = NameOf(imposter);
+        NetworkPlayer local = NetworkPlayer.Local;
+
+        TaskGuessPopup popup = TaskGuessPopup.Open(SecretTasks.Possible(secretTask), amImposter, imposterName, task =>
+        {
+            if (local != null && local.Object != null && local.Object.IsValid && local.secretTaskGuess == 0)
+            {
+                local.secretTaskGuess = (int)task;
+            }
+        });
+
+        // The imposter's own guess, from their player. The imposter's game ends the guessing when the time is up;
+        // the others wait a little longer for that to arrive, or stop if the imposter has left.
+        float deadline = Time.unscaledTime + TaskGuessSeconds;
+        bool left = false;
+        int guess;
+        while (true)
+        {
+            NetworkPlayer imposterPlayer = CompetitionFlow.FindPlayer(imposter);
+            if (imposterPlayer == null)
+            {
+                left = true;
+                guess = -1;
+                break;
+            }
+            guess = imposterPlayer.secretTaskGuess;
+            if (guess != 0) break;
+            float secondsLeft = deadline - Time.unscaledTime;
+            if (amImposter && secondsLeft <= 0f)
+            {
+                imposterPlayer.secretTaskGuess = -1;
+                guess = -1;
+                break;
+            }
+            if (!amImposter && secondsLeft <= -5f)
+            {
+                guess = -1;
+                break;
+            }
+            int shown = Mathf.Max(0, Mathf.CeilToInt(secondsLeft));
+            popup.SetStatus(amImposter ? shown + " s left to guess" : "Waiting for the guess... " + shown + " s");
+            yield return null;
+        }
+
+        SecretTasks.Task guessed = guess > 0 ? (SecretTasks.Task)guess : SecretTasks.Task.None;
+        taskGuessedRight = guessed != SecretTasks.Task.None && guessed == real;
+        popup.ShowAnswer(guessed, real);
+        string detail;
+        if (left) detail = imposterName + " left before guessing.";
+        else if (guessed == SecretTasks.Task.None) detail = imposterName + " didn't guess in time.";
+        else detail = imposterName + " guessed: " + SecretTasks.Label(guessed) + ".";
+        popup.SetStatus(taskGuessedRight ? "Right guess! The imposter wins." : detail);
+        yield return new WaitForSecondsRealtime(2.5f);
+        popup.Close();
+
+        if (overlay != null)
+        {
+            yield return overlay.PlayTaskVerdict(SecretTasks.Short(secretTask), taskGuessedRight, detail);
+        }
     }
 
     // ---- Money ----
@@ -393,36 +504,54 @@ public class EndScreenUI : MonoBehaviour
             : "Did not finish";
 
         int total = 0;
+        // The base money for the time played, for everyone who reached the finish (2026-11-19)
+        if (me.finished)
+        {
+            float played = CompetitionFlow.PlayedSeconds;
+            total += AddLine(CompetitionRewards.TimeLabel(played), CompetitionRewards.ForTime(played));
+        }
         if (amImposter && secretTaskMode)
         {
             // Without a task, the imposter simply races: a normal place, plus money for getting away
-            total += AddLine(placeLabel, CompetitionRewards.ForPlace(me.place, runners, me.finished));
+            total += AddLine(placeLabel, CompetitionRewards.ForBeaten(CompetitionRewards.Beaten(me, standings), runners, me.finished));
             if (votersCount > 0)
             {
-                total += AddLine(caught ? "Caught by the others" : "Got away with it",
-                    caught ? 0 : CompetitionRewards.ForImposterEscape(votersCount));
+                // Caught, but the right guess at the task wins after all: the same money as getting away
+                bool won = !caught || taskGuessedRight;
+                total += AddLine(!caught ? "Got away with it" : taskGuessedRight ? "Caught, but guessed the task" : "Caught, and the guess was wrong",
+                    won ? CompetitionRewards.ForImposterEscape(votersCount) : 0);
             }
         }
         else if (amImposter)
         {
-            total += AddLine(me.finished ? placeLabel + ", counted from the back" : placeLabel,
-                CompetitionRewards.ForImposterPlace(me.place, runners, me.finished));
+            int forPlace = CompetitionRewards.ForImposterPlace(me.place, runners, me.finished);
+            total += AddLine(me.finished && forPlace == 0 ? placeLabel + ", too far up for an imposter" : placeLabel, forPlace);
             if (votersCount > 0)
             {
                 total += AddLine(caught ? "Caught by the others" : "Got away with it",
                     caught ? 0 : CompetitionRewards.ForImposterEscape(votersCount));
             }
+            int lastUnseen = CompetitionRewards.ForImposterLastUnseen(me.place, runners, me.finished, caught);
+            if (lastUnseen > 0) total += AddLine("Last, and nobody saw it", lastUnseen);
         }
         else
         {
-            total += AddLine(placeLabel, CompetitionRewards.ForPlace(me.place, runners, me.finished));
+            total += AddLine(placeLabel, CompetitionRewards.ForBeaten(CompetitionRewards.Beaten(me, standings), runners, me.finished));
             if (imposterMode)
             {
                 NetworkPlayer local = NetworkPlayer.Local;
                 bool guessed = local != null && local.hasGuessedImposter;
                 bool right = guessed && local.imposterGuess == imposter;
-                total += AddLine(right ? "Found the imposter" : (guessed ? "Wrong guess" : "No guess"),
-                    right ? CompetitionRewards.CorrectGuess : 0);
+                if (right && taskGuessedRight)
+                {
+                    // Secret task: the caught imposter guessed the task, so the imposter won after all
+                    total += AddLine("Found the imposter, but they guessed the task", 0);
+                }
+                else
+                {
+                    total += AddLine(right ? "Found the imposter" : (guessed ? "Wrong guess" : "No guess"),
+                        right ? CompetitionRewards.CorrectGuess : 0);
+                }
             }
         }
 
@@ -439,22 +568,22 @@ public class EndScreenUI : MonoBehaviour
         GameObject line = Instantiate(rewardLineTemplate, rewardLineParent);
         line.SetActive(true);
         Text(line, "Label").text = label;
-        Text(line, "Amount").text = "+" + amount + " kr";
+        Text(line, "Amount").text = "+" + MoneyLabel.Format(amount);
         return amount;
     }
 
     static string Balance()
     {
-        return Money.Instance != null ? Money.Instance.GetMoney() + " kr" : "";
+        return Money.Instance != null ? MoneyLabel.Format(Money.Instance.GetMoney()) : "";
     }
 
     IEnumerator CountUp(int total)
     {
         for (float t = 0f; t < 0.9f; t += Time.unscaledDeltaTime)
         {
-            rewardTotalText.text = "+" + Mathf.RoundToInt(Mathf.Lerp(0, total, t / 0.9f)) + " kr";
+            rewardTotalText.text = "+" + MoneyLabel.Format(Mathf.RoundToInt(Mathf.Lerp(0, total, t / 0.9f)));
             yield return null;
         }
-        rewardTotalText.text = "+" + total + " kr";
+        rewardTotalText.text = "+" + MoneyLabel.Format(total);
     }
 }

@@ -57,6 +57,14 @@ public class PathfindingManager : MonoBehaviour
     {
         spriteAligner = GetComponent<SpriteAlignerAuto>();
         objectSpawner = GetComponent<GeoJsonSpawner>();
+        // The map's grid could not be read on this computer (missing or broken map files): say so instead of a
+        // string of errors further on
+        if (speedGrid2D == null || gridData == null)
+        {
+            Debug.LogError("PathfindingManager: the map " + jsonFileName + " could not be loaded on this computer");
+            UIToast.Show("This map could not be loaded on this computer. Press Esc to leave the race.", 10f);
+            return;
+        }
         if (multiplayer)
         {
             // en for loop som skapar alla agents.
@@ -158,7 +166,11 @@ public class PathfindingManager : MonoBehaviour
                 gridData = packageData;
                 speedGrid2D = packageSpeed;
                 slopeFactors = packageSlopes;
+                // Dark green open in a forest race on a sprint map, shut in a sprint race (before the slope model,
+                // which only converts the cells someone can run in)
+                RaceGreen.Apply(gridName, speedGrid2D);
                 TerrainSpeedModel.Apply(speedGrid2D, slopeFactors);
+                StairsSlopes.Apply(gridName, speedGrid2D, slopeFactors, GridBinary.LastHeights);   // quick up, slow down
                 Passages.Apply(gridName, speedGrid2D);
                 Tunnels.Apply(gridName, speedGrid2D);
                 cellSize = gridData.grid_size * scaleFactor;
@@ -237,12 +249,20 @@ public class PathfindingManager : MonoBehaviour
     public void MoveControlsOntoRunnableGround()
     {
         if (speedGrid2D == null || controlPoints == null) return;
+        CourseData course = CourseLoader.Loaded;
+        MapDefinition map = CourseLoader.LoadedMap;
         foreach (Transform point in controlPoints)
         {
             if (point == null) continue;
             Vector2Int cell = WorldToGridPosition(point.position);
+            // A control right at a fence or a wall: the side the course setter chose, the same for every player
+            if (course != null && map != null && PunchSides.TryGet(course, map.FromWorld(point.position), out CoursePoint side))
+            {
+                Vector2Int sideCell = WorldToGridPosition(map.ToWorld(side));
+                if (CourseValidator.RunCell(speedGrid2D, sideCell).x >= 0) cell = sideCell;
+            }
             Vector2Int run = CourseValidator.RunCell(speedGrid2D, cell);
-            if (run == cell || run.x < 0) continue;
+            if (run.x < 0 || run == WorldToGridPosition(point.position)) continue;
             Vector3 world = GridToWorldPosition(run.y, run.x);
             point.position = new Vector3(world.x, world.y, point.position.z);
         }

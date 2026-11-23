@@ -159,8 +159,9 @@ public static class MapFeatureIndex
     }
 
     // Runs in a background thread
-    public static void Build(List<byte[]> files, Mapping map, float mpu, float[,] speedGrid, float[,] heightGrid, byte[] kinds = null)
+    public static void Build(List<byte[]> files, Mapping map, float mpu, float[,] speedGrid, float[,] heightGrid, byte[] kinds = null, int generation = -1)
     {
+        if (generation >= 0 && generation != Generation) return;   // another map has been loaded since
         Ready = false;
         var pts = new List<Point>(); var smp = new List<Sample>();
         int lineId = 0;
@@ -226,6 +227,8 @@ public static class MapFeatureIndex
         }
         lock (pointBuckets)
         {
+            // A build for the map of an earlier race that finishes late must not replace (or stand in for) this map's
+            if (generation >= 0 && generation != Generation) return;
             metresPerUnit = mpu;
             points = pts; samples = smp;
             Fill(pointBuckets, pts.Count, i => pts[i].p);
@@ -297,10 +300,14 @@ public static class MapFeatureIndex
                 foreach (int j in near) if (areas[j].small) { Sample q = smp[i]; q.distinct = true; smp[i] = q; break; }
             }
         }
+        if (generation >= 0 && generation != Generation) return;
         Ready = true;
     }
 
-    public static void Clear() { Ready = false; }
+    // Each Clear starts a new build: a build started before it is thrown away when it finishes
+    static int generation;
+    public static int Generation => generation;
+    public static int Clear() { Ready = false; return System.Threading.Interlocked.Increment(ref generation); }
 
     // ---- from the grid: areas you cannot enter, hills, how open the ground is ----
     public static Vector2 CellMetres(int r, int c)

@@ -51,6 +51,7 @@ public class TvDirector : MonoBehaviour
         internal readonly Dictionary<IPackRunner, float> seen = new Dictionary<IPackRunner, float>();
         internal readonly Dictionary<IPackRunner, float> since = new Dictionary<IPackRunner, float>();
         internal IPackRunner firstRunner;      // the first runner to the spot on this leg
+        internal readonly List<IPackRunner> order = new List<IPackRunner>();   // the runners filmed here on this leg, first one first
     }
 
     public struct Split
@@ -74,6 +75,32 @@ public class TvDirector : MonoBehaviour
     readonly Dictionary<IPackRunner, Finishing> finishing = new Dictionary<IPackRunner, Finishing>();
     // After the finish punch the runner gets its breath back and walks off; the shot stays a moment on that
     const float FinishHold = 4.5f, FinishLongest = 12f;
+
+    // The host's "TV shot length" (HostSettings): 0.5 = half as long shots as in 1.0.4, the default since 2026-11-19.
+    // The runners are taken up nearer the control and left sooner after it.
+    static float ShotScale => Mathf.Clamp(HostSettings.TvShotScale, 0.1f, 2f);
+    static float Approach => Mathf.Max(14f, SeenWithin * ShotScale);
+    static float OutAfter => Mathf.Max(2f, Out * ShotScale);
+    static float Longest => Mathf.Max(6f, LongestShot * ShotScale);
+
+    // How many runners the spot shows on this leg, the first ones there (0 = all): the host's settings
+    int Limit(Spot spot)
+    {
+        HostSettings.Values settings = HostSettings.Current;
+        if (spot.start) return settings.tvStartShown;
+        bool finish = spot == finishSpot || (finishSpot != null && finishSpot.controlIndex > 0 && spot.controlIndex == finishSpot.controlIndex);
+        return finish ? settings.tvFinishShown : settings.tvControlShown;
+    }
+
+    // May the runner be filmed at the spot? The first ones there are, until the limit is reached
+    bool MayFilm(Spot spot, IPackRunner runner)
+    {
+        int limit = Limit(spot);
+        if (limit <= 0 || spot.order.Contains(runner)) return true;
+        if (spot.order.Count >= limit) return false;
+        spot.order.Add(runner);
+        return true;
+    }
 
     class Track
     {
@@ -127,6 +154,9 @@ public class TvDirector : MonoBehaviour
     // finish at the start of the leg punched the finish).
     static bool HeadingTo(Spot spot, IPackRunner runner)
     {
+        // A runner who is making a mistake does not punch, even near the control on the right leg (2026-11-19: a runner
+        // lost near a TV control punched it on TV and then went on making the mistake)
+        if (!spot.start && runner is NetworkPlayer lost && lost.relayLost) return false;
         if (spot.start || spot.controlIndex < 0) return true;
         int to = runner.RelayControl;
         return to == spot.controlIndex || to == spot.controlIndex + 1;
@@ -170,9 +200,9 @@ public class TvDirector : MonoBehaviour
     public static TvDirector Create(GameObject host, CourseData course, MapDefinition map)
     {
         if (course == null || course.tvControls == null || course.tvControls.Count == 0 || map == null) return null;
-        if (course.IsSprint() || !TvWorldData.HasWorld(map))
+        if (!TvWorldData.HasWorld(map, true))
         {
-            Debug.Log("TvDirector: the course has TV controls, but " + (course.IsSprint() ? "it is a sprint" : "the map has no 3D layer") + "; no TV");
+            Debug.Log("TvDirector: the course has TV controls, but the map has no 3D layer; no TV");
             return null;
         }
         TvDirector director = host.AddComponent<TvDirector>();
@@ -205,12 +235,15 @@ public class TvDirector : MonoBehaviour
         SetPace(false);
     }
 
-    // The whole race at TV pace (real running speed) or at its usual pace
+    // The whole race at TV pace (real running speed, times the host's TV speed) or at its usual pace (times the
+    // host's race speed). Both can be changed by the host during the race (HostSettings), so it is set every frame.
     void SetPace(bool slow)
     {
-        if (slow == slowed) return;
         slowed = slow;
-        Time.timeScale = slow ? TvPace : 1f;
+        float want;
+        if (!slow) want = isActiveAndEnabled && NetworkPlayer.Local != null ? RacePace.MapPace(NetworkPlayer.Local.agentMovement) : 1f;
+        else want = HostSettings.TvSpeed / PackRunning.GameSecondsPerSecond;
+        if (!Mathf.Approximately(Time.timeScale, want)) Time.timeScale = want;
     }
 
     static bool Same(CoursePoint a, CoursePoint b)
@@ -234,6 +267,7 @@ public class TvDirector : MonoBehaviour
             spot.since.Clear();
             spot.firstRunner = null;
             spot.ordinal = -1;
+            spot.order.Clear();
         }
         tracks.Clear();
         finishing.Clear();
@@ -259,6 +293,11 @@ public class TvDirector : MonoBehaviour
         finishSpot.name = "Finish · Leg " + (race.Leg + 1);
         finishSpot.controlIndex = points.Count - 1;
         finishSpot.off = points.Count < 2;
+        // The host's settings: the start only on the first leg and the finish only on the last, if so chosen
+        HostSettings.Values settings = HostSettings.Current;
+        bool lastLeg = course == null || race.Leg >= course.legs - 1;
+        if (!settings.tvFinishEveryLeg && !lastLeg) finishSpot.off = true;
+        startSpot.off = !settings.tvStartEveryLeg && race.Leg > 0;
         if (points.Count - 1 < route.commonOrdinal.Count) finishSpot.ordinal = route.commonOrdinal[points.Count - 1];
         CameraSide(finishSpot, points, points.Count - 1);
         for (int s = 0; s < spots.Count - 2; s++)
@@ -378,7 +417,7 @@ public class TvDirector : MonoBehaviour
                 {
                     // Stopped running near the finish: it finished. Keep it for the finish camera.
                     if (!finishSpot.off && runner.IsValidRunner && runner.RelayLeg == race.Leg && Distance(last, finishSpot.point) < 45f
-                        && !finishing.ContainsKey(runner) && HeadingTo(finishSpot, runner))
+                        && !finishing.ContainsKey(runner) && HeadingTo(finishSpot, runner) && MayFilm(finishSpot, runner))
                     {
                         finishing[runner] = new Finishing { runner = runner, track = last, label = runner.RunnerLabel, color = ColorOf(runner), since = now };
                         finishSpot.punched.Add(runner);
@@ -510,9 +549,9 @@ public class TvDirector : MonoBehaviour
         if (current != null && IsProducer)
         {
             // Never away from a runner who is on the way to the flag or punching
-            bool stay = wanted == current || Wants(current) || (current.view != null && current.view.Punching && now - shotStart < LongestShot);
+            bool stay = wanted == current || Wants(current) || (current.view != null && current.view.Punching && now - shotStart < Longest);
             if (stay) lastWanted = now;
-            bool tooLong = now - shotStart > LongestShot;
+            bool tooLong = now - shotStart > Longest;
             if (tooLong)
             {
                 // Someone stands still at the control, or is lost near it: enough of that
@@ -584,7 +623,7 @@ public class TvDirector : MonoBehaviour
                 // The runner sets off: its first metres
                 if (pass == Pass.None)
                 {
-                    if (d < 8f)
+                    if (d < 8f && !spot.off && MayFilm(spot, runner))
                     {
                         pass = Pass.In;
                         spot.since[runner] = now;
@@ -597,17 +636,18 @@ public class TvDirector : MonoBehaviour
                     // On TV while the camera can still see the runner, up to 12 s
                     if (InSight(spot, t, d, true, 0f)) spot.seen[runner] = now;
                     spot.seen.TryGetValue(runner, out float seenAt);
-                    if (d > StartOut || now - spot.since[runner] > 12f || (d > 12f && now - seenAt > 0.6f)) pass = Pass.Done;
+                    if (d > StartOut * ShotScale || now - spot.since[runner] > 12f * ShotScale || (d > 12f && now - seenAt > 0.6f)) pass = Pass.Done;
                 }
             }
             else if (pass == Pass.None)
             {
-                // Coming to the control: on TV as soon as the camera can see the runner
-                if (d < SeenWithin)
+                // Coming to the control: on TV as soon as the camera can see the runner, within the shot length
+                // (only the first runners there, as many as the host has chosen)
+                if (d < Approach)
                 {
                     float toE = (float)(spot.point.e - t.e), toN = (float)(spot.point.n - t.n);
                     float heading = d > 0.01f ? (toE * t.dirE + toN * t.dirN) / d : 1f;
-                    if ((d < 10f || heading > 0.3f) && InSight(spot, t, d, false, 0f))
+                    if ((d < 10f || heading > 0.3f) && InSight(spot, t, d, false, 0f) && MayFilm(spot, runner))
                     {
                         pass = Pass.In;
                         spot.since[runner] = now;
@@ -628,8 +668,8 @@ public class TvDirector : MonoBehaviour
                 spot.seen.TryGetValue(runner, out float seenAt);
                 bool lost = now - seenAt > 0.4f;
                 // On the way out: on TV for as long as the runner is seen, at least the first metres
-                if (punched && d > least + Out && (lost || d > SeenWithin)) pass = Pass.Done;
-                else if (!punched && (d > SeenWithin + 10f || now - seenAt > 1.5f))
+                if (punched && d > least + OutAfter && (lost || d > Approach)) pass = Pass.Done;
+                else if (!punched && (d > Approach + 10f || now - seenAt > 1.5f))
                 {
                     // Out of sight without punching: it may come back
                     pass = Pass.None;
@@ -690,7 +730,7 @@ public class TvDirector : MonoBehaviour
         nextPlan = now + 0.25f;
         // The start of the leg is always needed; then the TV control the runners reach next
         Spot next = null;
-        if (startSpot.view == null && !startSpot.failed && producedLeg >= 0 && running.Count == 0) next = startSpot;
+        if (startSpot.view == null && !startSpot.failed && !startSpot.off && producedLeg >= 0 && running.Count == 0) next = startSpot;
         if (next == null)
         {
             float best = 700f;
@@ -801,9 +841,10 @@ public class TvDirector : MonoBehaviour
                 into.Add(new Split { name = player.RunnerLabel, color = ColorOf(runner), seconds = player.relaySplits[current.ordinal] });
                 continue;
             }
-            // Still on the way to the control on this leg: the clock ticks on beside the name until the punch
-            // (2026-11-15: the split times are always there, not only once someone has punched)
+            // Still on the way to the control on this leg: the clock ticks on beside the name until the punch, but only
+            // for the runner the camera shows now (2026-11-19: the others, far away, were listed with their clocks too)
             if (player.relayLeg != producedLeg || (current.controlIndex >= 0 && player.relayControl > current.controlIndex)) continue;
+            if (!current.passes.TryGetValue(runner, out Pass pass) || pass != Pass.In) continue;
             into.Add(new Split { name = player.RunnerLabel, color = ColorOf(runner), seconds = RelayRace.TeamSeconds(player), running = true });
         }
         // The ones who have punched in order of time, then the ones on the way (the one furthest on first)

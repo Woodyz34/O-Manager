@@ -14,7 +14,8 @@ namespace MapImport
     {
         // The low four bits: what the ground is
         public const byte Forest = 0, Open = 1, RoughOpen = 2, OpenTrees = 3, RoughOpenTrees = 4, LightGreen = 5, Green = 6,
-            DarkGreen = 7, Cultivated = 8, Water = 9, BareRock = 10, Sand = 11, Paved = 12, Building = 13, Plot = 14;
+            DarkGreen = 7, Cultivated = 8, Water = 9, BareRock = 10, Sand = 11, Paved = 12, Building = 13, Plot = 14,
+            Impassable = 15;   // impassable vegetation (ISSprOM 410, the Swedish 411): looks like dark green, nobody gets through
         public const byte BaseMask = 0x0F;
         // Things drawn on top of the ground
         public const byte Marsh = 0x10, Undergrowth = 0x20, Stony = 0x40, Boulders = 0x80;
@@ -23,14 +24,22 @@ namespace MapImport
     public enum WorldPointKind : byte
     {
         None = 0, Boulder, LargeBoulder, BoulderCluster, BoulderField, StonyGround, Knoll, LongKnoll, Depression, Pit,
-        RockyPit, Cairn, BigTree, Bush, Spring, Well, WaterHole, Tower, SmallTower, FodderRack, Feature, RootStock
+        RockyPit, Cairn, BigTree, Bush, Spring, Well, WaterHole, Tower, SmallTower, FodderRack, Feature, RootStock,
+        // Since 2026-11-20 the X of a man-made feature (530, 531) apart from the brown landform X (115); Feature is what
+        // older packages have for all three
+        ManMade, Landform
     }
 
     public enum WorldLineKind : byte
     {
         None = 0, Cliff, SmallCliff, EarthBank, EarthWall, Gully, Stream, SmallStream, Ditch, NarrowMarsh,
         WideRoad, Road, Track, Footpath, SmallPath, FaintPath, Ride, Railway, PowerLine, MajorPowerLine,
-        Wall, RuinedWall, HighWall, Fence, RuinedFence, HighFence, Log
+        Wall, RuinedWall, HighWall, Fence, RuinedFence, HighFence, Log,
+        // 2026-11-20: the same passability as the 2D grid (SymbolRules)
+        Hedge,      // impassable vegetation drawn as a line (ISSprOM 410.1, 411)
+        Barrier,    // any other line nobody may cross (out-of-bounds boundary, uncrossable water's edge, impassable pipeline)
+        Stairs,     // a stairway: up or down, over the cliff or wall it crosses, slowly
+        Bridge      // a bridge or tunnel (512) and a crossing point (710): a way over or through
     }
 
     public struct WorldPoint
@@ -60,11 +69,40 @@ namespace MapImport
         }
     }
 
+    // The outline of an area the 3D town needs exactly (2026-11-23, Anders: the gardens were the zigzag of the 2 m
+    // cells; on the map they are straight): a garden (olive green, ISSprOM 520) or ground out of bounds (709, 714,
+    // a map maker's own forbidden area). One ring per part of the area (holes too), in the game's map metres.
+    public enum WorldAreaKind : byte { None = 0, Garden = 1, OutOfBounds = 2 }
+
+    public class WorldArea
+    {
+        public WorldAreaKind kind;
+        public bool hole;           // a hole in the area before it (a house standing in a garden)
+        public float[] xy;          // e0, n0, e1, n1, ... closed (the last point joins the first)
+        public float minE, minN, maxE, maxN;
+
+        public void Bounds()
+        {
+            minE = minN = float.MaxValue;
+            maxE = maxN = float.MinValue;
+            for (int i = 0; i + 1 < xy.Length; i += 2)
+            {
+                if (xy[i] < minE) minE = xy[i];
+                if (xy[i] > maxE) maxE = xy[i];
+                if (xy[i + 1] < minN) minN = xy[i + 1];
+                if (xy[i + 1] > maxN) maxN = xy[i + 1];
+            }
+        }
+    }
+
     public class WorldLayer
     {
         public const float CellSize = 2f;
         const int Magic = 0x444C574F;   // "OWLD"
-        const int Version = 1;
+        // 2 (2026-11-20): built with the passability rules of the 2D grid (Impassable cells, Hedge, Barrier, Stairs, Bridge)
+        // 3 (2026-11-23): the outlines of gardens and out-of-bounds areas (areas)
+        const int Version = 3;
+        public int version = Version;
         const long MaxCells = 120000000;
 
         public float cell = CellSize;
@@ -73,6 +111,7 @@ namespace MapImport
         public byte[] cells;            // rows * cols, row 0 at the south
         public List<WorldPoint> points = new List<WorldPoint>();
         public List<WorldLine> lines = new List<WorldLine>();
+        public List<WorldArea> areas = new List<WorldArea>();   // empty in layers made before version 3
 
         // What is at a place; outside the layer it is plain forest
         public byte At(double e, double n)
@@ -86,7 +125,8 @@ namespace MapImport
 
         // extent: the part of the paper the map's grid covers (after the map edge); offE/offN: what the package adds
         // to the paper's metres to get the game's coordinates (MapPackageInfo.offsetEast/offsetNorth)
-        public static WorldLayer Build(MapFile map, MapExtent extent, double offE, double offN)
+        // sprint: the map is a sprint map (impassable vegetation, hedges)
+        public static WorldLayer Build(MapFile map, MapExtent extent, double offE, double offN, bool sprint = false)
         {
             double mpm = map.MetersPerMm;
             var w = new WorldLayer();
@@ -105,8 +145,9 @@ namespace MapImport
             foreach (MapObject o in map.objects)
             {
                 if (o.kind != SymbolKind.Area || o.symbol == null) continue;
-                if (!AreaRule(o.symbol, out byte set, out byte flag, out bool clear)) continue;
+                if (!AreaRule(o.symbol, sprint, out byte set, out byte flag, out bool clear)) continue;
                 areas.Add((GridBuilder.TopColor(o.symbol), order++, o, set, flag, clear));
+                if (set == WorldCell.Plot) w.KeepOutline(o, SymbolRules.Isom2017Major(o.symbol) == 520 ? WorldAreaKind.Garden : WorldAreaKind.OutOfBounds, mpm, offE, offN);
             }
             areas.Sort((a, b) => a.prio != b.prio ? b.prio.CompareTo(a.prio) : a.order.CompareTo(b.order));
             double scale = mpm / w.cell;
@@ -139,7 +180,7 @@ namespace MapImport
                 }
                 else if (o.kind == SymbolKind.Line)
                 {
-                    WorldLineKind kind = LineKind(o.symbol);
+                    WorldLineKind kind = LineKind(o.symbol, sprint);
                     if (kind == WorldLineKind.None) continue;
                     foreach (double[] part in o.parts)
                     {
@@ -164,13 +205,50 @@ namespace MapImport
             return w;
         }
 
+        // An area's outline, every part a ring of its own, points closer than 0.3 m dropped
+        void KeepOutline(MapObject o, WorldAreaKind kind, double mpm, double offE, double offN)
+        {
+            for (int part = 0; part < o.parts.Count; part++)
+            {
+                double[] p = o.parts[part];
+                if (p == null || p.Length < 6) continue;
+                var pts = new List<float>(p.Length);
+                for (int i = 0; i + 1 < p.Length; i += 2)
+                {
+                    float e = (float)(p[i] * mpm + offE), n = (float)(p[i + 1] * mpm + offN);
+                    int c = pts.Count;
+                    if (c >= 2 && Math.Abs(pts[c - 2] - e) + Math.Abs(pts[c - 1] - n) < 0.3f) continue;
+                    pts.Add(e);
+                    pts.Add(n);
+                }
+                // Closed: the last point is not the first again
+                int k = pts.Count;
+                if (k >= 4 && Math.Abs(pts[0] - pts[k - 2]) + Math.Abs(pts[1] - pts[k - 1]) < 0.3f) pts.RemoveRange(k - 2, 2);
+                if (pts.Count < 6) continue;
+                var area = new WorldArea { kind = kind, hole = part > 0, xy = pts.ToArray() };
+                area.Bounds();
+                if (area.maxE < minE || area.maxN < minN || area.minE > minE + cols * cell || area.minN > minN + rows * cell) continue;
+                areas.Add(area);
+            }
+        }
+
         // What an area symbol does to the cells under it. set = 255: the ground stays, only the flag is added.
-        static bool AreaRule(MapSymbol s, out byte set, out byte flag, out bool clear)
+        static bool AreaRule(MapSymbol s, bool sprint, out byte set, out byte flag, out bool clear)
         {
             set = 255;
             flag = 0;
             clear = false;
             if (SymbolRules.IsBuilding(s)) { set = WorldCell.Building; clear = true; return true; }
+            if (GroundKind.Of(s) == GroundKind.Canopy) { set = WorldCell.Paved; clear = true; return true; }
+            bool blocked = SymbolRules.For(s, sprint).role == TerrainRole.Blocked;
+            switch (SymbolRules.Isom2017Major(s))
+            {
+                case 307: set = WorldCell.Water; flag = WorldCell.Marsh; clear = true; return true;   // uncrossable marsh
+                case 410: case 411:
+                    if (blocked) { set = WorldCell.Impassable; return true; }
+                    break;
+                case 709: case 714: set = WorldCell.Plot; clear = true; return true;               // out of bounds
+            }
             switch (SymbolRules.Isom2017Major(s))
             {
                 case 208: case 209: flag = WorldCell.Boulders; return true;
@@ -193,6 +271,8 @@ namespace MapImport
                 case 501: case 522: set = WorldCell.Paved; clear = true; return true;
                 case 520: set = WorldCell.Plot; clear = true; return true;
             }
+            // A map maker's own symbol for ground nobody may enter (named so; e.g. 999): out of bounds like a garden
+            if (blocked && SymbolRules.IsForbiddenArea(s)) { set = WorldCell.Plot; clear = true; return true; }
             return false;
         }
 
@@ -221,16 +301,24 @@ namespace MapImport
                 case 525: return WorldPointKind.SmallTower;
                 case 526: return WorldPointKind.Cairn;
                 case 527: return WorldPointKind.FodderRack;
-                case 115: case 530: case 531: return WorldPointKind.Feature;
+                case 115: return WorldPointKind.Landform;
+                case 530: case 531: return WorldPointKind.ManMade;
             }
             return WorldPointKind.None;
         }
 
-        static WorldLineKind LineKind(MapSymbol s)
+        static WorldLineKind LineKind(MapSymbol s, bool sprint)
         {
             string name = (s.name ?? "").ToLowerInvariant();
             if (name.Contains("vindfäl") || name.Contains("windfall") || name.Contains("fallen tree")) return WorldLineKind.Log;
-            switch (SymbolRules.Isom2017Major(s))
+            TerrainRole role = SymbolRules.For(s, sprint).role;
+            if (role == TerrainRole.Stairs) return WorldLineKind.Stairs;
+            int major = SymbolRules.Isom2017Major(s);
+            if (role == TerrainRole.Bridge || major == 512) return WorldLineKind.Bridge;
+            if (role == TerrainRole.BlockingLine && (major == 410 || major == 411 || major == 421)) return WorldLineKind.Hedge;
+            // The 3D runner jumps an ordinary wall or fence, but one the 2D rules say is impassable stays impassable
+            if (role == TerrainRole.BlockingLine && (major == 513 || major == 516)) return major == 513 ? WorldLineKind.HighWall : WorldLineKind.HighFence;
+            switch (major)
             {
                 case 104: return WorldLineKind.EarthBank;
                 case 105: case 106: return WorldLineKind.EarthWall;
@@ -258,6 +346,8 @@ namespace MapImport
                 case 517: return WorldLineKind.RuinedFence;
                 case 518: return WorldLineKind.HighFence;
             }
+            // Building outlines are closed by the building itself; every other impassable line is a barrier
+            if (role == TerrainRole.BlockingLine && major != 521 && major != 526) return WorldLineKind.Barrier;
             return WorldLineKind.None;
         }
 
@@ -298,6 +388,15 @@ namespace MapImport
                         Buffer.BlockCopy(line.xy, 0, raw, 0, raw.Length);
                         w.Write(raw);
                     }
+                    w.Write(areas.Count);
+                    foreach (WorldArea area in areas)
+                    {
+                        w.Write((byte)((byte)area.kind | (area.hole ? 0x80 : 0)));
+                        w.Write(area.xy.Length);
+                        var raw = new byte[area.xy.Length * 4];
+                        Buffer.BlockCopy(area.xy, 0, raw, 0, raw.Length);
+                        w.Write(raw);
+                    }
                 }
                 return ms.ToArray();
             }
@@ -309,12 +408,13 @@ namespace MapImport
             if (bytes == null || bytes.Length < 12) return null;
             try
             {
-                if (BitConverter.ToInt32(bytes, 0) != Magic || BitConverter.ToInt32(bytes, 4) != Version) return null;
+                int fileVersion = BitConverter.ToInt32(bytes, 4);
+                if (BitConverter.ToInt32(bytes, 0) != Magic || fileVersion < 1 || fileVersion > Version) return null;
                 using (var ms = new MemoryStream(bytes, 8, bytes.Length - 8))
                 using (var zip = new DeflateStream(ms, CompressionMode.Decompress))
                 using (var r = new BinaryReader(zip))
                 {
-                    var w = new WorldLayer { cell = r.ReadSingle(), cols = r.ReadInt32(), rows = r.ReadInt32(), minE = r.ReadDouble(), minN = r.ReadDouble() };
+                    var w = new WorldLayer { version = fileVersion, cell = r.ReadSingle(), cols = r.ReadInt32(), rows = r.ReadInt32(), minE = r.ReadDouble(), minN = r.ReadDouble() };
                     if (w.cell <= 0f || w.cols <= 0 || w.rows <= 0 || (long)w.cols * w.rows > MaxCells) return null;
                     w.cells = ReadAll(r, w.cols * w.rows);
                     int pointCount = r.ReadInt32();
@@ -335,6 +435,23 @@ namespace MapImport
                         Buffer.BlockCopy(raw, 0, line.xy, 0, raw.Length);
                         line.Bounds();
                         w.lines.Add(line);
+                    }
+                    if (fileVersion >= 3)
+                    {
+                        int areaCount = r.ReadInt32();
+                        if (areaCount < 0 || areaCount > 2000000) return null;
+                        for (int i = 0; i < areaCount; i++)
+                        {
+                            byte head = r.ReadByte();
+                            var area = new WorldArea { kind = (WorldAreaKind)(head & 0x7F), hole = (head & 0x80) != 0 };
+                            int n = r.ReadInt32();
+                            if (n < 0 || n > 4000000) return null;
+                            byte[] raw = ReadAll(r, n * 4);
+                            area.xy = new float[n];
+                            Buffer.BlockCopy(raw, 0, area.xy, 0, raw.Length);
+                            area.Bounds();
+                            w.areas.Add(area);
+                        }
                     }
                     return w;
                 }

@@ -58,6 +58,9 @@ public static class CompetitionFlow
         sceneLoadedAt = Time.unscaledTime;
     }
 
+    // How long this competition has been played, in real seconds, up to the results (the prize money, 2026-11-19)
+    public static float PlayedSeconds => Mathf.Max(0f, (ResultsShown ? resultsShownAt : Time.unscaledTime) - sceneLoadedAt);
+
     static bool InCompetition()
     {
         return ActiveScene.Name != "Lobby";
@@ -173,6 +176,7 @@ public static class CompetitionFlow
         {
             NetworkPlayer local = NetworkPlayer.Local;
             bool single = local != null && local.Runner != null && local.Runner.GameMode == GameMode.Single;
+            if (single && ContestRun.Active != null) return "Back to contests";
             return single ? "Back to single player" : "Back to the lobby";
         }
     }
@@ -203,6 +207,7 @@ public static class CompetitionFlow
         {
             ImposterOverlay.Instance.HideRoleChip();
         }
+        GameAnalytics.Record("race_finished", "seconds", Mathf.RoundToInt(PlayedSeconds));
         EndScreenUI.Show();
     }
 
@@ -388,35 +393,82 @@ public static class CompetitionFlow
     }
 }
 
-// How much money a competition pays. More runners means more money for a good placing.
+// How much money a competition pays (2026-11-19, the user's new economy: some players earned money fast with
+// courses that were over in seconds).
+//  - Time played: 10 kr for every 30 seconds from the start to the results, nothing under 30 seconds, at most 2000 kr.
+//  - Place: 50 kr for every runner beaten, 50 more for the winner.
+//  - Nothing at all without reaching the finish (or after leaving).
+//  - The imposter gets no place money in the top third, then more and more steeply the further back it comes, and
+//    an extra boost for coming last without being found.
 public static class CompetitionRewards
 {
-    public const int DidNotFinish = 10;
-    public const int FinishBase = 50;
+    public const int DidNotFinish = 0;
+    public const int PerHalfMinute = 10;
+    public const float MinPlayedSeconds = 30f;
+    public const int MaxForTime = 2000;
     public const int PerRunnerBeaten = 50;
-    public const int WinnerBonus = 50;
+
     public const int CorrectGuess = 150;
     public const int ImposterEscapeBase = 100;
     public const int ImposterEscapePerRunner = 50;
+    public const int ImposterPlaceStep = 50;
 
-    public static int ForPlace(int place, int runners, bool finished)
+    // The base money for the time played (only for those who finished)
+    public static int ForTime(float seconds)
     {
-        if (!finished)
-        {
-            return DidNotFinish;
-        }
-        int reward = FinishBase + PerRunnerBeaten * Mathf.Max(0, runners - place);
-        if (place == 1 && runners >= 2)
-        {
-            reward += WinnerBonus;
-        }
-        return reward;
+        if (seconds < MinPlayedSeconds) return 0;
+        return Mathf.Min(MaxForTime, Mathf.FloorToInt(seconds / 30f) * PerHalfMinute);
     }
 
-    // The imposter wants to finish last, so their placing is counted from the back
+    public static string TimeLabel(float seconds)
+    {
+        int minutes = Mathf.FloorToInt(seconds / 60f);
+        return seconds < MinPlayedSeconds ? "Played under 30 s"
+            : "Played " + (minutes > 0 ? minutes + " min " : "") + Mathf.FloorToInt(seconds % 60f) + " s";
+    }
+
+    // 50 kr for every runner beaten, and nothing extra for the win (2026-11-19, the user: winning against one player gives
+    // +50, not +100). A tie beats nobody (2026-11-19, the user: two
+    // players who both score 0 in the route choice game, or both stop at once, should not both get money for a win),
+    // so it is the number of runners strictly behind that counts, not the place.
+    public static int ForBeaten(int beaten, int runners, bool finished)
+    {
+        if (!finished) return DidNotFinish;
+        beaten = Mathf.Clamp(beaten, 0, Mathf.Max(0, runners - 1));
+        return PerRunnerBeaten * beaten;
+    }
+
+    // The runners strictly behind me in a race: slower, or not at the finish
+    public static int Beaten(Standing me, List<Standing> standings)
+    {
+        if (me == null || !me.finished || standings == null) return 0;
+        int beaten = 0;
+        foreach (Standing s in standings)
+        {
+            if (s == me) continue;
+            if (!s.finished || s.seconds > me.seconds) beaten++;
+        }
+        return beaten;
+    }
+
+    // The imposter's top places that pay nothing: the top third (1 of 3, 2 of 6, 3 of 8 or 9)
+    public static int ImposterFreePlaces(int runners) => Mathf.CeilToInt(runners / 3f);
+
+    // The imposter wants to finish last: nothing in the top third, then 50, 140, 260, 400, 560 ... kr for every place
+    // further back (9 runners: 4th 50 kr, last 740 kr)
     public static int ForImposterPlace(int place, int runners, bool finished)
     {
-        return ForPlace(runners - place + 1, runners, finished);
+        if (!finished) return 0;
+        int back = place - ImposterFreePlaces(runners);
+        if (back <= 0) return 0;
+        return Mathf.RoundToInt(ImposterPlaceStep * Mathf.Pow(back, 1.5f) / 10f) * 10;
+    }
+
+    // Last and not found: a boost that grows with the number of runners
+    public static int ForImposterLastUnseen(int place, int runners, bool finished, bool caught)
+    {
+        if (!finished || caught || runners < 3 || place != runners) return 0;
+        return PerRunnerBeaten * (runners - 1);
     }
 
     public static int ForImposterEscape(int otherRunners)

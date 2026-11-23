@@ -133,11 +133,13 @@ public static class SecretTasks
     // ---- In the competition ----
 
     static int remembered;
+    static int rememberedOff;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void Init()
     {
         remembered = 0;
+        rememberedOff = 0;
         HostOff = 0;
         SceneManager.sceneLoaded -= OnSceneLoaded;
         SceneManager.sceneLoaded += OnSceneLoaded;
@@ -147,6 +149,7 @@ public static class SecretTasks
     {
         if (mode == LoadSceneMode.Additive) return;
         remembered = 0;
+        rememberedOff = 0;
     }
 
     // True in a secret task competition
@@ -162,11 +165,24 @@ public static class SecretTasks
             if (p.secretTask != 0)
             {
                 remembered = p.secretTask;
+                // The host's task filter sits on the same player
+                rememberedOff = p.lobbyTasksOff;
                 break;
             }
         }
         code = remembered;
         return code != 0 && ActiveScene.Name != "Lobby";
+    }
+
+    // The tasks the host could have drawn this race: what a caught imposter picks from. The real task is
+    // always in it, even if the filter could not be read.
+    public static List<Task> Possible(int code)
+    {
+        List<Task> tasks = Available(CourseLibrary.Current, rememberedOff);
+        Task real = TaskOf(code);
+        if (real != Task.None && !tasks.Contains(real)) tasks.Add(real);
+        tasks.Sort((a, b) => System.Array.IndexOf(Pool, a).CompareTo(System.Array.IndexOf(Pool, b)));
+        return tasks;
     }
 }
 

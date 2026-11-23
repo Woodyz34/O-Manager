@@ -24,15 +24,20 @@ public class EscMenu : MonoBehaviour
     TextMeshProUGUI volumeValue;
     Slider volumeSlider;
     Button fullscreenButton;
+    Button statsButton;
     Button windowButton;
     Button endButton;
     Button mainMenuButton;
     TextMeshProUGUI hostNote;
+    Button settingsButton;
     float endConfirmUntil = -1f;
 
     // The key bindings page
     GameObject mainCard;
     GameObject keysCard;
+    // 2026-11-19, the user: one "Settings" button; it leads to Lobby settings or Your settings
+    GameObject settingsCard;   // the choice
+    GameObject personalCard;   // volume, display, statistics, key bindings
     readonly System.Collections.Generic.List<KeyRow> keyRows = new System.Collections.Generic.List<KeyRow>();
     KeyRow rebinding; // the row waiting for a new key, or null
 
@@ -145,6 +150,14 @@ public class EscMenu : MonoBehaviour
             {
                 ShowKeysPage(false);
             }
+            else if (personalCard != null && personalCard.activeSelf)
+            {
+                ShowPage(settingsCard);
+            }
+            else if (settingsCard != null && settingsCard.activeSelf)
+            {
+                ShowPage(mainCard);
+            }
             else
             {
                 Close();
@@ -176,7 +189,7 @@ public class EscMenu : MonoBehaviour
         }
         endConfirmUntil = -1f;
         rebinding = null;
-        ShowKeysPage(false);
+        ShowPage(mainCard);
         volumeSlider.SetValueWithoutNotify(Mathf.Round(AudioListener.volume * 100f));
         ShowVolume(volumeSlider.value);
         root.SetActive(true);
@@ -233,6 +246,10 @@ public class EscMenu : MonoBehaviour
         bool host = inCompetition && CompetitionFlow.IsHostRunner(runner);
 
         endButton.gameObject.SetActive(host);
+        // Lobby settings only in a multiplayer game (2026-11-19, Anders). The 3D settings are always under Settings
+        // (2026-11-20, Anders: not on the single player page)
+        if (settingsButton != null)
+            settingsButton.gameObject.SetActive(runner != null && ActiveScene.Name != "MainMenu" && !single);
         if (host)
         {
             bool confirming = Time.unscaledTime < endConfirmUntil;
@@ -276,6 +293,21 @@ public class EscMenu : MonoBehaviour
     }
 
     // ---- Buttons ----
+
+    void ShowStatsButton()
+    {
+        TextMeshProUGUI label = statsButton != null ? statsButton.GetComponentInChildren<TextMeshProUGUI>() : null;
+        if (label != null)
+        {
+            label.text = "Usage statistics: " + (GameAnalytics.Enabled ? "on" : "off");
+        }
+    }
+
+    void OnStatsToggle()
+    {
+        GameAnalytics.SetEnabled(!GameAnalytics.Enabled);
+        ShowStatsButton();
+    }
 
     void OnFullscreen()
     {
@@ -348,8 +380,7 @@ public class EscMenu : MonoBehaviour
             return;
         }
         rebinding = null;
-        mainCard.SetActive(!show);
-        keysCard.SetActive(show);
+        ShowPage(show ? keysCard : personalCard);
         if (show)
         {
             ShowKeys();
@@ -400,6 +431,27 @@ public class EscMenu : MonoBehaviour
             ShowKeys();
             return;
         }
+    }
+
+    void ShowPage(GameObject page)
+    {
+        if (page == null) return;
+        foreach (GameObject card in new[] { mainCard, keysCard, settingsCard, personalCard })
+        {
+            if (card != null) card.SetActive(card == page);
+        }
+    }
+
+    static Image NewCard(string name, Transform parent, string heading)
+    {
+        Image card = CourseUI.CardPanel(name, parent);
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 0));
+        CourseUI.Column(card.gameObject, 18, new RectOffset(48, 48, 40, 40));
+        ContentSizeFitter fitter = card.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, heading, 44, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+        CourseUI.Size(title, 56);
+        return card;
     }
 
     void BuildKeysCard()
@@ -483,37 +535,12 @@ public class EscMenu : MonoBehaviour
         subtitle = CourseUI.Text("Subtitle", card.transform, "", 22, CourseUI.InkMuted, FontStyles.Italic, TextAlignmentOptions.Center);
         CourseUI.Size(subtitle, 30);
 
-        // Volume: a label and the value on one line, the slider under it
-        RectTransform volumeRow = CourseUI.Rect("Volume row", card.transform);
-        CourseUI.Row(volumeRow.gameObject, 12, new RectOffset(4, 4, 6, 0));
-        CourseUI.Size(volumeRow, 40);
-        TextMeshProUGUI volumeLabel = CourseUI.Text("Label", volumeRow, "Volume", 28, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Size(volumeLabel, -1, -1, 1);
-        volumeValue = CourseUI.Text("Value", volumeRow, "100%", 28, CourseUI.Accent, FontStyles.Bold, TextAlignmentOptions.Right);
-        CourseUI.Size(volumeValue, -1, 110);
-
-        volumeSlider = CourseUI.SliderControl("Volume", card.transform, 0, 100, 100, true, OnVolumeChanged);
-        CourseUI.Size(volumeSlider, 40);
-
-        // Display: fullscreen or a window (F11 / Alt+Enter switch too)
-        TextMeshProUGUI displayLabel = CourseUI.Text("Display label", card.transform, "Display", 28, CourseUI.Ink, FontStyles.Bold);
-        CourseUI.Size(displayLabel, 40);
-        RectTransform displayRow = CourseUI.Rect("Display row", card.transform);
-        CourseUI.Row(displayRow.gameObject, 12, new RectOffset(0, 0, 0, 0));
-        CourseUI.Size(displayRow, 56);
-        fullscreenButton = CourseUI.Button("Fullscreen", displayRow, "Fullscreen", CourseUI.ButtonKind.Primary, OnFullscreen, 24);
-        CourseUI.Size(fullscreenButton, -1, -1, 1);
-        windowButton = CourseUI.Button("Window", displayRow, "Window", CourseUI.ButtonKind.Light, OnWindow, 24);
-        CourseUI.Size(windowButton, -1, -1, 1);
-
-        RectTransform gap = CourseUI.Rect("Gap", card.transform);
-        CourseUI.Size(gap, 6);
-
         Button resume = CourseUI.Button("Resume", card.transform, "Resume", CourseUI.ButtonKind.Primary, Close, 28);
         CourseUI.Size(resume, 68);
 
-        Button keys = CourseUI.Button("Key bindings", card.transform, "Key bindings", CourseUI.ButtonKind.Light, () => ShowKeysPage(true), 26);
-        CourseUI.Size(keys, 68);
+        Button settingsMenu = CourseUI.Button("Settings", card.transform, "Settings", CourseUI.ButtonKind.Light, () => ShowPage(settingsCard), 26);
+        CourseUI.Size(settingsMenu, 68);
+        HoverTip.Add(settingsMenu, "The lobby's settings (race speed, TV, bears, control moves), the 3D settings and your own (sound, screen, keys).");
 
         endButton = CourseUI.Button("End competition", card.transform, "End competition for everyone", CourseUI.ButtonKind.Danger, OnEndCompetition, 26);
         CourseUI.Size(endButton, 68);
@@ -526,6 +553,77 @@ public class EscMenu : MonoBehaviour
 
         Button quit = CourseUI.Button("Quit", card.transform, "Quit game", CourseUI.ButtonKind.Light, OnQuit, 26);
         CourseUI.Size(quit, 68);
+
+        // Your own settings: a page of their own behind Settings (2026-11-19)
+        Image personal = NewCard("Your settings", root.transform, "Your settings");
+        personalCard = personal.gameObject;
+        Transform mine = personal.transform;
+
+        // Volume of every sound in the game: a label and the value on one line, the slider under it
+        RectTransform volumeRow = CourseUI.Rect("Volume row", mine);
+        CourseUI.Row(volumeRow.gameObject, 12, new RectOffset(4, 4, 6, 0));
+        CourseUI.Size(volumeRow, 40);
+        TextMeshProUGUI volumeLabel = CourseUI.Text("Label", volumeRow, "Volume", 28, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Size(volumeLabel, -1, -1, 1);
+        volumeValue = CourseUI.Text("Value", volumeRow, "100%", 28, CourseUI.Accent, FontStyles.Bold, TextAlignmentOptions.Right);
+        CourseUI.Size(volumeValue, -1, 110);
+
+        volumeSlider = CourseUI.SliderControl("Volume", mine, 0, 100, 100, true, OnVolumeChanged);
+        CourseUI.Size(volumeSlider, 40);
+
+        // The sounds of "Run it yourself" one by one, and how quickly the mouse turns the head there (2026-11-20,
+        // Anders: one sound section here for everything, not in the 3D settings)
+        RunSettings.SoundRows(mine);
+        RunSettings.MouseRow(mine);
+
+        // Display: fullscreen or a window (F11 / Alt+Enter switch too)
+        TextMeshProUGUI displayLabel = CourseUI.Text("Display label", mine, "Display", 28, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Size(displayLabel, 40);
+        RectTransform displayRow = CourseUI.Rect("Display row", mine);
+        CourseUI.Row(displayRow.gameObject, 12, new RectOffset(0, 0, 0, 0));
+        CourseUI.Size(displayRow, 56);
+        fullscreenButton = CourseUI.Button("Fullscreen", displayRow, "Fullscreen", CourseUI.ButtonKind.Primary, OnFullscreen, 24);
+        CourseUI.Size(fullscreenButton, -1, -1, 1);
+        windowButton = CourseUI.Button("Window", displayRow, "Window", CourseUI.ButtonKind.Light, OnWindow, 24);
+        CourseUI.Size(windowButton, -1, -1, 1);
+
+        RectTransform gap = CourseUI.Rect("Gap", mine);
+        CourseUI.Size(gap, 6);
+
+        statsButton = CourseUI.Button("Usage statistics", mine, "", CourseUI.ButtonKind.Light, OnStatsToggle, 22);
+        CourseUI.Size(statsButton, 52);
+        ShowStatsButton();
+        HoverTip.Add(statsButton, "Anonymous statistics (how many play and what is played, no names) help make the game better. Click to turn them on or off.");
+
+        Button keys = CourseUI.Button("Key bindings", mine, "Key bindings", CourseUI.ButtonKind.Light, () => ShowKeysPage(true), 26);
+        CourseUI.Size(keys, 68);
+        Button personalBack = CourseUI.Button("Back", mine, "Back", CourseUI.ButtonKind.Primary, () => ShowPage(settingsCard), 26);
+        CourseUI.Size(personalBack, 68);
+
+        // Settings: the choice between the lobby's settings and your own
+        Image choice = NewCard("Settings", root.transform, "Settings");
+        settingsCard = choice.gameObject;
+        // The host's lobby settings (speeds, TV, bears and moves), also during the race. The host changes them; everyone
+        // else sees what the lobby uses, without it changing their own saved values.
+        settingsButton = CourseUI.Button("Lobby settings", choice.transform, "Lobby settings", CourseUI.ButtonKind.Light, () =>
+        {
+            Close();
+            HostSettingsPopup.Open();
+        }, 28);
+        CourseUI.Size(settingsButton, 76);
+        HoverTip.Add(settingsButton, "Race speed, TV controls, bears and control moves. Only the host can change them, also during the race; everyone else can look.");
+        Button threeD = CourseUI.Button("3D settings", choice.transform, "3D settings", CourseUI.ButtonKind.Light, () =>
+        {
+            Close();
+            RunSettings.Open();
+        }, 28);
+        CourseUI.Size(threeD, 76);
+        HoverTip.Add(threeD, "For \"Run it yourself\" (3D): graphics, game speed, man or woman, and the hand that holds the map.");
+        Button yours = CourseUI.Button("Your settings", choice.transform, "Your settings", CourseUI.ButtonKind.Light, () => ShowPage(personalCard), 28);
+        CourseUI.Size(yours, 76);
+        HoverTip.Add(yours, "Sound, mouse look, fullscreen or window, usage statistics and key bindings.");
+        Button choiceBack = CourseUI.Button("Back", choice.transform, "Back", CourseUI.ButtonKind.Primary, () => ShowPage(mainCard), 26);
+        CourseUI.Size(choiceBack, 68);
 
         HoverTip.Add(volumeSlider, "The volume of all sounds in the game.");
         HoverTip.Add(fullscreenButton, "Fill the whole screen. F11 also switches.");

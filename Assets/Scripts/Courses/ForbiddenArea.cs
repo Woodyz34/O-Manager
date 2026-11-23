@@ -10,11 +10,17 @@ using UnityEngine;
 public class ForbiddenArea
 {
     public const int MaxCorners = 40;       // per area or line
-    public const int MaxAreas = 20;         // areas and lines together
+    // Areas and lines together. No real limit since 2026-11-19 (the user: "no max"); only a guard against broken data.
+    // What limits them is the corners in all of them together (MaxCornersTotal), so the course still fits in the lobby.
+    public const int MaxAreas = 1000;
     public const int MaxCornersTotal = 150; // keeps the course small enough to send in the lobby (6 characters a corner)
 
     public List<CoursePoint> corners = new List<CoursePoint>();
     public bool line;                       // an uncrossable boundary instead of an area
+    // A bridge (2026-11-19): a line the course setter draws over water (or anything else) that the runners may cross
+    // on. Stored with the out-of-bounds shapes so it goes everywhere they go; always a line, and it opens cells instead
+    // of closing them.
+    public bool bridge;
 
     public int MinCorners => line ? 2 : 3;
     public bool IsValid => corners != null && corners.Count >= MinCorners;
@@ -45,7 +51,7 @@ public static class ForbiddenAreas
         var changed = new List<KeyValuePair<int, float>>();
         foreach (ForbiddenArea area in areas)
         {
-            if (area == null || !area.IsValid) continue;
+            if (area == null || !area.IsValid || area.bridge) continue;
             // Corners in grid cells (x = column, y = row), the same way MapDefinition.ToCell works
             List<Vector2> poly = new List<Vector2>(area.corners.Count);
             foreach (CoursePoint corner in area.corners)
@@ -59,7 +65,50 @@ public static class ForbiddenAreas
         }
         closed -= OpenGaps(speed, map, shapes, changed);
         if (purpleCells != null) foreach (var c in changed) purpleCells.Add(c.Key);
+        OpenBridges(speed, map, areas, purpleCells);
         return closed;
+    }
+
+    // ---- Bridges the course setter drew (2026-11-19) ----
+    // Every cell the bridge runs through, and the cells beside it where it goes diagonally (so the way is never only
+    // corner to corner), is opened at the speed of a footbridge, whatever closed it: a lake, a stream's banks, a fence.
+    public const float BridgeSpeed = 1.2f;
+
+    public static void OpenBridges(float[,] speed, MapDefinition map, List<ForbiddenArea> areas, HashSet<int> purpleCells = null)
+    {
+        if (speed == null || map == null || areas == null) return;
+        int rows = speed.GetLength(0), cols = speed.GetLength(1);
+        float cell = map.CellSize;
+        foreach (ForbiddenArea area in areas)
+        {
+            if (area == null || !area.bridge || !area.IsValid) continue;
+            for (int k = 0; k + 1 < area.corners.Count; k++)
+            {
+                Vector3 wa = map.ToWorld(area.corners[k]), wb = map.ToWorld(area.corners[k + 1]);
+                Vector2 a = new Vector2(wa.x / cell + cols / 2f, wa.y / cell + rows / 2f);
+                Vector2 b = new Vector2(wb.x / cell + cols / 2f, wb.y / cell + rows / 2f);
+                int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(a, b) * 4f));
+                int lastI = int.MinValue, lastJ = int.MinValue;
+                for (int s = 0; s <= steps; s++)
+                {
+                    Vector2 p = Vector2.Lerp(a, b, s / (float)steps);
+                    int j = Mathf.FloorToInt(p.x), i = Mathf.FloorToInt(p.y);
+                    if (i == lastI && j == lastJ) continue;
+                    OpenCell(speed, i, j, rows, cols, purpleCells);
+                    // A diagonal step: open one of the two cells beside it too
+                    if (lastI != int.MinValue && i != lastI && j != lastJ) OpenCell(speed, lastI, j, rows, cols, purpleCells);
+                    lastI = i;
+                    lastJ = j;
+                }
+            }
+        }
+    }
+
+    static void OpenCell(float[,] speed, int i, int j, int rows, int cols, HashSet<int> purpleCells)
+    {
+        if (i < 0 || j < 0 || i >= rows || j >= cols) return;
+        if (speed[i, j] < BridgeSpeed) speed[i, j] = BridgeSpeed;
+        purpleCells?.Remove(i * cols + j);
     }
 
     // ---- Gaps the course setter left on purpose (2026-11-15) ----
@@ -207,6 +256,8 @@ public static class ForbiddenAreas
     {
         CourseData course = CourseLoader.Loaded;
         MapDefinition map = CourseLoader.LoadedMap;
+        // Never the last race's cells on a course without any (2026-11-20)
+        if (manager != null && manager.speedGrid2D != null) CompetitionCells.Clear();
         if (manager == null || manager.speedGrid2D == null || map == null || !Any(course)) return;
         string gridName = manager.jsonFileName ?? "";
         if (gridName.EndsWith(".json")) gridName = gridName.Substring(0, gridName.Length - 5);

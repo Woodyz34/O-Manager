@@ -44,6 +44,9 @@ public class CameraController : MonoBehaviour
     private bool wasFollowing = false;
     // Set by the TV production (TvViewer): a place the following camera shows in place of the player's own runner
     public static Vector3? LookHere;
+    // Another player's runner picked on the leaderboard (2026-11-19): Follow runner follows it instead of your own,
+    // without Follow runner the map jumps there once. Pick your own row to come back.
+    public static Transform Watched;
     private AgentMovement agent;
     private Button followButton;
     private TextMeshProUGUI followButtonText;
@@ -150,14 +153,14 @@ public class CameraController : MonoBehaviour
 
         FocusOnNewStretchToDraw();
 
-        if (!following && !EscMenu.IsOpen && !TvViewer.BlocksMapInput && mapRenderer != null)
+        if (!following && !EscMenu.IsOpen && !HostSettingsPopup.IsOpen && !TvViewer.BlocksMapInput && mapRenderer != null)
         {
             PanCamera();
         }
         
         // The wheel belongs to the list under the mouse (the leaderboard, for one), not to the map behind it
         float wheel = Input.GetAxis("Mouse ScrollWheel");
-        if (wheel != 0f && !PointerOverUI() && !EscMenu.IsOpen && !TvViewer.BlocksMapInput && mapRenderer != null)
+        if (wheel != 0f && !PointerOverUI() && !EscMenu.IsOpen && !HostSettingsPopup.IsOpen && !TvViewer.BlocksMapInput && mapRenderer != null)
         {
             if (wheel > 0f) { ZoomIn(); }
             else { ZoomOut(); }
@@ -184,13 +187,15 @@ public class CameraController : MonoBehaviour
             bool wanted = cam != null && cam.enabled;
             if (ear.enabled != wanted) ear.enabled = wanted;
         }
-        if (cam == null || !cam.enabled || !IsFollowingRunner())
+        if (Watched != null && ActiveScene.Name == "Lobby") Watched = null;
+        bool watching = Watched != null && followRunner && agent != null && agent.manualPathDrawer != null && !agent.manualPathDrawer.timeToDraw;
+        if (cam == null || !cam.enabled || (!IsFollowingRunner() && !watching))
         {
             return;
         }
         // Efter att löparen har flyttats i Update, så att kameran inte ligger en bildruta efter
         // In a TV production the map goes to where something happens (another team's mistake) and back again
-        Vector3 look = LookHere ?? transform.position;
+        Vector3 look = LookHere ?? (Watched != null ? Watched.position : transform.position);
         cam.transform.position = new Vector3(look.x, look.y, -10f);
     }
 
@@ -213,6 +218,20 @@ public class CameraController : MonoBehaviour
     private bool IsFollowingRunner()
     {
         return followRunner && IsRunPhase();
+    }
+
+    // A row on the leaderboard was clicked: watch that runner (your own: back to your own)
+    public void ShowRunner(Transform runner)
+    {
+        if (runner == null) return;
+        Watched = runner == transform ? null : runner;
+        if (agent == null) agent = GetComponent<AgentMovement>();
+        bool drawing = agent != null && agent.manualPathDrawer != null && agent.manualPathDrawer.timeToDraw;
+        // Without Follow runner (or while drawing) the map just jumps there; you move it about yourself from there
+        if (cam != null && (!followRunner || drawing))
+        {
+            cam.transform.position = new Vector3(runner.position.x, runner.position.y, cam.transform.position.z);
+        }
     }
 
     public void ToggleFollowRunner()
@@ -284,6 +303,12 @@ public class CameraController : MonoBehaviour
 
     // Knappen skapas i koden så att den finns i alla banor utan att varje scen behöver ändras.
     // Den visas bara medan löparen springer, inte medan spelaren ritar.
+    // A replay takes the camera over (and turns this off): the button goes with it
+    public void HideFollowButton()
+    {
+        if (followButton != null) followButton.gameObject.SetActive(false);
+    }
+
     private void UpdateFollowButton()
     {
         if (followButton == null)
@@ -295,7 +320,8 @@ public class CameraController : MonoBehaviour
             }
         }
 
-        bool show = IsRunPhase();
+        // Never in a replay (2026-11-20, Anders: it does nothing there and is in the way)
+        bool show = IsRunPhase() && RelayReplayView.Current == null;
         if (followButton.gameObject.activeSelf != show)
         {
             followButton.gameObject.SetActive(show);

@@ -38,6 +38,8 @@ public class MultiPlayerHandler : MonoBehaviour
         {
             sessionNameinputField.text = savedSession;
         }
+        // Only a name the player writes is saved for next time (2026-11-19: another player's lobby name turned up)
+        if (sessionNameinputField != null) sessionNameinputField.onValueChanged.AddListener(_ => { if (sessionNameinputField.isFocused) lobbyNameTyped = true; });
         MakeBackButton();
     }
 
@@ -112,6 +114,8 @@ public class MultiPlayerHandler : MonoBehaviour
         sessionBrowserPanel.SetActive(true);
     }
 
+    bool lobbyNameTyped;   // the player wrote in the lobby name field on this visit
+
     public void OnStartNewSessionClicked()
     {
         if(FindObjectOfType<SessionListUIHandler>(true).dontCreateGame == true)
@@ -127,9 +131,13 @@ public class MultiPlayerHandler : MonoBehaviour
             string host = GameManager.Instance != null ? GameManager.Instance.playerNickName : "";
             sessionName = (string.IsNullOrWhiteSpace(host) ? "Player" : host.Trim()) + "'s lobby";
         }
-        PlayerPrefs.SetString(LocalPrefs.Key("LobbyName"), sessionName);
-        PlayerPrefs.Save();
+        if (lobbyNameTyped && sessionNameinputField.text.Trim().Length > 0)
+        {
+            PlayerPrefs.SetString(LocalPrefs.Key("LobbyName"), sessionName);
+            PlayerPrefs.Save();
+        }
         networkRunnerHandler.CreateGame(sessionName, "Lobby");
+        GameAnalytics.Record("lobby_created");
 
         HideAllPanels();
 

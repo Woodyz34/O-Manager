@@ -81,6 +81,9 @@ public class SinglePlayerMenu : MonoBehaviour
         mapHandler = gameObject.AddComponent<MapHandler>();
         Build();
         Refresh();
+
+        // A weekly or daily contest from the contests page: start it at once with its own course, runner and mode
+        if (ContestRun.StartPending) StartContest();
     }
 
     CourseData Chosen => mapHandler != null ? mapHandler.course : CourseLibrary.CurrentOrDefault;
@@ -116,11 +119,7 @@ public class SinglePlayerMenu : MonoBehaviour
         CourseUI.Place((RectTransform)leave.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(48, -40), new Vector2(250, 66));
 
         // Top right: your money
-        Image moneyPill = CourseUI.Panel("Money pill", page, CourseUI.Card);
-        if (CourseUI.Skin != null && CourseUI.Skin.pill != null) moneyPill.sprite = CourseUI.Skin.pill;
-        CourseUI.Place(moneyPill.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48, -40), new Vector2(220, 66));
-        moneyText = CourseUI.Text("Amount", moneyPill.transform, "", 26, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
-        CourseUI.Stretch(moneyText.rectTransform, 12, 12, 0, 0);
+        Image moneyPill = MoneyLabel.CreatePill(page, new Vector2(-48, -40), out moneyText);
 
         // Top middle: what you will play, as in the lobby
         Image setup = CourseUI.CardPanel("Game setup card", page);
@@ -202,11 +201,12 @@ public class SinglePlayerMenu : MonoBehaviour
         return value;
     }
 
-    static void SetupButton(Transform parent, string label, UnityEngine.Events.UnityAction click, string tip)
+    static Button SetupButton(Transform parent, string label, UnityEngine.Events.UnityAction click, string tip)
     {
         Button button = CourseUI.Button(label, parent, label, CourseUI.ButtonKind.Light, click, 26);
         CourseUI.Size(button, 66);
         HoverTip.Add(button, tip);
+        return button;
     }
 
     // The lobby's course window (MapSelectUI) with its tabs, search and AI course, built here in code
@@ -274,7 +274,7 @@ public class SinglePlayerMenu : MonoBehaviour
         if (startButton == null) return;
         CourseData course = Chosen;
         string problem = Problem();
-        string money = Money.Instance != null ? Money.Instance.GetMoney() + " kr" : "";
+        string money = Money.Instance != null ? MoneyLabel.Format(Money.Instance.GetMoney()) : "";
         string state = (course != null ? course.id + course.name : "") + "|" + pool + "|" + (int)modes + "|" + problem + "|" + starting
                        + "|" + GameModes.OwnedRunnerCount() + "|" + money;
         if (state == shownState) return;
@@ -353,7 +353,44 @@ public class SinglePlayerMenu : MonoBehaviour
         ChosenGameMode = string.IsNullOrWhiteSpace(pool) ? GameModes.YourRunners : pool;
         ChosenModes = modes & ExtraModes.Solo;
         if (MapSelectUI.IsAICourse(course)) AICoursePanel.RacedCourseId = course.id;
+        await Launch();
+    }
 
+    // A weekly or daily contest (ContestRun): the contest's course, its runner values and game mode, nothing to pick
+    async void StartContest()
+    {
+        if (starting) return;
+        starting = true;
+        GameObject cover = new GameObject("Contest cover", typeof(Canvas), typeof(CanvasScaler));
+        Canvas coverCanvas = cover.GetComponent<Canvas>();
+        coverCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        coverCanvas.sortingOrder = 200;
+        ScreenSettings.Fit(cover.GetComponent<CanvasScaler>());
+        Image sheet = CourseUI.Panel("Sheet", cover.transform, CourseUI.CardSolid, false);
+        CourseUI.Stretch(sheet.rectTransform);
+        TextMeshProUGUI text = CourseUI.Text("Text", sheet.transform, ContestRun.SpanName(ContestRun.Active) + "\n" + ContestRun.Title(ContestRun.Active) + "\n\nStarting...",
+            44, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+        CourseUI.Stretch(text.rectTransform, 60, 60, 60, 60);
+
+        CourseLibrary.Current = ContestRun.ActiveCourse;
+        ChosenGameMode = ContestRun.GameModeFor(ContestRun.Active);
+        ChosenModes = ContestRun.ModesFor(ContestRun.Active) & ExtraModes.Solo;
+        ContestRun.Started();
+        bool ok = await Launch();
+        if (!ok)
+        {
+            ContestRun.Leave();
+            SceneManager.LoadScene("MainMenu");
+        }
+        else if (cover != null)
+        {
+            Destroy(cover, 1.5f);
+        }
+    }
+
+    // Starts the competition in Fusion's Single mode with what is set in CourseLibrary.Current and the Chosen* values
+    async Task<bool> Launch()
+    {
         NetworkRunner runner = Instantiate(runnerPrefab);
         runner.name = "Single player runner";
         runner.ProvideInput = true;
@@ -368,6 +405,10 @@ public class SinglePlayerMenu : MonoBehaviour
             SceneManager = sceneManager,
             ConnectionToken = GameManager.Instance.GetConnectionsToken()
         });
+        if (result.Ok)
+        {
+            GameAnalytics.Record("single_player_started", "terrain", CourseLibrary.Current != null && CourseLibrary.Current.IsSprint() ? "sprint" : "forest");
+        }
         if (!result.Ok)
         {
             Debug.LogError("SinglePlayerMenu: could not start: " + result.ShutdownReason);
@@ -379,7 +420,9 @@ public class SinglePlayerMenu : MonoBehaviour
                 UIToast.Show("The game could not start: " + result.ShutdownReason);
                 Refresh();
             }
+            return false;
         }
+        return true;
     }
 
     // The same card and loading bar as in the lobby (ReadyUIHandler)
@@ -416,6 +459,13 @@ public class SinglePlayerMenu : MonoBehaviour
     {
         ChosenGameMode = null;
         ChosenModes = ExtraMode.None;
+        // A contest race goes back to the contests page in the main menu
+        if (ContestRun.Active != null)
+        {
+            ContestRun.Leave();
+            SceneLoader.LeaveSession(runner, "MainMenu");
+            return;
+        }
         SceneLoader.LeaveSession(runner, "SingelPlayer");
     }
 }

@@ -39,16 +39,21 @@ namespace MapImport
             double ox = extent.minX, oy = extent.minY;
 
             var contours = new List<Contour>();
+            var lines = new List<double[]>();
             foreach (MapObject o in map.objects)
             {
                 if (o.kind != SymbolKind.Line || !SymbolRules.IsContour(o.symbol)) continue;
                 foreach (double[] part in o.parts)
-                {
-                    if (part.Length < 4) continue;
-                    var q = new double[part.Length];
-                    for (int i = 0; i < part.Length; i += 2) { q[i] = (part[i] - ox) * scale; q[i + 1] = (part[i + 1] - oy) * scale; }
-                    contours.Add(new Contour { id = contours.Count + 1, p = q, closed = MapGeometry.IsClosed(part, 0.05) });
-                }
+                    if (part.Length >= 4) lines.Add(part);
+            }
+            // A contour is often drawn as several lines (cut where a tick, a text or a cliff sits). Joined end to end
+            // again, a ring round a hill is closed and so known as a hill; before (2026-11-20, Anders) the pieces of a
+            // hill's rings had no known up side, were guessed from their neighbours and a hilltop could become a hollow.
+            foreach (double[] part in StitchContours(lines, 0.25))
+            {
+                var q = new double[part.Length];
+                for (int i = 0; i < part.Length; i += 2) { q[i] = (part[i] - ox) * scale; q[i + 1] = (part[i + 1] - oy) * scale; }
+                contours.Add(new Contour { id = contours.Count + 1, p = q, closed = MapGeometry.IsClosed(part, 0.25) });
             }
             if (contours.Count < 3) return heights;
 
@@ -111,7 +116,11 @@ namespace MapImport
                                 int cx = (int)Math.Floor(px + nx * side * t), cy = (int)Math.Floor(py + ny * side * t);
                                 if (cx < 0 || cy < 0 || cx >= C || cy >= R) break;
                                 int v = ids[cy * C + cx];
-                                if (v == 0 || v == c.id) continue;
+                                if (v == 0) continue;
+                                // The ray met this contour again (across a small ring, round a bend): what lies beyond
+                                // is not its neighbour on this side. Before (2026-11-20) it went on, so the ring round a
+                                // hilltop saw the ring outside it on its inner side too, and a hill could become a hollow.
+                                if (v == c.id) { if (t > 3.0) break; continue; }
                                 long key = (long)c.id << 32 | (uint)v;
                                 if (!seen.TryGetValue(key, out int[] cnt)) seen[key] = cnt = new int[2];
                                 cnt[side > 0 ? 0 : 1]++;
@@ -221,9 +230,84 @@ namespace MapImport
             return heights;
         }
 
+        // Joins contour lines whose ends meet (within tolerance, map mm), each end to its nearest other end when that
+        // end's nearest is this one too; a line whose two ends meet is closed up
+        internal static List<double[]> StitchContours(List<double[]> parts, double tolerance)
+        {
+            var left = new List<List<double>>();
+            foreach (double[] p in parts) left.Add(new List<double>(p));
+            double t2 = tolerance * tolerance;
+            double D2(double ax, double ay, double bx, double by) => (ax - bx) * (ax - bx) + (ay - by) * (ay - by);
+            bool changed = true;
+            int guard = 0;
+            var turned = new HashSet<List<double>>();
+            while (changed && guard++ < 50)
+            {
+                changed = false;
+                for (int a = 0; a < left.Count; a++)
+                {
+                    List<double> A = left[a];
+                    int n = A.Count;
+                    if (n >= 8 && D2(A[0], A[1], A[n - 2], A[n - 1]) <= t2) continue;   // closed already
+                    double ex = A[n - 2], ey = A[n - 1];
+                    // The nearest end of another line to this line's end
+                    int best = -1;
+                    bool bestHead = true;
+                    double bd = t2;
+                    for (int b = 0; b < left.Count; b++)
+                    {
+                        if (b == a) continue;
+                        List<double> B = left[b];
+                        int m = B.Count;
+                        double h = D2(ex, ey, B[0], B[1]), t = D2(ex, ey, B[m - 2], B[m - 1]);
+                        if (h < bd) { bd = h; best = b; bestHead = true; }
+                        if (t < bd) { bd = t; best = b; bestHead = false; }
+                    }
+                    if (best < 0)
+                    {
+                        // Nothing at the end: turn the line round once, so its start is tried too
+                        if (!turned.Contains(A)) { turned.Add(A); A.Reverse(); for (int i = 0; i + 1 < A.Count; i += 2) { double t = A[i]; A[i] = A[i + 1]; A[i + 1] = t; } a--; }
+                        continue;
+                    }
+                    // ...and no end of a third line nearer to that end (a fork: leave it)
+                    List<double> J = left[best];
+                    double jx = bestHead ? J[0] : J[J.Count - 2], jy = bestHead ? J[1] : J[J.Count - 1];
+                    bool mutual = true;
+                    for (int c = 0; c < left.Count && mutual; c++)
+                    {
+                        List<double> Cc = left[c];
+                        int m = Cc.Count;
+                        bool skipHead = c == best && bestHead, skipTail = (c == best && !bestHead) || c == a;
+                        if (!skipHead && D2(jx, jy, Cc[0], Cc[1]) < bd) mutual = false;
+                        if (!skipTail && D2(jx, jy, Cc[m - 2], Cc[m - 1]) < bd) mutual = false;
+                    }
+                    if (!mutual) continue;
+                    if (!bestHead)
+                    {
+                        var r = new List<double>(J.Count);
+                        for (int i = J.Count - 2; i >= 0; i -= 2) { r.Add(J[i]); r.Add(J[i + 1]); }
+                        J = r;
+                    }
+                    A.AddRange(J.GetRange(2, J.Count - 2));
+                    left.RemoveAt(best);
+                    if (best < a) a--;
+                    changed = true;
+                }
+            }
+            var result = new List<double[]>(left.Count);
+            foreach (List<double> l in left)
+            {
+                int n = l.Count;
+                // Ends that meet: closed exactly
+                if (n >= 8 && D2(l[0], l[1], l[n - 2], l[n - 1]) <= t2) { l[n - 2] = l[0]; l[n - 1] = l[1]; }
+                result.Add(l.ToArray());
+            }
+            return result;
+        }
+
         // Weighted least squares for the levels: minimise sum w (level[b] - level[a] - diff)^2 with conjugate gradients.
         // (Plain sweeps converge far too slowly over a whole map and leave the map tilted.)
-        static void SolveLevels(double[] x, List<(int a, int b, int sa, int sb, double w)> edges, double[] diff, double[] weight)
+        internal static void SolveLevels(double[] x, List<(int a, int b, int sa, int sb, double w)> edges, double[] diff, double[] weight)
         {
             int n = x.Length;
             const double eps = 1e-6;   // ties every level weakly to 0 so the system has one answer
@@ -276,7 +360,7 @@ namespace MapImport
         }
 
         // Smooth fill between fixed cells: first on coarser grids, then refined
-        static void SolveLaplace(double[] z, bool[] isFixed, int rows, int cols)
+        internal static void SolveLaplace(double[] z, bool[] isFixed, int rows, int cols)
         {
             if (rows > 64 && cols > 64)
             {
@@ -324,9 +408,10 @@ namespace MapImport
         }
 
         // The direction a slope tick points, from its symbol: towards its element point furthest from the origin
-        static bool TickDirection(MapSymbol s, out double x, out double y)
+        internal static bool TickDirection(MapSymbol s, out double x, out double y)
         {
             x = y = 0;
+            if (s == null || s.point == null) return false;
             double best = 0;
             foreach (SymbolElement e in s.point)
             {
@@ -342,7 +427,7 @@ namespace MapImport
             return true;
         }
 
-        static int Nearest(int[] ids, int C, int R, double px, double py, int reach)
+        internal static int Nearest(int[] ids, int C, int R, double px, double py, int reach)
         {
             int cx = (int)Math.Floor(px), cy = (int)Math.Floor(py);
             for (int r = 0; r <= reach; r++)
@@ -357,7 +442,7 @@ namespace MapImport
         }
 
         // +1 if the point is on the left of the polyline (at its nearest segment), -1 on the right
-        static int SideOf(double[] p, double x, double y)
+        internal static int SideOf(double[] p, double x, double y)
         {
             double best = double.MaxValue; int side = 0;
             for (int i = 0; i + 3 < p.Length; i += 2)

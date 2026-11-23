@@ -15,7 +15,8 @@ namespace MapImport
         SlowLine,       // a line that takes a moment to cross (stone wall, fence)
         Crossing,       // a point that opens a way through a blocking line (gate, crossing point)
         Bridge,         // a line that is a way over water or another obstacle
-        SlowArea        // an area that slows down whatever ground it lies on (stony ground): speed is a factor
+        SlowArea,       // an area that slows down whatever ground it lies on (stony ground): speed is a factor
+        Stairs          // a stairway: a slow way up or down, also over a cliff, a retaining wall or an impassable wall it crosses
     }
 
     public struct TerrainRule
@@ -34,6 +35,22 @@ namespace MapImport
 
     public static class SymbolRules
     {
+        // Goes up by one every time the rules below change what can be run on, so maps imported with older rules can be
+        // told apart (MapPackageInfo.rulesVersion) and the player asked to build them again.
+        // 2 (2026-11-20): ISOM 2017-2 / ISSprOM 2019-2 check: hedges (410.1, 411), 513.1 wall, stairs, canopies,
+        // 707 marked route (not a barrier), 708 out-of-bounds boundary, 710 crossing, green minimum-width lines.
+        // 3 (2026-11-20): stairs as quick as a road going up, 0.6 going down (GroundKind.Stairs, StairsSlopes).
+        // 4 (2026-11-20): contour heights: hilltops no longer turned into hollows (ContourHeights), the grid's heights change.
+        // 5 (2026-11-23): slope ticks keep their direction in points.json (the run-yourself ground knows knolls from
+        //    hollows everywhere), and ticks drawn as a point of 101.0 itself count for the grid's heights too.
+        // 6 (2026-11-23): the world layer keeps the outlines of gardens and out-of-bounds areas, so the 3D town's garden
+        //    edges (hedges, walls, fences) run straight along them instead of the zigzag of the 2 m cells.
+        public const int RulesVersion = 6;
+
+        // Stairs: up (and on the flat) as quick as a road (Anders, 2026-11-20: running up stairs is quick), down slowly.
+        // Which way is down is worked out from the heights when the grid is loaded (StairsSlopes).
+        public const float StairsSpeed = 1.35f;
+        public const float StairsDownSpeed = 0.6f;
         // Old maps (ISOM 2000, ISSOM 2007, many OCAD 6-10 files) number some symbols differently: building 526,
         // forbidden area 527, paved area 529, uncrossable water 304. In the new standards 526-529 are points or
         // lines, never areas, so an area symbol with one of those numbers tells the map uses the old numbering.
@@ -131,7 +148,7 @@ namespace MapImport
                 switch (m)
                 {
                     case 301: return Blocked();                                           // uncrossable water
-                    case 302: return Ground(sprint ? 0f : 0.5f, sprint);                   // shallow water
+                    case 302: return Ground(sprint ? 0.4f : 0.5f, sprint);                 // shallow water: may be waded (blue edge; a black edge is a line of its own)
                     case 307: return Blocked();                                           // uncrossable marsh
                     case 308: return Ground(0.8f, sprint);                                // marsh
                     case 310: return Ground(0.9f, sprint);                                // indistinct marsh
@@ -145,10 +162,14 @@ namespace MapImport
                     case 408: return Ground(0.55f, sprint);                               // difficult to run
                     case 409: return Ground(0.55f, sprint);                               // walk, good visibility
                     case 410:
-                        // ISSprOM 410 is impassable vegetation; ISOM 410 is very difficult (fight)
-                        if (sprint || name.Contains("impassable") || name.Contains("opasserbar")) return Blocked();
+                        // ISSprOM 410 is impassable vegetation; ISOM 2017-2 410 is "Vegetation: fight" (passable, very slow)
+                        if (sprint || ImpassableName(name)) return Blocked();
                         return Ground(TerrainSpeeds.NormalDark, sprint);
-                    case 411: return Ground(sprint ? 0.6f : 0.8f, sprint);                // runnable in one direction
+                    case 411:
+                        // Not in ISOM 2017-2. The Swedish symbol sets use 411 for impassable vegetation / hedges
+                        // (2026-11-20, a player: "411 is impassable"); only a name that says one direction is runnable.
+                        if (OneWayName(name) && !ImpassableName(name)) return Ground(sprint ? 0.6f : 0.8f, sprint);
+                        return Blocked();
                     case 412: return Ground(sprint ? 1.3f : 1.15f, sprint);                            // cultivated land
                     case 413: return Ground(1.0f, sprint);                                // orchard
                     case 414: return Ground(1.0f, sprint);                                // vineyard
@@ -167,13 +188,21 @@ namespace MapImport
                         if (name.Contains("grus") || name.Contains("gravel") || name.Contains("unpaved")) return Ground(1.4f, sprint);
                         return Ground(1.5f, sprint);                                      // paved area
                     case 503: return Ground(1.4f, sprint);                                // meeting places, squares
-                    case 520: return Blocked();                                           // area that shall not be entered
-                    case 521: return Blocked();                                           // building
-                    case 522: return Ground(1.4f, sprint);                                // canopy: you can run under it
-                    case 709: return Blocked();                                           // out of bounds (course setting)
-                    case 714: return Blocked();                                           // temporary out of bounds
+                    case 520: return Blocked();                                           // area that shall not be entered (olive green)
+                    case 521:
+                        // Building; some symbol sets put the canopy under the building number (521.1 "Skärmtak")
+                        if (CanopyName(name)) return Ground(1.4f, sprint);
+                        return Blocked();
+                    case 522: return Ground(1.4f, sprint);                                // canopy: an accessible, runnable area with a roof
+                    case 709: return Blocked();                                           // out-of-bounds area (course setting)
+                    case 714: return Blocked();                                           // temporary construction or closed area
                 }
-                if (m == 206) return Blocked();                                           // gigantic boulder
+                if (m == 206)
+                {
+                    // Gigantic boulder or rock pillar; some maps borrow the number for their own area (Ängaryd: "Path area")
+                    if (name.Contains("path") || name.Contains("stig") || name.Contains("väg") || name.Contains("paved")) return Ground(1.4f, sprint);
+                    return Blocked();
+                }
                 if (m == 528 || m == 529) return Blocked();
                 // A map maker's own symbol (e.g. 999) for an area nobody may enter: known by its name
                 if (ForbiddenName(name)) return Blocked();
@@ -185,8 +214,15 @@ namespace MapImport
                 switch (m)
                 {
                     case 201: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // impassable cliff
-                    case 301: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // lake shore
+                    case 301: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // uncrossable water: bank line
+                    case 304: return new TerrainRule(TerrainRole.SlowLine, 0.7f);         // crossable watercourse (over 2 m wide): wade it
                     case 307: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // uncrossable marsh edge
+                    case 406: return GreenLine(name, sprint, 0.7f);                      // slow running, minimum width
+                    case 407: return GreenLine(name, sprint, 0.7f);
+                    case 408: return GreenLine(name, sprint, 0.55f);                     // walk, minimum width
+                    case 409: return GreenLine(name, sprint, 0.55f);
+                    case 410: return HedgeLine(name, sprint, false);                     // hedge / impassable vegetation, minimum width
+                    case 411: return HedgeLine(name, sprint, true);
                     case 502: return Path(1.5f);                                          // wide road, cycle path
                     case 503: return Path(1.4f);                                          // road
                     case 504: return Path(1.35f);                                         // vehicle track
@@ -197,43 +233,96 @@ namespace MapImport
                     case 509: return sprint ? TerrainRule.None : Path(1.3f);             // railway
                     case 512: return new TerrainRule(TerrainRole.Bridge, 1.4f);           // bridge / tunnel
                     case 513:
+                        // 513.1 Wall (passable, ISOM 2017-2 and ISSprOM 2019-2), 513.2 retaining wall (seen from one side)
                         if (ImpassableName(name)) return new TerrainRule(TerrainRole.BlockingLine, 0f);
-                        if (minor == 1 || RuinedName(name)) return new TerrainRule(TerrainRole.SlowLine, 0.8f);   // ruined wall (513.1)
-                        return new TerrainRule(TerrainRole.SlowLine, 0.5f);               // stone wall: over, but slower
+                        if (RuinedName(name)) return new TerrainRule(TerrainRole.SlowLine, 0.8f);
+                        if (RetainingName(name)) return new TerrainRule(TerrainRole.SlowLine, 0.6f);
+                        return new TerrainRule(TerrainRole.SlowLine, 0.5f);               // wall: over it, but slower
                     case 514: return new TerrainRule(TerrainRole.SlowLine, 0.8f);         // ruined wall
                     case 515: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // impassable wall
                     case 516:
                         if (ImpassableName(name)) return new TerrainRule(TerrainRole.BlockingLine, 0f);
                         if (RuinedName(name)) return TerrainRule.None;
-                        return new TerrainRule(TerrainRole.SlowLine, 0.8f);               // fence
+                        return new TerrainRule(TerrainRole.SlowLine, 0.8f);               // fence or railing
                     case 517: return TerrainRule.None;                                    // ruined fence
-                    case 518: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // impassable fence
-                    case 521: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // building outline
-                    case 529: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // prominent impassable line
-                    case 532: return Path(1.2f);                                          // stairway
+                    case 518: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // impassable fence or railing
+                    case 520:
+                        // The edge of an area that shall not be entered: the area closes the ground itself
+                        return TerrainRule.None;
+                    case 521:
+                        if (CanopyName(name)) return TerrainRule.None;                    // canopy outline: run under it
+                        return new TerrainRule(TerrainRole.BlockingLine, 0f);             // building outline
+                    case 522: return TerrainRule.None;                                    // canopy outline
+                    case 528: return new TerrainRule(TerrainRole.SlowLine, 0.8f);         // prominent line feature (a low pipeline): step over
+                    case 529: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // prominent impassable line feature
+                    case 532: return Stairs();                                            // stairway
                     case 534: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // impassable pipeline
-                    case 707: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // uncrossable boundary (course)
+                    case 707: return TerrainRule.None;                                    // marked route (ISOM 2017-2): part of the course
+                    case 708: return new TerrainRule(TerrainRole.BlockingLine, 0f);       // out-of-bounds boundary: shall not be crossed
+                    case 710: return new TerrainRule(TerrainRole.Bridge, 1.2f);           // crossing point (through a wall, fence, out-of-bounds area)
                 }
                 // Paved paths drawn as lines (ISSprOM "footprint" lines) and road edge lines
                 if (m == 501 && (name.Contains("footprint") || name.Contains("sidlinje") || name.Contains("road edge"))) return Path(1.45f);
+                if (StairsName(name)) return Stairs();
                 return TerrainRule.None;
             }
 
             if (point)
             {
-                if (m == 519 || m == 512 || m == 708) return new TerrainRule(TerrainRole.Crossing, 1.2f); // crossing point, footbridge
+                // crossing point, footbridge, the course setter's crossing point (ISSprOM 710.1; 708 in ISOM 2000 sets)
+                if (m == 519 || m == 512 || m == 708 || m == 710) return new TerrainRule(TerrainRole.Crossing, 1.2f);
                 if (m == 206) return Blocked();
                 return TerrainRule.None;
             }
             return TerrainRule.None;
         }
 
-        // "Impassable stone wall", "Oöverstigligt staket", "Opasserbar mur" ...
+        // "Impassable stone wall", "Oöverstigligt staket", "Opasserbar mur", "Ogenomtränglig vegetation" ...
         static bool ImpassableName(string name) =>
             name.Contains("opasserb") || name.Contains("impassable") || name.Contains("uncrossable")
-            || name.Contains("oöverstig") || name.Contains("ooverstig") || name.Contains("not crossable");
+            || name.Contains("oöverstig") || name.Contains("ooverstig") || name.Contains("not crossable")
+            || name.Contains("ogenomträng") || name.Contains("ogenomtrang") || name.Contains("ej passerb")
+            || name.Contains("inte passerb") || name.Contains("not passable");
 
         static bool RuinedName(string name) => name.Contains("raser") || name.Contains("ruin");
+
+        static bool RetainingName(string name) => name.Contains("stödmur") || name.Contains("stodmur") || name.Contains("retain");
+
+        // Canopy: "Skärmtak", "Canopy", a roof on posts or a passage under a house
+        public static bool CanopyName(string name) =>
+            name != null && (name.Contains("skärmtak") || name.Contains("skarmtak") || name.Contains("canopy") || name.Contains("överbyggnad")
+            || name.Contains("roof") || name.Contains("tak (") || name.EndsWith(" tak"));
+
+        // "Trappa", "Stairway", "Stairs" (not the outline of a paved area drawn together with the stairs)
+        static bool StairsName(string name) =>
+            (name.Contains("trapp") || name.Contains("stair")) && !name.Contains("kontur") && !name.Contains("edge") && !name.Contains("outline");
+
+        static bool OneWayName(string name) => name.Contains("one direction") || name.Contains("en riktning") || name.Contains("ena riktning");
+
+        static bool WindfallName(string name) => name.Contains("vindfäll") || name.Contains("vindfall") || name.Contains("windfall") || name.Contains("fallen tree");
+
+        static bool HedgeName(string name) => name.Contains("häck") || name.Contains("hack ") || name.Contains("hedge");
+
+        // Green drawn as a line (minimum width): as slow to cross as the area. Windfalls and open lanes are lines in the
+        // green numbers too.
+        static TerrainRule GreenLine(string name, bool sprint, float speed)
+        {
+            if (WindfallName(name)) return new TerrainRule(TerrainRole.SlowLine, 0.6f);
+            if (name.Contains("öppen gata") || name.Contains("open lane") || name.Contains("runnable lane")) return Path(1.0f);
+            return new TerrainRule(TerrainRole.SlowLine, speed);
+        }
+
+        // Vegetation 410/411 drawn as a line: a hedge (ISSprOM 410.1 "Impassable vegetation, minimum width (hedge)"),
+        // impassable on sprint maps and whenever the name says so; "Svårpasserbar häck" on a forest map is a fight
+        // through it. 411 is the impassable one in the Swedish sets. A windfall or an open lane is runnable.
+        static TerrainRule HedgeLine(string name, bool sprint, bool is411)
+        {
+            if (WindfallName(name)) return new TerrainRule(TerrainRole.SlowLine, 0.6f);
+            if (name.Contains("öppen gata") || name.Contains("open lane") || name.Contains("runnable lane")) return Path(1.0f);
+            if (is411 || sprint || ImpassableName(name)) return new TerrainRule(TerrainRole.BlockingLine, 0f);
+            if (HedgeName(name) || name.Contains("svårpasserb") || name.Contains("fight") || name.Contains("mycket svår")) return new TerrainRule(TerrainRole.SlowLine, 0.35f);
+            return new TerrainRule(TerrainRole.SlowLine, 0.35f);
+        }
 
         // The ISOM 2017 number of a symbol. Maps drawn with the old numbering (ISOM 2000, and the line and point
         // symbols ISSOM 2007 shares with it) are translated, so the game's map reading sees every map the same way.
@@ -323,12 +412,17 @@ namespace MapImport
             return s.major;
         }
 
-        public static bool IsBuilding(MapSymbol s) => s != null && s.kind == SymbolKind.Area && (s.oldNumbers ? s.major == 526 : s.major == 521);
+        public static bool IsBuilding(MapSymbol s) => s != null && s.kind == SymbolKind.Area && (s.oldNumbers ? s.major == 526 : s.major == 521)
+            && !CanopyName((s.name ?? "").ToLowerInvariant());
 
         // Areas nobody may enter: out of bounds, forbidden, course-setting overprint
         static bool ForbiddenName(string name) =>
             name.Contains("shall not be entered") || name.Contains("out of bounds") || name.Contains("out-of-bounds")
-            || name.Contains("forbidden") || name.Contains("förbjud") || name.Contains("beträdas");
+            || name.Contains("forbidden") || name.Contains("förbjud") || name.Contains("beträdas") || name.Contains("not be entered")
+            || name.Contains("tomtmark") || name.Contains("private") || name.Contains("closed area") || name.Contains("avspärr");
+
+        // An area symbol of the map maker's own whose name says nobody may enter it
+        public static bool IsForbiddenArea(MapSymbol s) => s != null && ForbiddenName((s.name ?? "").ToLowerInvariant());
 
         public static bool IsOutOfBounds(MapSymbol s) => s != null && (s.major >= 700 || (s.oldNumbers ? s.major == 527 || s.major == 528 : s.major == 520));
 
@@ -421,12 +515,14 @@ namespace MapImport
                     case 526: return canopy ? TerrainRule.None : new TerrainRule(TerrainRole.BlockingLine, 0f); // building outline
                     case 527: case 528: return new TerrainRule(TerrainRole.BlockingLine, 0f);   // out of bounds edge
                     case 529:                                                             // paved paths; paved area edges and stairs
+                        if (StairsName(name)) return Stairs();
                         if (name.Contains("stig") || name.Contains("path") || name.Contains("väg") || name.Contains("road")) return Path(1.45f);
                         return TerrainRule.None;
                     case 533: case 534: return impassable ? new TerrainRule(TerrainRole.BlockingLine, 0f) : TerrainRule.None; // pipeline
                     case 707: return new TerrainRule(TerrainRole.BlockingLine, 0f);
                 }
-                if (impassable && (m == 410)) return new TerrainRule(TerrainRole.BlockingLine, 0f);
+                if (m == 410 || m == 411) return HedgeLine(name, false, false);   // vegetation lines: impassable by name, else a fight
+                if (StairsName(name)) return Stairs();
                 return TerrainRule.None;
             }
 
@@ -449,10 +545,13 @@ namespace MapImport
 
         static TerrainRule Path(float speed) => new TerrainRule(TerrainRole.Path, speed);
 
+        static TerrainRule Stairs() => new TerrainRule(TerrainRole.Stairs, StairsSpeed);
+
         // Contours and slope lines used for heights
         public static bool IsContour(MapSymbol s) => s != null && s.kind == SymbolKind.Line && (s.major == 101 || s.major == 102);
         public static bool IsIndexContour(MapSymbol s) => s != null && s.major == 102 && s.kind == SymbolKind.Line;
-        public static bool IsSlopeTick(MapSymbol s) => s != null && s.kind == SymbolKind.Point && (s.major == 101 || s.major == 102) && s.minor > 0;
+        // A point symbol of a contour is its slope tick, also when the map draws it as 101.0 itself (Stöeryd, Ängaryd)
+        public static bool IsSlopeTick(MapSymbol s) => s != null && s.kind == SymbolKind.Point && (s.major == 101 || s.major == 102);
         public static bool IsWater(MapSymbol s) => s != null && s.kind == SymbolKind.Area && (s.major == 301 || s.major == 302);
 
         // Guess sprint or forest from the symbols: sprint maps (ISSprOM) are drawn at 1:4000 or 1:5000
@@ -475,14 +574,14 @@ namespace MapImport
         public const byte Forest = 0, Open = 1, Cultivated = 2, RoughOpen = 3, OpenTrees = 4, LightGreen = 5, Green = 6,
             DarkGreen = 7, Marsh = 8, IndistinctMarsh = 9, UncrossableMarsh = 10, Water = 11, ShallowWater = 12, Plot = 13,
             Building = 14, Paved = 15, Stony = 16, BoulderField = 17, BareRock = 18, Sand = 19, BrokenGround = 20,
-            Orchard = 21, OneWayForest = 22, Canopy = 23, OutOfBounds = 24;
+            Orchard = 21, OneWayForest = 22, Canopy = 23, OutOfBounds = 24, Stairs = 25;
 
         public static byte Of(MapSymbol s)
         {
             if (s == null || s.kind != SymbolKind.Area) return Forest;
             if (SymbolRules.IsBuilding(s)) return Building;
             string name = (s.name ?? "").ToLowerInvariant();
-            if (s.oldNumbers && s.major == 526 && (name.Contains("skärmtak") || name.Contains("canopy"))) return Canopy;
+            if ((s.oldNumbers ? s.major == 526 : s.major == 521) && SymbolRules.CanopyName(name)) return Canopy;
             switch (SymbolRules.Isom2017Major(s))
             {
                 case 113: case 114: return BrokenGround;
@@ -502,7 +601,7 @@ namespace MapImport
                 case 406: case 407: return LightGreen;
                 case 408: case 409: return Green;
                 case 410: return DarkGreen;
-                case 411: return OneWayForest;
+                case 411: return name.Contains("riktning") || name.Contains("direction") ? OneWayForest : DarkGreen;
                 case 412: return Cultivated;
                 case 413: case 414: return Orchard;
                 case 501: return Paved;

@@ -159,6 +159,27 @@ public static class CourseValidator
         return id >= 0 && p.size[id] < p.biggest * ShutInShare;
     }
 
+    // Can a runner get from a to b on this grid (the same connected piece of open ground)? Used by Move a control
+    // (2026-11-19): a moved control must be somewhere the runners can get to.
+    public static bool SamePiece(float[,] speed, Vector2Int a, Vector2Int b)
+    {
+        if (speed == null) return true;
+        int rows = speed.GetLength(0), cols = speed.GetLength(1);
+        a = RunCell(speed, a);
+        b = RunCell(speed, b);
+        if (a.x < 0 || b.x < 0 || a.x >= cols || b.x >= cols || a.y >= rows || b.y >= rows) return false;
+        Pieces p = PiecesOf(speed);
+        int pa = p.piece[a.y * cols + a.x], pb = p.piece[b.y * cols + b.x];
+        return pa >= 0 && pa == pb;
+    }
+
+    // The grid changed in place (out-of-bounds areas closed after the pieces were counted): count them again
+    public static void ForgetPieces()
+    {
+        piecesOf = null;
+        pieces = null;
+    }
+
     static Pieces PiecesOf(float[,] speed)
     {
         if (ReferenceEquals(speed, piecesOf) && pieces != null) return pieces;
@@ -214,6 +235,17 @@ public static class CourseValidator
     public static Vector2Int RunCell(MapGrid grid, Vector2Int cell)
     {
         return RunCell(grid.speed, cell);
+    }
+
+    // The cell a runner punches a course point from, on the side the course setter chose for it (PunchSides)
+    public static Vector2Int RunCell(MapDefinition map, MapGrid grid, CourseData course, CoursePoint point)
+    {
+        if (PunchSides.TryGet(course, point, out CoursePoint side))
+        {
+            Vector2Int onSide = RunCell(grid.speed, map.ToCell(side));
+            if (onSide.x >= 0) return onSide;
+        }
+        return RunCell(grid.speed, map.ToCell(point));
     }
 
     public static Vector2Int RunCell(float[,] speed, Vector2Int cell)
@@ -302,8 +334,8 @@ public static class CourseValidator
         AStarPathfinder pathfinder = new AStarPathfinder(grid.speed, grid.slopes);
         for (int i = 1; i < points.Count; i++)
         {
-            Vector2Int from = RunCell(grid, map.ToCell(points[i - 1]));
-            Vector2Int to = RunCell(grid, map.ToCell(points[i]));
+            Vector2Int from = RunCell(map, grid, course, points[i - 1]);
+            Vector2Int to = RunCell(map, grid, course, points[i]);
             if (from == to)
             {
                 return Fail(result, i, PointName(i, controls) + " is on top of " + PointName(i - 1, controls).ToLower() + ". Move it further away.");
@@ -382,8 +414,8 @@ public static class CourseValidator
         HashSet<long> done = new HashSet<long>();
         foreach (var way in ways)
         {
-            Vector2Int from = RunCell(grid, map.ToCell(way.from.point));
-            Vector2Int to = RunCell(grid, map.ToCell(way.to.point));
+            Vector2Int from = RunCell(map, grid, course, way.from.point);
+            Vector2Int to = RunCell(map, grid, course, way.to.point);
             if (from == to)
             {
                 return FailAt(result, way.to.point, Capital(way.to.name) + " is on top of " + way.from.name + ". Move it further away.");

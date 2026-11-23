@@ -411,7 +411,8 @@ public class TvViewer : MonoBehaviour
             if (!m.own && (watched == null || !mistakeAt.ContainsKey(watched))) watched = m.name;
         }
         mistakeGone.Clear();
-        foreach (var pair in mistakeSeen) if (now - pair.Value > 1.5f) mistakeGone.Add(pair.Key);
+        // Gone as soon as the runner knows where it is again (2026-11-19: it used to stay 1.5 s)
+        foreach (var pair in mistakeSeen) if (now - pair.Value > 0.5f) mistakeGone.Add(pair.Key);
         foreach (string name in mistakeGone)
         {
             mistakeSeen.Remove(name);
@@ -469,7 +470,7 @@ public class TvViewer : MonoBehaviour
         if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) move.y -= dt;
         if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) move.x += dt;
         if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) move.x -= dt;
-        float zoom = overBar ? 0f : Input.mouseScrollDelta.y;
+        float zoom = overBar || HostSettingsPopup.IsOpen ? 0f : Input.mouseScrollDelta.y;
         view.FreeCamera(turn, move, zoom);
     }
 

@@ -23,7 +23,18 @@ public static class MapPackages
     public const string FilePrefix = "file:";
     public const string ResourcesFolder = "MapPackages";
 
-    public static string LocalRoot => Path.Combine(Application.persistentDataPath, "Maps");
+    // A ParrelSync clone keeps its maps in a folder of its own (2026-11-19): the clone and the main editor share
+    // persistentDataPath, so the clone's downloads and clean-ups rebuilt and deleted the main editor's maps under it
+    // ("could not read grid file"). With a folder each, a clone behaves like a second computer.
+    public static string LocalRoot => Path.Combine(Application.persistentDataPath, LocalPrefs.Key("Maps"));
+
+    // True when the map's grid can be read from disk (or is built into the game)
+    public static bool GridExists(string gridName)
+    {
+        if (string.IsNullOrEmpty(gridName)) return false;
+        if (IsFile(gridName)) return File.Exists(gridName.Substring(FilePrefix.Length) + ".bytes");
+        return true;
+    }
 
     // ---- Reading files from either place ----
 
@@ -131,6 +142,7 @@ public static class MapPackages
         map.id = info.id;
         map.displayName = info.name;
         map.mapType = info.mapType;
+        map.editedAt = info.editedAt;
         map.gridName = root + "grid";
         map.pointsPath = root + "points";
         map.linesPath = root + "lines";

@@ -59,6 +59,25 @@ public class MainMenuUI : MonoBehaviour
         Show(homePanel);
         PrivateMaps.ForgetBorrowed();   // copies of other players' private maps are only for the lobby they were in
         SharedMaps.CheckOnce();   // maps other players have shared, downloaded in the background
+        AddContestsButton();
+        ContestsPage.ClaimInBackground();   // prize money from weekly and daily contests that are over
+        // Back from a contest race (or left it from the Esc menu): straight to the contests page again
+        if (ContestRun.Active != null) ContestRun.Leave();
+        if (ContestRun.ReturnToContests)
+        {
+            ContestRun.ReturnToContests = false;
+            ContestsPage.Open();
+        }
+    }
+
+    // The weekly and daily contests (2026-11-19): a button at the bottom middle of the home screen, between Quit
+    // and Course builder. Made here in code, so the scene does not have to be rebuilt.
+    void AddContestsButton()
+    {
+        if (homePanel == null || homePanel.transform.Find("Contests") != null) return;
+        Button contests = CourseUI.Button("Contests", homePanel.transform, "Weekly & daily contests", CourseUI.ButtonKind.Primary, ContestsPage.Open, 26);
+        CourseUI.Place((RectTransform)contests.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 44), new Vector2(420, 56));
+        HoverTip.Add(contests, "This week's and today's contests: one try each, a shared leaderboard and prize money for the best.");
     }
 
     static void BackGoesToLobby(GameObject panel)
@@ -168,10 +187,10 @@ public class MainMenuUI : MonoBehaviour
         bool canBuy = PackShop.CanBuy();
 
         if (runnersCaption != null) runnersCaption.text = owned + " of " + total + " runners collected";
-        if (shopCaption != null) shopCaption.text = price == 0 ? "Your first pack is free" : "Runner packs for " + price + " kr";
+        if (shopCaption != null) shopCaption.text = price == 0 ? "Your first pack is free" : "Runner packs for " + MoneyLabel.Format(price);
 
         if (buyButton != null) buyButton.interactable = canBuy;
-        if (buyLabel != null) buyLabel.text = price == 0 ? "Open free pack" : "Open pack   " + price + " kr";
+        if (buyLabel != null) buyLabel.text = price == 0 ? "Open free pack" : "Open pack   " + MoneyLabel.Format(price);
         if (noteText != null)
         {
             if (PackShop.AllCollected())
@@ -180,7 +199,7 @@ public class MainMenuUI : MonoBehaviour
             }
             else if (!canBuy)
             {
-                noteText.text = "You need " + (price - money) + " kr more. Compete to earn money.";
+                noteText.text = "You need " + MoneyLabel.Format(price - money) + " more. Compete to earn money.";
             }
             else if (price == 0)
             {

@@ -46,7 +46,7 @@ public class TvWorldView : MonoBehaviour
     static Texture2D grain;
 
     // Fine light and dark grains for the ground, the same every time
-    static Texture2D Grain()
+    public static Texture2D Grain()
     {
         if (grain != null) return grain;
         const int Size = 128;
@@ -61,6 +61,15 @@ public class TvWorldView : MonoBehaviour
         grain.SetPixels32(pixels);
         grain.Apply(true, true);
         return grain;
+    }
+
+    // The material of the trees, stones, houses and everything else: their colours with the surface grain on them (the
+    // shader works the grain out from the place)
+    public static Material NewObjectMaterial(float strength = 0.85f)
+    {
+        Material m = NewMaterial(Color.white);
+        m.SetFloat("_Surface", strength);
+        return m;
     }
 
     public static Material NewMaterial(Color color)
@@ -89,6 +98,7 @@ public class TvWorldView : MonoBehaviour
     {
         public string name;
         public bool castShadows;
+        public byte group;          // TvMesh.group: the run-yourself world draws some only near or only far
         public Vector3[] vertices, normals;
         public Color32[] colors;
         public int[] triangles;
@@ -97,6 +107,7 @@ public class TvWorldView : MonoBehaviour
         {
             name = source.name;
             castShadows = source.castShadows;
+            group = source.group;
             int count = source.VertexCount;
             vertices = new Vector3[count];
             normals = new Vector3[count];
@@ -113,7 +124,7 @@ public class TvWorldView : MonoBehaviour
         }
     }
 
-    static Mesh ToMesh(MeshArrays source)
+    public static Mesh ToMesh(MeshArrays source)
     {
         var mesh = new Mesh { name = source.name };
         if (source.vertices.Length > 65000) mesh.indexFormat = IndexFormat.UInt32;
@@ -129,10 +140,12 @@ public class TvWorldView : MonoBehaviour
     public static async Task<TvWorldView> Create(MapDefinition map, CoursePoint control, bool start = false, float camDirX = 0f, float camDirZ = 0f,
                                                   float legDirX = 0f, float legDirZ = 0f)
     {
-        TvWorldData.Data data = await TvWorldData.LoadAsync(map);
+        // A sprint map is a town (2026-11-20, Anders: TV controls in relays on sprint maps)
+        TvWorldData.Data data = await TvWorldData.LoadAsync(map, map != null && map.IsSprint);
         if (data == null) return null;
         var input = new TvWorldInput
         {
+            town = data.town,
             layer = data.layer,
             heights = data.heights,
             look = data.look,
@@ -208,7 +221,7 @@ public class TvWorldView : MonoBehaviour
 
     void Make()
     {
-        plainMaterial = NewMaterial(Color.white);
+        plainMaterial = NewObjectMaterial();
         materials.Add(plainMaterial);
         // The ground has a fine grain, so it does not look painted
         groundMaterial = NewMaterial(Color.white);

@@ -156,21 +156,37 @@ namespace MapImport
                 hard[idx] = false;
                 path[idx] = true;
             });
+            // 3b. Stairs (ISOM / ISSprOM 532): a way up or down with its own speed (quick up, slow down: the kind
+            //     tells StairsSlopes which cells are stairs), so the speed of the stairs is set, not the quicker of the two
+            var stairs = new bool[n];
+            ForLines(map, sprint, TerrainRole.Stairs, g, ox, oy, scale, (idx, rule) =>
+            {
+                if (building[idx]) return;
+                g.speed[idx] = rule.speed;
+                g.kind[idx] = GroundKind.Stairs;
+                hard[idx] = false;
+                stairs[idx] = true;
+            });
 
             // 4. Impassable lines. On forest maps a path that crosses the line goes through it (the gate is rarely
             //    drawn), but only in the cell where the two lines really cross: a path that runs along a fence must not
             //    open the whole fence. On sprint maps the cells are small enough that a path beside a wall is its own cell.
             var lineSpeed = new Dictionary<int, float>();
+            //    Stairs go through the line they cross on every map: a stairway is drawn exactly to take the runner up
+            //    or down a cliff, a retaining wall or an impassable wall (ISOM 2017-2, 532).
             ForLines(map, sprint, TerrainRole.BlockingLine, g, ox, oy, scale, (idx, rule) =>
             {
-                if (!sprint && path[idx] && !lineSpeed.ContainsKey(idx)) lineSpeed[idx] = g.speed[idx];
+                if (((!sprint && path[idx]) || stairs[idx]) && !lineSpeed.ContainsKey(idx)) lineSpeed[idx] = g.speed[idx];
                 g.speed[idx] = 0f;
                 hard[idx] = true;
             });
-            if (!sprint && lineSpeed.Count > 0)
+            if (lineSpeed.Count > 0)
             {
-                int gates = OpenPathCrossings(map, g, ox, oy, scale, lineSpeed, hard, path);
-                log?.Invoke($"Paths through impassable lines: {gates} crossings opened");
+                bool[] crossers = path;
+                if (sprint) crossers = stairs;
+                else for (int i = 0; i < n; i++) if (stairs[i]) crossers[i] = true;
+                int gates = OpenPathCrossings(map, sprint, g, ox, oy, scale, lineSpeed, hard, crossers);
+                log?.Invoke($"Paths and stairs through impassable lines: {gates} crossings opened");
             }
 
             // 5. Bridges and crossing points
@@ -353,7 +369,7 @@ namespace MapImport
                 }
                 if (rule.role != role) continue;
                 // Lines wider than a cell (streets on sprint maps) cover several cells across
-                double halfCells = role == TerrainRole.Path ? LineWidthMm(o.symbol) * scale / 2 : 0;
+                double halfCells = role == TerrainRole.Path || role == TerrainRole.Stairs ? LineWidthMm(o.symbol) * scale / 2 : 0;
                 int offsets = (int)Math.Floor(halfCells / 0.5);
                 foreach (double[] p in o.parts)
                 {
@@ -387,7 +403,8 @@ namespace MapImport
         // Forest maps: where a path crosses an impassable line (fence, wall, cliff), the cell of the crossing is opened
         // again with the path's speed. lineSpeed: the cells of impassable lines that a path also passes through, with
         // the speed they had before the line closed them; path: the cells paths pass through. Returns the number of cells opened.
-        static int OpenPathCrossings(MapFile map, MapGrid2 g, double ox, double oy, double scale, Dictionary<int, float> lineSpeed, bool[] hard, bool[] path)
+        // On sprint maps only stairs open a line this way (path holds the stairs' cells then).
+        static int OpenPathCrossings(MapFile map, bool sprint, MapGrid2 g, double ox, double oy, double scale, Dictionary<int, float> lineSpeed, bool[] hard, bool[] path)
         {
             // The impassable lines' segments (cell units), listed by the cells they pass through
             var segs = new List<double[]>();
@@ -396,9 +413,10 @@ namespace MapImport
             foreach (MapObject o in map.objects)
             {
                 if (o.kind != SymbolKind.Line) continue;
-                TerrainRule rule = SymbolRules.For(o.symbol, false, map.terrain);
+                TerrainRule rule = SymbolRules.For(o.symbol, sprint, map.terrain);
                 bool blocking = rule.role == TerrainRole.BlockingLine;
-                if (!blocking && rule.role != TerrainRole.Path) continue;
+                bool crosses = rule.role == TerrainRole.Stairs || (!sprint && rule.role == TerrainRole.Path);
+                if (!blocking && !crosses) continue;
                 foreach (double[] p in o.parts)
                 {
                     for (int i = 0; i + 3 < p.Length; i += 2)

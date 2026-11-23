@@ -15,6 +15,8 @@ using UnityEngine.UI;
 //  - A new map edge or new terrain speeds build the map again from the map file kept with it. Maps imported before the file was kept get
 //    it back from the player's own Cloud Save Files when they are public.
 //  - Forest or Sprint can be changed; the map is built again, since the symbols mean different things on a sprint map.
+//  - "Update map file" (2026-11-19) builds the map again from a new version of the map file, with the same id, so the
+//    courses on it stay (before, the map had to be deleted and imported again, and its courses went with it).
 //  - Delete removes the map from this computer and from the cloud, so no player gets it any more (other players'
 //    copies are deleted the next time they look for shared maps). It asks once more first.
 // Courses on the map stay where they are: the map's coordinates do not depend on the edge (MapPackageBuilder.Build).
@@ -41,7 +43,11 @@ public class MapEditPanel : MonoBehaviour
     Button publicButton, privateButton, edgeButton, terrainButton, lookButton, saveButton, cancelButton;
     Button forestButton, sprintButton, deleteButton;
     TextMeshProUGUI typeText;
-    TextMeshProUGUI visibilityText, edgeText, terrainText, lookText, statusText;
+    TextMeshProUGUI visibilityText, edgeText, terrainText, lookText, statusText, fileText;
+    Button fileButton;
+    // A new version of the map file (2026-11-19): the map is built again from it, keeping its id, so the courses on it stay
+    string newSourceName;
+    bool FileChanged => newSourceName != null;
     RectTransform contactRow;
 
     public static void Open(Transform canvas, MapDefinition map, Action<MapDefinition, bool> onSaved)
@@ -91,7 +97,7 @@ public class MapEditPanel : MonoBehaviour
     void Build(Transform root)
     {
         Image card = CourseUI.CardPanel("Card", root);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 924));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 988));
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
 
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Edit map", 36, CourseUI.Ink, FontStyles.Bold), 44);
@@ -134,6 +140,18 @@ public class MapEditPanel : MonoBehaviour
         typeText.alignment = TextAlignmentOptions.MidlineLeft;
         typeText.textWrappingMode = TextWrappingModes.Normal;
         CourseUI.Size(typeText, -1, -1, 1);
+
+        // A new version of the map file, after fixing something in OCAD: the map is updated, not imported as a new one
+        RectTransform fileRow = CourseUI.Rect("File row", card.transform);
+        CourseUI.Row(fileRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+        CourseUI.Size(fileRow, 52);
+        fileText = CourseUI.Text("File", fileRow, "", 20, CourseUI.Ink);
+        fileText.alignment = TextAlignmentOptions.MidlineLeft;
+        fileText.textWrappingMode = TextWrappingModes.Normal;
+        CourseUI.Size(fileText, -1, -1, 1);
+        fileButton = CourseUI.Button("File button", fileRow, "Update map file...", CourseUI.ButtonKind.Secondary, ReplaceFile, 20);
+        CourseUI.Size(fileButton, -1, 300);
+        HoverTip.Add(fileButton, "Pick a new version of the map file (for example after fixing something in OCAD). The map is built again from it, and every course on it stays.");
 
         RectTransform edgeRow = CourseUI.Rect("Edge row", card.transform);
         CourseUI.Row(edgeRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
@@ -226,20 +244,27 @@ public class MapEditPanel : MonoBehaviour
         CourseUI.SetButtonColor(forestButton, sprint ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Primary);
         CourseUI.SetButtonColor(sprintButton, sprint ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
         typeText.text = (sprint ? "Sprint map: 2 m cells, sprint courses." : "Forest map.")
-                        + (TypeChanged ? " The map is built again when you save." : "");
-        typeText.color = TypeChanged ? CourseUI.Accent : CourseUI.InkMuted;
+                        + (TypeChanged ? " The map is built again when you save."
+                           : OldRules ? " Built with older rules for walls, fences, hedges, stairs, heights and gardens: Save builds it again with the new ones." : "");
+        typeText.color = TypeChanged || OldRules ? CourseUI.Accent : CourseUI.InkMuted;
         bool confirming = Time.unscaledTime < deleteConfirmUntil;
         CourseUI.SetButtonText(deleteButton, confirming ? "Sure? Click again" : "Delete map");
         terrainText.text = TerrainSpeedPanel.Describe(terrain) + (terrainChanged ? " The map is built again when you save." : "");
         terrainText.color = terrainChanged ? CourseUI.Accent : CourseUI.Ink;
+        fileText.text = FileChanged ? "Map file: " + newSourceName + ". The map is built again when you save."
+            : "Map file: " + (string.IsNullOrEmpty(info.sourceFile) ? "the one it was imported from" : info.sourceFile);
+        fileText.color = FileChanged ? CourseUI.Accent : CourseUI.Ink;
         lookText.text = TerrainLookPanel.Describe(look);
         lookText.color = look.SameAs(info.look) ? CourseUI.Ink : CourseUI.Accent;
-        foreach (Selectable s in new Selectable[] { publicButton, privateButton, forestButton, sprintButton, deleteButton, edgeButton, terrainButton, lookButton, cancelButton, nameField, clubField, senderField, contactField })
+        foreach (Selectable s in new Selectable[] { publicButton, privateButton, forestButton, sprintButton, deleteButton, edgeButton, terrainButton, lookButton, fileButton, cancelButton, nameField, clubField, senderField, contactField })
             s.interactable = !working;
         saveButton.interactable = !working && (isPrivate || ContactGiven());
     }
 
     bool TypeChanged => mapType != (string.IsNullOrEmpty(info.mapType) ? "forest" : info.mapType);
+
+    // The map was built before the latest passability rules (SymbolRules.RulesVersion): saving builds it again
+    bool OldRules => info != null && info.rulesVersion < MapImport.SymbolRules.RulesVersion;
 
     bool ContactGiven()
     {
@@ -348,6 +373,56 @@ public class MapEditPanel : MonoBehaviour
     MapPreview preview;
     double[] guessed;
 
+    // Picks the new version of the map file and checks that the game can read it; it is used when the map is saved
+    async void ReplaceFile()
+    {
+        if (working) return;
+        string path = NativeFiles.OpenFile("Choose the new version of the map file", "Map files (OCAD, OOM)", MapImportPanel.MapExtensions, MapImportPanel.LastFolder());
+        if (string.IsNullOrEmpty(path)) return;
+        string ext = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+        if (Array.IndexOf(MapImportPanel.MapExtensions, ext) < 0)
+        {
+            SetStatus("That is not a map file. The game reads OCAD (.ocd) and OpenOrienteering Mapper (.omap, .xmap) files.", true);
+            return;
+        }
+        working = true;
+        Refresh();
+        SetStatus("Reading " + Path.GetFileName(path) + " ...", false);
+        try
+        {
+            (byte[], MapFile, MapPreview, double[]) read = await Task.Run(() =>
+            {
+                byte[] bytes = File.ReadAllBytes(path);
+                MapFile m = MapPackageBuilder.ReadMapFile(bytes);
+                MapPreview p = null;
+                double[] g = null;
+                try { p = MapBoundary.Preview(m); g = MapBoundary.Guess(m, p); } catch (Exception e) { Debug.LogWarning("MapEditPanel: no preview of the new file: " + e.Message); }
+                return (bytes, m, p, g);
+            });
+            if (this == null) return;
+            sourceBytes = read.Item1;
+            mapFile = read.Item2;
+            preview = read.Item3;
+            guessed = read.Item4;
+            newSourceName = Path.GetFileName(path);
+            PlayerPrefs.SetString("MapImport.Folder", Path.GetDirectoryName(path));
+            SetStatus("The new map file is read. Check the map edge if the map has grown, then save.", false);
+        }
+        catch (Exception e)
+        {
+            if (this == null) return;
+            SetStatus("Could not read that map file: " + e.Message, true);
+        }
+        finally
+        {
+            if (this != null)
+            {
+                working = false;
+                Refresh();
+            }
+        }
+    }
+
     async void OpenEdge()
     {
         if (working) return;
@@ -444,7 +519,7 @@ public class MapEditPanel : MonoBehaviour
         string sender = senderField.text.Trim(), contact = contactField.text.Trim();
         bool goPrivate = isPrivate && !info.isPrivate;
         bool goPublic = !isPrivate && info.isPrivate;
-        bool rebuild = edgeChanged || terrainChanged || TypeChanged;
+        bool rebuild = edgeChanged || terrainChanged || TypeChanged || FileChanged || OldRules;
         bool lookChanged = !look.SameAs(info.look);
         bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild || lookChanged
                        || (!isPrivate && (sender != (info.sender ?? "") || contact != (info.contact ?? "")));
@@ -473,6 +548,7 @@ public class MapEditPanel : MonoBehaviour
                 string newType = mapType;
                 string building = folder + ".rebuild";
                 string sourceCopy = PrivateMaps.SourceFile(folder, info);
+                string newName = newSourceName;
                 updated = await Task.Run(() =>
                 {
                     MapFile file = MapPackageBuilder.ReadMapFile(source);
@@ -484,19 +560,22 @@ public class MapEditPanel : MonoBehaviour
                         (step, share) => { progressShare = share; progressStep = step; });
                     MapPackageInfo i = package.info;
                     i.id = old.id;
-                    i.sourceFile = old.sourceFile;
+                    i.sourceFile = newName ?? old.sourceFile;
                     i.author = old.author;
                     i.created = old.created;
                     i.permissionConfirmed = old.permissionConfirmed;
                     i.isPrivate = old.isPrivate;
-                    i.privateSourceKey = old.privateSourceKey;
+                    // A new map file is sent to the cloud again the next time a lobby races on the private map
+                    i.privateSourceKey = newName != null ? "" : old.privateSourceKey;
                     i.sharedAt = old.sharedAt;
                     i.sender = old.sender;
                     i.ownerClub = old.ownerClub;
                     i.contact = old.contact;
                     if (Directory.Exists(building)) Directory.Delete(building, true);
                     MapPackageBuilder.WriteFolder(building, package, ownPng, (step, share) => { progressShare = share; progressStep = step; });
-                    File.Copy(sourceCopy, PrivateMaps.SourceFile(building, i), true);
+                    // The map file kept with the map: the new version when one was picked
+                    if (newName != null) File.WriteAllBytes(PrivateMaps.SourceFile(building, i), source);
+                    else File.Copy(sourceCopy, PrivateMaps.SourceFile(building, i), true);
                     return i;
                 });
                 progressStep = null;
@@ -514,6 +593,8 @@ public class MapEditPanel : MonoBehaviour
             }
             updated.name = name;
             updated.ownerClub = club;
+            // A new version: shared and used instead of the built-in map until this version is built in
+            updated.editedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             updated.look = look.Copy();
             if (!isPrivate)
             {

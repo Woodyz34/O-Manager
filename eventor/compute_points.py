@@ -178,8 +178,11 @@ class Identities:
         if r.get("club"):
             inf["club"] = r["club"]
         # Eventor gives the country of the club, not of the runner: a guess, which a country
-        # from VM, EM or the World Cup (WinSplits) replaces
-        if r.get("country") and not inf["country_sure"]:
+        # from VM, EM or the World Cup (WinSplits) replaces. A national team is a sure country.
+        if r.get("national_team"):
+            inf["country"] = r["country"]
+            inf["country_sure"] = True
+        elif r.get("country") and not inf["country_sure"]:
             inf["country"] = r["country"]
         return key
 
@@ -272,11 +275,45 @@ def analyse_group(runners, merge_bad_legs=False):
         r["_clean"] = r["time"] - mistake
 
 
+def national_team(club):
+    """A national team entered as a club ("Team Fin", "Team Spain" at O-Ringen or a junior championship):
+    the country code (FIN, ESP), else None. "Team Jizerky" is a real club and stays one."""
+    c = (club or "").strip()
+    m = (re.fullmatch(r"(?i)(?:national\s+team|team|landslaget?)\s+(.+?)", c)
+         or re.fullmatch(r"(?i)(.+?)\s+national\s+team", c))
+    # A plain country name as club ("Australia", "China" at O-Ringen) is a national team too
+    word = (m.group(1) if m else c).strip().upper()
+    if not word:
+        return None
+    if word in COUNTRIES:
+        return word
+    for code, name in COUNTRIES.items():
+        if name == word:
+            return code
+    swedish = SWEDISH_COUNTRY.get(word.lower())
+    for code, name in COUNTRIES.items():
+        if swedish and name == swedish:
+            return code
+    return None
+
+
 def load_races():
     races = []
     for p in sorted(glob.glob(os.path.join(RACES_DIR, "*.json"))):
         with open(p, encoding="utf-8") as f:
-            races.append(json.load(f))
+            race = json.load(f)
+        # A national team is the runner's country, not a club (2026-11-19: Florian Fritzen had the club
+        # "Team Fin" and no country)
+        for cls in race["classes"]:
+            for r in cls["runners"]:
+                team = national_team(r.get("club"))
+                if team:
+                    r["country"], r["club"], r["national_team"] = team, None, True
+                elif re.match(r"(?i)team\s", r.get("club") or ""):
+                    # No real club starts with "Team" (the user, 2026-11-19): a team that is not a
+                    # country ("Team Jizerky") is no club either
+                    r["club"] = None
+        races.append(race)
     return races
 
 

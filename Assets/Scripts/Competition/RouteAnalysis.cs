@@ -119,6 +119,10 @@ public static class RouteAnalysis
     }
 
     // The same smoothing and timing as the route choice game, with this runner's speed
+    // Run it yourself: the computer's route is timed by the 3D runner's own speeds (RunSession sets this), so it can be
+    // compared with the players' times. A line of map world points in, race seconds out.
+    public static System.Func<List<Vector3>, float> RealTimer;
+
     public static RouteChoiceGenerator Generator(PathfindingManager manager, float baseSpeed)
     {
         // Ground nobody can run on (a building, a fence, private land) counts as 100 times slower than open ground
@@ -535,11 +539,27 @@ public class RouteCompareView : MonoBehaviour
             {
                 if (r.player != null && ((track.look != null && r.player.transform == track.look) || r.team == track.label)) result = r;
             }
-            // Cut where the runner reached each control
+            // Cut at the punches (2026-11-20, Anders: the leg starts when control 2 is punched and ends when control 3
+            // is punched, not when the runner passes near it). The split clocks and the track's times are the same
+            // race clock when the track is stamped with the runner's own clock; otherwise (a relay leg, a track
+            // without split times) the cut is where the runner reached the control.
+            bool byPunch = track.runnerClock && result != null && result.hasSplits && result.clocks != null
+                           && track.times.Count == track.positions.Count && track.times.Count > 0;
             int from = 0;
             for (int k = 1; k <= legs && k < points.Count; k++)
             {
                 Vector3 control = points[k].position;
+                int punched = byPunch && k < result.clocks.Length ? PunchIndex(track, result.clocks[k], from) : -1;
+                if (punched >= 0)
+                {
+                    List<Vector3> cut = new List<Vector3> { points[k - 1].position };
+                    for (int i = from; i <= punched; i++) cut.Add(track.positions[i]);
+                    cut.Add(control);
+                    entry.legs[k] = cut;
+                    if (result.split != null && k < result.split.Length) entry.times[k] = result.split[k];
+                    from = punched;
+                    continue;
+                }
                 int hit = -1, closest = from;
                 float best = float.MaxValue;
                 for (int i = from; i < track.positions.Count; i++)
@@ -572,6 +592,22 @@ public class RouteCompareView : MonoBehaviour
             entries.Add(entry);
         }
         return entries;
+    }
+
+    // The last GPS point at or before the punch (clock in game seconds), or -1 when the control was never punched
+    static int PunchIndex(RelayTrack track, int clock, int from)
+    {
+        if (clock <= 0) return -1;
+        float at = clock / PackRunning.GameSecondsPerSecond;
+        int index = from;
+        for (int i = from; i < track.times.Count; i++)
+        {
+            if (track.times[i] > at + 0.001f) break;
+            index = i;
+        }
+        // The next point if it is closer in time (the clock is in whole seconds)
+        if (index + 1 < track.times.Count && track.times[index + 1] - at < at - track.times[index]) index++;
+        return index;
     }
 
     // ---- The computer's routes ----
@@ -652,16 +688,31 @@ public class RouteCompareView : MonoBehaviour
         if (leg > 0)
         {
             RouteChoice c = Computer(leg);
-            return c != null && c.points.Count > 1 ? Mathf.RoundToInt(c.seconds) : 0;
+            return c != null && c.points.Count > 1 ? SecondsOf(c) : 0;
         }
         int sum = 0;
         for (int k = 1; k <= Legs; k++)
         {
             RouteChoice c = Computer(k);
             if (c == null || c.points.Count < 2) return 0;
-            sum += Mathf.RoundToInt(c.seconds);
+            sum += SecondsOf(c);
         }
         return sum;
+    }
+
+    // Run it yourself: the computer's route is timed by the 3D runner's own speeds (RouteAnalysis.RealTimer)
+    readonly Dictionary<RouteChoice, int> realSeconds = new Dictionary<RouteChoice, int>();
+
+    int SecondsOf(RouteChoice c)
+    {
+        if (RouteAnalysis.RealTimer == null) return Mathf.RoundToInt(c.seconds);
+        if (realSeconds.TryGetValue(c, out int known)) return known;
+        PathfindingManager manager = Manager;
+        List<Vector3> line = new List<Vector3>();
+        foreach (Vector2 p in c.points) line.Add(RouteAnalysis.GridToWorld(manager, p));
+        int seconds = Mathf.RoundToInt(RouteAnalysis.RealTimer(line));
+        realSeconds[c] = seconds;
+        return seconds;
     }
 
     // ---- Showing a leg ----

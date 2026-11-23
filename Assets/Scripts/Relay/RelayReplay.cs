@@ -12,6 +12,12 @@ public class RelayTrack
     public readonly List<float> times = new List<float>();     // real seconds since the leg started
     public readonly List<Vector3> positions = new List<Vector3>();
     public Transform look;     // the runner's own dot, copied for the replay (null for test ghosts)
+    // A plain round dot in the track's own colour instead of a copy of the runner's look (run it yourself, 2026-11-20,
+    // Anders: the copied circle came out white and at its forest size on a sprint map)
+    public bool plainDot;
+    // The times are the runner's own race clock (game seconds / GameSecondsPerSecond), the same clock the split times
+    // are punched on, so route analysis can cut the legs at the punches (2026-11-20)
+    public bool runnerClock;
 }
 
 // Records where every runner on the leg is, a few times a second, from the moment the leg starts until the statistics come up
@@ -81,7 +87,7 @@ public class RelayReplayRecorder : MonoBehaviour
 
     static RelayTrack WithoutStops(RelayTrack track)
     {
-        RelayTrack smooth = new RelayTrack { label = track.label, isLocal = track.isLocal, color = track.color, look = track.look };
+        RelayTrack smooth = new RelayTrack { label = track.label, isLocal = track.isLocal, color = track.color, look = track.look, plainDot = track.plainDot, runnerClock = true };
         smooth.positions.AddRange(track.positions);
         int n = track.times.Count;
         if (n == 0) return smooth;
@@ -208,11 +214,15 @@ public class RelayReplayView : MonoBehaviour
     bool settingSlider;
     static Material material;
 
+    // The replay on the screen, if any: the Follow runner button hides and the clock shows the replay's time
+    public static RelayReplayView Current { get; private set; }
+
     public static RelayReplayView Open(List<RelayTrack> tracks, System.Action onClose)
     {
         RelayReplayView view = new GameObject("Relay replay").AddComponent<RelayReplayView>();
         view.tracks = tracks;
         view.onClose = onClose;
+        Current = view;
         view.Build();
         return view;
     }
@@ -222,7 +232,11 @@ public class RelayReplayView : MonoBehaviour
         NetworkPlayer local = NetworkPlayer.Local;
         cameraController = local != null ? local.GetComponent<CameraController>() : null;
         cam = cameraController != null && cameraController.cam != null ? cameraController.cam : Camera.main;
-        if (cameraController != null) cameraController.enabled = false;
+        if (cameraController != null)
+        {
+            cameraController.enabled = false;
+            cameraController.HideFollowButton();
+        }
         savedPosition = cam.transform.position;
         savedRotation = cam.transform.rotation;
         savedSize = cam.orthographicSize;
@@ -271,7 +285,8 @@ public class RelayReplayView : MonoBehaviour
             line.useWorldSpace = true;
             lines.Add(line);
 
-            GameObject marker = track.look != null ? CopyLook(track.look) : null;
+            // A runner who left the game has no dot of its own any more: a plain round one (2026-11-20, Anders: it was a square)
+            GameObject marker = track.plainDot || track.look == null ? PlainDot(track, dotSize * 1.3f) : CopyLook(track.look);
             if (marker == null)
             {
                 marker = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -310,6 +325,37 @@ public class RelayReplayView : MonoBehaviour
         HideRealRunners();
         BuildBar();
         Apply();
+    }
+
+    // A round dot in the track's colour with a dark ring round it, the size the replay draws every runner at least
+    GameObject PlainDot(RelayTrack track, float diameter)
+    {
+        RunnerMarker look = track.look != null ? track.look.GetComponentInChildren<RunnerMarker>(true) : null;
+        // Gone (the runner left): the round dot of any runner still here
+        if (look == null || look.circle == null) look = FindAnyObjectByType<RunnerMarker>(FindObjectsInactive.Include);
+        Sprite round = look != null && look.circle != null ? look.circle.sprite : null;
+        if (round == null) return null;
+        Sprite ringSprite = look.ring != null ? look.ring.sprite : null;
+        GameObject root = new GameObject("Look");
+        float size = Mathf.Max(0.0001f, round.bounds.size.x);
+        root.transform.localScale = Vector3.one * (diameter / size);
+        SpriteRenderer dot = new GameObject("Dot").AddComponent<SpriteRenderer>();
+        dot.transform.SetParent(root.transform, false);
+        dot.sprite = round;
+        dot.sharedMaterial = material;
+        dot.color = new Color(track.color.r, track.color.g, track.color.b, 1f);
+        dot.sortingOrder = 41;
+        if (ringSprite != null)
+        {
+            SpriteRenderer ring = new GameObject("Ring").AddComponent<SpriteRenderer>();
+            ring.transform.SetParent(root.transform, false);
+            ring.transform.localScale = Vector3.one * (size * 1.08f / Mathf.Max(0.0001f, ringSprite.bounds.size.x));
+            ring.sprite = ringSprite;
+            ring.sharedMaterial = material;
+            ring.color = new Color(0.12f, 0.16f, 0.13f, 1f);
+            ring.sortingOrder = 42;
+        }
+        return root;
     }
 
     // A copy of how the runner looks on the map (its dot and rings), in its own colour
@@ -492,6 +538,8 @@ public class RelayReplayView : MonoBehaviour
         if (timeText != null)
         {
             timeText.text = "+" + RelayStats.Time(Mathf.RoundToInt(time * PackRunning.GameSecondsPerSecond));
+        Clock clock = NetworkPlayer.Local != null ? NetworkPlayer.Local.clock : null;
+        if (clock != null) clock.ShowReplayTime(Mathf.RoundToInt(time * PackRunning.GameSecondsPerSecond));
         }
         if (slider != null)
         {
@@ -516,6 +564,12 @@ public class RelayReplayView : MonoBehaviour
     // Closed by a scene change (the host took everyone back to the lobby) rather than by Close()
     void OnDestroy()
     {
+        if (Current == this)
+        {
+            Current = null;
+            Clock clock = NetworkPlayer.Local != null ? NetworkPlayer.Local.clock : null;
+            if (clock != null) clock.ShowOwnTime();
+        }
         if (cameraController != null) cameraController.enabled = true;
         // The runners live on into the next race: they must not stay hidden
         ShowRealRunners();
