@@ -108,6 +108,51 @@ public partial class TvWorldBuilder
             return a == e && b == d && a != b;
         }
 
+        // ---- 3a. The block's outside, straightened as one: the corners where homes meet on a front sit on that
+        // straight line (2026-11-23, Anders: a long slanted row had a step in its front at every home, it is one
+        // smooth wall on the map) ----
+        float tol = input.passable != null ? c * 0.5f : c * 0.76f;
+        var outerPos = new Dictionary<int, (float x, float z)>();
+        {
+            var usedO = new bool[directed.Count];
+            for (int k0 = 0; k0 < directed.Count; k0++)
+            {
+                if (usedO[k0] || directed[k0].left <= 0 || directed[k0].right != 0) continue;
+                var keys = new List<int> { directed[k0].a };
+                int k = k0, guard = 0;
+                while (guard++ < 100000)
+                {
+                    usedO[k] = true;
+                    int at = directed[k].b;
+                    keys.Add(at);
+                    if (at == keys[0]) break;
+                    int next = -1;
+                    if (byStart.TryGetValue(at, out var outs))
+                        foreach (int q in outs)
+                            if (!usedO[q] && directed[q].left > 0 && directed[q].right == 0) { next = q; break; }
+                    if (next < 0) break;
+                    k = next;
+                }
+                if (keys.Count < 5 || keys[0] != keys[keys.Count - 1]) continue;
+                var ring = new List<(float x, float z)>(keys.Count);
+                foreach (int key in keys) ring.Add((x0 + key % (W + 1) * c, z0 + key / (W + 1) * c));
+                var straight = StraightenLoop(ring, tol);
+                if (straight.Count < 3) continue;
+                for (int i = 0; i < ring.Count; i++)
+                {
+                    // Onto the nearest wall of the straightened outside
+                    float bx = ring[i].x, bz = ring[i].z, bestD = float.MaxValue;
+                    for (int q = 0; q + 1 < straight.Count; q++)
+                    {
+                        float d = DistSeg(ring[i].x, ring[i].z, straight[q].x, straight[q].z, straight[q + 1].x, straight[q + 1].z, out float px, out float pz);
+                        if (d < bestD) { bestD = d; bx = px; bz = pz; }
+                    }
+                    if (bestD <= tol + 0.05f) outerPos[keys[i]] = (bx, bz);
+                }
+            }
+        }
+        (float x, float z) Corner(int key) => outerPos.TryGetValue(key, out var at) ? at : (x0 + key % (W + 1) * c, z0 + key / (W + 1) * c);
+
         // ---- 3. Chains: the borders between nodes, straightened once for both sides ----
         var used = new bool[directed.Count];
         var chainOf = new List<(List<(float x, float z)> pts, int left, int right, int startKey, int endKey)>();
@@ -132,12 +177,13 @@ public partial class TvWorldBuilder
                 k = next;
             }
             var pts = new List<(float x, float z)>(keys.Count);
-            foreach (int key in keys) pts.Add((x0 + key % (W + 1) * c, z0 + key / (W + 1) * c));
+            foreach (int key in keys) pts.Add(Corner(key));
             bool loop = keys[0] == keys[keys.Count - 1] && !Node(keys[0]);
             // In the run-yourself world a little tighter to the map's cells, so a wall never stands far out in a street
-            // or a passage the race lets the runner through
-            float tol = input.passable != null ? c * 0.5f : c * 0.76f;
-            pts = loop ? StraightenLoop(pts, tol) : Straighten(pts, tol);
+            // or a passage the race lets the runner through. A front is already on the straightened outside: only
+            // its own corners are kept.
+            float t = left == 0 || right == 0 ? 0.05f : tol;
+            pts = loop ? StraightenLoop(pts, t) : Straighten(pts, t);
             chainOf.Add((pts, left, right, keys[0], keys[keys.Count - 1]));
         }
         // From the nodes first, then the loops that have none
@@ -197,6 +243,20 @@ public partial class TvWorldBuilder
         }
 
         // ---- 5. Heights and looks, from the place, so every piece agrees ----
+        // The homes of one row and the wings of one house stand on one plinth when the ground lets them (3 m), so the
+        // row's bands and eaves run straight along it
+        var groupLow = new Dictionary<int, float>();
+        var groupHigh = new Dictionary<int, float>();
+        foreach (HouseOutline o in outlines)
+        {
+            if (o == null || o.group < 0) continue;
+            foreach (var sg in o.rings[0])
+            {
+                float y = H(sg.ax, sg.az);
+                groupLow[o.group] = groupLow.TryGetValue(o.group, out float lo) ? Math.Min(lo, y) : y;
+                groupHigh[o.group] = groupHigh.TryGetValue(o.group, out float hi) ? Math.Max(hi, y) : y;
+            }
+        }
         for (int h = 0; h < outlines.Length; h++)
         {
             HouseOutline o = outlines[h];
@@ -238,6 +298,11 @@ public partial class TvWorldBuilder
             {
                 float y = H(sg.ax, sg.az);
                 lowest = Math.Min(lowest, y); highest = Math.Max(highest, y);
+            }
+            if (o.group >= 0 && groupHigh[o.group] - groupLow[o.group] <= 3f)
+            {
+                lowest = groupLow[o.group];
+                highest = groupHigh[o.group];
             }
             o.plinth = Math.Min(3f, highest - lowest) + 0.3f;
             o.baseY = lowest - 0.25f;

@@ -341,6 +341,48 @@ public class RunWorld : MonoBehaviour
         return terrain.MapHeight(e, n) - baseHeight;
     }
 
+    // The height of the ground on a level: over a tunnel (upper), the top of its roof, where the road goes over
+    public float GroundY(double e, double n, bool upper)
+    {
+        if (upper)
+        {
+            TunnelSpot s = Tunnel(e, n);
+            if (s.inside) return Mathf.Max(s.roof, GroundY(e, n));
+        }
+        return GroundY(e, n);
+    }
+
+    // Where a point is to a tunnel of the town (TvWorld.tunnels): inside it (under its roof), between its mouths (on
+    // the road over it, or in it), and the height of its roof's top there
+    public struct TunnelSpot
+    {
+        public bool inside, between;
+        public float roof;
+    }
+
+    public TunnelSpot Tunnel(double e, double n)
+    {
+        var s = new TunnelSpot();
+        int ix = (int)Math.Floor((e - anchorE) / PieceSize), iz = (int)Math.Floor((n - anchorN) / PieceSize);
+        if (!pieces.TryGetValue(Key(ix, iz), out Piece p) || p.world == null) return s;
+        List<float> t = p.world.tunnels;
+        float x = (float)(e - p.ce), z = (float)(n - p.cn);
+        for (int i = 0; i + 7 < t.Count; i += 8)
+        {
+            float dx = x - t[i], dz = z - t[i + 1], along = dx * t[i + 2] + dz * t[i + 3], across = Mathf.Abs(-dx * t[i + 3] + dz * t[i + 2]);
+            float len = t[i + 4], half = t[i + 5];
+            if (along < 0f || along > len || across > half + 45f) continue;
+            s.between = true;
+            if (across <= half + 0.1f)
+            {
+                s.inside = true;
+                s.roof = Mathf.Lerp(t[i + 6], t[i + 7], along / Mathf.Max(0.1f, len)) + TvWorldBuilder.TunnelRoof;
+                return s;
+            }
+        }
+        return s;
+    }
+
     // Moves a point out of the trunks, stones, houses and poles of the pieces round it
     public void PushOut(ref double e, ref double n, float reach)
     {

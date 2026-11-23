@@ -58,6 +58,9 @@ public class RunPlayer : MonoBehaviour
     public Action<double, double, double, double> Moved;
 
     float moveDirX, moveDirZ = 1f;
+    // Up on a tunnel's roof (the road over it), not in the tunnel below (2026-11-23, Anders: two levels, the tunnel
+    // only straight through, the road over it)
+    bool overTunnel;
     float jumpY, jumpV;
     bool airborne, manualJump;
     float fallTimer, fallLength = 1f;
@@ -148,7 +151,7 @@ public class RunPlayer : MonoBehaviour
         }
 
         // The slope the way the runner goes, over 6 m so bumps and the steps of cliffs don't count
-        float y1 = world.GroundY(e + moveDirX * 3.0, n + moveDirZ * 3.0), y0 = world.GroundY(e - moveDirX * 3.0, n - moveDirZ * 3.0);
+        float y1 = world.GroundY(e + moveDirX * 3.0, n + moveDirZ * 3.0, overTunnel), y0 = world.GroundY(e - moveDirX * 3.0, n - moveDirZ * 3.0, overTunnel);
         gradient = Mathf.Lerp(gradient, Mathf.Clamp((y1 - y0) / 6f / RunSettings.Hills, -1.2f, 1.2f), 0.25f);   // the real slope: the hills are drawn higher (RunSettings.Hills) to be seen
 
         float target = 0f;
@@ -222,11 +225,11 @@ public class RunPlayer : MonoBehaviour
                     }
                 }
             }
-            if (terrain.Blocked(ne, nn, Reach))
+            if (terrain.Blocked(ne, nn, Reach) || TunnelBlocks(e, n, ne, nn))
             {
                 // Slide along whatever is in the way
-                if (!terrain.Blocked(ne, n, Reach)) nn = n;
-                else if (!terrain.Blocked(e, nn, Reach)) ne = e;
+                if (!terrain.Blocked(ne, n, Reach) && !TunnelBlocks(e, n, ne, n)) nn = n;
+                else if (!terrain.Blocked(e, nn, Reach) && !TunnelBlocks(e, n, e, nn)) ne = e;
                 else
                 {
                     speed *= 0.3f;
@@ -243,7 +246,11 @@ public class RunPlayer : MonoBehaviour
                 ne = o.x + ox / d * r;
                 nn = o.y + oz / d * r;
             }
-            if (terrain.Blocked(ne, nn, Reach)) break;
+            if (terrain.Blocked(ne, nn, Reach) || TunnelBlocks(e, n, ne, nn)) break;
+            // Into a tunnel's inside from the road over it: up on its roof; from a mouth: in the tunnel
+            RunWorld.TunnelSpot was = world.Tunnel(e, n), now = world.Tunnel(ne, nn);
+            if (!now.inside) overTunnel = false;
+            else if (!was.inside) overTunnel = was.between;
             double de = ne - e, dn = nn - n;
             double pe = e, pn = n;
             e = ne;
@@ -251,6 +258,17 @@ public class RunPlayer : MonoBehaviour
             distance += (float)Math.Sqrt(de * de + dn * dn);
             Moved?.Invoke(pe, pn, e, n);
         }
+    }
+
+    // A tunnel's walls: in the tunnel the runner goes only along it, on its roof not off over a mouth, and from the
+    // ground before a mouth not up the wing walls onto the raised road (nor down them)
+    bool TunnelBlocks(double ae, double an, double be, double bn)
+    {
+        RunWorld.TunnelSpot a = world.Tunnel(ae, an), b = world.Tunnel(be, bn);
+        if (a.inside && !b.inside) return overTunnel ? !b.between : b.between;
+        if (!a.inside && !b.inside && a.between != b.between)
+            return Mathf.Abs(world.GroundY(be, bn) - world.GroundY(ae, an)) > 0.8f;
+        return false;
     }
 
     // Speed compared with flat ground on a slope (positive = uphill). Uphill from the energy it costs (Minetti); downhill
@@ -372,7 +390,7 @@ public class RunPlayer : MonoBehaviour
 
     void PlaceCamera(float dt)
     {
-        float groundY = world.GroundY(e, n);
+        float groundY = world.GroundY(e, n, overTunnel);
         float sf = Mathf.Clamp01(speed / (ForestSpeed * 1.25f));
         float bob = airborne ? 0f : (Mathf.Abs(Mathf.Sin(Mathf.PI * StepPhase * 2f)) - 0.5f) * 0.055f * sf;
         float sway = Mathf.Sin(Mathf.PI * StepPhase * 2f) * 0.6f * sf;
