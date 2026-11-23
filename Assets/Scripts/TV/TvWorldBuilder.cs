@@ -378,6 +378,7 @@ public partial class TvWorldBuilder
         Stones();
         Structures();
         if (input.town != null) TownStreets();
+        else ForestBridges();
         ControlFlag();
         CameraSpot();
         Trees();
@@ -400,6 +401,8 @@ public partial class TvWorldBuilder
             world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townThingMesh }, "Town things", true, R, DrawTiles));
             world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townBuiltMesh }, "Town bridges", true, R, DrawTiles));
         }
+        else if (townBuiltMesh != null)
+            world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { townBuiltMesh }, "Bridges", true, R, DrawTiles));
         foreach (TvMesh m in world.meshes)
         {
             world.vertices += m.VertexCount;
@@ -473,11 +476,13 @@ public partial class TvWorldBuilder
         Structures();
         OpenPassages(lineSolids, world.solids.Count);
         if (input.town != null) TownStreets();
+        else ForestBridges();
         Flags();
         int treeSolids = world.solids.Count;
         Trees();
         OpenPassages(treeSolids, world.solids.Count);
         if (pavedCorner != null) KeepTown();
+        if (input.town == null) Keep(townBuiltMesh);
         Keep(groundMesh);
         Keep(GroundFar());
         Keep(waterMesh);
@@ -671,12 +676,14 @@ public partial class TvWorldBuilder
             for (int i = 0; i < N; i++)
             {
                 byte cell = CellAt(i - R, j - R);
-                if (Base(cell) == WorldCell.Water) F[j * N + i] -= 0.45f;
+                if (Base(cell) == WorldCell.Water || BridgeWater(i - R, j - R)) F[j * N + i] -= 0.45f;
                 // Pools in a marsh are hollows with water in them
                 else if (MarshPool(i - R - 0.5f, j - R - 0.5f, (cell & WorldCell.Marsh) != 0, bog[j * N + i])) F[j * N + i] -= 0.3f;
             }
         }
-        if (input.town != null) TownHeights();
+        // The town's bridges, tunnels and stairs; on a forest map its footbridges (TvBridges)
+        TownLines();
+        TownHeights();
     }
 
     // The map's heights with a little roughness, before knolls, cliffs and ditches
@@ -841,6 +848,40 @@ public partial class TvWorldBuilder
                 });
             }
         }
+        if (input.town != null) TownPathTracks();
+    }
+
+    // A town's paths and paved ways drawn as lines (2026-11-23, Anders: the paved path to the Tranås bridge was the
+    // zigzag of the 2 m cells, and nothing kept trees off it): a straight strip along the line, asphalt when paved,
+    // earth when not, kept clear of trees and stones. Paved areas of the map are already paved.
+    void TownPathTracks()
+    {
+        TownLines();
+        foreach (var (c, w, paved) in townPaths)
+        {
+            float half = Math.Max(0.6f, Math.Min(3f, w / 2f));
+            if (paved && asphaltCorner == null) asphaltCorner = new bool[N * N];
+            for (int q = 0; q + 3 < c.Length; q += 2)
+            {
+                ForNear(c[q], c[q + 1], c[q + 2], c[q + 3], half + 2f, (k, d, qx, qz) =>
+                {
+                    clear[k] = Math.Min(clear[k], d - half);
+                    int b = Base(CellAt(k % N - R, k / N - R));
+                    if (b == WorldCell.Paved || b == WorldCell.Building || b == WorldCell.Water) return;
+                    if (paved)
+                    {
+                        if (d <= half) asphaltCorner[k] = true;
+                        return;
+                    }
+                    float blend = 1f - Sm(half * 0.6f, half + 0.3f, d);
+                    if (blend > trackBlend[k])
+                    {
+                        trackBlend[k] = blend;
+                        trackColor[k] = Earth;
+                    }
+                });
+            }
+        }
     }
 
     float ClearAt(float x, float z)
@@ -895,6 +936,8 @@ public partial class TvWorldBuilder
                 float ragged = input.town != null ? 0.9f : 3f;    // a town's edges are straight
                 byte cell = CellAt(x + (TvRandom.Noise(ax * 0.4f, az * 0.4f) - 0.5f) * ragged, z + (TvRandom.Noise(ax * 0.4f + 9f, az * 0.4f) - 0.5f) * ragged);
                 int kind = Base(cell);
+                // A bridge made from a path over water: water round its deck, not the zigzag land strip of the cells
+                if (kind != WorldCell.Water && BridgeWater(x, z)) { kind = WorldCell.Water; cell = WorldCell.Water; }
                 float f = TvRandom.Patches(ax * 0.12f, az * 0.12f), f2 = TvRandom.Noise(ax * 0.9f, az * 0.9f);
                 TvColor c;
                 bool hard = false;
@@ -978,7 +1021,7 @@ public partial class TvWorldBuilder
                 int a = j * N + i;
                 float x = i - R, z = j - R;
                 byte cell = CellAt(x + 0.5f, z + 0.5f);
-                if (Base(cell) == WorldCell.Water) { kind[a] = 1; continue; }
+                if (Base(cell) == WorldCell.Water || BridgeWater(x + 0.5f, z + 0.5f)) { kind[a] = 1; continue; }
                 float wet = Math.Max(Math.Max(water[a], water[a + 1]), Math.Max(water[a + N], water[a + N + 1]));
                 if (wet > 0.55f) { kind[a] = 2; continue; }
                 float strip = Math.Max(Math.Max(bog[a], bog[a + 1]), Math.Max(bog[a + N], bog[a + N + 1]));
@@ -2290,6 +2333,8 @@ public partial class TvWorldBuilder
                 if (random.Value() > p || Blocked(x, z, 1.3f)) continue;
                 // A town: no crown in a house, a canopy, a bridge or a street thing (the crown reaches about 2 m)
                 if (input.town != null && (TownKeepOut(x, z, 1.2f + 1.6f * s) || !Free(x, z, 1.2f + 1.4f * s))) continue;
+                // A forest map: not on its footbridges, nor in the water round one (TvBridges)
+                if (input.town == null && townLines != null && townLines.Count > 0 && (TownLineDist(x, z, 1) < 2.5f || BridgeWater(x, z))) continue;
 
                 bool near = chunk || x * x + z * z < 70f * 70f;
                 int pick = random.Value() < 0.5f ? 0 : 1;
@@ -2340,6 +2385,7 @@ public partial class TvWorldBuilder
                 }
                 if (random.Value() > p || Blocked(x, z, 0.8f)) continue;
                 if (input.town != null && TownKeepOut(x, z, 0.9f)) continue;
+                if (input.town == null && townLines != null && townLines.Count > 0 && (TownLineDist(x, z, 1) < 1.8f || BridgeWater(x, z))) continue;
                 bool spruce = ThicketTree(kind != WorldCell.LightGreen) != Tree.Birch;
                 TvShape[] set = spruce ? youngSpruce : youngLeafy;
                 float sc = h / 2.5f;

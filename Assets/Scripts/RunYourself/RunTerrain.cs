@@ -81,7 +81,12 @@ public class RunTerrain
             for (int b = 0; b < town.bridges.Count; b++)
             {
                 all.Add((BridgeKind, town.bridges[b]));
-                if (b < town.bridgeWidths.Count && town.bridgeWidths[b] > 0.5f) wayHalf[town.bridges[b]] = Math.Min(5f, town.bridgeWidths[b] / 2f) + 0.2f;
+                if (b < town.bridgeWidths.Count && town.bridgeWidths[b] > 0.5f)
+                {
+                    // Between fences (TvBridges.Fenced): the fences stay where they are, the way ends short of them
+                    bool fenced = b < town.bridgeFlags.Count && (town.bridgeFlags[b] & TvBridges.Fenced) != 0;
+                    wayHalf[town.bridges[b]] = fenced ? Math.Max(0.6f, Math.Min(5f, town.bridgeWidths[b] / 2f) - 0.35f) : Math.Min(5f, town.bridgeWidths[b] / 2f) + 0.2f;
+                }
             }
             for (int b = 0; b < town.tunnels.Count; b++)
             {
@@ -89,10 +94,19 @@ public class RunTerrain
                 if (b < town.tunnelWidths.Count && town.tunnelWidths[b] > 0.5f) wayHalf[town.tunnels[b]] = Math.Min(5f, town.tunnelWidths[b] / 2f);
             }
             foreach (float[] xy in town.stairs) all.Add((TownStairsKind, xy));
-            foreach (var (xy, width) in town.paths)
+            foreach (TvBridges.PathLine path in town.paths)
             {
-                all.Add((TownPathKind, xy));
-                wayHalf[xy] = width > 0.5f ? Math.Min(4f, width / 2f) : 1f;
+                all.Add((TownPathKind, path.xy));
+                wayHalf[path.xy] = Math.Max(1f, Math.Min(4f, path.width / 2f));
+            }
+        }
+        else
+        {
+            // A forest map: footbridges over streams and lakes where the paths cross them, and the map's own bridges
+            foreach (TvBridges.Span span in TvBridges.Forest(layer))
+            {
+                all.Add((BridgeKind, span.xy));
+                wayHalf[span.xy] = Math.Min(5f, span.width / 2f) + 0.2f;
             }
         }
         if (forbidden != null)
@@ -131,7 +145,7 @@ public class RunTerrain
                 var p = new Piece
                 {
                     kind = line.kind,
-                    way = wayHalf.TryGetValue(line.xy, out float wh) ? (line.kind == TownPathKind ? wh : Math.Max(1.4f, wh)) : 1.4f,
+                    way = wayHalf.TryGetValue(line.xy, out float wh) ? (line.kind == TownPathKind ? wh : Math.Max(0.8f, wh)) : 1.4f,
                     ax = (float)(line.xy[i] - layer.minE), az = (float)(line.xy[i + 1] - layer.minN),
                     bx = (float)(line.xy[i + 2] - layer.minE), bz = (float)(line.xy[i + 3] - layer.minN)
                 };
