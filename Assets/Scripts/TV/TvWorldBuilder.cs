@@ -1075,7 +1075,12 @@ public partial class TvWorldBuilder
                 c = c.Shade(0.86f + f2 * 0.24f);
 
                 float nx = -sx / 2f, nz = -sz / 2f, nl = (float)Math.Sqrt(nx * nx + 1f + nz * nz);
-                groundMesh.Vertex(x, F[k], z, nx / nl, 1f / nl, nz / nl, c);
+                // Under a bridge's deck the ground is drawn well below it (the runner still walks on F, the deck's
+                // height): else the ground at the deck's height showed through the deck as a zigzag strip
+                // (2026-11-23, Anders on the Tranås bridge)
+                float gy = F[k];
+                if (UnderBridgeDeck(x, z)) gy -= 1.6f;
+                groundMesh.Vertex(x, gy, z, nx / nl, 1f / nl, nz / nl, c);
             }
         }
         for (int j = 0; j < N - 1; j++)
