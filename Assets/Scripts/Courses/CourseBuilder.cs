@@ -267,7 +267,14 @@ public class CourseBuilder : MonoBehaviour
             RefreshMyCourses();
             return;
         }
-        SelectMap(maps[0]);
+        // The map that was open last time comes up again (2026-11-23); the first map if it is gone
+        MapDefinition first = maps[0];
+        string lastId = PlayerPrefs.GetString(LocalPrefs.Key(LastMapKey), "");
+        if (lastId != "")
+        {
+            foreach (MapDefinition m in maps) if (m.id == lastId) { first = m; break; }
+        }
+        SelectMap(first);
         RefreshMyCourses();
         RestoreDraft();
         // Sign in early so publishing is quick later; failure is shown when saving
@@ -388,9 +395,16 @@ public class CourseBuilder : MonoBehaviour
 
     // ---- Map ----
 
+    const string LastMapKey = "CourseBuilder.LastMap";
+
     void SelectMap(MapDefinition chosen)
     {
         map = chosen;
+        if (!string.IsNullOrEmpty(map.id))
+        {
+            PlayerPrefs.SetString(LocalPrefs.Key(LastMapKey), map.id);
+            PlayerPrefs.Save();
+        }
         grid = MapGrid.Load(map.gridName);
         if (mapRenderer == null)
         {
