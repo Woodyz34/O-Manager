@@ -1128,6 +1128,10 @@ public partial class TvWorldBuilder
         }
         // One level for every corner: the lowest ground round it, so the surface is smooth and lies below the banks
         var level = new float[N * N];
+        // Under a bridge's deck the ground is drawn low (Ground): the deck's own height must not lift the water over
+        // the deck (2026-11-23: blue patches on the Tranås bridge)
+        var low = new float[N * N];
+        for (int k = 0; k < low.Length; k++) low[k] = UnderBridgeDeck(k % N - R, k / N - R) ? F[k] - 1.6f : F[k];
         for (int j = 0; j < N; j++)
         {
             for (int i = 0; i < N; i++)
@@ -1138,7 +1142,7 @@ public partial class TvWorldBuilder
                     {
                         int ii = i + di, jj = j + dj;
                         if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
-                        lo = Math.Min(lo, F[jj * N + ii]);
+                        lo = Math.Min(lo, low[jj * N + ii]);
                     }
                 level[j * N + i] = lo;
             }
@@ -2432,7 +2436,7 @@ public partial class TvWorldBuilder
                 // A town: no crown in a house, a canopy, a bridge or a street thing (the crown reaches about 2 m)
                 if (input.town != null && (TownKeepOut(x, z, 1.2f + 1.6f * s) || !Free(x, z, 1.2f + 1.4f * s))) continue;
                 // A forest map: not on its footbridges, nor in the water round one (TvBridges)
-                if (input.town == null && townLines != null && townLines.Count > 0 && (TownLineDist(x, z, 1) < 2.5f || BridgeWater(x, z))) continue;
+                if (townLines != null && townLines.Count > 0 && (BridgeWater(x, z) || (input.town == null && TownLineDist(x, z, 1) < 2.5f))) continue;
 
                 bool near = chunk || x * x + z * z < 70f * 70f;
                 int pick = random.Value() < 0.5f ? 0 : 1;
@@ -2483,7 +2487,7 @@ public partial class TvWorldBuilder
                 }
                 if (random.Value() > p || Blocked(x, z, 0.8f)) continue;
                 if (input.town != null && TownKeepOut(x, z, 0.9f)) continue;
-                if (input.town == null && townLines != null && townLines.Count > 0 && (TownLineDist(x, z, 1) < 1.8f || BridgeWater(x, z))) continue;
+                if (townLines != null && townLines.Count > 0 && (BridgeWater(x, z) || (input.town == null && TownLineDist(x, z, 1) < 1.8f))) continue;
                 bool spruce = ThicketTree(kind != WorldCell.LightGreen) != Tree.Birch;
                 TvShape[] set = spruce ? youngSpruce : youngLeafy;
                 float sc = h / 2.5f;
