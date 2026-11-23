@@ -85,6 +85,15 @@ public partial class TvWorldBuilder
         }
     }
 
+    // Under the deck of a bridge (not its last metre and a half at each end, where it meets the ground)
+    bool UnderBridgeDeck(float x, float z)
+    {
+        if (townLines == null) return false;
+        foreach (var l in townLines)
+            if (l.kind == 1 && TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, -0.1f)) return true;
+        return false;
+    }
+
     // Beside the deck of a bridge made from a path over water (TvBridges.OverWater): water, whatever the 2 m cells say
     bool BridgeWater(float x, float z)
     {
@@ -251,10 +260,21 @@ public partial class TvWorldBuilder
         }
         else
         {
-            // Flat round them: as before, up from the low end's ground (to a door: a little; else the usual)
+            // Flat round them. Steps up to a door: up from the ground a little. Else the top stays on the ground and
+            // the low end goes down into a dug hollow, so the stairs never stand up out of the ground (2026-11-23,
+            // Anders: "den får inte sticka upp så där ... så det är liksom en grop här nere istället")
             bool door = Base(CellAt(tx + tux * 1.2f, tz + tuz * 1.2f)) == WorldCell.Building;
-            rise = door ? Math.Max(0.45f, Math.Min(total * 0.5f, 1.4f)) : usual;
-            h0 = Plain(lx, lz);
+            if (door)
+            {
+                rise = Math.Max(0.45f, Math.Min(total * 0.5f, 1.4f));
+                h0 = Plain(lx, lz);
+            }
+            else
+            {
+                rise = need;
+                h0 = Plain(tx, tz) - rise;
+                DigInFront(lx, lz, lux, luz, half, Math.Max(3f, rise * 2.5f), h0);
+            }
         }
         // Along the line from the low end (f = 0) to the high one
         for (int q = 0; q + 3 < c.Length; q += 2)
