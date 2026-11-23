@@ -25,7 +25,7 @@ MonoBehaviour:
   cols: 1802
   pointsPath: MapPackages/bergen-sentrum-base-map-nof-saml/points
   linesPath: MapPackages/bergen-sentrum-base-map-nof-saml/lines
-  editedAt: 0
+  editedAt: 1795462331
   defaultBackground: map
   backgrounds:
   - id: map
