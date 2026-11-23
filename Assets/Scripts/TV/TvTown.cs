@@ -97,6 +97,7 @@ public class TvTown
                     case 2: tunnels.Add(xy); break;
                     case 3: stairs.Add(xy); stairWidths.Add(Footprint(name)); break;
                     case 5: paths.Add(Path(xy, name)); break;
+                    case 6: pavedEdges.Add(xy); break;
                     case 4:
                         if (xy.Length >= 8 && Math.Abs(xy[0] - xy[xy.Length - 2]) < 0.6f && Math.Abs(xy[1] - xy[xy.Length - 1]) < 0.6f) canopies.Add(xy);
                         else canopyPieces.Add(xy);
@@ -108,6 +109,9 @@ public class TvTown
 
     // The paths and roads: their width (the symbol's footprint, else the usual width of the kind) and whether paved
     public readonly List<TvBridges.PathLine> paths = new List<TvBridges.PathLine>();
+
+    // The edge lines of the paved areas (ISSprOM 501.1 edge, "Konturlinje"): the 3D paving is cut along them
+    public readonly List<float[]> pavedEdges = new List<float[]>();
 
     static TvBridges.PathLine Path(float[] xy, string name)
     {
@@ -250,6 +254,7 @@ public class TvTown
         if (code >= 502 && code <= 507) return 5;
         if (code == 501 && (n.Contains("stig") || n.Contains("footprint") || n.Contains("path") || n.Contains("väg"))
             && !n.Contains("kontur") && !n.Contains("edge") && !n.Contains("step") && !n.Contains("kant")) return 5;
+        if ((code == 501 || code == 523) && (n.Contains("kontur") || n.Contains("edge") || n.Contains("kant"))) return 6;
         return 0;
     }
 
