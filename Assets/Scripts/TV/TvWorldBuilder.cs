@@ -265,6 +265,60 @@ public partial class TvWorldBuilder
     byte CellAt(float x, float z) => layer.At(input.centerE + x, input.centerN + z);
     static int Base(byte cell) => cell & WorldCell.BaseMask;
 
+    // The ground kind at a point of a town with smooth edges (2026-11-23, Anders: the paved ways and the lake shores
+    // were the staircase of the 2 m cells; they should be smooth like the map's lines). The 4 x 4 cells round the
+    // point vote with cubic B-spline weights of their middles, and the kind with the most weight wins: a staircase
+    // becomes a smooth slanted edge and a corner is rounded, while a way one cell wide still keeps its cell
+    // (2/3 of the weight across it). Houses keep their own cells (their walls stand on them).
+    readonly float[] voteWeight = new float[16];
+
+    byte SmoothCell(float x, float z)
+    {
+        byte own = CellAt(x, z);
+        if (Base(own) == WorldCell.Building) return own;
+        double fe = (input.centerE + x - layer.minE) / layer.cell - 0.5, fn = (input.centerN + z - layer.minN) / layer.cell - 0.5;
+        int i0 = (int)Math.Floor(fe), j0 = (int)Math.Floor(fn);
+        float tx = (float)(fe - i0), tz = (float)(fn - j0);
+        Span4(tx, out float x0, out float x1, out float x2, out float x3);
+        Span4(tz, out float z0, out float z1, out float z2, out float z3);
+        float[] wx = { x0, x1, x2, x3 }, wz = { z0, z1, z2, z3 };
+        Array.Clear(voteWeight, 0, 16);
+        var cells = new byte[16];
+        for (int dj = 0; dj < 4; dj++)
+            for (int di = 0; di < 4; di++)
+            {
+                byte c = layer.At(layer.minE + (i0 + di - 1 + 0.5) * layer.cell, layer.minN + (j0 + dj - 1 + 0.5) * layer.cell);
+                int kind = Base(c) == WorldCell.Building ? WorldCell.Paved : Base(c);
+                voteWeight[kind] += wx[di] * wz[dj];
+                cells[dj * 4 + di] = c;
+            }
+        int ownKind = Base(own), best = ownKind;
+        for (int k = 0; k < 16; k++)
+            if (voteWeight[k] > voteWeight[best] + 1e-4f) best = k;
+        if (best == ownKind) return own;
+        // The flags (marsh, stones) of the nearest cell of the winning kind
+        int pick = -1;
+        float near = float.MaxValue;
+        for (int q = 0; q < 16; q++)
+        {
+            int kind = Base(cells[q]) == WorldCell.Building ? WorldCell.Paved : Base(cells[q]);
+            if (kind != best) continue;
+            float dx = (q % 4) - 1 - tx, dz = (q / 4) - 1 - tz, d = dx * dx + dz * dz;
+            if (d < near) { near = d; pick = q; }
+        }
+        return (byte)((cells[pick] & ~WorldCell.BaseMask) | best);
+    }
+
+    // Uniform cubic B-spline weights of the four cells round a point t (0..1) past the second one's middle
+    static void Span4(float t, out float w0, out float w1, out float w2, out float w3)
+    {
+        float t2 = t * t, t3 = t2 * t;
+        w0 = (1f - t) * (1f - t) * (1f - t) / 6f;
+        w1 = (3f * t3 - 6f * t2 + 4f) / 6f;
+        w2 = (-3f * t3 + 3f * t2 + 3f * t + 1f) / 6f;
+        w3 = t3 / 6f;
+    }
+
     float BaseHeight(float x, float z) => input.heights != null ? input.heights.At(input.centerE + x, input.centerN + z) : 0f;
 
     // Distance from (px, pz) to the stretch a-b, and the nearest point on it
@@ -675,7 +729,7 @@ public partial class TvWorldBuilder
         {
             for (int i = 0; i < N; i++)
             {
-                byte cell = CellAt(i - R, j - R);
+                byte cell = input.town != null ? SmoothCell(i - R, j - R) : CellAt(i - R, j - R);
                 if (Base(cell) == WorldCell.Water || BridgeWater(i - R, j - R)) F[j * N + i] -= 0.45f;
                 // Pools in a marsh are hollows with water in them
                 else if (MarshPool(i - R - 0.5f, j - R - 0.5f, (cell & WorldCell.Marsh) != 0, bog[j * N + i])) F[j * N + i] -= 0.3f;
@@ -934,7 +988,8 @@ public partial class TvWorldBuilder
                 // The 2 m cells' edges are made ragged, so the ground does not show squares
                 float ax = x + ox, az = z + oz;
                 float ragged = input.town != null ? 0.9f : 3f;    // a town's edges are straight
-                byte cell = CellAt(x + (TvRandom.Noise(ax * 0.4f, az * 0.4f) - 0.5f) * ragged, z + (TvRandom.Noise(ax * 0.4f + 9f, az * 0.4f) - 0.5f) * ragged);
+                byte cell = input.town != null ? SmoothCell(x, z)
+                    : CellAt(x + (TvRandom.Noise(ax * 0.4f, az * 0.4f) - 0.5f) * ragged, z + (TvRandom.Noise(ax * 0.4f + 9f, az * 0.4f) - 0.5f) * ragged);
                 int kind = Base(cell);
                 // A bridge made from a path over water: water round its deck, not the zigzag land strip of the cells
                 if (kind != WorldCell.Water && BridgeWater(x, z)) { kind = WorldCell.Water; cell = WorldCell.Water; }
@@ -1021,7 +1076,16 @@ public partial class TvWorldBuilder
                 int a = j * N + i;
                 float x = i - R, z = j - R;
                 byte cell = CellAt(x + 0.5f, z + 0.5f);
-                if (Base(cell) == WorldCell.Water || BridgeWater(x + 0.5f, z + 0.5f)) { kind[a] = 1; continue; }
+                // A town: water where all four corners are water by the smooth edges (as the ground's colour)
+                if (input.town != null)
+                {
+                    int lake = 0;
+                    for (int q = 0; q < 4; q++)
+                        if (Base(SmoothCell(x + (q & 1), z + (q >> 1))) == WorldCell.Water || BridgeWater(x + (q & 1), z + (q >> 1))) lake++;
+                    if (lake >= 3) { kind[a] = 1; continue; }
+                    if (Base(cell) == WorldCell.Water) cell = (byte)(cell & ~WorldCell.BaseMask);
+                }
+                else if (Base(cell) == WorldCell.Water || BridgeWater(x + 0.5f, z + 0.5f)) { kind[a] = 1; continue; }
                 float wet = Math.Max(Math.Max(water[a], water[a + 1]), Math.Max(water[a + N], water[a + N + 1]));
                 if (wet > 0.55f) { kind[a] = 2; continue; }
                 float strip = Math.Max(Math.Max(bog[a], bog[a + 1]), Math.Max(bog[a + N], bog[a + N + 1]));
