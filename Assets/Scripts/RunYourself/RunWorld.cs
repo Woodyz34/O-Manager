@@ -206,10 +206,13 @@ public class RunWorld : MonoBehaviour
             }
         }
 
-        // The map's own out-of-bounds areas (olive green, the purple hatching printed on the map; Plot cells) near the
-        // course (2026-11-20, Anders: they were invisible walls). Only where they meet ground a runner may be on.
-        WorldLayer layer = data != null ? data.layer : null;
-        if (layer != null && flagE.Length > 0)
+        // The map's own out-of-bounds areas (the purple hatching printed on the map, a map maker's forbidden area) near
+        // the course (2026-11-20, Anders: they were invisible walls), along the straight lines the map draws them with.
+        // Gardens (olive green) get no tape since 2026-11-23: hedges, walls and fences show where they start (Anders:
+        // "snyggare om man kan göra det bara naturligt"; TvWorldBuilderYards). A map built before 2026-11-23 keeps no
+        // outlines: its gardens and out-of-bounds cells all get the garden edges then.
+        TvGardens outlines = data != null && data.town != null ? data.town.gardens : null;
+        if (outlines != null && flagE.Length > 0)
         {
             double minE = anchorE, maxE = anchorE, minN = anchorN, maxN = anchorN;
             for (int i = 0; i < flagE.Length; i++)
@@ -218,23 +221,11 @@ public class RunWorld : MonoBehaviour
                 minN = Math.Min(minN, flagN[i]); maxN = Math.Max(maxN, flagN[i]);
             }
             const double Margin = 150.0;
-            int i0 = (int)Math.Floor((minE - Margin - layer.minE) / layer.cell), i1 = (int)Math.Floor((maxE + Margin - layer.minE) / layer.cell);
-            int j0 = (int)Math.Floor((minN - Margin - layer.minN) / layer.cell), j1 = (int)Math.Floor((maxN + Margin - layer.minN) / layer.cell);
-            TvPassable gate = passable;
-            bool Plot(int i, int j) => (layer.cells[j * layer.cols + i] & WorldCell.BaseMask) == WorldCell.Plot;
-            bool Open(int i, int j)
+            foreach (float[] ring in outlines.Outlines(minE - Margin, minN - Margin, maxE + Margin, maxN + Margin, MapImport.WorldAreaKind.OutOfBounds))
             {
-                int b = layer.cells[j * layer.cols + i] & WorldCell.BaseMask;
-                if (b == WorldCell.Plot) return false;
-                double e = layer.minE + (i + 0.5) * layer.cell, n = layer.minN + (j + 0.5) * layer.cell;
-                if (gate != null) return !gate.Closed(e, n);
-                return b != WorldCell.Building && b != WorldCell.Water && b != WorldCell.Impassable;
-            }
-            foreach (var line in TvOutlines.CellBorders(layer, i0, j0, i1, j1, Plot, Open))
-            {
-                bool closed = line.Count > 2 && line[0].e == line[line.Count - 1].e && line[0].n == line[line.Count - 1].n;
-                if (closed) line.RemoveAt(line.Count - 1);
-                TapeLine(line, closed);
+                var pts = new List<(double e, double n)>(ring.Length / 2);
+                for (int i = 0; i + 3 < ring.Length; i += 2) pts.Add((ring[i], ring[i + 1]));   // the last point is the first again
+                if (pts.Count >= 3) TapeLine(pts, true);
             }
         }
         if (v.Count == 0) return;

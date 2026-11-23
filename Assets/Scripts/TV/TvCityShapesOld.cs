@@ -59,8 +59,21 @@ public static partial class TvCityShapes
         p.roof = Roofs[(look * 11 + 1) % Roofs.Length];
         p.awning = Awnings[(look * 3 + 1) % Awnings.Length];
         p.shutter = look % 4 == 3 ? Doors[(look + 2) % Doors.Length].Shade(0.9f) : (TvColor?)null;
+        if (kind == Kind.School)
+        {
+            // Yellow or red brick, dark window bands and edges, a white band between the floors (2026-11-23)
+            p.wall = SchoolBricks[look % SchoolBricks.Length];
+            p.trim = TvColor.Hex("#2f3336");
+            p.band = TvColor.Hex("#e9e3d3");
+            p.roof = TvColor.Hex("#2f3336");
+            p.door = TvColor.Hex("#2b3640");
+            p.shutter = null;
+        }
+        if (kind == Kind.Hall) p.roof = TvColor.Hex("#3b3f45");
         return p;
     }
+
+    static readonly TvColor[] SchoolBricks = { TvColor.Hex("#c99a52"), TvColor.Hex("#a5533b"), TvColor.Hex("#cfc6b4"), TvColor.Hex("#b8864a") };
 
     // A building in the given style; the Swedish town is the one above
     public static TvShape Building(TvRandom random, Kind kind, float len, float wid, int floors, int look, Style style, float plinth = 0.25f)
@@ -492,6 +505,8 @@ public static partial class TvCityShapes
                 case Kind.Villa:
                     wall = new[] { TvColor.Hex("#8f3426"), TvColor.Hex("#e0c27a"), TvColor.Hex("#dfe3e0"), TvColor.Hex("#9cc0d8"), TvColor.Hex("#a9c49a"), TvColor.Hex("#e9d9a6") }[look % 6];
                     roof = Roofs[(look * 7 + 1) % Roofs.Length]; top = plinth + (len > 11f ? 5.2f : 2.7f); rise = hw * 0.75f; break;
+                case Kind.School:
+                    wall = SchoolBricks[look % SchoolBricks.Length]; roof = TvColor.Hex("#2f3336"); top = plinth + 3.8f + 3.5f * (Math.Max(1, floors) - 1) + 0.3f; rise = 0f; flat = true; break;
                 case Kind.Hall:
                     wall = look % 2 == 0 ? TvColor.Hex("#c9c6bc") : TvColor.Hex("#b45a3c"); roof = TvColor.Hex("#4e5254"); top = plinth + 7f; rise = 0f; flat = true; break;
                 default:

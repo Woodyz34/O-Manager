@@ -25,6 +25,9 @@ public class TvTown
     public readonly List<int> bridgeFlags = new List<int>();
     // Outlines of canopies (roofs on posts, and passages under houses), closed
     public readonly List<float[]> canopies = new List<float[]>();
+    // The gardens and out-of-bounds areas as the map draws them (null on maps built before 2026-11-23: then the
+    // straightened borders of the cells)
+    public TvGardens gardens;
 
     // The same town with the style of another terrain look (the look can change in Edit map)
     public TvTown WithLook(TerrainLook look)
@@ -53,6 +56,8 @@ public class TvTown
         catch (Exception) { }
         try { town.Landmarks(layer); }
         catch (Exception) { }
+        try { town.gardens = TvGardens.Make(layer); }
+        catch (Exception) { town.gardens = null; }
         return town;
     }
 

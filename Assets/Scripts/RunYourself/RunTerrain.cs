@@ -53,6 +53,9 @@ public class RunTerrain
     // The course setter's out-of-bounds areas, in metres from the layer's lower left corner
     readonly List<float[]> outOfBounds = new List<float[]>();
 
+    // The gardens and out-of-bounds areas as the map draws them (maps built from 2026-11-23), or null
+    readonly TvGardens gardens;
+
     static bool IsWay(WorldLineKind k) => k == BridgeKind || k == TunnelKind || k == CourseBridgeKind || k == WorldLineKind.Bridge;
     static bool IsStairs(WorldLineKind k) => k == WorldLineKind.Stairs || k == TownStairsKind;
 
@@ -62,6 +65,7 @@ public class RunTerrain
     {
         this.layer = layer;
         this.passable = passable;
+        gardens = town != null ? town.gardens : null;
         this.heights = heights;
         this.speeds = speeds ?? new TerrainSpeeds();
         // A sprint map's world layer from before 2026-11-20 has no Impassable cells: its dark green is ISSprOM 410
@@ -227,6 +231,13 @@ public class RunTerrain
             // Right beside an open cell, where the 3D ground itself is open (no house, water or garden) and the course
             // has not closed it, the 3D walls and fences decide (TvPassable.NearOpen: narrow gaps and footbridges)
             if (closed && !g.blocked && !passable.Purple(e, n) && (passable.NearOpen(e, n, passable.CellSize * 0.8) || OnTownPath(e, n))) closed = false;
+            // Along a garden's edge the map's own straight line decides, not the zigzag of the 2 m cells (2026-11-23,
+            // Anders): the hedge, wall or fence stands on the line, and the runner stops at it
+            if (gardens != null && !passable.Purple(e, n) && gardens.Near(e, n, 2.6f))
+            {
+                if (gardens.Inside(e, n)) closed = true;
+                else if ((cell & WorldCell.BaseMask) == WorldCell.Plot) closed = false;
+            }
             if (g.blocked && !closed)
             {
                 g.speed = speeds.Ground(TerrainKind.Paved, 1.5f);

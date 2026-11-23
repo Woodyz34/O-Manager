@@ -43,7 +43,9 @@ namespace MapImport
         // 4 (2026-11-20): contour heights: hilltops no longer turned into hollows (ContourHeights), the grid's heights change.
         // 5 (2026-11-23): slope ticks keep their direction in points.json (the run-yourself ground knows knolls from
         //    hollows everywhere), and ticks drawn as a point of 101.0 itself count for the grid's heights too.
-        public const int RulesVersion = 5;
+        // 6 (2026-11-23): the world layer keeps the outlines of gardens and out-of-bounds areas, so the 3D town's garden
+        //    edges (hedges, walls, fences) run straight along them instead of the zigzag of the 2 m cells.
+        public const int RulesVersion = 6;
 
         // Stairs: up (and on the flat) as quick as a road (Anders, 2026-11-20: running up stairs is quick), down slowly.
         // Which way is down is worked out from the heights when the grid is loaded (StairsSlopes).
