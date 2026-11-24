@@ -20,7 +20,7 @@ public class MapImportPanel : MonoBehaviour
 {
     public static bool IsOpen { get; private set; }
 
-    public const double PixelsPerMm = 16;   // about 400 dpi: sharp, and the picture stays a manageable size
+    public const double PixelsPerMm = 12;   // about 300 dpi like a printed map, so the picture stays a manageable size
     public const int MaxPictureSide = 16384; // the largest texture Unity can make
 
     internal static readonly string[] MapExtensions = { "ocd", "omap", "xmap" };
