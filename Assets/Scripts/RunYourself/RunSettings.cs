@@ -7,14 +7,16 @@ using UnityEngine.UI;
 // the runner is a woman or a man (the breathing and the sounds), and how quick the mouse turns the head.
 public static class RunSettings
 {
-    public enum Quality { Low = 0, Medium = 1, High = 2 }
+    // Ultra (2026-11-25, Anders): for strong computers, as real as it gets: the densest undergrowth and litter, the most
+    // detailed trees, the longest view and the sharpest shadows
+    public enum Quality { Low = 0, Medium = 1, High = 2, Ultra = 3 }
 
     const string QualityKey = "RunYourself.Quality", SpeedKey = "RunYourself.Speed", WomanKey = "RunYourself.Woman",
         MouseKey = "RunYourself.Mouse", HandKey = "RunYourself.RightHand";
 
     public static Quality Level
     {
-        get => (Quality)Mathf.Clamp(PlayerPrefs.GetInt(LocalPrefs.Key(QualityKey), (int)DefaultQuality()), 0, 2);
+        get => (Quality)Mathf.Clamp(PlayerPrefs.GetInt(LocalPrefs.Key(QualityKey), (int)DefaultQuality()), 0, 3);
         set => PlayerPrefs.SetInt(LocalPrefs.Key(QualityKey), (int)value);
     }
 
@@ -129,7 +131,7 @@ public static class RunSettings
         HoverTip.Add(row, "How quickly the mouse turns your head when you look round in \"Run it yourself\" (3D).");
     }
 
-    public static string QualityName(Quality q) => q == Quality.Low ? "Low" : q == Quality.High ? "High" : "Medium";
+    public static string QualityName(Quality q) => q == Quality.Low ? "Low" : q == Quality.High ? "High" : q == Quality.Ultra ? "Ultra" : "Medium";
 
     // ---- What each level means ----
 
@@ -139,7 +141,7 @@ public static class RunSettings
         public float near;            // metres: closer than this, the full trees and ground are drawn
         public float detail;          // metres: closer than this, undergrowth and thickets are drawn
         public float undergrowth;     // share of the undergrowth a TV control has (1 = as much)
-        public int shadows;           // 0 = none, 1 = hard, 2 = soft
+        public int shadows;           // 0 = none, 1 = hard, 2 = soft, 3 = soft and sharp (4 cascades)
         public float shadowDistance;
         public int msaa;
     }
@@ -150,12 +152,16 @@ public static class RunSettings
     {
         switch (q)
         {
+            // The undergrowth is flat cards with pictures since 2026-11-25, about a tenth of the triangles of the old
+            // lumpy tufts, so every level has more of it than before
             case Quality.Low:
-                return new Look { view = 150f, near = 50f, detail = 26f, undergrowth = 0.06f, shadows = 0, shadowDistance = 0f, msaa = 1 };
+                return new Look { view = 150f, near = 50f, detail = 26f, undergrowth = 0.12f, shadows = 0, shadowDistance = 0f, msaa = 1 };
             case Quality.High:
-                return new Look { view = 330f, near = 96f, detail = 56f, undergrowth = 0.22f, shadows = 2, shadowDistance = 60f, msaa = 4 };
+                return new Look { view = 330f, near = 96f, detail = 56f, undergrowth = 0.6f, shadows = 2, shadowDistance = 60f, msaa = 4 };
+            case Quality.Ultra:
+                return new Look { view = 420f, near = 130f, detail = 72f, undergrowth = 1f, shadows = 3, shadowDistance = 110f, msaa = 8 };
             default:
-                return new Look { view = 230f, near = 72f, detail = 40f, undergrowth = 0.12f, shadows = 1, shadowDistance = 32f, msaa = 2 };
+                return new Look { view = 230f, near = 72f, detail = 40f, undergrowth = 0.3f, shadows = 1, shadowDistance = 32f, msaa = 2 };
         }
     }
 
@@ -188,8 +194,9 @@ public static class RunSettings
         CourseUI.Size(hint, 30);
 
         Transform left = card.transform;
-        Chips(left, "Graphics", new[] { "Low", "Medium", "High" }, (int)Level, i => { Level = (Quality)i; changed?.Invoke(); },
-            "Low: shorter view, no shadows, little undergrowth. For weak computers. High: long view and soft shadows.");
+        Chips(left, "Graphics", new[] { "Low", "Medium", "High", "Ultra" }, (int)Level, i => { Level = (Quality)i; changed?.Invoke(); },
+            "Low: shorter view, no shadows, little undergrowth. For weak computers. High: long view and soft shadows. "
+            + "Ultra: for strong computers: the most detailed trees, thick bilberry and litter everywhere, the longest view and the sharpest shadows.");
         int speedIndex = 1;   // 4 x
         for (int i = 0; i < Speeds.Length; i++) if (Mathf.Approximately(Speeds[i], GameSpeed)) speedIndex = i;
         Chips(left, "Game speed", new[] { "3 x real life", "4 x real life", "5 x real life" }, speedIndex, i => { GameSpeed = Speeds[i]; changed?.Invoke(); },

@@ -16,8 +16,20 @@ public class TvMesh
     public readonly List<float> normals = new List<float>();
     public readonly List<byte> colors = new List<byte>();        // r, g, b (sRGB)
     public readonly List<int> triangles = new List<int>();
+    // Textured meshes only (the bark and the leaves of the trees, the undergrowth, the forest floor's litter;
+    // TvAtlas): u, v and which picture of the atlas, for each corner. Empty for the plain coloured meshes.
+    public readonly List<float> uvs = new List<float>();
 
     public int VertexCount => positions.Count / 3;
+
+    public bool Textured => uvs.Count > 0;
+
+    // Fills in "no picture" (tile -1) for the corners before `count` that have no u, v yet: a mesh that holds both
+    // textured and plain shapes gives every corner a u, v, tile
+    public void PadUvs(int count)
+    {
+        while (uvs.Count < count * 3) { uvs.Add(0f); uvs.Add(0f); uvs.Add(-1f); }
+    }
 
     public int Vertex(float x, float y, float z, float nx, float ny, float nz, TvColor c)
     {
@@ -52,6 +64,12 @@ public class TvMesh
         }
         int[] t = shape.triangles;
         for (int i = 0; i < t.Length; i++) triangles.Add(first + t[i]);
+        if (shape.uvs != null)
+        {
+            PadUvs(first);
+            uvs.AddRange(shape.uvs);
+        }
+        else if (uvs.Count > 0) PadUvs(VertexCount);
     }
 
     // Cuts meshes into square tiles (tiles x tiles over the square of 2 x radius round the control), each triangle to
@@ -98,6 +116,12 @@ public class TvMesh
                             tile.positions.Add(p[v * 3]); tile.positions.Add(p[v * 3 + 1]); tile.positions.Add(p[v * 3 + 2]);
                             tile.normals.Add(n[v * 3]); tile.normals.Add(n[v * 3 + 1]); tile.normals.Add(n[v * 3 + 2]);
                             tile.colors.Add(c[v * 3]); tile.colors.Add(c[v * 3 + 1]); tile.colors.Add(c[v * 3 + 2]);
+                            if (source.uvs.Count > 0)
+                            {
+                                tile.PadUvs(nv);
+                                tile.uvs.Add(source.uvs[v * 3]); tile.uvs.Add(source.uvs[v * 3 + 1]); tile.uvs.Add(source.uvs[v * 3 + 2]);
+                            }
+                            else if (tile.uvs.Count > 0) tile.PadUvs(nv + 1);
                             remap[v] = nv + 1;
                         }
                         tile.triangles.Add(nv);
@@ -106,7 +130,12 @@ public class TvMesh
             }
         }
         var list = new List<TvMesh>();
-        foreach (TvMesh m in result) if (m != null && m.VertexCount > 0) list.Add(m);
+        foreach (TvMesh m in result)
+            if (m != null && m.VertexCount > 0)
+            {
+                if (m.uvs.Count > 0) m.PadUvs(m.VertexCount);
+                list.Add(m);
+            }
         return list;
     }
 
@@ -150,10 +179,11 @@ public class TvShape
     public float[] positions, normals;
     public byte[] colors;
     public int[] triangles;
+    public float[] uvs;          // u, v, atlas tile for each corner (TvAtlas), or null for a plain coloured shape
 }
 
 // Puts a shape together from blobs, cylinders and cones
-public class TvShapeBuilder
+public partial class TvShapeBuilder
 {
     readonly List<float> p = new List<float>(), n = new List<float>();
     readonly List<byte> c = new List<byte>();
@@ -162,9 +192,18 @@ public class TvShapeBuilder
 
     public TvShapeBuilder(TvRandom random) { this.random = random; }
 
+    // The u, v and atlas tile of every corner, only once a textured part (TvFlora.cs) has been added
+    readonly List<float> uv = new List<float>();
+
     public TvShape Done()
     {
-        return new TvShape { positions = p.ToArray(), normals = n.ToArray(), colors = c.ToArray(), triangles = t.ToArray() };
+        float[] uvs = null;
+        if (uv.Count > 0)
+        {
+            while (uv.Count < p.Count) { uv.Add(0f); uv.Add(0f); uv.Add(-1f); }
+            uvs = uv.ToArray();
+        }
+        return new TvShape { positions = p.ToArray(), normals = n.ToArray(), colors = c.ToArray(), triangles = t.ToArray(), uvs = uvs };
     }
 
     int V(float x, float y, float z, float nx, float ny, float nz, TvColor col)
@@ -172,6 +211,7 @@ public class TvShapeBuilder
         p.Add(x); p.Add(y); p.Add(z);
         n.Add(nx); n.Add(ny); n.Add(nz);
         c.Add(col.r); c.Add(col.g); c.Add(col.b);
+        if (uv.Count > 0) { uv.Add(0f); uv.Add(0f); uv.Add(-1f); }
         return p.Count / 3 - 1;
     }
 

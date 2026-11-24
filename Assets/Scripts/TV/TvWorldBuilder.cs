@@ -97,6 +97,9 @@ public class TvWorldInput
     public TvTown town;                 // a sprint map in the run-yourself game mode: build it as a town (TvWorldBuilderTown.cs)
     public TvPassable passable;         // the town: the 2D race's grid; no house stands where it lets a runner through
     public bool townRich = true;        // chunkDetail in a town: the houses in full detail (not on the Low 3D quality)
+    // How detailed the trees, the undergrowth and the forest floor are made (RunSettings.Quality): 0 Low, 1 Medium,
+    // 2 High, 3 Ultra. The TV controls use High.
+    public int quality = 2;
 }
 
 // Something a runner cannot run through: a stone, a tree trunk, a pole
@@ -223,6 +226,7 @@ public partial class TvWorldBuilder
     // round them, not like smooth grey slabs (2026-11-19, Anders)
     TvMesh cliffMesh;
     TvMesh[] treeMeshes, tuftMeshes;
+    TvMesh litterMesh;                  // needles, twigs and cones lying on the forest floor (TvWorldBuilderFlora.Litter)
     // A piece of the run-yourself world: the trees as they are drawn far away, and the young trees of the thickets
     TvMesh treeFarMesh, thicketMesh;
     readonly bool chunk;
@@ -467,6 +471,7 @@ public partial class TvWorldBuilder
         thingMesh = new TvMesh { name = "Things" };
         wireMesh = new TvMesh { name = "Wires", castShadows = false };
         waterMesh = new TvMesh { name = "Water", castShadows = false };
+        litterMesh = new TvMesh { name = "Litter", castShadows = false };
         treeMeshes = new TvMesh[TreeTiles * TreeTiles];
         tuftMeshes = new TvMesh[TreeTiles * TreeTiles];
         for (int i = 0; i < treeMeshes.Length; i++)
@@ -494,6 +499,7 @@ public partial class TvWorldBuilder
         CameraSpot();
         Trees();
         Undergrowth();
+        Litter();
 
         world.ground = F;
         // Everything in small tiles, so only what the TV camera looks at is drawn (see TvMesh.SplitIntoTiles)
@@ -505,6 +511,7 @@ public partial class TvWorldBuilder
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { wireMesh }, "Wires", false, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh>(treeMeshes), "Trees", true, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh>(tuftMeshes), "Undergrowth", false, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { litterMesh }, "Litter", false, R, DrawTiles));
         if (townMesh != null)
         {
             // A sprint map's town (TV controls on sprint maps, 2026-11-20)
@@ -566,6 +573,7 @@ public partial class TvWorldBuilder
         treeFarMesh = new TvMesh { name = "Trees far", castShadows = false, group = TvMesh.Far };
         tuftMeshes = new[] { new TvMesh { name = "Undergrowth", castShadows = false } };
         thicketMesh = new TvMesh { name = "Thickets" };
+        litterMesh = new TvMesh { name = "Litter", castShadows = false };
 
         MakeShapes();
         Heights();
@@ -581,8 +589,10 @@ public partial class TvWorldBuilder
             Thickets();
             OpenPassages(thicketSolids, world.solids.Count);
             Undergrowth();
+            Litter();
             Keep(tuftMeshes[0]);
             Keep(thicketMesh);
+            Keep(litterMesh);
             // A town's houses in full detail, right round the runner
             if (input.town != null && input.townRich)
             {
@@ -1221,7 +1231,7 @@ public partial class TvWorldBuilder
             case TerrainLook.Sand: return new GroundLook { a = TvColor.Hex("#b9a577"), b = TvColor.Hex("#a8946a"), c = TvColor.Hex("#8f8a5a") };
             case TerrainLook.Stone: return new GroundLook { a = TvColor.Hex("#9c9b8d"), b = TvColor.Hex("#86934f"), c = TvColor.Hex("#b0b09c") };
             case TerrainLook.Lichen: return new GroundLook { a = TvColor.Hex("#a9ad97"), b = TvColor.Hex("#8b8f73"), c = TvColor.Hex("#6a5a3a") };
-            default: return new GroundLook { a = TvColor.Hex("#55683a"), b = TvColor.Hex("#6b7a3c"), c = TvColor.Hex("#6a5a3a") };
+            default: return new GroundLook { a = TvColor.Hex("#4d5f35"), b = TvColor.Hex("#627039"), c = TvColor.Hex("#625437") };
         }
     }
 
@@ -1967,6 +1977,9 @@ public partial class TvWorldBuilder
         s = new TvShapeBuilder(random);
         s.Blob(1f, 1f, 0.06f, 1f, 0f, 0.02f, 0f, 0.15f, 1, false, TvColor.Hex("#3f5a6c"));
         poolShape = s.Done();
+
+        // The trees, bushes and undergrowth with bark, needles and leaves (TvWorldBuilderFlora.cs)
+        MakeFlora();
     }
 
     // ---- Stones, boulder clusters, stony ground, cairns: exactly where the map has them ----
@@ -3188,6 +3201,8 @@ public partial class TvWorldBuilder
 
     // ---- Undergrowth: what covers the ground between the trees ----
 
+    static readonly float[] UndergrowthDensity = { 0.7f, 1.2f, 2.2f, 3.2f };
+
     void Undergrowth()
     {
         const float Reach = 75f;
@@ -3203,7 +3218,8 @@ public partial class TvWorldBuilder
             case TerrainLook.Lichen: amount -= 0.16f; break;
         }
         if (look.forest == TerrainLook.Beech) amount -= 0.12f;
-        int tries = (int)(26000f * (0.6f + look.undergrowth * 0.8f));
+        // Thicker on the higher 3D qualities (the plants are cards now, cheap to draw; 2026-11-25)
+        int tries = (int)(26000f * (0.6f + look.undergrowth * 0.8f) * UndergrowthDensity[Q]);
         // A run-yourself piece: as many per square metre as round a TV control, times the player's 3D quality
         if (chunk) tries = (int)(tries * (2f * R) * (2f * R) / (Math.PI * Reach * Reach) * Math.Max(0f, input.undergrowthShare));
         for (int i = 0; i < tries; i++)
@@ -3252,9 +3268,10 @@ public partial class TvWorldBuilder
             }
             else
             {
-                if (rough <= 0.5f || random.Value() > Sm(0.5f, 0.68f, rough)) continue;
+                if (rough <= 0.42f || random.Value() > Sm(0.42f, 0.62f, rough)) continue;
                 float r = random.Value();
-                s = Rr(0.4f, 0.95f);
+                // Wide, low clumps that grow together into a carpet (2026-11-25)
+                s = Rr(0.65f, 1.3f);
                 tint = Rr(0.55f, 0.85f);
                 switch (look.ground)
                 {
