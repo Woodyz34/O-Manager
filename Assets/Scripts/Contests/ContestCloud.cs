@@ -109,6 +109,25 @@ public class RankRow
     public float[] parts;     // overall only: route choice game, race, 3D
     public int place;
     public int was;           // place at the update before, 0 = not in the list then
+    public int ww;            // weekly contests won, all time
+    public int wd;            // daily contests won, all time
+}
+
+// A player's contest wins of all time (counted when a contest with 2+ finishers comes into the ranking)
+public class RankWins
+{
+    public int ww;            // weekly
+    public int wd;            // daily
+    public int rc, race, run; // by game
+
+    public int Total => ww + wd;
+}
+
+// One player's ranking history and wins (the "rankHistory" action)
+public class RankHistory
+{
+    public List<RankDay> days = new List<RankDay>();
+    public RankWins wins = new RankWins();
 }
 
 public class RankRules
@@ -129,6 +148,7 @@ public class RankingData
     public Dictionary<string, RankRow> mine;
     public Dictionary<string, int> counts;            // players in each list (only the top 200 are sent)
     public RankRules rules;
+    public RankWins myWins;
 }
 
 // One day of a player's ranking history: list -> [points, place, players in the list]
@@ -222,11 +242,14 @@ public static class ContestCloud
         return data;
     }
 
-    // One player's ranking day by day, oldest first
-    public static async Task<List<RankDay>> RankHistoryAsync(string playerId)
+    // One player's ranking day by day (oldest first) and their wins of all time
+    public static async Task<RankHistory> RankHistoryAsync(string playerId)
     {
         JObject output = await Call("rankHistory", new { player = playerId });
-        return output["days"] != null ? output["days"].ToObject<List<RankDay>>() : new List<RankDay>();
+        RankHistory result = new RankHistory();
+        if (output["days"] != null) result.days = output["days"].ToObject<List<RankDay>>() ?? new List<RankDay>();
+        if (output["wins"] != null) result.wins = output["wins"].ToObject<RankWins>() ?? new RankWins();
+        return result;
     }
 
     public static async Task<List<ContestPaid>> ClaimAsync()

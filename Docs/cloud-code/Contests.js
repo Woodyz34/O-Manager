@@ -50,11 +50,12 @@
 //                                (daily 7 days, weekly 30 days): winner, number of runners and my place
 //   ranking                      the world ranking (2026-11-24): the best players of the last 30 days, overall and
 //                                per game and map type, see "World ranking" below; brings it up to date first
-//   rankHistory { player }       one player's ranking day by day, for the line chart
+//   rankHistory { player }       one player's ranking day by day, for the line chart, and their wins of all time
 //
 // The world ranking is kept in:
 //   Private custom data "contests_rank"         key "window": the contests of the last RANK_DAYS days with every
-//                                                player's points; key "lists": the ranking lists as last worked out
+//                                                player's points; key "lists": the ranking lists as last worked out;
+//                                                key "wins": every player's weekly/daily wins of all time
 //   Private custom data "contests_rank_hist_<n>" key "h": the ranking history of the players whose id hashes to n
 //                                                (RANK_HIST_SHARDS parts), one entry per day, kept for years
 
@@ -738,6 +739,11 @@ async function updateRanking(api, context, now, logger) {
   const todo = finishedIds(now, LATE_MINUTES * 60000, RANK_DAYS + 8)
     .filter(id => endOf(id) > from && endOf(id) <= day.end && win.done.indexOf(id) < 0);
   const part = todo.slice(0, RANK_LOADS_PER_CALL);
+  // Wins of all time (2026-11-24, the user: "hur många gånger man har vunnit"): each player's weekly and daily
+  // contest wins, counted once when a contest comes into the ranking (so only contests with 2+ finishers)
+  const winsItem = await loadRankItem(api, context, "contests_rank", "wins");
+  const wins = winsItem.value && winsItem.value.players ? winsItem.value : { players: {} };
+  let winsChanged = false;
   for (let i = 0; i < part.length; i += 20) {
     const ids = part.slice(i, i + 20);
     const loaded = await Promise.all(ids.map(async id => {
@@ -753,6 +759,14 @@ async function updateRanking(api, context, now, logger) {
       if (!rows) continue;
       const end = endOf(id);
       win.contests.push({ id, end, g: gameOf(id), s: isSprint(id), w: RANK_WEIGHT[id[0]], rows });
+      for (const r of list) {
+        if (r.place !== 1) continue;
+        const x = wins.players[r.playerId] || (wins.players[r.playerId] = { w: 0, d: 0 });
+        x[id[0]] = (x[id[0]] || 0) + 1;
+        const g = gameOf(id);
+        x[g] = (x[g] || 0) + 1;
+        winsChanged = true;
+      }
       for (const r of list) {
         const old = win.names[r.playerId];
         if (!old || old.at <= end) win.names[r.playerId] = { n: r.name, at: end };
@@ -777,6 +791,7 @@ async function updateRanking(api, context, now, logger) {
     if (status === 409 || status === 412) return false;   // someone else is updating it right now
     throw err;
   }
+  if (winsChanged) await api.setPrivateCustomItem(context.projectId, "contests_rank", { key: "wins", value: wins });
   if (!complete) return false;
 
   const before = await loadRankItem(api, context, "contests_rank", "lists");
@@ -822,15 +837,25 @@ async function ranking(api, context, me, now, logger) {
   try { await updateRanking(api, context, now, logger); } catch (err) { logger.warning("updateRanking: " + err); }
   const item = await loadRankItem(api, context, "contests_rank", "lists");
   const stored = item.value || { day: "", updatedAt: 0, lists: {} };
+  const winsItem = await loadRankItem(api, context, "contests_rank", "wins");
+  const wins = winsItem.value && winsItem.value.players ? winsItem.value.players : {};
+  // Each row gets the player's wins: ww weekly, wd daily (all time)
+  const withWins = r => {
+    if (!r) return null;
+    const x = wins[r.p] || {};
+    return Object.assign({}, r, { ww: x.w || 0, wd: x.d || 0 });
+  };
   const lists = {}, mine = {}, counts = {};
   for (const key of RANK_LISTS) {
     const rows = stored.lists && stored.lists[key] ? stored.lists[key] : [];
-    lists[key] = rows.slice(0, RANK_TOP);
+    lists[key] = rows.slice(0, RANK_TOP).map(withWins);
     counts[key] = rows.length;
-    mine[key] = rows.find(r => r.p === me) || null;
+    mine[key] = withWins(rows.find(r => r.p === me));
   }
+  const myWins = wins[me] || {};
   return {
     day: stored.day, updatedAt: stored.updatedAt, me, lists, mine, counts,
+    myWins: { ww: myWins.w || 0, wd: myWins.d || 0, rc: myWins.rc || 0, race: myWins.race || 0, run: myWins.run || 0 },
     rules: { days: RANK_DAYS, weekly: RANK_WEIGHT.w, daily: RANK_WEIGHT.d, full: RANK_FULL, minFinishers: RANK_MIN_FINISHERS }
   };
 }
@@ -840,5 +865,7 @@ async function rankHistory(api, context, payload) {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(pid)) throw new Error("Bad player");
   const item = await loadRankItem(api, context, "contests_rank_hist_" + histShard(pid), "h");
   const list = item.value && item.value.players && item.value.players[pid] ? item.value.players[pid] : [];
-  return { player: pid, days: list };
+  const winsItem = await loadRankItem(api, context, "contests_rank", "wins");
+  const x = winsItem.value && winsItem.value.players && winsItem.value.players[pid] ? winsItem.value.players[pid] : {};
+  return { player: pid, days: list, wins: { ww: x.w || 0, wd: x.d || 0, rc: x.rc || 0, race: x.race || 0, run: x.run || 0 } };
 }

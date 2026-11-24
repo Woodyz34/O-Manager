@@ -160,7 +160,8 @@ public class RankingPage : MonoBehaviour
         columns.offsetMin = new Vector2(20, -82);
         columns.offsetMax = new Vector2(-20, -52);
         Column(columns, "#", ColPlace, 60, TextAlignmentOptions.Center);
-        Column(columns, "PLAYER", ColName, 400, TextAlignmentOptions.Left);
+        Column(columns, "PLAYER", ColName, ColNameWidth, TextAlignmentOptions.Left);
+        Column(columns, "WINS", ColWins, ColWinsWidth, TextAlignmentOptions.Center);
         Column(columns, "CONTESTS", ColCount, ColCountWidth, TextAlignmentOptions.Center);
         Column(columns, "POINTS", ColPoints, ColPointsWidth, TextAlignmentOptions.Center);
         Column(columns, "GAP", ColGap, ColGapWidth, TextAlignmentOptions.Center);
@@ -169,7 +170,7 @@ public class RankingPage : MonoBehaviour
         RectTransform viewport = (RectTransform)listScroll.transform;
         viewport.anchorMin = Vector2.zero;
         viewport.anchorMax = Vector2.one;
-        viewport.offsetMin = new Vector2(20, 70);
+        viewport.offsetMin = new Vector2(20, 80);
         viewport.offsetMax = new Vector2(-20, -88);
         CourseUI.Column(list.gameObject, 6, new RectOffset(0, 0, 0, 6));
         listScroll.scrollSensitivity = 60f;
@@ -177,7 +178,7 @@ public class RankingPage : MonoBehaviour
 
         footer = CourseUI.Text("You", card.transform, "", 22, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.Center);
         footer.richText = true;
-        CourseUI.Place(footer.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 14), new Vector2(1120, 44));
+        CourseUI.Place(footer.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 8), new Vector2(1120, 64));
 
         message = CourseUI.Text("Message", card.transform, "", 28, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
         message.richText = true;
@@ -186,7 +187,8 @@ public class RankingPage : MonoBehaviour
     }
 
     // Column positions in a row (x from the left edge, width)
-    const float ColPlace = 8, ColMove = 72, ColName = 150, ColCount = 600, ColCountWidth = 140, ColPoints = 760,
+    const float ColPlace = 8, ColMove = 72, ColName = 150, ColNameWidth = 320, ColWins = 478, ColWinsWidth = 160,
+                ColCount = 642, ColCountWidth = 110, ColPoints = 760,
                 ColPointsWidth = 160, ColGap = 940, ColGapWidth = 190;
 
     static void Column(RectTransform parent, string text, float x, float width, TextAlignmentOptions align)
@@ -266,15 +268,17 @@ public class RankingPage : MonoBehaviour
     void ShowMine()
     {
         if (data == null) return;
+        RankWins my = data.myWins ?? new RankWins();
+        string wins = "\n<size=90%>Your contest wins: " + WinsText(my.ww, my.wd) + "</size>";
         int count = data.counts.TryGetValue(ListKey, out int n) ? n : 0;
         if (data.mine.TryGetValue(ListKey, out RankRow mine) && mine != null)
         {
             footer.text = "You: <b>" + CompetitionFlow.Ordinal(mine.place) + "</b> of " + count + "   ·   <b>" + Pts(mine.pts) + "</b> points   ·   "
-                          + mine.c + (mine.c == 1 ? " contest" : " contests") + MoveText(mine, true);
+                          + mine.c + (mine.c == 1 ? " contest" : " contests") + MoveText(mine, true) + wins;
         }
         else
         {
-            footer.text = "<color=#5B7563>You are not in this list yet: finish a contest of this kind and you are in it the day after it ends.</color>";
+            footer.text = "<color=#5B7563>You are not in this list yet: finish a contest of this kind and you are in it the day after it ends.</color>" + wins;
         }
     }
 
@@ -303,10 +307,20 @@ public class RankingPage : MonoBehaviour
         TextMeshProUGUI name = CourseUI.Text("Name", row.transform, (r.n ?? "Runner") + (me ? "  <color=#E8742A><size=80%>(you)</size></color>" : ""), 25, CourseUI.Ink, FontStyles.Bold);
         name.richText = true;
         name.enableWordWrapping = false;
-        PlaceInRow(name.rectTransform, ColName, 440, 6, 30);
+        PlaceInRow(name.rectTransform, ColName, ColNameWidth, 6, 30);
         TextMeshProUGUI sub = CourseUI.Text("Sub", row.transform, SubText(r), 17, CourseUI.InkMuted);
         sub.enableWordWrapping = false;
-        PlaceInRow(sub.rectTransform, ColName, 440, 38, 4);
+        sub.enableAutoSizing = true;
+        sub.fontSizeMin = 12;
+        sub.fontSizeMax = 17;
+        PlaceInRow(sub.rectTransform, ColName, ColNameWidth, 38, 4);
+
+        // Weekly and daily contests won, all time (2026-11-24, the user: "mäktigt att kunna se hur många gånger man har vunnit")
+        TextMeshProUGUI winsText = CourseUI.Text("Wins", row.transform, WinsCell(r.ww, r.wd), 24, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.Center);
+        winsText.richText = true;
+        winsText.lineSpacing = -12;
+        winsText.enableWordWrapping = false;
+        PlaceInRow(winsText.rectTransform, ColWins, ColWinsWidth);
 
         TextMeshProUGUI count = CourseUI.Text("Count", row.transform, r.c.ToString(), 24, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.Center);
         PlaceInRow(count.rectTransform, ColCount, ColCountWidth);
@@ -321,6 +335,20 @@ public class RankingPage : MonoBehaviour
         gap.lineSpacing = -12;
         PlaceInRow(gap.rectTransform, ColGap, ColGapWidth);
         HoverTip.Add(button, "Click to see how " + (r.n ?? "this player") + " has done over time");
+    }
+
+    // "3" big, "1 weekly · 2 daily" small under it; a dash for none
+    static string WinsCell(int weekly, int daily)
+    {
+        if (weekly + daily == 0) return "<color=#5B7563>-</color>";
+        return "<b>" + (weekly + daily) + "</b>\n<size=62%><color=#5B7563>" + weekly + " weekly · " + daily + " daily</color></size>";
+    }
+
+    static string WinsText(int weekly, int daily)
+    {
+        int total = weekly + daily;
+        if (total == 0) return "no wins yet";
+        return "<b>" + total + "</b> " + (total == 1 ? "win" : "wins") + " (" + weekly + " weekly, " + daily + " daily)";
     }
 
     // Overall: the three games' points; a game list: the plain average of the contests
@@ -371,6 +399,7 @@ public class RankingPage : MonoBehaviour
             "<b>Overall</b> is the average of your route choice game, race and 3D points. A game you have not played counts as 0, so the best all-round player is at the top.\n\n" +
             "<b>Updated</b> once a day, when the daily contest is over (3 hours after midnight, Swedish time, when late runs are in). " +
             "<color=#3F7D54>+2</color> / <color=#C0392B>-1</color> is how many places a player moved since the update before.\n\n" +
+            "<b>Wins</b> counts every weekly and daily contest a player has won, of all time (contests with at least " + rules.minFinishers + " finishers).\n\n" +
             "Click a player to see their points and places day by day.";
         GameObject go = MakePopup("How it works", new Vector2(1180, 760), out Transform card);
         TextMeshProUGUI body = CourseUI.Text("Body", card, text, 23, CourseUI.Ink);
@@ -414,6 +443,7 @@ public class RankingPage : MonoBehaviour
     LineChart chart;
     TextMeshProUGUI playerSummary;
     TextMeshProUGUI playerBest;
+    TextMeshProUGUI playerWins;
     Button pointsTab, placesTab;
 
     void OpenPlayer(RankRow r)
@@ -429,6 +459,10 @@ public class RankingPage : MonoBehaviour
                                       22, CourseUI.InkMuted);
         playerSummary.richText = true;
         CourseUI.Place(playerSummary.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40, -80), new Vector2(1100, 34));
+
+        playerWins = CourseUI.Text("Wins", card, "Contest wins: " + WinsText(r.ww, r.wd), 22, CourseUI.Ink);
+        playerWins.richText = true;
+        CourseUI.Place(playerWins.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40, -114), new Vector2(1100, 34));
 
         pointsTab = CourseUI.Button("Points", card, "Points", CourseUI.ButtonKind.Primary, () => { showPlaces = false; ShowChart(); }, 22);
         CourseUI.Place((RectTransform)pointsTab.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-236, -84), new Vector2(170, 50));
@@ -451,10 +485,10 @@ public class RankingPage : MonoBehaviour
 
     async void LoadPlayer(string playerId, GameObject forPopup)
     {
-        List<RankDay> days;
+        RankHistory history;
         try
         {
-            days = await ContestCloud.RankHistoryAsync(playerId);
+            history = await ContestCloud.RankHistoryAsync(playerId);
         }
         catch (Exception e)
         {
@@ -465,7 +499,10 @@ public class RankingPage : MonoBehaviour
             return;
         }
         if (this == null || popup != forPopup || forPopup == null) return;
-        playerDays = days ?? new List<RankDay>();
+        playerDays = history.days ?? new List<RankDay>();
+        RankWins w = history.wins ?? new RankWins();
+        if (w.Total > 0)
+            playerWins.text = "Contest wins: " + WinsText(w.ww, w.wd) + "   <color=#5B7563>·   Route choice " + w.rc + "  ·  Race " + w.race + "  ·  3D " + w.run + "</color>";
         chart.EmptyMessage = "No history yet: the chart gets a new point every day the player is in the ranking.";
         ShowChart();
     }
