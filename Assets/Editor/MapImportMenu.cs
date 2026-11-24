@@ -14,7 +14,7 @@ public static class MapImportMenu
 {
     const string PackagesFolder = "Assets/Resources/MapPackages";
     const string MapDefsFolder = "Assets/Resources/MapDefs";
-    const double PixelsPerMm = 24;      // about 600 dpi, sharp even when zoomed far in
+    const double PixelsPerMm = 12;      // about 300 dpi like a printed map; 600 dpi used 4x the memory (2026-11-24)
     const int MaxPictureSide = 16384;
 
     [MenuItem("Tools/O-Manager/Import map file (OCAD or OOM)...", false, 1)]
