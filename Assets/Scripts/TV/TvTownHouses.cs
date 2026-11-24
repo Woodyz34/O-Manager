@@ -137,6 +137,10 @@ public partial class TvWorldBuilder
                 var ring = new List<(float x, float z)>(keys.Count);
                 foreach (int key in keys) ring.Add((x0 + key % (W + 1) * c, z0 + key / (W + 1) * c));
                 var straight = StraightenLoop(ring, tol);
+                // On the map's own outline where it has one: exactly straight walls and real corners
+                float near = tol + 0.05f;
+                var onMap = SnapRing(ring);
+                if (onMap != null) { straight = onMap; near = 1.9f; }
                 if (straight.Count < 3) continue;
                 for (int i = 0; i < ring.Count; i++)
                 {
@@ -147,7 +151,7 @@ public partial class TvWorldBuilder
                         float d = DistSeg(ring[i].x, ring[i].z, straight[q].x, straight[q].z, straight[q + 1].x, straight[q + 1].z, out float px, out float pz);
                         if (d < bestD) { bestD = d; bx = px; bz = pz; }
                     }
-                    if (bestD <= tol + 0.05f) outerPos[keys[i]] = (bx, bz);
+                    if (bestD <= near) outerPos[keys[i]] = (bx, bz);
                 }
             }
         }
@@ -372,6 +376,119 @@ public partial class TvWorldBuilder
             if (b == WorldCell.Plot || b == WorldCell.Open || b == WorldCell.OpenTrees || b == WorldCell.Forest) plots++;
         }
         return plots >= all / 2;
+    }
+
+    // ---- The map's building outlines ----
+
+    // The outside of a block (its cell corners, a loop) laid on the map's building outlines near it: each run of
+    // corners along one straight wall of the map becomes that wall, and its corners where the walls meet. Null where
+    // the map has no outline there (an old map, or a block the outlines do not fit).
+    List<(float x, float z)> SnapRing(List<(float x, float z)> ring)
+    {
+        TvTown town = input.town;
+        int n = ring.Count - 1;
+        if (town == null || town.houseEdges.Count == 0 || n < 4) return null;
+        float lx = float.MaxValue, lz = float.MaxValue, hx = float.MinValue, hz = float.MinValue;
+        foreach (var r in ring) { lx = Math.Min(lx, r.x); lz = Math.Min(lz, r.z); hx = Math.Max(hx, r.x); hz = Math.Max(hz, r.z); }
+        lx -= 3f; lz -= 3f; hx += 3f; hz += 3f;
+        // The map's straight walls near the block: segments on one line are one wall
+        var segs = new List<(float ax, float az, float bx, float bz, int line)>();
+        var walls = new List<(float px, float pz, float ux, float uz)>();
+        foreach (float[] xy in town.houseEdges)
+        {
+            for (int i = 0; i + 3 < xy.Length; i += 2)
+            {
+                float ax = (float)(xy[i] - input.centerE), az = (float)(xy[i + 1] - input.centerN);
+                float bx = (float)(xy[i + 2] - input.centerE), bz = (float)(xy[i + 3] - input.centerN);
+                if (Math.Max(ax, bx) < lx || Math.Min(ax, bx) > hx || Math.Max(az, bz) < lz || Math.Min(az, bz) > hz) continue;
+                float dx = bx - ax, dz = bz - az, len = (float)Math.Sqrt(dx * dx + dz * dz);
+                if (len < 0.3f) continue;
+                dx /= len; dz /= len;
+                int line = -1;
+                for (int w = 0; w < walls.Count && line < 0; w++)
+                {
+                    var L = walls[w];
+                    if (Math.Abs(dx * L.uz - dz * L.ux) > 0.05f) continue;
+                    float mx = (ax + bx) / 2f - L.px, mz = (az + bz) / 2f - L.pz;
+                    if (Math.Abs(mx * L.uz - mz * L.ux) < 0.25f) line = w;
+                }
+                if (line < 0) { line = walls.Count; walls.Add((ax, az, dx, dz)); }
+                segs.Add((ax, az, bx, bz, line));
+            }
+        }
+        if (segs.Count == 0) return null;
+        // Each corner of the cells on its nearest wall
+        var id = new int[n];
+        int missing = 0;
+        for (int i = 0; i < n; i++)
+        {
+            float best = 1.7f;
+            id[i] = -1;
+            foreach (var sg in segs)
+            {
+                float d = DistSeg(ring[i].x, ring[i].z, sg.ax, sg.az, sg.bx, sg.bz, out _, out _);
+                if (d < best) { best = d; id[i] = sg.line; }
+            }
+            if (id[i] < 0) missing++;
+        }
+        if (missing * 5 > n) return null;
+        int start = -1;
+        for (int i = 0; i < n && start < 0; i++) if (id[i] >= 0) start = i;
+        if (start < 0) return null;
+        for (int k = 1; k < n; k++)
+        {
+            int i = (start + k) % n;
+            if (id[i] < 0) id[i] = id[(i + n - 1) % n];
+        }
+        // A corner or two on another wall between two runs on the same wall is noise (a wall meeting this one)
+        for (int pass = 0; pass < 2; pass++)
+            for (int i = 0; i < n; i++)
+            {
+                int prev = id[(i + n - 1) % n];
+                if (id[i] == prev) continue;
+                int len = 1;
+                while (len < 3 && id[(i + len) % n] == id[i]) len++;
+                if (len < 3 && id[(i + len) % n] == prev)
+                    for (int k = 0; k < len; k++) id[(i + k) % n] = prev;
+            }
+        // The runs round the loop, from the start of one
+        int s0 = -1;
+        for (int i = 0; i < n && s0 < 0; i++) if (id[i] != id[(i + n - 1) % n]) s0 = i;
+        if (s0 < 0) return null;
+        var runs = new List<(int line, int first)>();
+        for (int k = 0; k < n; k++)
+        {
+            int i = (s0 + k) % n;
+            if (k == 0 || id[i] != id[(i + n - 1) % n]) runs.Add((id[i], i));
+        }
+        if (runs.Count < 3) return null;
+        var poly = new List<(float x, float z)>();
+        (float x, float z) On(int line, (float x, float z) q)
+        {
+            var L = walls[line];
+            float t = (q.x - L.px) * L.ux + (q.z - L.pz) * L.uz;
+            return (L.px + L.ux * t, L.pz + L.uz * t);
+        }
+        for (int k = 0; k < runs.Count; k++)
+        {
+            var a = walls[runs[k].line];
+            var bRun = runs[(k + 1) % runs.Count];
+            var b = walls[bRun.line];
+            // The cells' corner where the one wall gives way to the next
+            var at = ring[bRun.first];
+            float cross = a.ux * b.uz - a.uz * b.ux;
+            if (Math.Abs(cross) > 0.25f)
+            {
+                float t = ((b.px - a.px) * b.uz - (b.pz - a.pz) * b.ux) / cross;
+                float vx = a.px + a.ux * t, vz = a.pz + a.uz * t;
+                if ((vx - at.x) * (vx - at.x) + (vz - at.z) * (vz - at.z) < 9f) { poly.Add((vx, vz)); continue; }
+            }
+            // Nearly parallel walls (a step in the front): a short wall across between them
+            poly.Add(On(runs[k].line, at));
+            poly.Add(On(bRun.line, at));
+        }
+        poly.Add(poly[0]);
+        return poly;
     }
 
     // ---- Straightening a border ----
