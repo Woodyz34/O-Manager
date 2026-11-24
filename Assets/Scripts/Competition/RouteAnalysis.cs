@@ -534,64 +534,84 @@ public class RouteCompareView : MonoBehaviour
                 legs = new List<Vector3>[legs + 1],
                 times = new int[legs + 1]
             };
-            RelayTeamResult result = null;
-            foreach (RelayTeamResult r in results)
-            {
-                if (r.player != null && ((track.look != null && r.player.transform == track.look) || r.team == track.label)) result = r;
-            }
-            // Cut at the punches (2026-11-20, Anders: the leg starts when control 2 is punched and ends when control 3
-            // is punched, not when the runner passes near it). The split clocks and the track's times are the same
-            // race clock when the track is stamped with the runner's own clock; otherwise (a relay leg, a track
-            // without split times) the cut is where the runner reached the control.
-            bool byPunch = track.runnerClock && result != null && result.hasSplits && result.clocks != null
-                           && track.times.Count == track.positions.Count && track.times.Count > 0;
-            int from = 0;
+            RelayTeamResult result = ResultFor(results, track);
+            int[] ends = LegEnds(track, result, points, legs, out bool[] punched);
             for (int k = 1; k <= legs && k < points.Count; k++)
             {
-                Vector3 control = points[k].position;
-                int punched = byPunch && k < result.clocks.Length ? PunchIndex(track, result.clocks[k], from) : -1;
-                if (punched >= 0)
-                {
-                    List<Vector3> cut = new List<Vector3> { points[k - 1].position };
-                    for (int i = from; i <= punched; i++) cut.Add(track.positions[i]);
-                    cut.Add(control);
-                    entry.legs[k] = cut;
-                    if (result.split != null && k < result.split.Length) entry.times[k] = result.split[k];
-                    from = punched;
-                    continue;
-                }
-                int hit = -1, closest = from;
-                float best = float.MaxValue;
-                for (int i = from; i < track.positions.Count; i++)
-                {
-                    float d = Vector2.Distance(track.positions[i], control);
-                    if (d < best) { best = d; closest = i; }
-                    if (d <= 0.35f) { hit = i; break; }
-                }
-                // The runner first comes this close a little before the control and then runs on into it. Cut where
-                // it came closest while still near the control, or the last bit into the control would be drawn as
-                // the start of the next leg (a hook back towards where the runner came from).
-                if (hit >= 0)
-                {
-                    best = Vector2.Distance(track.positions[hit], control);
-                    for (int i = hit + 1; i < track.positions.Count; i++)
-                    {
-                        float d = Vector2.Distance(track.positions[i], control);
-                        if (d > 0.35f) break;
-                        if (d < best) { best = d; hit = i; }
-                    }
-                }
-                int end = hit >= 0 ? hit : closest;
                 List<Vector3> line = new List<Vector3> { points[k - 1].position };
-                for (int i = from; i <= end && i < track.positions.Count; i++) line.Add(track.positions[i]);
-                line.Add(control);
+                for (int i = ends[k - 1]; i <= ends[k] && i < track.positions.Count; i++) line.Add(track.positions[i]);
+                line.Add(points[k].position);
                 entry.legs[k] = line;
-                if (result != null && result.hasSplits && k < result.split.Length) entry.times[k] = result.split[k];
-                from = end;
+                if (punched[k]) { if (result.split != null && k < result.split.Length) entry.times[k] = result.split[k]; }
+                else if (result != null && result.hasSplits && k < result.split.Length) entry.times[k] = result.split[k];
             }
             entries.Add(entry);
         }
         return entries;
+    }
+
+    // The result (split times) of the runner whose route the track is
+    public static RelayTeamResult ResultFor(List<RelayTeamResult> results, RelayTrack track)
+    {
+        RelayTeamResult result = null;
+        foreach (RelayTeamResult r in results)
+        {
+            if (r.player != null && ((track.look != null && r.player.transform == track.look) || r.team == track.label)) result = r;
+        }
+        return result;
+    }
+
+    // Where in the track each control was reached: ends[k] is the index of the track point at control k (ends[0] = 0,
+    // the start), for k = 1..legs. Also used by the replay to show one leg at a time (2026-11-24).
+    // Cut at the punches (2026-11-20, Anders: the leg starts when control 2 is punched and ends when control 3
+    // is punched, not when the runner passes near it). The split clocks and the track's times are the same
+    // race clock when the track is stamped with the runner's own clock; otherwise (a relay leg, a track
+    // without split times) the cut is where the runner reached the control.
+    public static int[] LegEnds(RelayTrack track, RelayTeamResult result, List<Transform> points, int legs, out bool[] punchedLegs)
+    {
+        int[] ends = new int[legs + 1];
+        punchedLegs = new bool[legs + 1];
+        bool byPunch = track.runnerClock && result != null && result.hasSplits && result.clocks != null
+                       && track.times.Count == track.positions.Count && track.times.Count > 0;
+        int from = 0;
+        for (int k = 1; k <= legs; k++)
+        {
+            if (k >= points.Count) { ends[k] = from; continue; }
+            Vector3 control = points[k].position;
+            int punched = byPunch && k < result.clocks.Length ? PunchIndex(track, result.clocks[k], from) : -1;
+            if (punched >= 0)
+            {
+                ends[k] = punched;
+                punchedLegs[k] = true;
+                from = punched;
+                continue;
+            }
+            int hit = -1, closest = from;
+            float best = float.MaxValue;
+            for (int i = from; i < track.positions.Count; i++)
+            {
+                float d = Vector2.Distance(track.positions[i], control);
+                if (d < best) { best = d; closest = i; }
+                if (d <= 0.35f) { hit = i; break; }
+            }
+            // The runner first comes this close a little before the control and then runs on into it. Cut where
+            // it came closest while still near the control, or the last bit into the control would be drawn as
+            // the start of the next leg (a hook back towards where the runner came from).
+            if (hit >= 0)
+            {
+                best = Vector2.Distance(track.positions[hit], control);
+                for (int i = hit + 1; i < track.positions.Count; i++)
+                {
+                    float d = Vector2.Distance(track.positions[i], control);
+                    if (d > 0.35f) break;
+                    if (d < best) { best = d; hit = i; }
+                }
+            }
+            int end = hit >= 0 ? hit : closest;
+            ends[k] = end;
+            from = end;
+        }
+        return ends;
     }
 
     // The last GPS point at or before the punch (clock in game seconds), or -1 when the control was never punched

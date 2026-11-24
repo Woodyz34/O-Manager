@@ -57,11 +57,45 @@ public class ContestRow
 public class ContestPaid
 {
     public string id;
+    public bool sprint;
     public int place;
     public int of;
     public int prize;
     public List<string> packs;
     public bool finished;
+}
+
+// A leaderboard as the cloud sends it: the rows, and the course and its dates so a contest that is over can be
+// shown without the status (2026-11-24)
+public class ContestBoard
+{
+    public List<ContestRow> rows = new List<ContestRow>();
+    public string course;
+    public bool over;
+    public bool sprint;
+    public long endsAt;
+    public long replaysUntil;   // the GPS routes are deleted then (daily 7 days after the end, weekly 30 days)
+
+    public bool ReplaysKept => replaysUntil <= 0 || DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() < replaysUntil;
+}
+
+// A contest that ended lately (the "recent" action): its winner, how many finished and my place
+public class ContestRecent
+{
+    public string id;
+    public string span;
+    public string kind;
+    public bool sprint;
+    public long endsAt;
+    public long replaysUntil;
+    public int entries;
+    public ContestWinner winner;
+    public ContestMine mine;     // null when I did not run it
+
+    public class ContestWinner { public string name; public int score; public int seconds; }
+    public class ContestMine { public int place; public int score; public int seconds; public bool finished; }
+
+    public ContestInfo Info() => new ContestInfo { id = id, span = span, kind = kind, sprint = sprint, endsAt = endsAt };
 }
 
 public class ContestPrizeRules
@@ -106,10 +140,23 @@ public static class ContestCloud
         return Rows(output);
     }
 
-    public static async Task<List<ContestRow>> BoardAsync(string id)
+    public static async Task<ContestBoard> BoardAsync(string id)
     {
-        return Rows(await Call("board", new { id }));
+        JObject output = await Call("board", new { id });
+        ContestBoard board = output.ToObject<ContestBoard>() ?? new ContestBoard();
+        if (board.rows == null) board.rows = new List<ContestRow>();
+        return board;
     }
+
+    // The contests that ended lately and still have their GPS routes, newest first
+    public static async Task<List<ContestRecent>> RecentAsync()
+    {
+        JObject output = await Call("recent", null);
+        return output["contests"] != null ? output["contests"].ToObject<List<ContestRecent>>() : new List<ContestRecent>();
+    }
+
+    // How many runners' replays the cloud sends at once
+    public const int MaxReplays = 10;
 
     // playerId -> replay JSON
     public static async Task<Dictionary<string, string>> ReplaysAsync(string id, IEnumerable<string> players)

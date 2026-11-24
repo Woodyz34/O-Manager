@@ -8,7 +8,8 @@ using UnityEngine.UI;
 
 // The replays of a weekly or daily contest, shown on the contests page (no race scene needed): the map picture with
 // the course, and
-//  - for a race: the runners' ways round, growing as the time goes, with a dot and the name at the front;
+//  - for a race: the runners' ways round, growing as the time goes, with a dot and the name at the front; the whole
+//    course or one leg at a time, everyone starting the leg together, with the leg times (2026-11-24, the user);
 //  - for the route choice game: one leg at a time with its routes, and which route each runner picked.
 // Only shown after the player has run the contest themselves (the cloud says no before that).
 public class ContestReplay : MonoBehaviour
@@ -41,16 +42,25 @@ public class ContestReplay : MonoBehaviour
         public List<float> times = new List<float>();          // game seconds
         public List<CoursePoint> track = new List<CoursePoint>();
         public List<ChoiceLeg> legs = new List<ChoiceLeg>();
+        public List<float> controlTimes = new List<float>();   // when each control (1.., then the finish) was reached
         public bool shown = true;
         // drawn
         public UIRouteLine line;
         public RectTransform dot;
+        public TextMeshProUGUI dotLabel;
+        public TextMeshProUGUI listLabel;
+        // legs: the track point at each control (ends[0] = 0, the start) and the time on each leg (game seconds)
+        public int[] ends;
+        public float[] legSeconds;
+        public int viewFrom, viewTo;
+        public float viewOffset;
     }
 
     static readonly Color[] Palette =
     {
         new Color(0.91f, 0.45f, 0.16f), new Color(0.13f, 0.47f, 0.85f), new Color(0.20f, 0.62f, 0.33f),
-        new Color(0.80f, 0.16f, 0.30f), new Color(0.55f, 0.30f, 0.75f), new Color(0.10f, 0.65f, 0.70f), new Color(0.85f, 0.70f, 0.10f)
+        new Color(0.80f, 0.16f, 0.30f), new Color(0.55f, 0.30f, 0.75f), new Color(0.10f, 0.65f, 0.70f), new Color(0.85f, 0.70f, 0.10f),
+        new Color(0.45f, 0.30f, 0.20f), new Color(0.95f, 0.35f, 0.70f), new Color(0.30f, 0.30f, 0.30f), new Color(0.55f, 0.75f, 0.15f)
     };
 
     // Reads one replay; false when it can not be read
@@ -71,6 +81,7 @@ public class ContestReplay : MonoBehaviour
                     runner.times.Add((int)t[i] / 10f);
                     runner.track.Add(new CoursePoint(origin.e + (int)p[2 * i] / 10.0, origin.n + (int)p[2 * i + 1] / 10.0));
                 }
+                if (o["c"] is JArray c) foreach (JToken x in c) runner.controlTimes.Add((int)x / 10f);
                 return n > 0;
             }
             if (kind == "rc")
@@ -126,6 +137,10 @@ public class ContestReplay : MonoBehaviour
     bool settingSlider;
     int legIndex;
     List<int> legNumbers = new List<int>();
+    int raceLegs;          // race: the number of legs (start - 1 ... last - finish)
+    int raceLeg;           // race: 0 = the whole course, else the leg shown
+    TextMeshProUGUI raceLegTitle;
+    TextMeshProUGUI legTimes;
     bool dragging;
     Vector2 dragFrom;
 
@@ -212,11 +227,22 @@ public class ContestReplay : MonoBehaviour
     {
         Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
         void Add(Vector2 uv) { min = Vector2.Min(min, uv); max = Vector2.Max(max, uv); }
-        foreach (CoursePoint p in course.AllPoints()) Add(UV(p));
-        foreach (Runner r in runners)
+        List<CoursePoint> all = course.AllPoints();
+        if (raceLeg > 0 && raceLeg < all.Count)
         {
-            foreach (CoursePoint p in r.track) Add(UV(p));
-            foreach (ChoiceLeg l in r.legs) foreach (ChoiceRoute route in l.routes) foreach (CoursePoint p in route.points) Add(UV(p));
+            // One leg: its two controls and everyone's way between them
+            Add(UV(all[raceLeg - 1]));
+            Add(UV(all[raceLeg]));
+            foreach (Runner r in runners) for (int i = r.viewFrom; i <= r.viewTo && i < r.track.Count; i++) Add(UV(r.track[i]));
+        }
+        else
+        {
+            foreach (CoursePoint p in all) Add(UV(p));
+            foreach (Runner r in runners)
+            {
+                foreach (CoursePoint p in r.track) Add(UV(p));
+                foreach (ChoiceLeg l in r.legs) foreach (ChoiceRoute route in l.routes) foreach (CoursePoint p in route.points) Add(UV(p));
+            }
         }
         Vector2 size = background.pixelSize;
         areaCenterUV = (min + max) / 2f;
@@ -326,8 +352,12 @@ public class ContestReplay : MonoBehaviour
 
     void BuildRace()
     {
+        PrepareLegs();
         foreach (Runner r in runners)
         {
+            r.viewFrom = 0;
+            r.viewTo = Mathf.Min(r.times.Count, r.track.Count) - 1;
+            r.viewOffset = 0f;
             if (r.times.Count > 0) endTime = Mathf.Max(endTime, r.times[r.times.Count - 1]);
             r.line = UIRouteLine.Make("Track " + r.name, overlay, r.color, r.me ? 5f : 4f);
             Image dot = CourseUI.Panel("Runner " + r.name, overlay, r.color);
@@ -344,13 +374,33 @@ public class ContestReplay : MonoBehaviour
             label.outlineWidth = 0.25f;
             label.outlineColor = Color.white;
             CourseUI.Place(label.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 0f), new Vector2(0, 4), new Vector2(260, 28));
+            r.dotLabel = label;
+        }
+
+        // The whole course or one leg at a time
+        float top = -160f;
+        if (raceLegs > 0)
+        {
+            RectTransform nav = CourseUI.Rect("Leg buttons", side);
+            CourseUI.Place(nav, new Vector2(0, 1), new Vector2(0, 1), new Vector2(28, top), new Vector2(424, 56));
+            CourseUI.Row(nav.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+            Button previous = CourseUI.Button("Previous", nav, "<", CourseUI.ButtonKind.Light, () => ShowRaceLeg(raceLeg - 1), 24);
+            Button whole = CourseUI.Button("Leg", nav, "Whole course", CourseUI.ButtonKind.Light, () => ShowRaceLeg(raceLeg + 1), 21);
+            Button next = CourseUI.Button("Next", nav, ">", CourseUI.ButtonKind.Light, () => ShowRaceLeg(raceLeg + 1), 24);
+            CourseUI.Size(previous, 56, 70);
+            CourseUI.Size(whole, 56, 264);
+            CourseUI.Size(next, 56, 70);
+            raceLegTitle = whole.GetComponentInChildren<TextMeshProUGUI>(true);
+            HoverTip.Add(whole, "One leg at a time: everyone starts the leg together, so you can compare the route choices and the leg times. Arrow keys work too.");
+            top -= 70f;
         }
 
         // Who is shown
         TextMeshProUGUI caption = CourseUI.Text("Runners caption", side, "Runners (click to show or hide)", 20, CourseUI.InkMuted, FontStyles.Bold);
-        CourseUI.Place(caption.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(28, -160), new Vector2(424, 30));
+        CourseUI.Place(caption.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(28, top), new Vector2(424, 30));
+        legTimes = caption;
         RectTransform list = CourseUI.Rect("Runners", side);
-        CourseUI.Place(list, new Vector2(0, 1), new Vector2(0, 1), new Vector2(28, -196), new Vector2(424, 600));
+        CourseUI.Place(list, new Vector2(0, 1), new Vector2(0, 1), new Vector2(28, top - 36), new Vector2(424, 600));
         CourseUI.Column(list.gameObject, 8, new RectOffset(0, 0, 0, 0));
         foreach (Runner r in runners)
         {
@@ -358,6 +408,8 @@ public class ContestReplay : MonoBehaviour
             string label = (r.place > 0 ? r.place + ". " : "") + r.name + (r.times.Count > 0 ? "   " + CompetitionFlow.FormatTime(Mathf.RoundToInt(r.times[r.times.Count - 1])) : "");
             Button b = CourseUI.Button("Runner " + r.name, list, label, CourseUI.ButtonKind.Light, null, 22);
             CourseUI.Size(b, 52);
+            r.listLabel = b.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (r.listLabel != null) r.listLabel.richText = true;
             Image swatch = CourseUI.Panel("Colour", b.transform, r.color);
             if (CourseUI.Skin != null && CourseUI.Skin.pill != null) swatch.sprite = CourseUI.Skin.pill;
             CourseUI.Place(swatch.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(14, 0), new Vector2(20, 20));
@@ -412,23 +464,31 @@ public class ContestReplay : MonoBehaviour
         if (routeChoice || background == null) return;
         foreach (Runner r in runners)
         {
-            int count = 0;
-            while (count < r.times.Count && r.times[count] <= time) count++;
-            List<Vector2> shown = new List<Vector2>(count + 1);
-            for (int i = 0; i < count; i++) shown.Add(UV(r.track[i]));
-            Vector2 at = count > 0 ? shown[count - 1] : (r.track.Count > 0 ? UV(r.track[0]) : Vector2.zero);
-            if (count > 0 && count < r.times.Count)
+            float clock = time + r.viewOffset;
+            int last = r.viewFrom - 1;     // the last point reached
+            while (last + 1 <= r.viewTo && r.times[last + 1] <= clock) last++;
+            int count = last - r.viewFrom + 1;
+            List<Vector2> shown = new List<Vector2>(Mathf.Max(0, count) + 1);
+            for (int i = 0; i < count; i++) shown.Add(UV(r.track[r.viewFrom + i]));
+            bool any = r.viewTo >= r.viewFrom;
+            Vector2 at = count > 0 ? shown[count - 1] : (any ? UV(r.track[r.viewFrom]) : Vector2.zero);
+            if (count > 0 && last < r.viewTo)
             {
-                float span = r.times[count] - r.times[count - 1];
-                float f = span > 0f ? (time - r.times[count - 1]) / span : 0f;
-                at = Vector2.Lerp(at, UV(r.track[count]), Mathf.Clamp01(f));
+                float span = r.times[last + 1] - r.times[last];
+                float f = span > 0f ? (clock - r.times[last]) / span : 0f;
+                at = Vector2.Lerp(at, UV(r.track[last + 1]), Mathf.Clamp01(f));
                 shown.Add(at);
             }
             r.line.gameObject.SetActive(r.shown);
             r.line.Set(shown, false);
-            r.dot.gameObject.SetActive(r.shown && r.track.Count > 0);
+            r.dot.gameObject.SetActive(r.shown && any);
             r.dot.anchorMin = r.dot.anchorMax = at;
             r.dot.anchoredPosition = Vector2.zero;
+            if (r.dotLabel != null)
+            {
+                float leg = raceLeg > 0 && r.legSeconds != null ? r.legSeconds[raceLeg] : 0f;
+                r.dotLabel.text = r.name + (raceLeg > 0 && any && last >= r.viewTo && leg > 0 ? "  " + CompetitionFlow.FormatTime(Mathf.RoundToInt(leg)) : "");
+            }
         }
         if (clockText != null) clockText.text = CompetitionFlow.FormatTime(Mathf.RoundToInt(time));
         if (slider != null)
@@ -437,6 +497,114 @@ public class ContestReplay : MonoBehaviour
             slider.value = time;
             settingSlider = false;
         }
+    }
+
+    // ---- Race legs ----
+
+    // Where each runner reached each control: from the times the game saved with the replay, or (older replays) where
+    // the track came closest to the control
+    void PrepareLegs()
+    {
+        List<CoursePoint> controls = course.AllPoints();
+        raceLegs = controls.Count - 1;
+        if (raceLegs < 1) { raceLegs = 0; return; }
+        foreach (Runner r in runners)
+        {
+            int n = Mathf.Min(r.times.Count, r.track.Count);
+            r.ends = new int[raceLegs + 1];
+            r.legSeconds = new float[raceLegs + 1];
+            int from = 0;
+            for (int k = 1; k <= raceLegs; k++)
+            {
+                int end;
+                if (r.controlTimes.Count >= raceLegs)
+                {
+                    float at = r.controlTimes[k - 1];
+                    end = from;
+                    while (end + 1 < n && r.times[end + 1] <= at + 0.05f) end++;
+                }
+                else end = Nearest(r, controls[k], from, n);
+                r.ends[k] = end;
+                if (end > from && end < n) r.legSeconds[k] = r.times[end] - r.times[from];
+                from = end;
+            }
+        }
+    }
+
+    // The first time the track comes within 0.35 of the control (as RouteCompareView does), or else its closest point
+    int Nearest(Runner r, CoursePoint control, int from, int n)
+    {
+        Vector3 target = map.ToWorld(control);
+        int hit = -1, closest = from;
+        float best = float.MaxValue;
+        for (int i = from; i < n; i++)
+        {
+            float d = Vector2.Distance(map.ToWorld(r.track[i]), target);
+            if (d < best) { best = d; closest = i; }
+            if (d <= 0.35f) { hit = i; break; }
+        }
+        if (hit < 0) return closest;
+        best = Vector2.Distance(map.ToWorld(r.track[hit]), target);
+        for (int i = hit + 1; i < n; i++)
+        {
+            float d = Vector2.Distance(map.ToWorld(r.track[i]), target);
+            if (d > 0.35f) break;
+            if (d < best) { best = d; hit = i; }
+        }
+        return hit;
+    }
+
+    void ShowRaceLeg(int leg)
+    {
+        if (raceLegs <= 0) return;
+        raceLeg = ((leg % (raceLegs + 1)) + raceLegs + 1) % (raceLegs + 1);
+        endTime = 0f;
+        foreach (Runner r in runners)
+        {
+            int n = Mathf.Min(r.times.Count, r.track.Count);
+            if (raceLeg == 0)
+            {
+                r.viewFrom = 0;
+                r.viewTo = n - 1;
+                r.viewOffset = 0f;
+            }
+            else
+            {
+                r.viewFrom = r.ends[raceLeg - 1];
+                r.viewTo = r.ends[raceLeg] > r.viewFrom ? r.ends[raceLeg] : r.viewFrom - 1;
+                r.viewOffset = r.viewFrom < n ? r.times[r.viewFrom] : 0f;
+            }
+            if (r.viewTo >= r.viewFrom && r.viewTo < n) endTime = Mathf.Max(endTime, r.times[r.viewTo] - r.viewOffset);
+        }
+        List<CoursePoint> controls = course.AllPoints();
+        if (raceLegTitle != null)
+            raceLegTitle.text = raceLeg == 0 ? "Whole course" : "Leg " + raceLeg + ": " + (raceLeg == 1 ? "Start" : (raceLeg - 1).ToString()) + " - " + (raceLeg == raceLegs ? "Finish" : raceLeg.ToString());
+
+        // The runners' list: total time, or the time on the leg with the place and the gap to the fastest
+        List<Runner> order = runners.FindAll(r => raceLeg == 0 || (r.legSeconds != null && r.legSeconds[raceLeg] > 0));
+        if (raceLeg > 0) order.Sort((a, b) => a.legSeconds[raceLeg].CompareTo(b.legSeconds[raceLeg]));
+        float best = raceLeg > 0 && order.Count > 0 ? order[0].legSeconds[raceLeg] : 0f;
+        foreach (Runner r in runners)
+        {
+            if (r.listLabel == null) continue;
+            if (raceLeg == 0)
+            {
+                r.listLabel.text = (r.place > 0 ? r.place + ". " : "") + r.name + (r.times.Count > 0 ? "   " + CompetitionFlow.FormatTime(Mathf.RoundToInt(r.times[r.times.Count - 1])) : "");
+                continue;
+            }
+            int index = order.IndexOf(r);
+            float seconds = r.legSeconds[raceLeg];
+            r.listLabel.text = index < 0 ? r.name + "   <color=#5B7563>no time</color>"
+                : (index + 1) + ". " + r.name + "   <b>" + CompetitionFlow.FormatTime(Mathf.RoundToInt(seconds)) + "</b>"
+                  + (index > 0 ? "  <color=#5B7563>+" + RelayStats.Gap(Mathf.RoundToInt(seconds - best)) + "</color>" : "");
+        }
+        if (legTimes != null) legTimes.text = raceLeg == 0 ? "Runners (click to show or hide)" : "Time on the leg (click to show or hide)";
+        if (slider != null) slider.maxValue = Mathf.Max(1f, endTime);
+        time = 0f;
+        playing = true;
+        if (playButton != null) CourseUI.SetButtonText(playButton, "Pause");
+        Fit();
+        Apply();
     }
 
     // ---- Route choices ----
@@ -555,7 +723,9 @@ public class ContestReplay : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.RightArrow)) ShowLeg(legIndex + 1);
             if (Input.GetKeyDown(KeyCode.LeftArrow)) ShowLeg(legIndex - 1);
         }
-        else if (playing && background != null)
+        else if (raceLegs > 0 && Input.GetKeyDown(KeyCode.RightArrow)) ShowRaceLeg(raceLeg + 1);
+        else if (raceLegs > 0 && Input.GetKeyDown(KeyCode.LeftArrow)) ShowRaceLeg(raceLeg - 1);
+        if (!routeChoice && playing && background != null)
         {
             time += Time.unscaledDeltaTime * PackRunning.GameSecondsPerSecond * speed;
             if (time >= endTime)

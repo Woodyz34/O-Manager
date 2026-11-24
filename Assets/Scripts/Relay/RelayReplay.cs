@@ -190,6 +190,9 @@ public class RelayReplayRecorder : MonoBehaviour
 
 // Plays back the recorded leg on the map: every runner's line grows as the time goes, with a dot and the team's name
 // at the front. The camera is taken over while it plays and given back when it closes.
+// After an individual race (normal game, run it yourself, weekly/daily contests) it can also show one leg at a time
+// (2026-11-24, the user): everyone starts the leg together, so their route choices and leg times can be compared,
+// with the leg's times in a box in the corner.
 public class RelayReplayView : MonoBehaviour
 {
     List<RelayTrack> tracks;
@@ -214,14 +217,28 @@ public class RelayReplayView : MonoBehaviour
     bool settingSlider;
     static Material material;
 
+    // One leg at a time (individual races only): 0 = the whole course, k = start or control k-1 to control k
+    IRaceStats race;
+    int legCount;
+    int shownLeg;
+    int[][] legEnds;           // per track: the track point at each control (RouteCompareView.LegEnds)
+    int[][] legSeconds;        // per track: the time on each leg in game seconds, 0 when not run
+    int[] viewFrom, viewTo;    // per track: the points shown
+    float[] viewOffset;        // per track: the time the shown part starts (real seconds)
+    readonly List<TextMeshPro> labels = new List<TextMeshPro>();
+    TextMeshProUGUI legButtonText;
+    GameObject legBox;
+    TextMeshProUGUI legBoxText;
+
     // The replay on the screen, if any: the Follow runner button hides and the clock shows the replay's time
     public static RelayReplayView Current { get; private set; }
 
-    public static RelayReplayView Open(List<RelayTrack> tracks, System.Action onClose)
+    public static RelayReplayView Open(List<RelayTrack> tracks, System.Action onClose, IRaceStats race = null)
     {
         RelayReplayView view = new GameObject("Relay replay").AddComponent<RelayReplayView>();
         view.tracks = tracks;
         view.onClose = onClose;
+        view.race = race;
         Current = view;
         view.Build();
         return view;
@@ -240,6 +257,8 @@ public class RelayReplayView : MonoBehaviour
         savedPosition = cam.transform.position;
         savedRotation = cam.transform.rotation;
         savedSize = cam.orthographicSize;
+
+        PrepareLegs();
 
         // Fit the whole leg on the screen, north up
         Bounds bounds = new Bounds();
@@ -263,8 +282,7 @@ public class RelayReplayView : MonoBehaviour
             }
         }
         cam.transform.rotation = Quaternion.identity;
-        cam.transform.position = new Vector3(bounds.center.x, bounds.center.y - bounds.extents.y * 0.08f, -10f);
-        cam.orthographicSize = Mathf.Max(bounds.extents.y, bounds.extents.x / Mathf.Max(0.1f, cam.aspect)) * 1.2f + 0.3f;
+        FitCamera(bounds);
 
         if (material == null) material = new Material(Shader.Find("Sprites/Default"));
         // Sizes follow the zoom, so the lines and dots are as easy to see on a long leg as on a short one
@@ -318,13 +336,140 @@ public class RelayReplayView : MonoBehaviour
             label.alignment = TextAlignmentOptions.Center;
             label.enableWordWrapping = false;
             label.sortingOrder = 42;
+            labels.Add(label);
             markers.Add(marker.transform);
             markerScales.Add(marker.transform.localScale);
         }
 
         HideRealRunners();
         BuildBar();
+        ShowLeg(0);
+    }
+
+    void FitCamera(Bounds bounds)
+    {
+        cam.transform.position = new Vector3(bounds.center.x, bounds.center.y - bounds.extents.y * 0.08f, -10f);
+        cam.orthographicSize = Mathf.Max(bounds.extents.y, bounds.extents.x / Mathf.Max(0.1f, cam.aspect)) * 1.2f + 0.3f;
+    }
+
+    // ---- One leg at a time ----
+
+    void PrepareLegs()
+    {
+        int n = tracks.Count;
+        viewFrom = new int[n];
+        viewTo = new int[n];
+        viewOffset = new float[n];
+        PathfindingManager manager = FindObjectOfType<PathfindingManager>();
+        if (race == null || race.IsRelay || manager == null || manager.controlPoints == null || manager.controlPoints.Count < 2) return;
+        List<Transform> points = manager.controlPoints;
+        legCount = points.Count - 1;
+        List<RelayTeamResult> results = RelayStats.ForLeg(race, 0);
+        legEnds = new int[n][];
+        legSeconds = new int[n][];
+        for (int t = 0; t < n; t++)
+        {
+            RelayTrack track = tracks[t];
+            RelayTeamResult result = RouteCompareView.ResultFor(results, track);
+            int[] ends = RouteCompareView.LegEnds(track, result, points, legCount, out bool[] _);
+            legEnds[t] = ends;
+            legSeconds[t] = new int[legCount + 1];
+            for (int k = 1; k <= legCount; k++)
+            {
+                int seconds = 0;
+                if (result != null && result.hasSplits && result.split != null && k < result.split.Length) seconds = result.split[k];
+                if (seconds <= 0 && ends[k] > ends[k - 1] && ends[k] < track.times.Count)
+                    seconds = Mathf.RoundToInt((track.times[ends[k]] - track.times[ends[k - 1]]) * PackRunning.GameSecondsPerSecond);
+                legSeconds[t][k] = seconds;
+            }
+        }
+    }
+
+    bool HasLegs => legCount > 0 && legEnds != null;
+
+    public void ShowLeg(int leg)
+    {
+        if (!HasLegs) leg = 0;
+        else leg = ((leg % (legCount + 1)) + legCount + 1) % (legCount + 1);
+        shownLeg = leg;
+        endTime = 0f;
+        Bounds bounds = new Bounds();
+        bool any = false;
+        void Add(Vector3 p)
+        {
+            if (!any) { bounds = new Bounds(p, Vector3.zero); any = true; }
+            else bounds.Encapsulate(p);
+        }
+        for (int t = 0; t < tracks.Count; t++)
+        {
+            RelayTrack track = tracks[t];
+            int from = 0, to = track.positions.Count - 1;
+            if (leg > 0)
+            {
+                from = legEnds[t][leg - 1];
+                to = legEnds[t][leg];
+                // Not run (missed, or never got there): nothing shown on this leg
+                if (to <= from) to = from - 1;
+            }
+            viewFrom[t] = from;
+            viewTo[t] = Mathf.Min(to, Mathf.Min(track.positions.Count, track.times.Count) - 1);
+            viewOffset[t] = from < track.times.Count ? (leg > 0 ? track.times[from] : 0f) : 0f;
+            if (viewTo[t] >= viewFrom[t])
+            {
+                endTime = Mathf.Max(endTime, track.times[viewTo[t]] - viewOffset[t]);
+                for (int i = viewFrom[t]; i <= viewTo[t]; i++) Add(track.positions[i]);
+            }
+            if (t < labels.Count && labels[t] != null) labels[t].text = track.label;
+        }
+        PathfindingManager manager = FindObjectOfType<PathfindingManager>();
+        if (leg > 0 && manager != null)
+        {
+            Add(manager.controlPoints[leg - 1].position);
+            Add(manager.controlPoints[leg].position);
+        }
+        else if (manager != null) foreach (Transform point in manager.controlPoints) Add(point.position);
+        if (any)
+        {
+            FitCamera(bounds);
+            Rescale();
+        }
+        if (slider != null) slider.maxValue = Mathf.Max(0.1f, endTime);
+        if (legButtonText != null) legButtonText.text = leg == 0 ? "Whole course" : LegName(leg);
+        ShowLegBox();
+        time = 0f;
+        playing = true;
+        if (playButton != null) CourseUI.SetButtonText(playButton, "Pause");
         Apply();
+    }
+
+    string LegName(int leg) => "Leg " + leg + ": " + (leg == 1 ? "Start" : (leg - 1).ToString()) + " - " + (leg == legCount ? "Finish" : leg.ToString());
+
+    // The times on the shown leg, fastest first
+    void ShowLegBox()
+    {
+        if (legBox == null) return;
+        legBox.SetActive(shownLeg > 0);
+        if (shownLeg == 0) return;
+        List<int> order = new List<int>();
+        for (int t = 0; t < tracks.Count; t++) if (legSeconds[t][shownLeg] > 0) order.Add(t);
+        order.Sort((a, b) => legSeconds[a][shownLeg].CompareTo(legSeconds[b][shownLeg]));
+        System.Text.StringBuilder text = new System.Text.StringBuilder("<b>" + LegName(shownLeg) + "</b>");
+        int best = order.Count > 0 ? legSeconds[order[0]][shownLeg] : 0;
+        for (int i = 0; i < order.Count; i++)
+        {
+            int t = order[i];
+            int seconds = legSeconds[t][shownLeg];
+            text.Append("\n").Append(i + 1).Append(". <color=#").Append(ColorUtility.ToHtmlStringRGB(tracks[t].color)).Append("><b>")
+                .Append(tracks[t].label).Append("</b></color>  ").Append(RelayStats.Time(seconds));
+            if (i > 0) text.Append("  <color=#5B7563>+").Append(RelayStats.Time(seconds - best)).Append("</color>");
+        }
+        for (int t = 0; t < tracks.Count; t++)
+        {
+            if (legSeconds[t][shownLeg] <= 0) text.Append("\n<color=#5B7563>").Append(tracks[t].label).Append(": no time</color>");
+        }
+        legBoxText.text = text.ToString();
+        RectTransform box = (RectTransform)legBox.transform;
+        box.sizeDelta = new Vector2(box.sizeDelta.x, 70 + 34 * tracks.Count);
     }
 
     // A round dot in the track's colour with a dark ring round it, the size the replay draws every runner at least
@@ -416,7 +561,7 @@ public class RelayReplayView : MonoBehaviour
         if (canvas == null) return;
         Image panel = CourseUI.CardPanel("Replay controls", canvas.transform);
         bar = panel.gameObject;
-        CourseUI.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 24), new Vector2(1180, 96));
+        CourseUI.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 24), new Vector2(HasLegs ? 1640 : 1180, 96));
         CourseUI.Row(panel.gameObject, 14, new RectOffset(20, 20, 18, 18)).childForceExpandWidth = false;
 
         playButton = CourseUI.Button("Play", panel.transform, "Pause", CourseUI.ButtonKind.Secondary, TogglePlay, 22);
@@ -432,6 +577,28 @@ public class RelayReplayView : MonoBehaviour
         CourseUI.Size(slider, 58, 420);
         timeText = CourseUI.Text("Clock", panel.transform, "", 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Size(timeText, 58, 170);
+        if (HasLegs)
+        {
+            Button previous = CourseUI.Button("Previous leg", panel.transform, "<", CourseUI.ButtonKind.Light, () => ShowLeg(shownLeg - 1), 24);
+            CourseUI.Size(previous, 58, 60);
+            HoverTip.Add(previous, "The leg before (left arrow key)");
+            Button which = CourseUI.Button("Leg", panel.transform, "Whole course", CourseUI.ButtonKind.Light, () => ShowLeg(shownLeg + 1), 20);
+            CourseUI.Size(which, 58, 260);
+            legButtonText = which.GetComponentInChildren<TextMeshProUGUI>(true);
+            HoverTip.Add(which, "One leg at a time: everyone starts the leg together, so you can compare the route choices");
+            Button nextLeg = CourseUI.Button("Next leg", panel.transform, ">", CourseUI.ButtonKind.Light, () => ShowLeg(shownLeg + 1), 24);
+            CourseUI.Size(nextLeg, 58, 60);
+            HoverTip.Add(nextLeg, "The next leg (right arrow key)");
+
+            Image box = CourseUI.CardPanel("Leg times", canvas.transform);
+            box.raycastTarget = false;
+            CourseUI.Place(box.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24, -24), new Vector2(460, 200));
+            legBoxText = CourseUI.Text("Text", box.transform, "", 22, CourseUI.Ink);
+            legBoxText.richText = true;
+            CourseUI.Stretch(legBoxText.rectTransform, 22, 22, 16, 16);
+            legBox = box.gameObject;
+            legBox.SetActive(false);
+        }
         Button close = CourseUI.Button("Close", panel.transform, "Back to statistics", CourseUI.ButtonKind.Primary, Close, 20);
         CourseUI.Size(close, 58, 220);
     }
@@ -500,6 +667,11 @@ public class RelayReplayView : MonoBehaviour
     void Update()
     {
         HandleMapInput();
+        if (HasLegs)
+        {
+            if (Input.GetKeyDown(KeyCode.RightArrow)) ShowLeg(shownLeg + 1);
+            if (Input.GetKeyDown(KeyCode.LeftArrow)) ShowLeg(shownLeg - 1);
+        }
         if (!playing) return;
         time += Time.deltaTime * speed;
         if (time >= endTime)
@@ -516,23 +688,32 @@ public class RelayReplayView : MonoBehaviour
         for (int k = 0; k < tracks.Count; k++)
         {
             RelayTrack track = tracks[k];
-            int count = 0;
-            while (count < track.times.Count && track.times[count] <= time) count++;
+            int from = viewFrom[k], to = viewTo[k];
+            float at = time + viewOffset[k];
+            int last = from - 1;     // the last point reached
+            while (last + 1 <= to && track.times[last + 1] <= at) last++;
+            int count = last - from + 1;
             LineRenderer line = lines[k];
-            line.positionCount = count;
-            for (int i = 0; i < count; i++) line.SetPosition(i, new Vector3(track.positions[i].x, track.positions[i].y, -1.3f));
+            line.positionCount = Mathf.Max(0, count);
+            for (int i = 0; i < count; i++) line.SetPosition(i, new Vector3(track.positions[from + i].x, track.positions[from + i].y, -1.3f));
             bool shown = count > 0;
             markers[k].gameObject.SetActive(shown);
             if (shown)
             {
-                Vector3 position = track.positions[count - 1];
-                if (count < track.times.Count)
+                Vector3 position = track.positions[last];
+                if (last < to)
                 {
-                    float span = track.times[count] - track.times[count - 1];
-                    float f = span > 0f ? (time - track.times[count - 1]) / span : 0f;
-                    position = Vector3.Lerp(position, track.positions[count], Mathf.Clamp01(f));
+                    float span = track.times[last + 1] - track.times[last];
+                    float f = span > 0f ? (at - track.times[last]) / span : 0f;
+                    position = Vector3.Lerp(position, track.positions[last + 1], Mathf.Clamp01(f));
                 }
                 markers[k].position = new Vector3(position.x, position.y, -1.35f);
+            }
+            // At the end of the leg the runner's leg time shows by the name
+            if (shownLeg > 0 && k < labels.Count && labels[k] != null)
+            {
+                int seconds = legSeconds[k][shownLeg];
+                labels[k].text = track.label + (last >= to && seconds > 0 ? "  " + RelayStats.Time(seconds) : "");
             }
         }
         if (timeText != null)
@@ -557,6 +738,7 @@ public class RelayReplayView : MonoBehaviour
         if (cameraController != null) cameraController.enabled = true;
         ShowRealRunners();
         if (bar != null) Destroy(bar);
+        if (legBox != null) Destroy(legBox);
         Destroy(gameObject);
         onClose?.Invoke();
     }
