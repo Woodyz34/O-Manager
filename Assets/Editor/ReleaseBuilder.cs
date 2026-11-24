@@ -71,6 +71,14 @@ public class ReleaseBuilder : EditorWindow
         EditorGUILayout.LabelField("Version now", PlayerSettings.bundleVersion);
         version = EditorGUILayout.TextField("New version", version);
         EditorGUILayout.HelpBox("Use numbers like 1.0.4. It must be higher than the last release, or the games will not update.", MessageType.None);
+        string typed = (version ?? "").Trim().TrimStart('v', 'V', '.', ' ');
+        if (typed.Length > 0 && !GameUpdater.IsNewer(typed, PlayerSettings.bundleVersion))
+        {
+            EditorGUILayout.HelpBox("This is not higher than the version now (" + PlayerSettings.bundleVersion + "). The built game would say " +
+                                    typed + ", so if you publish it under a higher release number, every player's game downloads it, " +
+                                    "still sees an old version, and ends up with \"The update did not finish\". Use a higher number.",
+                                    MessageType.Warning);
+        }
 
         EditorGUILayout.Space(6);
         EditorGUILayout.LabelField("What's new (shown in the game while it updates, and on GitHub)");
@@ -122,7 +130,7 @@ public class ReleaseBuilder : EditorWindow
             EditorPrefs.SetBool(WindowsKey, buildWindows);
             EditorPrefs.SetBool(MacKey, buildMac);
             EditorPrefs.SetBool(LinuxKey, buildLinux);
-            string v = version.Trim().TrimStart('v', 'V');
+            string v = version.Trim().TrimStart('v', 'V', '.', ' ');
             bool win = buildWindows, mac = buildMac && macOk, linux = buildLinux && linuxOk;
             EditorApplication.delayCall += () => BuildRelease(v, notes ?? "", openGitHub, win, mac, linux);
             Close();

@@ -529,7 +529,8 @@ public class GameUpdater : MonoBehaviour
     {
         tag = (tag ?? "").Trim();
         if (tag.StartsWith("v", StringComparison.OrdinalIgnoreCase)) tag = tag.Substring(1);
-        return tag;
+        // A tag typed as "v.1.0.6.1" must still read as 1.0.6.1, not ".1.0.6.1"
+        return tag.TrimStart('.', ' ');
     }
 
     static Version ParseVersion(string text)
@@ -622,7 +623,8 @@ public class GameUpdater : MonoBehaviour
         barFill.offsetMax = Vector2.zero;
 
         statusText = CourseUI.Text("Status", panel.transform, "", 22, CourseUI.InkMuted, FontStyles.Italic, TextAlignmentOptions.Center);
-        CourseUI.Size(statusText, 30);
+        // Long sentences wrap onto more lines; the card's column layout sizes it to the text
+        statusText.overflowMode = TextOverflowModes.Overflow;
 
         RectTransform row = CourseUI.Rect("Buttons", panel.transform);
         CourseUI.Row(row.gameObject, 12, new RectOffset(0, 0, 4, 0));
