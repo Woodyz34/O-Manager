@@ -779,8 +779,10 @@ public partial class TvWorldBuilder
                 // cliff was a decimetre high where the contours showed no drop)
                 // ... and at most this high in the middle where the ground drops more; the rest of that drop stays
                 // a slope below the face (2026-11-24, Anders: 2-6 m in the middle, gentler at the ends)
-                case WorldLineKind.Cliff: Cliff(c, 2.0f, 6f, true); break;
-                case WorldLineKind.SmallCliff: Cliff(c, 1.0f, 2f, true); break;
+                // (2026-11-24 again, Anders: a bit higher, at least about 2.6 m, and up to 15 m for the big cliffs
+                // of e.g. Czechia; small cliffs at least 1.2 m)
+                case WorldLineKind.Cliff: Cliff(c, 2.8f, 15f, true); break;
+                case WorldLineKind.SmallCliff: Cliff(c, 1.2f, 2.2f, true); break;
                 case WorldLineKind.EarthBank: Cliff(c, 0.6f, 1.8f, false); break;
                 case WorldLineKind.EarthWall: Groove(c, 0.6f, 1.6f, 0.5f, false); break;
                 case WorldLineKind.Gully: Groove(c, -0.9f, 2.6f, 0.5f, false); break;
@@ -891,7 +893,7 @@ public partial class TvWorldBuilder
         // Stations every metre or so along the line: the ground's height a few metres above the edge and down at the
         // foot, evened out along the line, so the cliff's height changes smoothly along it and one odd spot in the
         // map's heights (a hollow or a knoll by the foot) does not make a pit or a bump at the cliff
-        const float Reach = 6f, TopReach = 3f, Up = 0.55f, LiftBack = 6f;
+        const float Reach = 6f, TopReach = 3f, Up = 0.65f, LiftBack = 4f;
         int stations = Math.Max(2, (int)Math.Ceiling(length / 1f) + 1);
         float gap = length / (stations - 1);
         var top = new float[stations];
@@ -2042,39 +2044,57 @@ public partial class TvWorldBuilder
     }
 
     // A rock cliff stands straight up (2026-11-19, Anders: a cliff is a wall, not a slope): a rough vertical face along
-    // the line, from the ground on the high side down to the foot on the low side, jagged a little along its length
+    // the line, jagged a little along its length, with a rock top on it. The ground has a corner only every metre, so
+    // the drop itself is a slope a metre wide; the face stands at the foot of that slope and the top covers the slope
+    // behind it back to the ground above, so the cliff is one solid block of rock: straight up from the foot, level on
+    // top (2026-11-24, Anders: the face was a thin sheet standing in the slope and stuck up above the ground behind it)
     void CliffFaces()
     {
+        const float Out = 0.75f, Back = 1.15f;
         foreach (var cliff in cliffs)
         {
             float[] c = cliff.xz;
+            stepEnds.TryGetValue(c, out var more);
+            float length = 0f;
+            for (int q = 0; q + 3 < c.Length; q += 2)
+                length += (float)Math.Sqrt((c[q + 2] - c[q]) * (c[q + 2] - c[q]) + (c[q + 3] - c[q + 1]) * (c[q + 3] - c[q + 1]));
+            float done = 0f;
             for (int q = 0; q + 3 < c.Length; q += 2)
             {
                 float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
                 float sx = bx - ax, sz = bz - az, len = (float)Math.Sqrt(sx * sx + sz * sz);
+                float start = done;
+                done += len;
                 if (len < 0.05f) continue;
                 if (!Inside((ax + bx) / 2f, (az + bz) / 2f, chunk ? 0f : 2f)) continue;
                 // The low side, as the drop was made
                 float nx = cliff.side * sz / len, nz = -cliff.side * sx / len;
                 int steps = Math.Max(1, (int)Math.Ceiling(len / 0.7f));
-                int first = -1;
+                int first = -1, firstTop = -1;
                 const int Rows = 4;   // the face in bands, each bulging a little its own way, so it is not one flat slab
                 for (int k = 0; k <= steps; k++)
                 {
                     float f = k / (float)steps, px = ax + sx * f, pz = az + sz * f;
-                    float jag = (TvRandom.Noise((px + ox) * 1.7f, (pz + oz) * 1.7f) - 0.5f) * 0.35f;
-                    float fx = px + nx * (0.15f + jag), fz = pz + nz * (0.15f + jag);
-                    float top = H(px - nx * 0.7f, pz - nz * 0.7f) + 0.1f, foot = H(px + nx * 1.1f, pz + nz * 1.1f) - 0.35f;
+                    float jag = (TvRandom.Noise((px + ox) * 1.7f, (pz + oz) * 1.7f) - 0.5f) * 0.3f;
+                    float fx = px + nx * (Out + jag), fz = pz + nz * (Out + jag);
+                    // The top: level with the ground above the edge (a little over it, so the ground does not show
+                    // through); the foot: in the ground below
+                    float top = Math.Max(H(px - nx * 0.7f, pz - nz * 0.7f), H(px - nx * 0.3f, pz - nz * 0.3f)) + 0.1f;
+                    float foot = H(px + nx * (Out + 0.6f), pz + nz * (Out + 0.6f)) - 0.35f;
+                    // At the cliff's own ends the face sinks into the ground where it stands
+                    float s = start + len * f;
+                    float toEnd = Math.Min(more.before > 0f ? 9f : s, more.after > 0f ? 9f : length - s);
+                    top = Lerp(H(fx, fz) - 0.05f, top, Sm(0f, 1.2f, toEnd));
                     // A low cliff: the face reaches further into the ground below, never up above the top
                     if (top < foot + 0.5f) foot = top - 0.5f;
-                    float lean = (TvRandom.Noise((px + ox) * 0.9f + 7f, (pz + oz) * 0.9f) - 0.5f) * 0.5f;
+                    float lean = (TvRandom.Noise((px + ox) * 0.9f + 7f, (pz + oz) * 0.9f) - 0.5f) * 0.3f;
                     int v0 = -1;
                     for (int r = 0; r <= Rows; r++)
                     {
                         float h = r / (float)Rows;                       // 0 top .. 1 foot
                         float y = top + (foot - top) * h;
-                        float bulge = r == 0 || r == Rows ? 0f : (TvRandom.Noise((px + ox) * 1.1f + r * 3.1f, (pz + oz) * 1.1f + y * 0.9f) - 0.5f) * 0.45f;
-                        float out0 = -0.12f + 0.17f * h + bulge;
+                        float bulge = r == 0 || r == Rows ? 0f : (TvRandom.Noise((px + ox) * 1.1f + r * 3.1f, (pz + oz) * 1.1f + y * 0.9f) - 0.5f) * 0.3f;
+                        float out0 = -0.05f + 0.1f * h + bulge;
                         // Grey granite in patches, lichen-pale near the top, darker and damp at the foot
                         float patch = TvRandom.Noise((px + ox) * 0.45f + y * 0.6f, (pz + oz) * 0.45f - y * 0.4f);
                         TvColor col = Rock.Lerp(RockDark, Math.Max(0f, Math.Min(1f, patch * 1.3f - 0.15f)));
@@ -2083,6 +2103,14 @@ public partial class TvWorldBuilder
                         int v = cliffMesh.Vertex(fx + nx * out0, y, fz + nz * out0, nx + lean * nz + bulge * 0.8f * nx, 0.15f - bulge * 0.3f, nz - lean * nx + bulge * 0.8f * nz, col);
                         if (r == 0) v0 = v;
                     }
+                    // The rock top: from the face's top edge back over the slope to the ground above
+                    float tex = fx + nx * -0.05f, tez = fz + nz * -0.05f;
+                    float mx = px - nx * 0.45f, mz = pz - nz * 0.45f, bkx = px - nx * Back, bkz = pz - nz * Back;
+                    float lichen = TvRandom.Noise((px + ox) * 0.6f + 3f, (pz + oz) * 0.6f);
+                    TvColor capCol = Rock.Lerp(LichenRock, 0.35f + 0.5f * lichen);
+                    int t0 = cliffMesh.Vertex(tex, top, tez, 0f, 1f, 0f, capCol);
+                    cliffMesh.Vertex(mx, Math.Max(top, H(mx, mz) + 0.06f), mz, 0f, 1f, 0f, capCol);
+                    cliffMesh.Vertex(bkx, H(bkx, bkz) - 0.04f, bkz, 0f, 1f, 0f, capCol.Lerp(Rock, 0.3f));
                     if (k > 0)
                     {
                         // Front faces must run clockwise seen from the low side
@@ -2102,11 +2130,30 @@ public partial class TvWorldBuilder
                                 cliffMesh.triangles.Add(c2); cliffMesh.triangles.Add(b2); cliffMesh.triangles.Add(d2);
                             }
                         }
+                        for (int r = 0; r < 2; r++)
+                        {
+                            UpTriangle(cliffMesh, firstTop + r, t0 + r, firstTop + r + 1);
+                            UpTriangle(cliffMesh, t0 + r, t0 + r + 1, firstTop + r + 1);
+                        }
                     }
                     first = v0;
+                    firstTop = t0;
                 }
             }
         }
+    }
+
+    // A triangle that faces up (clockwise seen from above, as Unity draws front faces)
+    static void UpTriangle(TvMesh mesh, int a, int b, int c)
+    {
+        var p = mesh.positions;
+        float abx = p[b * 3] - p[a * 3], abz = p[b * 3 + 2] - p[a * 3 + 2];
+        float acx = p[c * 3] - p[a * 3], acz = p[c * 3 + 2] - p[a * 3 + 2];
+        // The y of (b - a) x (c - a): positive when a, b, c run clockwise seen from above
+        float y = abz * acx - abx * acz;
+        mesh.triangles.Add(a);
+        if (y >= 0f) { mesh.triangles.Add(b); mesh.triangles.Add(c); }
+        else { mesh.triangles.Add(c); mesh.triangles.Add(b); }
     }
 
     // ---- Walls, fences, power lines, towers, buildings, fallen trees, springs ----
