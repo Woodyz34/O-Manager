@@ -82,6 +82,8 @@ public class TvMesh
         float size = 2f * radius / tiles;
         foreach (TvMesh source in sources)
         {
+            // Corners added after the last textured one get "no picture" too
+            if (source.uvs.Count > 0) source.PadUvs(source.VertexCount);
             List<float> p = source.positions, n = source.normals;
             List<byte> c = source.colors;
             List<int> t = source.triangles;

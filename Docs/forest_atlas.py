@@ -1,6 +1,6 @@
 """Paints the forest texture atlas for O-Manager's 3D world (TvAtlas).
 
-4 x 4 tiles of 512 px; each tile has 16 px padding round a 480 px picture (the shader maps a tile's 0..1 to the
+6 x 6 tiles of 512 px; each tile has 16 px padding round a 480 px picture (the shader maps a tile's 0..1 to the
 inner part). Bark tiles repeat (padding wraps), the others are cut-outs (alpha) with colour bled into the clear parts.
 
 usage: python3 tex.py out.png [tile previews dir]
@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageFilter
 TILE, PAD = 512, 16
 IN = TILE - 2 * PAD          # 480
 SS = 3                       # supersampling when painting
-N = 5
+N = 6
 
 rng = np.random.default_rng(12345)
 
@@ -928,6 +928,144 @@ def moss_tex():
 
 
 
+# ------------------------------------------------------------------ the town (repeating; light and fairly neutral,
+# so the house's own colour, multiplied on, still shows)
+
+def plaster():
+    """Rendered wall (2 m): soft trowel marks, faint damp patches low down, a few hairline cracks, about 0.9 grey."""
+    s = IN
+    n = fft_noise(s, 1.9, 401) * 0.6 + fft_noise(s, 1.2, 402) * 0.4
+    lum = 220 + (n - 0.5) * 40
+    lum = lum * (0.94 + 0.09 * np.random.default_rng(403).random((s, s)))
+    damp = smooth(0.62, 0.85, fft_noise(s, 1.6, 404, (0.4, 1.0)))
+    lum = lum * (1 - damp * 0.06)
+    rgb = np.dstack([lum, lum * 0.985, lum * 0.96])
+    f1, f2, _ = voronoi(s, 5, 405, warp=90)
+    crack = smooth(1.2, 0.0, f2 - f1) * smooth(0.55, 0.7, fft_noise(s, 1.5, 406))
+    rgb = lerp(rgb, col('#8a857c'), crack[..., None] * 0.5)
+    return to_img(rgb)
+
+
+def brick():
+    """Red brick (1.2 m): 15 courses in running bond, each brick its own shade, light mortar joints."""
+    s = IN
+    rows = 15
+    rh = s / rows
+    g = np.random.default_rng(411)
+    ys, xs = np.mgrid[0:s, 0:s].astype(np.float32)
+    row = np.floor(ys / rh).astype(int)
+    bw = s / 4.0
+    shift = (row % 2) * bw / 2
+    colx = np.floor(((xs + shift) % s) / bw).astype(int)
+    bid = (row * 7 + colx) % 97
+    shade = g.random(97)
+    hue = g.random(97)
+    base = lerp(col('#8e3f2c'), col('#b0583c'), shade[bid][..., None])
+    base = lerp(base, col('#6a3a30'), (hue[bid] > 0.8)[..., None] * 0.6)
+    base *= (0.9 + 0.18 * g.random((s, s)))[..., None]
+    base *= (0.94 + 0.12 * fft_noise(s, 1.4, 412))[..., None]
+    fy = ys - row * rh
+    fx = ((xs + shift) % s) - colx * bw
+    joint = np.maximum(smooth(2.6, 1.2, fy), smooth(2.6, 1.2, np.minimum(fx, bw - fx)))
+    rgb = lerp(base, col('#b9b2a4'), joint[..., None])
+    soot = smooth(0.6, 0.85, fft_noise(s, 1.6, 413))
+    rgb = lerp(rgb, col('#3a2a24'), soot[..., None] * 0.25)
+    return to_img(rgb)
+
+
+def wood_panel():
+    """Painted wooden boards (2 m), board and batten: 10 wide boards, narrow battens over the joints, grain."""
+    s = IN
+    ys, xs = np.mgrid[0:s, 0:s].astype(np.float32)
+    bw = s / 10.0
+    fx = xs % bw
+    grain = fft_noise(s, 1.3, 421, (0.05, 1.0))
+    lum = 214 + (grain - 0.5) * 30
+    bid = np.floor(xs / bw).astype(int)
+    lum = lum * (0.95 + 0.08 * np.random.default_rng(422).random(11)[bid])
+    batten = smooth(bw * 0.16, bw * 0.12, np.minimum(fx, bw - fx))
+    edge = smooth(bw * 0.16, bw * 0.13, np.minimum(fx, bw - fx)) - smooth(bw * 0.13, bw * 0.10, np.minimum(fx, bw - fx))
+    lum = lum * (1 + batten * 0.06) * (1 - np.clip(edge, 0, 1) * 0.35)
+    shadow = smooth(bw * 0.22, bw * 0.16, fx) * (1 - batten)
+    lum = lum * (1 - shadow * 0.15)
+    rgb = np.dstack([lum, lum * 0.98, lum * 0.95])
+    peel = smooth(0.78, 0.86, fft_noise(s, 1.5, 423))
+    rgb = lerp(rgb, col('#8f8a80'), peel[..., None] * 0.4)
+    return to_img(rgb)
+
+
+def roof_tiles():
+    """Clay roof tiles (2 m, the slope runs up the picture): 7 courses of rounded tiles, each overlapping the one
+    below, shadows under each course; grey enough that the roof's own colour (red, black) shows."""
+    s = IN
+    rows, cols = 7, 8
+    rh, cw = s / rows, s / cols
+    ys, xs = np.mgrid[0:s, 0:s].astype(np.float32)
+    row = np.floor(ys / rh).astype(int)
+    shift = (row % 2) * cw / 2
+    fx = ((xs + shift) % cw) / cw
+    fy = (ys - row * rh) / rh               # 0 at the top of a course (image y down: the course above overlaps)
+    round_ = np.sin(fx * math.pi) ** 0.6     # the barrel of a tile
+    lum = 150 + 80 * round_
+    lum = lum * (1 - smooth(0.7, 1.0, fy) * 0.45)           # shadow at the bottom edge under the next course
+    lum = lum * (1 - smooth(0.12, 0.0, fy) * 0.25)
+    g = np.random.default_rng(431)
+    tid = (row * 13 + np.floor((xs + shift) / cw).astype(int)) % 101
+    lum = lum * (0.9 + 0.16 * g.random(101)[tid])
+    lum = lum * (0.95 + 0.1 * fft_noise(s, 1.5, 432))
+    rgb = np.dstack([lum, lum * 0.97, lum * 0.94])
+    moss = smooth(0.68, 0.8, fft_noise(s, 1.6, 433)) * smooth(0.4, 0.9, fy)
+    rgb = lerp(rgb, col('#6a7a3a'), moss[..., None] * 0.35)
+    return to_img(rgb)
+
+
+def metal_sheet():
+    """Ribbed sheet metal (2 m): standing seams every 25 cm, soft dents, a little rust at the seams."""
+    s = IN
+    ys, xs = np.mgrid[0:s, 0:s].astype(np.float32)
+    pw = s / 8.0
+    fx = xs % pw
+    seam = smooth(3.0, 1.0, np.minimum(fx, pw - fx))
+    lum = 205 + (fft_noise(s, 1.8, 441, (0.3, 1.0)) - 0.5) * 30
+    lum = lum * (1 - seam * 0.3) + smooth(5.0, 3.0, fx) * 15
+    rgb = np.dstack([lum, lum * 1.0, lum * 1.02])
+    rust = smooth(0.7, 0.85, fft_noise(s, 1.5, 442, (0.2, 1.0))) * smooth(10.0, 2.0, np.minimum(fx, pw - fx))
+    rgb = lerp(rgb, col('#7a5a40'), rust[..., None] * 0.4)
+    return to_img(rgb)
+
+
+def concrete():
+    """Concrete (2 m): smooth panels with form joints, pores and rain streaks."""
+    s = IN
+    ys, xs = np.mgrid[0:s, 0:s].astype(np.float32)
+    lum = 200 + (fft_noise(s, 1.7, 451) - 0.5) * 30
+    lum = lum * (0.95 + 0.07 * np.random.default_rng(452).random((s, s)))
+    pores = np.random.default_rng(453).random((s, s)) > 0.992
+    lum = lum * (1 - pores * 0.35)
+    joint = np.maximum(smooth(2.0, 0.5, np.minimum(ys % (s / 2), s / 2 - ys % (s / 2))), smooth(2.0, 0.5, np.minimum(xs % (s / 2), s / 2 - xs % (s / 2))))
+    lum = lum * (1 - joint * 0.3)
+    streak = smooth(0.6, 0.85, fft_noise(s, 1.5, 454, (0.06, 1.0)))
+    lum = lum * (1 - streak * 0.12)
+    return to_img(np.dstack([lum, lum * 0.99, lum * 0.97]))
+
+
+def glass():
+    """A window pane (stretched over each window): the sky and the street mirrored in it, brighter at the top,
+    a soft diagonal sheen, the dark room behind and a curtain at one side."""
+    s = IN
+    ys, xs = np.mgrid[0:s, 0:s].astype(np.float32) / s
+    sky = lerp(np.array([200, 215, 225], np.float32), np.array([90, 100, 110], np.float32), smooth(0.0, 0.75, ys)[..., None])
+    room = np.array([40, 42, 45], np.float32)
+    rgb = lerp(sky, np.broadcast_to(room, sky.shape), smooth(0.25, 0.8, ys)[..., None] * 0.75)
+    sheen = smooth(0.12, 0.0, np.abs((xs + ys * 0.6) - 0.55))
+    rgb = rgb + sheen[..., None] * 70
+    sheen2 = smooth(0.05, 0.0, np.abs((xs + ys * 0.6) - 0.8))
+    rgb = rgb + sheen2[..., None] * 40
+    curtain = smooth(0.2, 0.16, xs) * (0.85 + 0.15 * np.sin(xs * 60))
+    rgb = lerp(rgb, col('#d8d0c0') * 0.8, curtain[..., None] * smooth(0.1, 0.3, ys)[..., None] * 0.7)
+    return to_img(rgb)
+
+
 # ------------------------------------------------------------------ assembling
 
 def bleed(img):
@@ -997,6 +1135,13 @@ TILES = [
     ('dead wood', dead_wood, True),
     ('path soil', path_soil, True),
     ('moss', moss_tex, True),
+    ('plaster', plaster, True),
+    ('brick', brick, True),
+    ('wood panel', wood_panel, True),
+    ('roof tiles', roof_tiles, True),
+    ('metal sheet', metal_sheet, True),
+    ('concrete', concrete, True),
+    ('glass', glass, True),
 ]
 
 if __name__ == '__main__':

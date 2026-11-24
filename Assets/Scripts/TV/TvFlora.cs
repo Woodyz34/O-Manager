@@ -2,18 +2,19 @@ using System;
 using System.Collections.Generic;
 
 // The pictures of the forest's texture atlas (Resources/Textures/TvForestAtlas.png, painted by Docs/forest_atlas.py):
-// 5 x 5 tiles of 512 px, each with 16 px padding round its picture. A textured corner carries u, v (0..1 over the
+// 6 x 6 tiles of 512 px, each with 16 px padding round its picture. A textured corner carries u, v (0..1 over the
 // tile's picture; bark and stone repeat past 1) and the tile's number. The shader (TvAtlasLit) cuts the leaves, needles
-// and stems out of their tile by its alpha. Tiles 0-4 are bark and 20-24 stone; 5-19 are leaves and plants.
+// and stems out of their tile by its alpha. Tiles 0-4 are bark, 20-24 stone and wood, 25-31 the town's walls, roofs and windows; 5-19 are leaves and plants.
 public static class TvAtlas
 {
-    public const int PerSide = 5;
+    public const int PerSide = 6;
     public const float Padding = 16f / 512f;
 
     public const int PineBarkLow = 0, PineBarkHigh = 1, SpruceBark = 2, BirchBark = 3, BeechBark = 4,
         PineNeedles = 5, SpruceSpray = 6, BirchLeaves = 7, BroadLeaves = 8, Bilberry = 9, Grass = 10, Fern = 11,
         Heather = 12, Litter = 13, Twig = 14, DeadTwigs = 15, Lingonberry = 16, Sedge = 17, Juniper = 18, Flowers = 19,
-        Granite = 20, CliffRock = 21, DeadWood = 22, PathSoil = 23, Moss = 24;
+        Granite = 20, CliffRock = 21, DeadWood = 22, PathSoil = 23, Moss = 24,
+        Plaster = 25, Brick = 26, WoodPanel = 27, RoofTiles = 28, MetalSheet = 29, Concrete = 30, Glass = 31;
 
     // Tiles from this one on are leaves and plants: lit softly through, as light comes through a leaf
     public const int FirstFoliage = 5;

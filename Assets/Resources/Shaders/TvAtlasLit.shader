@@ -1,8 +1,8 @@
-// The trees, bushes, undergrowth and forest-floor litter of the 3D world with real pictures on them (2026-11-25):
+// The trees, bushes, undergrowth, forest-floor litter and town walls of the 3D world with real pictures on them (2026-11-25):
 // bark, needles, leaves, bilberry, grass, ferns, twigs (the forest atlas, TV/TvFlora.cs). Lit like TvVertexLit (its
 // own sun, sky and ground light, ACES tone mapping, fog), so it sits in the same picture.
 // Each corner carries u, v and the atlas tile in its first uv (x, y, z); tile -1 = no picture (the corner's colour only).
-// Tiles 0-4 are bark and 20-24 stone (lit as solid things); 5-19 are leaves and plants.
+// Tiles 0-4 are bark, 20-24 stone and wood, 25-31 walls, roofs and glass (lit as solid things); 5-19 are leaves and plants.
 // u, v repeat inside the tile (bark round a trunk), so the picture is looked up with its own slopes (no seam lines).
 // The leaves and plants are cut out by the picture's alpha and drawn from both sides; they are lit softly through
 // (light wraps round a leaf), with the normal the builder gave them (out of the crown), so a crown is lit as a whole.

@@ -571,7 +571,13 @@ public partial class TvWorldBuilder
                     HouseOutline n = all[sg.other - 1];
                     float from = n != null ? n.top + (n.flat ? 0.4f : 0f) : y0;
                     if (n != null && !n.flat) from = n.top;   // under its roof's slope the wall is hidden anyway
-                    if (top > from + 0.05f) WallQuad(m, sg.ax, sg.az, sg.bx, sg.bz, nx, nz, Math.Max(y0, from - 0.3f), top, col.wall.Shade(0.95f));
+                    if (top > from + 0.05f)
+                    {
+                        var look = WallLook(o);
+                        PaintOn(look.tile, look.size, look.size);
+                        WallQuad(m, sg.ax, sg.az, sg.bx, sg.bz, nx, nz, Math.Max(y0, from - 0.3f), top, look.color.Shade(0.95f));
+                        PaintOff();
+                    }
                     continue;
                 }
                 Facade(m, o, sg, len, ux, uz, nx, nz, detail, groundFloor, upper);
@@ -579,6 +585,47 @@ public partial class TvWorldBuilder
         }
         if (pitched) PitchedRoof(m, o, roofCorners, detail);
         else FlatRoof(m, o, detail);
+    }
+
+    // ---- Pictures on the walls and roofs (2026-11-25, Anders: more detail on the sprint houses) ----
+    // While paint is a tile of the atlas (TvAtlas: plaster, brick, boards, roof tiles ...), every face made gets that
+    // picture, laid flat on it: u along the face, v up it (up the slope on a roof), paintSu x paintSv metres per
+    // picture, shifted by paintOu, paintOv pictures. -1: plain colour as before. Thread-static, as pieces of the
+    // town are built on several threads at once.
+    [ThreadStatic] static int paintTile;
+    [ThreadStatic] static bool painting;
+    [ThreadStatic] static float paintSu, paintSv, paintOu, paintOv;
+
+    static void PaintOn(int tile, float su, float sv, float ou = 0f, float ov = 0f)
+    {
+        painting = true; paintTile = tile; paintSu = su; paintSv = sv; paintOu = ou; paintOv = ov;
+    }
+
+    static void PaintOff() => painting = false;
+
+    // The u, v of the corners from `first` on, from their place and normal
+    static void Paint(TvMesh m, int first)
+    {
+        if (!painting) return;
+        m.PadUvs(first);
+        for (int i = first; i < m.VertexCount; i++)
+        {
+            float x = m.positions[i * 3], y = m.positions[i * 3 + 1], z = m.positions[i * 3 + 2];
+            float nx = m.normals[i * 3], ny = m.normals[i * 3 + 1], nz = m.normals[i * 3 + 2];
+            float u, v;
+            if (ny > 0.97f || ny < -0.97f) { u = x; v = z; }
+            else
+            {
+                float h = (float)Math.Sqrt(nx * nx + nz * nz);
+                float tx = -nz / h, tz = nx / h;
+                // Up the face: straight up on a wall, up the slope on a roof
+                float bx = -nx * ny, by = nx * nx + nz * nz, bz = -nz * ny;
+                float bl = (float)Math.Sqrt(bx * bx + by * by + bz * bz);
+                u = x * tx + z * tz;
+                v = (x * bx + y * by + z * bz) / bl;
+            }
+            m.uvs.Add(u / paintSu - paintOu); m.uvs.Add(v / paintSv - paintOv); m.uvs.Add(paintTile);
+        }
     }
 
     // One flat face of a wall from a to b, from y0 to y1, set out d metres from the wall line, facing (nx, nz)
@@ -597,6 +644,7 @@ public partial class TvWorldBuilder
         bool flip = qx * nx + qy * ny + qz * nz < 0f;
         int a = m.Vertex(ax, ay, az, nx, ny, nz, col), b = m.Vertex(bx, by, bz, nx, ny, nz, col);
         int q = m.Vertex(cx, cy, cz, nx, ny, nz, col), d = m.Vertex(dx, dy, dz, nx, ny, nz, col);
+        Paint(m, a);
         if (flip) { m.triangles.Add(a); m.triangles.Add(q); m.triangles.Add(b); m.triangles.Add(a); m.triangles.Add(d); m.triangles.Add(q); }
         else { m.triangles.Add(a); m.triangles.Add(b); m.triangles.Add(q); m.triangles.Add(a); m.triangles.Add(q); m.triangles.Add(d); }
     }
@@ -607,6 +655,7 @@ public partial class TvWorldBuilder
         float qx = ey * fz - ez * fy, qy = ez * fx - ex * fz, qz = ex * fy - ey * fx;
         bool flip = qx * nx + qy * ny + qz * nz < 0f;
         int a = m.Vertex(ax, ay, az, nx, ny, nz, col), b = m.Vertex(bx, by, bz, nx, ny, nz, col), q = m.Vertex(cx, cy, cz, nx, ny, nz, col);
+        Paint(m, a);
         if (flip) { m.triangles.Add(a); m.triangles.Add(q); m.triangles.Add(b); }
         else { m.triangles.Add(a); m.triangles.Add(b); m.triangles.Add(q); }
     }
@@ -627,14 +676,35 @@ public partial class TvWorldBuilder
         Face(m, bx + nx * d0, y0, bz + nz * d0, bx + nx * d1, y0, bz + nz * d1, bx + nx * d1, y1, bz + nz * d1, bx + nx * d0, y1, bz + nz * d0, ux, 0f, uz, side);
     }
 
+    // What a house's walls are made of: the picture, its size in metres and the colour multiplied on it. Rendered
+    // walls keep the house's own colour; brick shows its own red; boards take the paint colour.
+    (int tile, float size, TvColor color) WallLook(HouseOutline o)
+    {
+        TvColor wall = o.colour.wall, brick = new TvColor(236, 230, 224);
+        switch (o.kind)
+        {
+            case TvCityShapes.Kind.Hall: return (TvAtlas.MetalSheet, 2f, wall);
+            case TvCityShapes.Kind.School: return (TvAtlas.Brick, 1.2f, brick);
+            case TvCityShapes.Kind.Villa: return Old ? (TvAtlas.Plaster, 2f, wall) : (TvAtlas.WoodPanel, 2f, wall);
+            case TvCityShapes.Kind.Apartments:
+                return o.look % 3 == 0 ? (TvAtlas.Brick, 1.2f, brick) : o.look % 3 == 1 ? (TvAtlas.Plaster, 2f, wall) : (TvAtlas.Concrete, 3f, wall);
+        }
+        if (o.row) return o.look % 2 == 0 ? (TvAtlas.WoodPanel, 2f, wall) : (TvAtlas.Brick, 1.2f, brick);
+        return !Old && o.look % 4 == 1 ? (TvAtlas.Brick, 1.2f, brick) : (TvAtlas.Plaster, 2f, wall);
+    }
+
     // The facade of one outside wall
     void Facade(TvMesh m, HouseOutline o, HouseSeg sg, float len, float ux, float uz, float nx, float nz, int detail, float groundFloor, float upper)
     {
         TvCityShapes.Palette col = o.colour;
         float y0 = o.baseY, top = o.top, foot = y0 + o.plinth;
-        // The wall, and the stone foot of it
-        WallQuad(m, sg.ax, sg.az, sg.bx, sg.bz, nx, nz, foot, top, col.wall);
+        // The wall (plaster, brick, boards, sheet metal or concrete), and the stone foot of it
+        var look = WallLook(o);
+        PaintOn(look.tile, look.size, look.size);
+        WallQuad(m, sg.ax, sg.az, sg.bx, sg.bz, nx, nz, foot, top, look.color);
+        PaintOn(TvAtlas.Concrete, 2f, 2f);
         WallQuad(m, sg.ax, sg.az, sg.bx, sg.bz, nx, nz, y0 - 0.4f, foot, Old ? col.foot : TvCityShapes.PaletteOf(0, input.town.style, o.kind).foot.Shade(0.95f));
+        PaintOff();
         if (detail == 0) return;
         // A dark band of splash at the foot (the old town: its painted band)
         WallBox(m, sg, ux, uz, nx, nz, 0f, len, foot, foot + (Old ? 0.9f : 0.45f), 0f, 0.025f, Old ? col.foot : col.wall.Shade(0.75f), false);
@@ -648,10 +718,7 @@ public partial class TvWorldBuilder
         bool hall = o.kind == TvCityShapes.Kind.Hall, school = o.kind == TvCityShapes.Kind.School;
         bool flats = o.kind == TvCityShapes.Kind.Apartments;
 
-        // A hall's walls of ribbed sheet metal
-        if (hall && detail == 2)
-            for (float ru = 0.4f; ru < len - 0.2f; ru += 0.8f)
-                WallBox(m, sg, ux, uz, nx, nz, ru - 0.05f, ru + 0.05f, foot, top - 0.35f, 0f, 0.06f, col.wall.Shade(0.88f), false);
+        // A hall's walls of ribbed sheet metal: in its picture (WallLook)
 
         // Windows: one every 2.4 m (a big one every 4 m on a hall, wide bands on a school), none on a wall shorter than 1.6 m
         float spacing = hall ? 4.2f : school ? 3.0f : Old ? 2.8f : 2.4f;
@@ -745,7 +812,11 @@ public partial class TvWorldBuilder
     {
         WallBox(m, sg, ux, uz, nx, nz, u - w / 2f - 0.09f, u + w / 2f + 0.09f, y - 0.09f, y + h + 0.09f, 0f, 0.03f, Old ? col.trim : col.trim, false);
         bool lit = TvRandom.Hash((int)((sg.ax + ox) * 3f + u * 7f), (int)((sg.az + oz) * 3f + y * 5f)) < 0.16f;
-        WallBox(m, sg, ux, uz, nx, nz, u - w / 2f, u + w / 2f, y, y + h, 0f, 0.045f, lit ? TvColor.Hex("#c9b98e") : col.glass, false);
+        // The pane: the sky mirrored in it and the room behind (a lit room warm)
+        float left = (sg.ax + ux * (u - w / 2f)) * ux + (sg.az + uz * (u - w / 2f)) * uz;
+        PaintOn(TvAtlas.Glass, w, h, left / w, y / h);
+        WallBox(m, sg, ux, uz, nx, nz, u - w / 2f, u + w / 2f, y, y + h, 0f, 0.045f, lit ? TvColor.Hex("#f0dca0") : col.glass.Lerp(new TvColor(255, 255, 255), 0.55f), false);
+        PaintOff();
         if (detail < 2) return;
         // Glazing bars and a sill
         WallBox(m, sg, ux, uz, nx, nz, u - 0.03f, u + 0.03f, y, y + h, 0.045f, 0.06f, col.trim, false);
@@ -868,7 +939,9 @@ public partial class TvWorldBuilder
             float ny = depth / 2f, upx = nx * rise, upz = nz * rise;
             float len = (float)Math.Sqrt(upx * upx + ny * ny + upz * upz);
             float rnx = upx / len, rny = ny / len, rnz = upz / len;
-            Face(m, ax, eave - drop, az, bx, eave - drop, bz, rb.x, ridge, rb.z, ra.x, ridge, ra.z, rnx, rny, rnz, col.roof);
+            PaintOn(TvAtlas.RoofTiles, 2f, 2f);
+            Face(m, ax, eave - drop, az, bx, eave - drop, bz, rb.x, ridge, rb.z, ra.x, ridge, ra.z, rnx, rny, rnz, col.roof.Shade(1.2f));
+            PaintOff();
             if (o2 > 0f) Face(m, ax, eave - drop - 0.02f, az, bx, eave - drop - 0.02f, bz, rb.x, ridge - 0.02f, rb.z, ra.x, ridge - 0.02f, ra.z, -rnx, -rny, -rnz, col.roof.Shade(0.5f));
         }
         bool Out((float x, float z) a, (float x, float z) b) => SharedShare(o, a, b) < 0.5f;
@@ -882,7 +955,9 @@ public partial class TvWorldBuilder
                 float dx = b.x - a.x, dz = b.z - a.z, l = (float)Math.Sqrt(dx * dx + dz * dz);
                 if (l < 1e-3f) return;
                 float nx = dz / l, nz = -dx / l;
-                Tri(m, a.x, eave, a.z, b.x, eave, b.z, r.x, ridge, r.z, nx * 0.6f, 0.8f, nz * 0.6f, col.roof.Shade(0.93f));
+                PaintOn(TvAtlas.RoofTiles, 2f, 2f);
+                Tri(m, a.x, eave, a.z, b.x, eave, b.z, r.x, ridge, r.z, nx * 0.6f, 0.8f, nz * 0.6f, col.roof.Shade(1.12f));
+                PaintOff();
             }
             Hip(c0, c1, mA);
             Hip(c2, c3, mB);
@@ -931,8 +1006,10 @@ public partial class TvWorldBuilder
             holes.Add(hole);
         }
         var poly = JoinHoles(outer, holes);
+        PaintOn(TvAtlas.Concrete, 3f, 3f);
         foreach (var (a, b, c) in EarClip(poly))
             Tri(m, a.x, y, a.z, b.x, y, b.z, c.x, y, c.z, 0f, 1f, 0f, felt);
+        PaintOff();
         if (detail == 0) return;
         // The parapet: a low wall on the edge, its inside and top
         foreach (var ring in o.rings)
