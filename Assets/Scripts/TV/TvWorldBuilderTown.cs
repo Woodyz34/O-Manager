@@ -220,6 +220,141 @@ public partial class TvWorldBuilder
         TunnelHeights();
     }
 
+    // ---- Fountains and small pools on a square (2026-11-24, Anders: a fountain's water was the zigzag of the 2 m
+    // cells; on the map it is a clean rectangle) ----
+    // A small body of water with paving round it is a basin: a rectangle laid along the cells' own long side, with a
+    // stone rim, its water inside, and a fountain in the middle. The ground under it is paving.
+
+    class TownPool
+    {
+        public float cx, cz, ux, uz, ha, hb;        // middle (the piece's metres), long axis, half length and half width
+        public bool Holds(float x, float z, float pad)
+        {
+            float dx = x - cx, dz = z - cz, a = Math.Abs(dx * ux + dz * uz), b = Math.Abs(-dx * uz + dz * ux);
+            return a <= ha + pad && b <= hb + pad;
+        }
+    }
+    List<TownPool> townPools;
+
+    void FindPools()
+    {
+        if (townPools != null) return;
+        townPools = new List<TownPool>();
+        if (input.town == null) return;
+        double c = layer.cell;
+        bool IsWater(int ci, int cj) => Base(layer.At(layer.minE + (ci + 0.5) * c, layer.minN + (cj + 0.5) * c)) == WorldCell.Water;
+        int i0 = (int)Math.Floor((input.centerE - R - 14 - layer.minE) / c), i1 = (int)Math.Floor((input.centerE + R + 14 - layer.minE) / c);
+        int j0 = (int)Math.Floor((input.centerN - R - 14 - layer.minN) / c), j1 = (int)Math.Floor((input.centerN + R + 14 - layer.minN) / c);
+        var seen = new HashSet<long>();
+        for (int cj = j0; cj <= j1; cj++)
+            for (int ci = i0; ci <= i1; ci++)
+            {
+                long key = ((long)ci << 32) ^ (uint)cj;
+                if (seen.Contains(key) || !IsWater(ci, cj)) continue;
+                var cells = new List<(int i, int j)>();
+                var q = new Queue<(int i, int j)>();
+                q.Enqueue((ci, cj)); seen.Add(key);
+                int paved = 0, rim = 0;
+                bool big = false;
+                while (q.Count > 0)
+                {
+                    var at = q.Dequeue();
+                    cells.Add(at);
+                    if (cells.Count > 40) { big = true; }
+                    foreach (var (di, dj) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+                    {
+                        int ni = at.i + di, nj = at.j + dj;
+                        long nk = ((long)ni << 32) ^ (uint)nj;
+                        if (IsWater(ni, nj)) { if (seen.Add(nk)) q.Enqueue((ni, nj)); continue; }
+                        rim++;
+                        int b = Base(layer.At(layer.minE + (ni + 0.5) * c, layer.minN + (nj + 0.5) * c));
+                        if (b == WorldCell.Paved || b == WorldCell.Building) paved++;
+                    }
+                }
+                if (big || cells.Count < 2 || paved * 10 < rim * 6) continue;
+                // The rectangle: along the cells' long axis, as big as the cells together
+                double mx = 0, mz = 0;
+                foreach (var cl in cells) { mx += cl.i; mz += cl.j; }
+                mx /= cells.Count; mz /= cells.Count;
+                double sxx = 0, szz = 0, sxz = 0;
+                foreach (var cl in cells) { double dx = cl.i - mx, dz = cl.j - mz; sxx += dx * dx; szz += dz * dz; sxz += dx * dz; }
+                double ang = 0.5 * Math.Atan2(2 * sxz, sxx - szz);
+                // Square to the grid when it is nearly so
+                double snap = Math.Round(ang / (Math.PI / 2)) * (Math.PI / 2);
+                if (Math.Abs(ang - snap) < 0.2) ang = snap;
+                float ux = (float)Math.Cos(ang), uz = (float)Math.Sin(ang);
+                float amin = float.MaxValue, amax = float.MinValue, bmin = float.MaxValue, bmax = float.MinValue;
+                foreach (var cl in cells)
+                {
+                    float dx = (float)(cl.i - mx), dz = (float)(cl.j - mz), a = dx * ux + dz * uz, b = -dx * uz + dz * ux;
+                    amin = Math.Min(amin, a); amax = Math.Max(amax, a); bmin = Math.Min(bmin, b); bmax = Math.Max(bmax, b);
+                }
+                float la = (amax - amin + 1f) * (float)c, lb = (bmax - bmin + 1f) * (float)c;
+                float area = cells.Count * (float)(c * c), shrink = (float)Math.Sqrt(Math.Min(1f, area / Math.Max(1f, la * lb)));
+                float ca = (amax + amin) / 2f, cb = (bmax + bmin) / 2f;
+                double ce = layer.minE + (mx + 0.5 + ca * ux - cb * uz) * c, cn = layer.minN + (mz + 0.5 + ca * uz + cb * ux) * c;
+                townPools.Add(new TownPool
+                {
+                    cx = (float)(ce - input.centerE), cz = (float)(cn - input.centerN), ux = ux, uz = uz,
+                    ha = Math.Max(1f, la * shrink / 2f), hb = Math.Max(0.8f, lb * shrink / 2f)
+                });
+            }
+    }
+
+    TownPool InPool(float x, float z, float pad)
+    {
+        FindPools();
+        foreach (TownPool p in townPools) if (p.Holds(x, z, pad)) return p;
+        return null;
+    }
+
+    // The ground round a basin: level paving, not water (the basin holds its own)
+    void PoolGround()
+    {
+        FindPools();
+        foreach (TownPool p in townPools)
+        {
+            float level = Plain(p.cx, p.cz);
+            ForNear(p.cx - p.ux * p.ha, p.cz - p.uz * p.ha, p.cx + p.ux * p.ha, p.cz + p.uz * p.ha, p.hb + 3f, (k, d, qx, qz) =>
+            {
+                float x = k % N - R, z = k / N - R;
+                if (!p.Holds(x, z, 3f)) return;
+                if (wLvl != null && p.Holds(x, z, 2.2f)) wLvl[k] = Math.Min(wLvl[k], -1.5f);
+                float dx = x - p.cx, dz = z - p.cz, a = Math.Abs(dx * p.ux + dz * p.uz) - p.ha, b = Math.Abs(-dx * p.uz + dz * p.ux) - p.hb;
+                F[k] = Math.Max(a, b) <= 0.2f ? level - 0.7f : Lerp(level, F[k], Sm(0.5f, 3f, Math.Max(a, b)));
+            });
+        }
+    }
+
+    // The basins of the piece: a stone rim, the water, and a fountain in the middle
+    void PoolShapes()
+    {
+        FindPools();
+        TvColor stone = TvColor.Hex("#b5ada0"), rimTop = TvColor.Hex("#c7c0b3"), water = TvColor.Hex("#5b8296"), jet = TvColor.Hex("#cfe3ec");
+        foreach (TownPool p in townPools)
+        {
+            if (!Inside(p.cx, p.cz, 0f)) continue;
+            float y = Plain(p.cx, p.cz), yaw = (float)Math.Atan2(-p.uz, p.ux), A = p.ha, B = p.hb, w = 0.35f;
+            var b = new TvShapeBuilder(random);
+            b.Box(-A - w, -0.3f, -B - w, A + w, 0.45f, -B, stone);
+            b.Box(-A - w, -0.3f, B, A + w, 0.45f, B + w, stone);
+            b.Box(-A - w, -0.3f, -B, -A, 0.45f, B, stone);
+            b.Box(A, -0.3f, -B, A + w, 0.45f, B, stone);
+            b.Box(-A - w, 0.45f, -B - w, A + w, 0.5f, -B, rimTop);
+            b.Box(-A - w, 0.45f, B, A + w, 0.5f, B + w, rimTop);
+            b.Box(-A - w, 0.45f, -B, -A, 0.5f, B, rimTop);
+            b.Box(A, 0.45f, -B, A + w, 0.5f, B, rimTop);
+            b.Box(-A, -0.3f, -B, A, 0.3f, B, water);
+            // The fountain: a pedestal, a bowl and its jet
+            float s = Math.Min(1f, Math.Min(A, B) * 0.45f);
+            b.Box(-0.25f * s, 0.3f, -0.25f * s, 0.25f * s, 1.1f, 0.25f * s, stone);
+            b.Box(-0.7f * s, 1.1f, -0.7f * s, 0.7f * s, 1.25f, 0.7f * s, rimTop);
+            b.Box(-0.08f, 1.25f, -0.08f, 0.08f, 2.1f, 0.08f, jet);
+            townBuiltMesh.Add(b.Done(), p.cx, y, p.cz, 1f, 1f, 1f, yaw);
+            world.solids.Add(new TvSolid { x = p.cx, z = p.cz, r = Math.Min(A, B) + w });
+        }
+    }
+
     // ---- Tunnels (2026-11-23, Anders: junk and steps inside a tunnel, a fence across its mouth, and the road over it
     // down at the tunnel's floor, so a runner went in and out onto the road sideways) ----
     // A tunnel has a clean floor, straight from one mouth to the other; nothing stands in it (no cliff, wall, fence or
@@ -430,6 +565,8 @@ public partial class TvWorldBuilder
     void ClearTunnels()
     {
         if (input.town == null) return;
+        // Nothing of the map's (a fountain's point symbol, a stone) stands in a basin's water (FindPools)
+        points.RemoveAll(q => InPool(q.x, q.z, 0.5f) != null);
         PlanTunnels();
         if (tunnelPlans.Count == 0) return;
         for (int i = lines.Count - 1; i >= 0; i--)
@@ -514,12 +651,14 @@ public partial class TvWorldBuilder
                     float x = mx + nx * (a + 0.5f), z = mz + nz * (a + 0.5f);
                     if (!Inside(x, z, 0f)) continue;
                     float ix = x - p.ux * out0 * 0.6f, iz = z - p.uz * out0 * 0.6f;
-                    float top = H(ix, iz), low = H(x + p.ux * out0 * 0.8f, z + p.uz * out0 * 0.8f);
+                    float low = H(x + p.ux * out0 * 0.8f, z + p.uz * out0 * 0.8f), top = H(ix, iz), roofTop = p.FloorAt(tEnd) + TunnelRoof;
                     // Only where the road was raised over the tunnel (a wall of the map holds its own drop)
-                    if (top - low < 0.4f || top - Plain(ix, iz) < 0.4f) break;
+                    if (top - low < 0.4f || top - Plain(ix, iz) < 0.4f) continue;
+                    // On the road's level: all one height (the ground's 1 m squares step)
+                    if (top > roofTop - 0.6f) top = roofTop;
                     var b = new TvShapeBuilder(random);
                     // From the mouth's face in under the raised road, where the ground rises behind it (TunnelHeights)
-                    b.Box(-0.52f, low - 0.4f - top, -0.8f, 0.52f, 0.15f, 0.8f, concrete);
+                    b.Box(-0.52f, low - 0.4f - top, -0.8f, 0.52f, 0.06f, 0.8f, concrete);
                     townBuiltMesh.Add(b.Done(), x - p.ux * out0 * 0.6f, top, z - p.uz * out0 * 0.6f, 1f, 1f, 1f, (float)Math.Atan2(-nz, nx));
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.3f });
                 }
@@ -536,7 +675,7 @@ public partial class TvWorldBuilder
             if (cw == null) continue;
             float nx = -p.uz * side, nz = p.ux * side, mx = p.ax + p.ux * p.len / 2f, mz = p.az + p.uz * p.len / 2f;
             float yaw = (float)Math.Atan2(-nz, nx);
-            for (float s = p.half + 2.5f; s < cw.ext + 30f; s += 1f)
+            for (float s = p.half + 2.5f; s <= cw.ext; s += 1f)
             {
                 cw.Edges(s, out float ea, out float eb);
                 foreach (float o in new[] { -1f, 1f })
@@ -550,6 +689,9 @@ public partial class TvWorldBuilder
                         : Math.Max(H(cx + p.ux * (edge - o * 0.6f), cz + p.uz * (edge - o * 0.6f)), H(cx + p.ux * (edge - o * 1.2f), cz + p.uz * (edge - o * 1.2f)));
                     float low = Math.Min(H(cx + p.ux * (edge + o * 1.3f), cz + p.uz * (edge + o * 1.3f)), H(x, z));
                     if (top - low < 0.4f) continue;
+                    // Only where water is beside it (on land the road ramps down, it has no wall)
+                    if (Base(CellAt(cx + p.ux * (edge + o * 1.5f), cz + p.uz * (edge + o * 1.5f))) != WorldCell.Water
+                        && Base(CellAt(cx + p.ux * (edge + o * 3f), cz + p.uz * (edge + o * 3f))) != WorldCell.Water) continue;
                     var b = new TvShapeBuilder(random);
                     b.Box(-0.53f, low - 2.5f - top, -0.3f, 0.53f, 0.12f, 0.3f, concrete);
                     townBuiltMesh.Add(b.Done(), x, top, z, 1f, 1f, 1f, yaw);
@@ -594,8 +736,21 @@ public partial class TvWorldBuilder
                     float q = t - p.len / 2f;
                     onWay = q >= lo && q <= hi;
                 }
-                if (!overTunnel && !onWay) return;
+                if (!overTunnel && !onWay)
+                {
+                    // Past the causeway's land end: the ground round its end ramps down from it on every side
+                    if (cw == null || a <= cw.ext || Base(CellAt(x, z)) == WorldCell.Water || (wLvl != null && wLvl[k] > -0.6f)) return;
+                    cw.Edges(cw.ext, out float ea, out float eb);
+                    float qq = t - p.len / 2f, dq = qq < ea ? ea - qq : qq > eb ? qq - eb : 0f, dEnd = (float)Math.Sqrt(dq * dq + (a - cw.ext) * (a - cw.ext));
+                    float r0 = floor + TunnelRoof - F[k];
+                    if (r0 <= 0f) return;
+                    float rmp = Math.Max(6f, Math.Min(40f, r0 * 10f));
+                    F[k] = Math.Max(F[k], Lerp(floor + TunnelRoof, F[k], Sm(0f, rmp, dEnd)));
+                    return;
+                }
                 bool overWater = onWay && a <= cw.ext;
+                // The road over the water is road, not water (its colour, and no lake surface over it)
+                if (overWater && wLvl != null) wLvl[k] = Math.Min(wLvl[k], -1f);
                 if (!overWater)
                 {
                     if (Base(CellAt(x, z)) == WorldCell.Water) return;
@@ -1606,6 +1761,7 @@ public partial class TvWorldBuilder
         CanopyAreas();
         if (input.town != null)
         {
+            PoolShapes();
             PlanTunnels();
             foreach (TunnelPlan p in tunnelPlans) CausewayWalls(p, concrete);
         }
@@ -1645,6 +1801,8 @@ public partial class TvWorldBuilder
                             world.solids.Add(new TvSolid { x = x + dz * s * (W / 2f + 0.25f), z = z - dx * s * (W / 2f + 0.25f), r = 0.3f });
                         }
                         b.Box(-pl / 2f, Top, -W / 2f - 1.8f, pl / 2f, Top + 0.6f, W / 2f + 1.8f, concrete.Shade(0.92f));
+                        // The road's own asphalt on top (2026-11-24, Anders: the tunnel's top was another surface)
+                        b.Box(-pl / 2f, Top + 0.6f, -W / 2f - 1.8f, pl / 2f, Top + 0.64f, W / 2f + 1.8f, TownPaved(x + ox, z + oz));
                         b.Box(-pl / 2f, Top - 0.05f, -W / 2f, pl / 2f, Top, W / 2f, dark);
                         townBuiltMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, yaw);
                     }
