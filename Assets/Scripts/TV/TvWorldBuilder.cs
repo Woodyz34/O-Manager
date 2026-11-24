@@ -442,6 +442,9 @@ public partial class TvWorldBuilder
         trackColor = new TvColor[N * N];
         asphaltCorner = null;
         asphaltLevel = null;
+        roadLevel = null;
+        waterTop = null;
+        stepSegs = null;
         pavedCorner = null;
         paveLevel = null;
         eDist = eLvl = wLvl = pDist = pLvl = null;
@@ -538,6 +541,9 @@ public partial class TvWorldBuilder
         trackColor = new TvColor[N * N];
         asphaltCorner = null;
         asphaltLevel = null;
+        roadLevel = null;
+        waterTop = null;
+        stepSegs = null;
         pavedCorner = null;
         paveLevel = null;
         eDist = eLvl = wLvl = pDist = pLvl = null;
@@ -596,6 +602,11 @@ public partial class TvWorldBuilder
         int treeSolids = world.solids.Count;
         Trees();
         OpenPassages(treeSolids, world.solids.Count);
+        // The ground and the water cut exactly along the map's lines (TvWorldBuilderSteps)
+        cutLevel = new Dictionary<int, float>();
+        GatherSteps();
+        CutSteps(groundMesh, false);
+        CutSteps(waterMesh, true);
         if (pavedCorner != null) KeepTown();
         CutGroundEdges();
         if (input.town == null) Keep(townBuiltMesh);
@@ -1372,6 +1383,8 @@ public partial class TvWorldBuilder
                         if (kind == WorldCell.Plot) level = Math.Min(level, -0.3f);
                         if (asphaltLevel != null) level = Math.Max(level, asphaltLevel[k]);
                     }
+                    // The road over a tunnel and its causeway: paved right across, up to its walls (2026-11-24, Anders)
+                    if (roadLevel != null && roadLevel[k] >= 0f) level = Math.Max(level, roadLevel[k]);
                     paveLevel[k] = level;
                     if (level >= 0f && !pavedCorner[k])
                     {
@@ -1402,6 +1415,16 @@ public partial class TvWorldBuilder
                 if (gKind != null) gKind[k] = (byte)(pavedCorner != null && pavedCorner[k] ? WorldCell.Paved : Kind2(cell));
                 // Steep ground and cliff faces show the rock
                 float sx = F[k + (i < N - 1 ? 1 : 0)] - F[k - (i > 0 ? 1 : 0)], sz = F[k + (j < N - 1 ? N : 0)] - F[k - (j > 0 ? N : 0)];
+                if (input.town != null)
+                {
+                    // In a town the ground is cut into steps along its walls, quays and the road over a tunnel
+                    // (CutSteps): each side is level up to the step, so its slope is the gentler of the two ways
+                    // (else the corners next to a step lay tilted and dark, a zigzag along it; 2026-11-24)
+                    float fx0 = i > 0 ? F[k] - F[k - 1] : 0f, fx1 = i < N - 1 ? F[k + 1] - F[k] : 0f;
+                    float fz0 = j > 0 ? F[k] - F[k - N] : 0f, fz1 = j < N - 1 ? F[k + N] - F[k] : 0f;
+                    sx = 2f * (fx0 * fx1 <= 0f && i > 0 && i < N - 1 ? 0f : Math.Abs(fx0) < Math.Abs(fx1) && i > 0 ? fx0 : fx1);
+                    sz = 2f * (fz0 * fz1 <= 0f && j > 0 && j < N - 1 ? 0f : Math.Abs(fz0) < Math.Abs(fz1) && j > 0 ? fz0 : fz1);
+                }
                 if (chunk)
                 {
                     // At a piece's edge the slope is taken over the edge too, so the light has no seam
@@ -1486,6 +1509,8 @@ public partial class TvWorldBuilder
         }
         var corner = new int[N * N];
         for (int i = 0; i < corner.Length; i++) corner[i] = -1;
+        waterTop = new float[N * N];
+        for (int i = 0; i < waterTop.Length; i++) waterTop[i] = float.NaN;
         for (int j = 0; j < N - 1; j++)
         {
             for (int i = 0; i < N - 1; i++)
@@ -1503,6 +1528,7 @@ public partial class TvWorldBuilder
                     float glint = TvRandom.Noise((x + ox) * 0.12f + 3f, (z + oz) * 0.05f);
                     TvColor c = k == 3 ? bogC.Shade(0.9f + 0.2f * glint) : deep.Lerp(sky, 0.15f + 0.45f * glint);
                     corner[q] = waterMesh.Vertex(x, level[q] + lift, z, 0f, 1f, 0f, c);
+                    if (k == 1) waterTop[q] = level[q] + lift;
                     return corner[q];
                 }
                 int v0 = V(i, j), v1 = V(i + 1, j), v2 = V(i, j + 1), v3 = V(i + 1, j + 1);
@@ -1546,6 +1572,22 @@ public partial class TvWorldBuilder
         z += oz;
         float n = TvRandom.Patches(x * 0.13f + 11f, z * 0.13f - 4f) + TvRandom.Noise(x * 0.6f, z * 0.6f) * 0.1f;
         return (marsh && n > 0.6f) || (strip > 0.55f && TvRandom.Patches(x * 0.3f + 11f, z * 0.3f - 4f) > 0.38f);
+    }
+
+    // A fence post's foot in a town: on the high side where the fence stands on a step (a quay, the road over a
+    // causeway), not down the slope of the ground's 1 m squares beside it (2026-11-24, Anders: the fence on the bridge
+    // leaned down towards the lake)
+    float PostH(float x, float z)
+    {
+        float h = H(x, z);
+        if (input.town == null) return h;
+        float best = h;
+        for (int a = 0; a < 8; a++)
+        {
+            float ang = a * 0.785398f;
+            best = Math.Max(best, H(x + (float)Math.Cos(ang) * 0.6f, z + (float)Math.Sin(ang) * 0.6f));
+        }
+        return best - h > 0.25f ? best : h;
     }
 
     float H(float x, float z)
@@ -2128,7 +2170,10 @@ public partial class TvWorldBuilder
                         // A wall with the ground higher on one side (a town's drop, WallSteps): from the low ground's
                         // foot up to a little over the high ground (2026-11-23, Anders)
                         float wnx = (float)Math.Sin(yaw), wnz = -(float)Math.Cos(yaw);
-                        float g0 = H(x + wnx * 0.8f, z + wnz * 0.8f), g1 = H(x - wnx * 0.8f, z - wnz * 0.8f);
+                        // Each side's ground a little out from the wall too: the ground is cut along the wall (CutSteps),
+                        // each side level to it, but the 1 m squares' heights mix the two sides near it
+                        float g0 = Math.Max(H(x + wnx * 0.8f, z + wnz * 0.8f), H(x + wnx * 1.5f, z + wnz * 1.5f)),
+                              g1 = Math.Max(H(x - wnx * 0.8f, z - wnz * 0.8f), H(x - wnx * 1.5f, z - wnz * 1.5f));
                         float lo = Math.Min(Math.Min(g0, g1), H(x, z)), hi = Math.Max(g0, g1);
                         float top = hi - lo >= 0.5f ? hi + 0.35f : H(x, z) + 1.8f;
                         float tall = Math.Max(0.5f, top - (lo - 0.1f));
@@ -2175,7 +2220,7 @@ public partial class TvWorldBuilder
                     float lastX = float.NaN, lastY = 0f, lastZ = 0f;
                     AlongPosts(ToHouse(c), 2.4f, (x, z, own) =>
                     {
-                        float y = H(x, z);
+                        float y = PostH(x, z);
                         // A post over the piece's edge is the next piece's: only where the rail to the first post here starts
                         if (!own) { lastX = ruined ? float.NaN : x; lastY = y; lastZ = z; return; }
                         if (ruined && random.Value() < 0.3f) { lastX = float.NaN; return; }
@@ -2199,7 +2244,7 @@ public partial class TvWorldBuilder
                     float lastX = float.NaN, lastY = 0f, lastZ = 0f;
                     AlongPosts(ToHouse(c), 3f, (x, z, own) =>
                     {
-                        float y = H(x, z);
+                        float y = PostH(x, z);
                         if (!own) { lastX = x; lastY = y; lastZ = z; return; }
                         Bar(thingMesh, x, y - 0.2f, z, x, y + 2.1f, z, 0.07f, 0.06f, 5, grey.Shade(Rr(0.85f, 1.05f)));
                         if (!float.IsNaN(lastX) && (x - lastX) * (x - lastX) + (z - lastZ) * (z - lastZ) < 25f)
