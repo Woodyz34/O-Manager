@@ -4,9 +4,9 @@ using UnityEngine;
 
 // Runner packs won in the weekly and daily contests (2026-11-19, the user). The cloud says which packs a place wins
 // (Docs/cloud-code/Contests.js, PRIZES); they wait here, saved on this computer, until the player opens them.
-//   Weekly pack: only Silver, Gold or Elite, the best pack in the game. Won by 1st in a weekly contest.
-//   Daily pack:  only Silver, Gold or Elite, a bit worse. Won by 2nd and 3rd in a weekly contest and 1st in a daily one.
-//   Normal pack: the shop's pack (PackShop). Won by 2nd in a weekly contest, together with a daily pack.
+//   Golden pack (id weekly): only Silver, Gold or Elite, the best pack in the game. Won by 1st in a weekly contest.
+//   Silver pack (id daily): only Silver, Gold or Elite, a bit worse. Won by 2nd and 3rd in a weekly contest and 1st in a daily one.
+//   Bronze pack (id normal): the shop's pack (PackShop). Won by 2nd in a weekly contest, together with a daily pack.
 // Like the shop's packs, they only hold runners the player does not have yet.
 public static class PrizePacks
 {
@@ -31,7 +31,10 @@ public static class PrizePacks
     // Money instead, for a pack that has nothing left to give (the player owns every runner it could hold)
     static int MoneyInstead(string kind) => kind == Weekly ? 1500 : kind == Daily ? 700 : PackShop.PackPrice;
 
-    public static string Name(string kind) => kind == Weekly ? "Weekly pack" : kind == Daily ? "Daily pack" : "Runner pack";
+    // 2026-11-24 (the user): the packs are named by metal. The weekly prize is the Golden pack, the daily prize the
+// Silver pack and the shop's pack the Bronze pack. The ids above stay (the cloud and saved games use them).
+    public static string KindOf(string kind) => kind == Weekly ? PackKinds.Gold : kind == Daily ? PackKinds.Silver : PackKinds.Bronze;
+    public static string Name(string kind) => PackKinds.Name(KindOf(kind));
 
     public static string Odds(string kind)
     {
@@ -168,6 +171,6 @@ public static class PrizePacks
         {
             UnityEngine.Object.Destroy(show.gameObject);
             OpenNext(done);
-        }, false);
+        }, false, KindOf(kind));
     }
 }
