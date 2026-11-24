@@ -18,7 +18,7 @@ public partial class RunSession
     float watchedDoneSince = -1f;
     float shownPitch;
     RectTransform watchCard;
-    TextMeshProUGUI watchTabText;
+    Button watchTab;
     static readonly float[] WatchWidths = { 300f, 400f, 520f, 640f };
     int watchWidthStep = 1;
     bool watchOpen = true;
@@ -58,15 +58,15 @@ public partial class RunSession
         titleRect.offsetMax = new Vector2(-104f, -14f);
         watchTitle.richText = true;
 
-        Button smaller = CourseUI.Button("Smaller", card.transform, "-", CourseUI.ButtonKind.Light, () => ResizeWatch(-1), 28);
+        Button smaller = CourseUI.IconButton("Smaller", card.transform, CourseUI.Icon.Minus, CourseUI.ButtonKind.Light, () => ResizeWatch(-1), 20);
         CourseUI.Place((RectTransform)smaller.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-54f, -22f), new Vector2(42f, 42f));
         HoverTip.Add(smaller, "Make the list narrower");
-        Button larger = CourseUI.Button("Larger", card.transform, "+", CourseUI.ButtonKind.Light, () => ResizeWatch(1), 28);
+        Button larger = CourseUI.IconButton("Larger", card.transform, CourseUI.Icon.Plus, CourseUI.ButtonKind.Light, () => ResizeWatch(1), 20);
         CourseUI.Place((RectTransform)larger.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-8f, -22f), new Vector2(42f, 42f));
         HoverTip.Add(larger, "Make the list wider");
 
-        Button tab = CourseUI.Button("Tab", card.transform, "<", CourseUI.ButtonKind.Secondary, () => { watchOpen = !watchOpen; }, 30);
-        watchTabText = tab.GetComponentInChildren<TextMeshProUGUI>();
+        Button tab = CourseUI.IconButton("Tab", card.transform, CourseUI.Icon.Arrow, CourseUI.ButtonKind.Secondary, () => { watchOpen = !watchOpen; }, 22);
+        watchTab = tab;
         CourseUI.Place((RectTransform)tab.transform, new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(46f, 120f));
         HoverTip.Add(tab, "Show or hide the list");
 
@@ -94,7 +94,7 @@ public partial class RunSession
         watchSlide = Mathf.MoveTowards(watchSlide, watchOpen ? 1f : 0f, Time.unscaledDeltaTime * 5f);
         float eased = watchSlide * watchSlide * (3f - 2f * watchSlide);
         watchCard.anchoredPosition = new Vector2(-WatchWidths[watchWidthStep] * (1f - eased), 0f);
-        if (watchTabText != null) watchTabText.text = watchOpen ? "<" : ">";
+        CourseUI.PointIcon(watchTab, !watchOpen);
     }
 
     void CloseWatchList()
