@@ -805,6 +805,7 @@ public partial class TvWorldBuilder
         // is, so the shore where the ground meets the water follows the map's bank line
         TownLines();
         EdgeField();
+        if (input.town != null) PoolGround();
         for (int j = 0; j < N; j++)
         {
             for (int i = 0; i < N; i++)
@@ -812,7 +813,7 @@ public partial class TvWorldBuilder
                 int k = j * N + i;
                 byte cell = input.town != null ? SmoothCell(i - R, j - R) : CellAt(i - R, j - R);
                 float inside = Math.Max(0f, Math.Min(1f, (wLvl[k] + 0.5f) / 1f));
-                if (inside > 0f) F[k] -= 0.45f * inside;
+                if (inside > 0f) F[k] -= 0.45f * inside + (quay != null ? 0.9f * quay[k] : 0f);
                 // Pools in a marsh are hollows with water in them
                 else if (Base(cell) != WorldCell.Water && MarshPool(i - R - 0.5f, j - R - 0.5f, (cell & WorldCell.Marsh) != 0, bog[k])) F[k] -= 0.3f;
             }
@@ -1270,7 +1271,8 @@ public partial class TvWorldBuilder
     float[] eDist, eLvl;                // the nearest edge line round each corner: distance, and signed (+ on its left)
     int[] eId;                          // which line (-1: none within reach)
     byte[] eCell;                       // the ground on the corner's side of it
-    float[] wLvl;                       // how far inside the water each corner is (metres; below 0 on land)
+    float[] wLvl;
+    float[] quay;                       // 0..1: near a quay wall on its water side (EdgeField)                       // how far inside the water each corner is (metres; below 0 on land)
     float[] pDist, pLvl;                // the nearest edge line with paving on one side only: distance, + on the paved side
     const float EdgeReach = 1.6f;
     byte[] gKind;                       // a town: the ground kind each corner got (houses as paving)
@@ -1309,7 +1311,7 @@ public partial class TvWorldBuilder
     {
         int n = N * N;
         eDist = new float[n]; eLvl = new float[n]; eId = new int[n]; eCell = new byte[n];
-        pDist = new float[n]; pLvl = new float[n]; wLvl = new float[n];
+        pDist = new float[n]; pLvl = new float[n]; wLvl = new float[n]; quay = new float[n];
         var wDist = new float[n];
         for (int k = 0; k < n; k++) { eDist[k] = pDist[k] = wDist[k] = 99f; eId[k] = -1; }
         TvEdges edges = TvEdges.Of(layer);
@@ -1349,6 +1351,41 @@ public partial class TvWorldBuilder
                         }
                         if (water && d < wDist[k]) { wDist[k] = d; wLvl[k] = side * wSide * dd; }
                         if (paved && d < pDist[k]) { pDist[k] = d; pLvl[k] = side * pSide * dd; }
+                    });
+                }
+            }
+        }
+        // In a town a wall or fence with water on one side is the water's edge (2026-11-24, Anders: a street along a
+        // quay wall sloped down into the water before the wall, with water and stones on the street)
+        if (input.town != null && lines != null)
+        {
+            foreach (var line in lines)
+            {
+                switch (line.kind)
+                {
+                    case WorldLineKind.Barrier: case WorldLineKind.Wall: case WorldLineKind.HighWall: case WorldLineKind.HighFence:
+                        break;
+                    default:
+                        continue;
+                }
+                float[] c = line.xz;
+                for (int q = 0; q + 3 < c.Length; q += 2)
+                {
+                    float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
+                    if (Math.Max(ax, bx) < -R - 3f || Math.Min(ax, bx) > R + 3f || Math.Max(az, bz) < -R - 3f || Math.Min(az, bz) > R + 3f) continue;
+                    float sx = bx - ax, sz = bz - az, sl = (float)Math.Sqrt(sx * sx + sz * sz);
+                    if (sl < 0.05f) continue;
+                    float nx = -sz / sl, nz = sx / sl, mx = (ax + bx) / 2f, mz = (az + bz) / 2f;
+                    bool wl = Base(SideCell(mx + nx * 1.6f, mz + nz * 1.6f)) == WorldCell.Water, wr = Base(SideCell(mx - nx * 1.6f, mz - nz * 1.6f)) == WorldCell.Water;
+                    if (wl == wr) continue;
+                    float wSide = wl ? 1f : -1f;
+                    ForNear(ax, az, bx, bz, 4f, (k, d, qx, qz) =>
+                    {
+                        float vx = k % N - R, vz = k / N - R;
+                        float side = (vx - qx) * nx + (vz - qz) * nz >= 0f ? 1f : -1f;
+                        if (d < EdgeReach && d < wDist[k]) { wDist[k] = d; wLvl[k] = side * wSide * Math.Max(d, 0.02f); }
+                        // The water by a quay wall is deep: its surface lies well below the street
+                        if (side * wSide > 0f) quay[k] = Math.Max(quay[k], 1f - Sm(2.5f, 4f, d));
                     });
                 }
             }
@@ -1936,6 +1973,12 @@ public partial class TvWorldBuilder
     {
         if (!Inside(x, z, 1.5f)) return;
         if (InTunnel(x, z, 0.6f + s * 0.5f) != null) return;
+        // No loose stones on a town's streets or in its water (2026-11-24, Anders: stones on the street by a quay)
+        if (!solid && input.town != null)
+        {
+            int b = Base(CellAt(x, z));
+            if (b == WorldCell.Paved || b == WorldCell.Water || b == WorldCell.Building) return;
+        }
         rockMesh.Add(RockFor(x, z, s), x, H(x, z) - sink * s, z, s, s * Rr(0.85f, 1.15f), s, Rr(0f, 6.283f), tint < 0f ? Rr(0.9f, 1.08f) : tint);
         world.rocks++;
         if (solid) world.solids.Add(new TvSolid { x = x, z = z, r = s * 0.95f });
