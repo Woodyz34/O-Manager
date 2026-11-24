@@ -1,5 +1,23 @@
 [
   {
+    "date": "2026-11-23",
+    "tag": "new",
+    "title": { "sv": "Spring själv i 3D", "en": "Run it yourself in 3D" },
+    "text": {
+      "sv": "Nytt spelläge där du själv springer banan i första person med kartan i handen och tumkompassen, i skog eller genom sprintstäder. Ensam eller online, med GPS-repris efteråt.",
+      "en": "A new game mode where you run the course yourself in first person with the map in your hand and a thumb compass, in forests or through sprint towns. Alone or online, with a GPS replay afterwards."
+    }
+  },
+  {
+    "date": "2026-11-23",
+    "tag": "new",
+    "title": { "sv": "Veckans och dagens tävlingar", "en": "Weekly and daily contests" },
+    "text": {
+      "sv": "Varje dag och vecka kör alla spelare samma banor, med ett försök var. Topplistor, repriser och paket till de tre bästa.",
+      "en": "Every day and every week all players run the same courses, with one try each. Leaderboards, replays and packs for the top three."
+    }
+  },
+  {
     "date": "2026-11-14",
     "tag": "update",
     "title": { "sv": "Snabbare på svagare datorer", "en": "Faster on weaker computers" },

@@ -154,7 +154,7 @@
   var caption = function (img) {
     var l = lang(), q = '[data-l="' + l + '"]';
     var c = img.closest(".g-item, figure") && (img.closest(".g-item") || img.closest("figure")).querySelector(".g-item > " + q + ", figcaption " + q);
-    if (!c) { var part = img.closest(".leg, .tv-in, .duo-in"); c = part && part.querySelector("h3 " + q + ", h2 " + q); }
+    if (!c) { var part = img.closest(".leg, .tv-in, .duo-in, .run3d, .contests"); c = part && part.querySelector("h3 " + q + ", h2 " + q); }
     return c ? c.textContent : img.alt;
   };
 
@@ -353,6 +353,60 @@
         releaseState = "ok"; renderDownload();
       })
       .catch(function () { releaseState = "error"; renderDownload(); });
+  }
+
+  /* ---------- Run it yourself: step into the picture while scrolling, head bob while moving ---------- */
+  var r3 = document.querySelector(".r3-view");
+  if (r3 && !reduce) {
+    var bobT, r3Tick = function () {
+      var r = r3.getBoundingClientRect(), vh = window.innerHeight;
+      var p = Math.max(0, Math.min(1, (vh - r.top) / (vh * 0.75 + r.height * 0.35)));
+      r3.parentNode.parentNode.style.setProperty("--p", p.toFixed(3));
+      if (p > 0.7) r3.classList.add("hints");
+      return r.bottom > 0 && r.top < vh;
+    };
+    window.addEventListener("scroll", function () {
+      requestAnimationFrame(r3Tick);
+      if (r3.getBoundingClientRect().top < window.innerHeight) {
+        r3.classList.add("running");
+        clearTimeout(bobT); bobT = setTimeout(function () { r3.classList.remove("running"); }, 180);
+      }
+    }, { passive: true });
+    r3Tick();
+  } else if (r3) r3.classList.add("hints");
+
+  /* Endless picture reel: a copy of the pictures follows the originals; clicking a copy opens the original */
+  var track = $("r3Track");
+  if (track && !reduce) {
+    Array.prototype.slice.call(track.children).forEach(function (f) {
+      var c = f.cloneNode(true);
+      c.setAttribute("aria-hidden", "true");
+      var im = c.querySelector("img"); im.removeAttribute("tabindex"); im.removeAttribute("role"); im.alt = "";
+      c.addEventListener("click", function () { f.click(); });
+      track.appendChild(c);
+    });
+  }
+
+  /* ---------- Contest clocks: time left of today's and this week's contest (Swedish time) ---------- */
+  var clockDay = $("clockDay"), clockWeek = $("clockWeek");
+  if (clockDay) {
+    var swe = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Stockholm", weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+    var days = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+    var two = function (n) { return (n < 10 ? "0" : "") + n; };
+    var paint = function (el, text) {
+      var old = el.textContent, html = "";
+      for (var i = 0; i < text.length; i++) html += '<span' + (old.length === text.length && old[i] !== text[i] && !reduce ? ' class="tick"' : "") + '>' + text[i] + "</span>";
+      if (old !== text) el.innerHTML = html;
+    };
+    var clocks = function () {
+      var parts = {};
+      swe.formatToParts(new Date()).forEach(function (x) { parts[x.type] = x.value; });
+      var left = 86400 - (+parts.hour * 3600 + +parts.minute * 60 + +parts.second);
+      paint(clockDay, two(Math.floor(left / 3600)) + ":" + two(Math.floor(left / 60) % 60) + ":" + two(left % 60));
+      var w = (6 - (days[parts.weekday] || 0)) * 86400 + left;
+      paint(clockWeek, Math.floor(w / 86400) + " d " + two(Math.floor(w / 3600) % 24) + " h " + two(Math.floor(w / 60) % 60) + " min");
+    };
+    clocks(); setInterval(clocks, 1000);
   }
 
   $("year").textContent = new Date().getFullYear();
