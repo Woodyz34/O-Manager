@@ -261,6 +261,10 @@ public class ReleaseBuilder : EditorWindow
             targetGroup = BuildTargetGroup.Standalone,
             options = BuildOptions.None,
         };
+        // Let go of textures and other assets the editor still holds from the last build or Play,
+        // so the big map pictures are not in memory twice while Unity writes this build
+        EditorUtility.UnloadUnusedAssetsImmediate();
+        GC.Collect();
         BuildReport report = BuildPipeline.BuildPlayer(options);
         if (report.summary.result != BuildResult.Succeeded)
         {
