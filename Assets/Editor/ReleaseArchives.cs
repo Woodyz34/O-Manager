@@ -27,57 +27,111 @@ public static class ReleaseArchives
         if (File.Exists(zipPath)) File.Delete(zipPath);
 
         var central = new List<CentralEntry>();
-        using (FileStream zip = new FileStream(zipPath, FileMode.Create, FileAccess.ReadWrite))
+        try
         {
-            central.Add(WriteZipEntry(zip, Path.GetFileName(appPath.TrimEnd('\\', '/')) + "/", null, DirMode));
-            foreach (string dir in AllDirs(appPath))
+            using (FileStream zip = new FileStream(zipPath, FileMode.Create, FileAccess.ReadWrite))
             {
-                central.Add(WriteZipEntry(zip, Relative(baseDir, dir) + "/", null, DirMode));
-            }
-            foreach (string file in AllFiles(appPath))
-            {
-                string name = Relative(baseDir, file);
-                central.Add(WriteZipEntry(zip, name, file, IsMacProgram(name) ? ExecMode : RegularMode));
-            }
+                central.Add(WriteZipEntry(zip, Path.GetFileName(appPath.TrimEnd('\\', '/')) + "/", null, DirMode));
+                foreach (string dir in AllDirs(appPath))
+                {
+                    central.Add(WriteZipEntry(zip, Relative(baseDir, dir) + "/", null, DirMode));
+                }
+                foreach (string file in AllFiles(appPath))
+                {
+                    string name = Relative(baseDir, file);
+                    central.Add(WriteZipEntry(zip, name, file, IsMacProgram(name) ? ExecMode : RegularMode));
+                }
 
-            long centralStart = zip.Position;
-            var w = new BinaryWriter(zip, Encoding.UTF8, true);
-            foreach (CentralEntry e in central)
-            {
-                w.Write(0x02014b50u);
-                w.Write((ushort)((3 << 8) | 20));   // made by Unix, so the Mac reads the file modes
-                w.Write((ushort)20);
-                w.Write((ushort)0x0800);            // names in UTF-8
-                w.Write(e.Method);
-                w.Write(e.Time);
-                w.Write(e.Date);
-                w.Write(e.Crc);
-                w.Write(e.Compressed);
-                w.Write(e.Size);
-                w.Write((ushort)e.Name.Length);
-                w.Write((ushort)0);
-                w.Write((ushort)0);
-                w.Write((ushort)0);
-                w.Write((ushort)0);
-                w.Write(((uint)e.Mode << 16) | (e.Mode == DirMode ? 0x10u : 0u));
-                w.Write(e.Offset);
-                w.Write(e.Name);
-            }
-            long centralEnd = zip.Position;
-            w.Write(0x06054b50u);
-            w.Write((ushort)0);
-            w.Write((ushort)0);
-            w.Write((ushort)central.Count);
-            w.Write((ushort)central.Count);
-            w.Write((uint)(centralEnd - centralStart));
-            w.Write((uint)centralStart);
-            w.Write((ushort)0);
-            w.Flush();
-            if (central.Count > 65535 || zip.Position > uint.MaxValue)
-            {
-                throw new IOException("The Mac game is too big for a simple zip (over 4 GB or 65 535 files).");
+                WriteCentralDirectory(zip, central);
             }
         }
+        catch
+        {
+            // Never leave a half-written zip in Builds/Release where it could be uploaded by mistake
+            try { if (File.Exists(zipPath)) File.Delete(zipPath); } catch { }
+            throw;
+        }
+    }
+
+    // The table of contents at the end of the zip. Files over 4 GB (the Mac's resources.assets.resS can be) and
+    // positions past 4 GB do not fit the old 4-byte fields, so those use the "zip64" extension that the Mac's
+    // ditto/Archive Utility, unzip and 7-Zip all read.
+    static void WriteCentralDirectory(FileStream zip, List<CentralEntry> central)
+    {
+        long centralStart = zip.Position;
+        var w = new BinaryWriter(zip, Encoding.UTF8, true);
+        foreach (CentralEntry e in central)
+        {
+            bool bigSize = e.Size >= uint.MaxValue || e.Compressed >= uint.MaxValue || e.Zip64Local;
+            bool bigOffset = e.Offset >= uint.MaxValue;
+            var extra = new MemoryStream();
+            var x = new BinaryWriter(extra);
+            if (bigSize || bigOffset)
+            {
+                x.Write((ushort)0x0001);
+                x.Write((ushort)((bigSize ? 16 : 0) + (bigOffset ? 8 : 0)));
+                if (bigSize)
+                {
+                    x.Write(e.Size);
+                    x.Write(e.Compressed);
+                }
+                if (bigOffset) x.Write(e.Offset);
+            }
+            x.Flush();
+            byte[] extraBytes = extra.ToArray();
+
+            w.Write(0x02014b50u);
+            w.Write((ushort)((3 << 8) | 45));   // made by Unix, so the Mac reads the file modes
+            w.Write((ushort)(extraBytes.Length > 0 || e.Zip64Local ? 45 : 20));
+            w.Write((ushort)0x0800);            // names in UTF-8
+            w.Write(e.Method);
+            w.Write(e.Time);
+            w.Write(e.Date);
+            w.Write(e.Crc);
+            w.Write(bigSize ? uint.MaxValue : (uint)e.Compressed);
+            w.Write(bigSize ? uint.MaxValue : (uint)e.Size);
+            w.Write((ushort)e.Name.Length);
+            w.Write((ushort)extraBytes.Length);
+            w.Write((ushort)0);
+            w.Write((ushort)0);
+            w.Write((ushort)0);
+            w.Write(((uint)e.Mode << 16) | (e.Mode == DirMode ? 0x10u : 0u));
+            w.Write(bigOffset ? uint.MaxValue : (uint)e.Offset);
+            w.Write(e.Name);
+            w.Write(extraBytes);
+        }
+        long centralEnd = zip.Position;
+        long centralSize = centralEnd - centralStart;
+        bool zip64End = central.Count >= 0xFFFF || centralStart >= uint.MaxValue || centralSize >= uint.MaxValue
+                        || central.Any(e => e.Zip64Local || e.Offset >= uint.MaxValue);
+        if (zip64End)
+        {
+            // zip64 end of central directory record, then the locator that points at it
+            w.Write(0x06064b50u);
+            w.Write(44UL);                      // size of the rest of this record
+            w.Write((ushort)((3 << 8) | 45));
+            w.Write((ushort)45);
+            w.Write(0u);
+            w.Write(0u);
+            w.Write((ulong)central.Count);
+            w.Write((ulong)central.Count);
+            w.Write((ulong)centralSize);
+            w.Write((ulong)centralStart);
+
+            w.Write(0x07064b50u);
+            w.Write(0u);
+            w.Write((ulong)centralEnd);
+            w.Write(1u);
+        }
+        w.Write(0x06054b50u);
+        w.Write((ushort)0);
+        w.Write((ushort)0);
+        w.Write((ushort)Math.Min(central.Count, 0xFFFF));
+        w.Write((ushort)Math.Min(central.Count, 0xFFFF));
+        w.Write(centralSize >= uint.MaxValue ? uint.MaxValue : (uint)centralSize);
+        w.Write(centralStart >= uint.MaxValue ? uint.MaxValue : (uint)centralStart);
+        w.Write((ushort)0);
+        w.Flush();
     }
 
     // Everything in Contents/MacOS is a program; libraries get the flag too (it does no harm)
@@ -91,8 +145,10 @@ public static class ReleaseArchives
     {
         public byte[] Name;
         public ushort Method, Time, Date;
-        public uint Crc, Compressed, Size, Offset;
+        public uint Crc;
+        public ulong Compressed, Size, Offset;
         public int Mode;
+        public bool Zip64Local;   // the local header carries 8-byte sizes (files of 4 GB or close to it)
     }
 
     static CentralEntry WriteZipEntry(FileStream zip, string name, string sourceFile, int mode)
@@ -106,24 +162,34 @@ public static class ReleaseArchives
             Method = (ushort)(sourceFile != null && new FileInfo(sourceFile).Length > 0 ? 8 : 0),
             Time = (ushort)((stamp.Hour << 11) | (stamp.Minute << 5) | (stamp.Second / 2)),
             Date = (ushort)(((stamp.Year - 1980) << 9) | (stamp.Month << 5) | stamp.Day),
-            Offset = (uint)zip.Position,
+            Offset = (ulong)zip.Position,
             Mode = mode,
         };
+        // Decided before the data is written: a file near 4 GB could pack to more than its own size
+        e.Zip64Local = sourceFile != null && new FileInfo(sourceFile).Length >= 0xF0000000L;
 
         var w = new BinaryWriter(zip, Encoding.UTF8, true);
         w.Write(0x04034b50u);
-        w.Write((ushort)20);
+        w.Write((ushort)(e.Zip64Local ? 45 : 20));
         w.Write((ushort)0x0800);
         w.Write(e.Method);
         w.Write(e.Time);
         w.Write(e.Date);
         long sizesAt = zip.Position;
         w.Write(0u);   // crc, sizes: filled in below
-        w.Write(0u);
-        w.Write(0u);
+        w.Write(e.Zip64Local ? uint.MaxValue : 0u);
+        w.Write(e.Zip64Local ? uint.MaxValue : 0u);
         w.Write((ushort)e.Name.Length);
-        w.Write((ushort)0);
+        w.Write((ushort)(e.Zip64Local ? 20 : 0));
         w.Write(e.Name);
+        long bigSizesAt = zip.Position + 4;
+        if (e.Zip64Local)
+        {
+            w.Write((ushort)0x0001);   // zip64 extra field: the real sizes, filled in below
+            w.Write((ushort)16);
+            w.Write(0UL);
+            w.Write(0UL);
+        }
         w.Flush();
 
         if (e.Method == 0) return e;
@@ -144,18 +210,28 @@ public static class ReleaseArchives
             }
         }
         long end = zip.Position;
-        if (size > uint.MaxValue || end - dataStart > uint.MaxValue)
-        {
-            throw new IOException(name + " is over 4 GB, too big for a simple zip.");
-        }
         e.Crc = ~crc;
-        e.Size = (uint)size;
-        e.Compressed = (uint)(end - dataStart);
+        e.Size = (ulong)size;
+        e.Compressed = (ulong)(end - dataStart);
+        if (!e.Zip64Local && (e.Size >= uint.MaxValue || e.Compressed >= uint.MaxValue))
+        {
+            // Cannot happen with the size check above, but never write a broken zip quietly
+            throw new IOException(name + " grew past 4 GB while it was packed.");
+        }
 
         zip.Position = sizesAt;
         w.Write(e.Crc);
-        w.Write(e.Compressed);
-        w.Write(e.Size);
+        if (e.Zip64Local)
+        {
+            zip.Position = bigSizesAt;
+            w.Write(e.Size);
+            w.Write(e.Compressed);
+        }
+        else
+        {
+            w.Write((uint)e.Compressed);
+            w.Write((uint)e.Size);
+        }
         w.Flush();
         zip.Position = end;
         return e;
@@ -239,7 +315,8 @@ public static class ReleaseArchives
         Octal(h, 100, 8, mode);
         Octal(h, 108, 8, 0);       // uid
         Octal(h, 116, 8, 0);       // gid
-        Octal(h, 124, 12, size);
+        if (size > 0x1FFFFFFFFL) BigSize(h, 124, 12, size);   // 8 GB or more: GNU binary size
+        else Octal(h, 124, 12, size);
         Octal(h, 136, 12, mtime);
         for (int i = 148; i < 156; i++) h[i] = (byte)' ';
         h[156] = type;
@@ -259,6 +336,17 @@ public static class ReleaseArchives
         if (text.Length > width - 1) throw new IOException("A file is too big for the tar archive.");
         Encoding.ASCII.GetBytes(text).CopyTo(h, at);
         h[at + width - 1] = 0;
+    }
+
+    // GNU tar's form for numbers too big for octal: top bit set, then the value big-endian (GNU tar, bsdtar read it)
+    static void BigSize(byte[] h, int at, int width, long value)
+    {
+        for (int i = width - 1; i > 0; i--)
+        {
+            h[at + i] = (byte)(value & 0xFF);
+            value >>= 8;
+        }
+        h[at] = 0x80;
     }
 
     static void Pad(Stream output, long size)
