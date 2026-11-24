@@ -813,8 +813,64 @@ public class ForestMistakes
             return;
         }
         List<Vector2Int> tail = own.GetRange(best + 1, own.Count - best - 1);
-        Log("tillbaka in på sitt vägval, " + Mathf.RoundToInt(left[best]) + " m före kontrollen");
-        PathTo((Vector2)agent.GridToWorldPosition(own[best]) * Mpu, false, tail);
+        agent.StartCoroutine(OwnOrFastest(own[best], tail, left[best]));
+    }
+
+    // Its own route choice is kept unless it has become a big detour: up to OwnSlower (15 %) slower than the fastest
+    // way to the control from here, the runner cuts in onto its own route and goes on along it; more than that, it
+    // takes the fastest way (2026-11-24, the user: no odd long way round to get back onto the own route choice)
+    const float OwnSlower = 1.15f;
+
+    IEnumerator OwnOrFastest(Vector2Int join, List<Vector2Int> tail, float leftMetres)
+    {
+        Vector2Int start = agent.WorldToGridPositionCentered(agent.transform.position);
+        Vector2Int goal = NearestOpen(join);
+        Vector2Int controlCell = NearestOpen(agent.WorldToGridPositionCentered(Control / Mpu));
+        waitingForPath = true;
+        agent.isWaiting = true;
+        List<Vector2Int> toJoin = null, fastest = null;
+        yield return agent.StartCoroutine(agent.FindPathAsync(start, goal, r => toJoin = r));
+        yield return agent.StartCoroutine(agent.FindPathAsync(start, controlCell, r => fastest = r));
+        waitingForPath = false;
+        agent.isWaiting = false;
+        // Something else happened meanwhile (a new leg, a new mistake)
+        if (mode != Mode.Route || NearestOpen(agent.WorldToGridPositionCentered(Control / Mpu)) != controlCell) yield break;
+        List<Vector2Int> own = null;
+        if (toJoin != null && toJoin.Count > 0)
+        {
+            own = new List<Vector2Int>(toJoin);
+            own.AddRange(tail);
+        }
+        float ownTime = Seconds(own), fastTime = Seconds(fastest);
+        if (own != null && (fastest == null || fastest.Count == 0 || ownTime <= fastTime * OwnSlower))
+        {
+            Log("tillbaka in på sitt vägval, " + Mathf.RoundToInt(leftMetres) + " m före kontrollen ("
+                + Mathf.RoundToInt(100f * (ownTime / Mathf.Max(0.01f, fastTime) - 1f)) + " % längre än snabbaste)");
+            agent.SetMistakePath(own);
+        }
+        else if (fastest != null && fastest.Count > 0)
+        {
+            Log("eget vägval blev för lång omväg, tar snabbaste vägen till kontrollen");
+            agent.SetMistakePath(fastest);
+        }
+        else PathTo(Control);
+    }
+
+    // How long a path takes on the map's ground (cell steps over the mean speed of the two cells)
+    float Seconds(List<Vector2Int> path)
+    {
+        if (path == null || path.Count == 0) return float.MaxValue;
+        float[,] g = agent.pathfindingManager.speedGrid2D;
+        int rows = g.GetLength(0), cols = g.GetLength(1);
+        float sum = 0f;
+        for (int i = 1; i < path.Count; i++)
+        {
+            Vector2Int a = path[i - 1], b = path[i];
+            float sa = a.x >= 0 && a.y >= 0 && a.x < cols && a.y < rows ? g[a.y, a.x] : 0.05f;
+            float sb = b.x >= 0 && b.y >= 0 && b.x < cols && b.y < rows ? g[b.y, b.x] : 0.05f;
+            sum += Vector2Int.Distance(a, b) / Mathf.Max(0.05f, 0.5f * (sa + sb));
+        }
+        return sum;
     }
 
     void ToControl()
