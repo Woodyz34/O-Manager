@@ -645,23 +645,30 @@ public partial class TvWorldBuilder
             float mx = p.ax + p.ux * tEnd, mz = p.az + p.uz * tEnd;
             foreach (float side in new[] { -1f, 1f })
             {
+                // One straight wall, its top sloping evenly (2026-11-24, Anders: blocks at different heights)
+                var run = new List<float[]>();
                 for (float a = W / 2f + 0.2f; a < W / 2f + 40f; a += 1f)
                 {
                     float nx = -p.uz * side, nz = p.ux * side;
                     float x = mx + nx * (a + 0.5f), z = mz + nz * (a + 0.5f);
-                    if (!Inside(x, z, 0f)) continue;
                     float ix = x - p.ux * out0 * 0.6f, iz = z - p.uz * out0 * 0.6f;
                     float low = H(x + p.ux * out0 * 0.8f, z + p.uz * out0 * 0.8f), top = H(ix, iz), roofTop = p.FloorAt(tEnd) + TunnelRoof;
                     // Only where the road was raised over the tunnel (a wall of the map holds its own drop)
-                    if (top - low < 0.4f || top - Plain(ix, iz) < 0.4f) continue;
+                    if (!Inside(x, z, 1f) || top - low < 0.4f || top - Plain(ix, iz) < 0.4f)
+                    {
+                        WallRun(townBuiltMesh, run, 0.8f, concrete);
+                        run.Clear();
+                        continue;
+                    }
                     // On the road's level: all one height (the ground's 1 m squares step)
                     if (top > roofTop - 0.6f) top = roofTop;
-                    var b = new TvShapeBuilder(random);
                     // From the mouth's face in under the raised road, where the ground rises behind it (TunnelHeights)
-                    b.Box(-0.52f, low - 0.4f - top, -0.8f, 0.52f, 0.06f, 0.8f, concrete);
-                    townBuiltMesh.Add(b.Done(), x - p.ux * out0 * 0.6f, top, z - p.uz * out0 * 0.6f, 1f, 1f, 1f, (float)Math.Atan2(-nz, nx));
-                    world.solids.Add(new TvSolid { x = x, z = z, r = 0.3f });
+                    float cx = mx + nx * a - p.ux * out0 * 0.6f, cz = mz + nz * a - p.uz * out0 * 0.6f;
+                    if (run.Count == 0) run.Add(new[] { cx, cz, top + 0.06f, low - 0.4f });
+                    run.Add(new[] { cx + nx, cz + nz, top + 0.06f, low - 0.4f });
+                    if (Inside(x, z, 0f)) world.solids.Add(new TvSolid { x = x, z = z, r = 0.3f });
                 }
+                WallRun(townBuiltMesh, run, 0.8f, concrete);
             }
         }
     }
@@ -674,29 +681,61 @@ public partial class TvWorldBuilder
             Causeway cw = side < 0f ? p.wayA : p.wayB;
             if (cw == null) continue;
             float nx = -p.uz * side, nz = p.ux * side, mx = p.ax + p.ux * p.len / 2f, mz = p.az + p.uz * p.len / 2f;
-            float yaw = (float)Math.Atan2(-nz, nx);
-            for (float s = p.half + 2.5f; s <= cw.ext; s += 1f)
+            foreach (float o in new[] { -1f, 1f })
             {
-                cw.Edges(s, out float ea, out float eb);
-                foreach (float o in new[] { -1f, 1f })
+                // One straight wall along the road's side, its top sloping evenly with the road (2026-11-24, Anders:
+                // the 1 m blocks stood at different heights, with the water showing between them and the road)
+                var run = new List<float[]>();
+                for (float s = p.half + 1.6f; s <= cw.ext + 0.01f; s += 1f)
                 {
+                    cw.Edges(s, out float ea, out float eb);
                     float edge = o < 0f ? ea : eb;
                     float cx = mx + nx * s, cz = mz + nz * s;
                     float x = cx + p.ux * (edge + o * 0.3f), z = cz + p.uz * (edge + o * 0.3f);
-                    if (!Inside(x, z, 0f)) continue;
-                    // The road's own height (the ground's 1 m squares slope down at its edge)
-                    float top = s <= cw.ext ? p.FloorAt(p.len / 2f + edge) + TunnelRoof
-                        : Math.Max(H(cx + p.ux * (edge - o * 0.6f), cz + p.uz * (edge - o * 0.6f)), H(cx + p.ux * (edge - o * 1.2f), cz + p.uz * (edge - o * 1.2f)));
-                    float low = Math.Min(H(cx + p.ux * (edge + o * 1.3f), cz + p.uz * (edge + o * 1.3f)), H(x, z));
-                    if (top - low < 0.4f) continue;
+                    float top = p.FloorAt(p.len / 2f + edge) + TunnelRoof;
+                    float low = Math.Min(H(cx + p.ux * (edge + o * 1.5f), cz + p.uz * (edge + o * 1.5f)), H(x, z));
                     // Only where water is beside it (on land the road ramps down, it has no wall)
-                    if (Base(CellAt(cx + p.ux * (edge + o * 1.5f), cz + p.uz * (edge + o * 1.5f))) != WorldCell.Water
-                        && Base(CellAt(cx + p.ux * (edge + o * 3f), cz + p.uz * (edge + o * 3f))) != WorldCell.Water) continue;
-                    var b = new TvShapeBuilder(random);
-                    b.Box(-0.53f, low - 2.5f - top, -0.3f, 0.53f, 0.12f, 0.3f, concrete);
-                    townBuiltMesh.Add(b.Done(), x, top, z, 1f, 1f, 1f, yaw);
+                    bool wet = Base(CellAt(cx + p.ux * (edge + o * 1.5f), cz + p.uz * (edge + o * 1.5f))) == WorldCell.Water
+                               || Base(CellAt(cx + p.ux * (edge + o * 3f), cz + p.uz * (edge + o * 3f))) == WorldCell.Water;
+                    if (wet && top - low >= 0.4f) { run.Add(new[] { x, z, top + 0.12f, low - 2.5f }); continue; }
+                    WallRun(townBuiltMesh, run, 0.3f, concrete);
+                    run.Clear();
                 }
+                WallRun(townBuiltMesh, run, 0.3f, concrete);
             }
+        }
+    }
+
+    // A straight wall through points (x, z, top, foot), half as thick as given, its top and sides flat between them
+    static void WallRun(TvMesh m, List<float[]> pts, float half, TvColor c)
+    {
+        if (pts.Count < 2) return;
+        TvColor side = c.Shade(0.93f), top = c.Shade(1.06f);
+        void Quad(float[] a, float[] b, float[] cc, float[] d, float nx, float ny, float nz, TvColor col)
+        {
+            // Both ways round: seen from either side
+            int ia = m.Vertex(a[0], a[1], a[2], nx, ny, nz, col), ib = m.Vertex(b[0], b[1], b[2], nx, ny, nz, col);
+            int ic = m.Vertex(cc[0], cc[1], cc[2], nx, ny, nz, col), id = m.Vertex(d[0], d[1], d[2], nx, ny, nz, col);
+            m.triangles.AddRange(new[] { ia, ib, ic, ia, ic, id });
+            int ja = m.Vertex(a[0], a[1], a[2], -nx, -ny, -nz, col), jb = m.Vertex(b[0], b[1], b[2], -nx, -ny, -nz, col);
+            int jc = m.Vertex(cc[0], cc[1], cc[2], -nx, -ny, -nz, col), jd = m.Vertex(d[0], d[1], d[2], -nx, -ny, -nz, col);
+            m.triangles.AddRange(new[] { ja, jc, jb, ja, jd, jc });
+        }
+        for (int i = 0; i + 1 < pts.Count; i++)
+        {
+            float[] p0 = pts[i], p1 = pts[i + 1];
+            float dx = p1[0] - p0[0], dz = p1[1] - p0[1], l = (float)Math.Sqrt(dx * dx + dz * dz);
+            if (l < 1e-3f) continue;
+            float ax = -dz / l * half, az = dx / l * half;
+            float[] l0t = { p0[0] + ax, p0[2], p0[1] + az }, l1t = { p1[0] + ax, p1[2], p1[1] + az };
+            float[] r0t = { p0[0] - ax, p0[2], p0[1] - az }, r1t = { p1[0] - ax, p1[2], p1[1] - az };
+            float[] l0b = { p0[0] + ax, p0[3], p0[1] + az }, l1b = { p1[0] + ax, p1[3], p1[1] + az };
+            float[] r0b = { p0[0] - ax, p0[3], p0[1] - az }, r1b = { p1[0] - ax, p1[3], p1[1] - az };
+            Quad(l0t, l1t, r1t, r0t, 0f, 1f, 0f, top);
+            Quad(l0b, l1b, l1t, l0t, -dz / l, 0f, dx / l, side);
+            Quad(r0t, r1t, r1b, r0b, dz / l, 0f, -dx / l, side);
+            if (i == 0) Quad(l0b, l0t, r0t, r0b, -dx / l, 0f, -dz / l, side);
+            if (i + 2 == pts.Count) Quad(l1t, l1b, r1b, r1t, dx / l, 0f, dz / l, side);
         }
     }
 
@@ -728,13 +767,15 @@ public partial class TvWorldBuilder
                 if (Base(CellAt(x, z)) == WorldCell.Building) return;
                 float roof = floor + TunnelRoof;
                 Causeway cw = across < 0f ? p.wayA : p.wayB;
-                bool overTunnel = t >= 0.3f && t <= p.len - 0.3f;
+                // From the middle of the walls across its mouths, where the ground is cut (CutSteps)
+                bool overTunnel = t >= 0.6f && t <= p.len - 0.6f;
                 bool onWay = false;
                 if (cw != null && a >= p.half + 1.6f)
                 {
                     cw.Edges(a, out float lo, out float hi);
                     float q = t - p.len / 2f;
-                    onWay = q >= lo && q <= hi;
+                    // Out to the middle of its walls, where the ground is cut (CutSteps)
+                    onWay = q >= lo - 0.3f && q <= hi + 0.3f;
                 }
                 if (!overTunnel && !onWay)
                 {
@@ -756,10 +797,37 @@ public partial class TvWorldBuilder
                     if (Base(CellAt(x, z)) == WorldCell.Water) return;
                     if (wLvl != null && wLvl[k] > -0.6f) return;
                 }
+                if (input.town != null && (cw == null || a <= cw.ext + 30f))
+                {
+                    // Paved right across, up to the walls and the mouths (2026-11-24, Anders: grass and zigzag on the tunnel)
+                    float inside;
+                    if (cw != null)
+                    {
+                        cw.Edges(a, out float lo2, out float hi2);
+                        float q2 = t - p.len / 2f;
+                        inside = Math.Min(q2 - (lo2 - 0.3f), hi2 + 0.3f - q2);
+                    }
+                    else inside = Math.Min(t, p.len - t);
+                    if (roadLevel == null) { roadLevel = new float[N * N]; for (int i = 0; i < roadLevel.Length; i++) roadLevel[i] = -9f; }
+                    roadLevel[k] = Math.Max(roadLevel[k], Math.Max(0.02f, inside));
+                }
+                if (overTunnel && a < p.half + 1.8f)
+                {
+                    // Behind the tunnel's wall, under its slab: kept under the slab's top, so the ground does not
+                    // show through its edge in a zigzag (2026-11-24, Anders)
+                    F[k] = Lerp(floor, roof - 0.1f, Sm(p.half + 0.6f, p.half + 1.6f, a));
+                    return;
+                }
                 if (a < p.half + 1.6f)
                 {
                     // Behind the tunnel's wall, under its slab
                     F[k] = Math.Max(F[k], Lerp(floor, roof, Sm(p.half + 0.6f, p.half + 1.6f, a)));
+                    return;
+                }
+                if (overTunnel || overWater)
+                {
+                    // The road over the tunnel and on over the water: flat at the roof's height, not the land's bumps
+                    F[k] = roof;
                     return;
                 }
                 // Level over the water; then down to the land along the road at about 1 in 10
@@ -2166,11 +2234,13 @@ public partial class TvWorldBuilder
         if (pavedCorner != null && groundMesh != null)
         {
             pavedMesh = new TvMesh { name = "Ground paved", castShadows = false, group = TvMesh.Near };
-            var map = new int[N * N];
+            var map = new int[groundMesh.VertexCount];
             for (int i = 0; i < map.Length; i++) map[i] = -1;
             var kept = new List<int>(groundMesh.triangles.Count);
             var t = groundMesh.triangles;
-            float Lv(int v) => paveLevel != null ? paveLevel[v] : (pavedCorner[v] ? 1f : -1f);
+            // A corner made by a cut along the map's lines (CutSteps) has its level kept beside it
+            float Lv(int v) => v >= N * N ? (cutLevel != null && cutLevel.TryGetValue(v, out float l) ? l : -1f)
+                : paveLevel != null ? paveLevel[v] : (pavedCorner[v] ? 1f : -1f);
             int PavedVertex(int v)
             {
                 if (map[v] < 0) map[v] = CopyVertex(groundMesh, v, pavedMesh, v, v, 0f);
@@ -2178,12 +2248,10 @@ public partial class TvWorldBuilder
             }
             // Each triangle whole on one side, or cut where the level is 0: the part inside the paving to the paved
             // mesh, the rest stays ground. A new corner on the cut takes the colour of the side it is drawn with.
-            int baseCount = N * N;
             var poly = new List<(int v, int a, int b, float t)>(5);
             for (int q = 0; q + 2 < t.Count; q += 3)
             {
                 int v0 = t[q], v1 = t[q + 1], v2 = t[q + 2];
-                if (v0 >= baseCount || v1 >= baseCount || v2 >= baseCount) { kept.Add(v0); kept.Add(v1); kept.Add(v2); continue; }
                 float l0 = Lv(v0), l1 = Lv(v1), l2 = Lv(v2);
                 bool p0 = l0 >= 0f, p1 = l1 >= 0f, p2 = l2 >= 0f;
                 if (!p0 && !p1 && !p2) { kept.Add(v0); kept.Add(v1); kept.Add(v2); continue; }
