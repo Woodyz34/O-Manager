@@ -221,7 +221,7 @@ public class EndScreenUI : MonoBehaviour
             badge.color = !standing.finished ? unfinishedBadgeColor : (standing.place == 1 ? winnerBadgeColor : badgeColor);
             Text(row, "Badge/Place").text = standing.finished ? standing.place.ToString() : "-";
             Text(row, "Name").text = standing.name;
-            Text(row, "Tag").text = standing.isLocal ? "YOU" : "";
+            Text(row, "Tag").text = "";
             Text(row, "Time").text = standing.finished ? CompetitionFlow.FormatTime(standing.seconds) : "DNF";
 
             // Rows drop in one after the other

@@ -384,7 +384,7 @@ public class RelayStatsUI : MonoBehaviour
         List<RelayTeamResult> players = new List<RelayTeamResult>(teams);
         players.Sort((a, b) => b.isLocal.CompareTo(a.isLocal));
         List<CellData> header = new List<CellData> { Cell("Leg", 230), Cell("", 190) };
-        foreach (RelayTeamResult t in players) header.Add(Cell(t.team + (t.isLocal ? " (you)" : ""), 190));
+        foreach (RelayTeamResult t in players) header.Add(Cell(t.team, 190));
         Row(48, true, header.ToArray());
         for (int c = 1; c < points; c++)
         {

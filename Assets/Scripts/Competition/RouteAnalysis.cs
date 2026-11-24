@@ -898,7 +898,7 @@ public class RouteCompareView : MonoBehaviour
             {
                 for (int i = leg == 0 ? 1 : leg; i <= (leg == 0 ? Legs : leg) && i < row.crosses.Length; i++) crosses |= row.crosses[i];
             }
-            string name = number + "<b>" + row.label + "</b>" + (row.isLocal ? " (you)" : "")
+            string name = number + "<b>" + row.label + "</b>"
                 + (crosses ? "\n<size=75%><color=#C0392B>Goes through ground you may not run on</color></size>" : "");
             AddRow(row.color, name, time + behind, row.isLocal, focus == e, () => Focus(index));
         }
