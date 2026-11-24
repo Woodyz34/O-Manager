@@ -616,7 +616,7 @@ public class ContestsPage : MonoBehaviour
             string result = r.dnf ? "Did not finish" : c.RouteChoice ? RouteChoiceGame.Points(r.score) + " p" : CompetitionFlow.FormatTime(r.seconds);
             TextMeshProUGUI place = CourseUI.Text("Place", row.transform, r.dnf ? "-" : r.place + ".", 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
             CourseUI.Place(place.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(10, 0), new Vector2(60, 50));
-            TextMeshProUGUI who = CourseUI.Text("Name", row.transform, r.name, 24, CourseUI.Ink, r.me ? FontStyles.Bold : FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            TextMeshProUGUI who = CourseUI.Text("Name", row.transform, r.name + (r.me ? "  (you)" : ""), 24, CourseUI.Ink, r.me ? FontStyles.Bold : FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
             CourseUI.Place(who.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(90, 0), new Vector2(520, 50));
             TextMeshProUGUI res = CourseUI.Text("Result", row.transform, result, 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
             res.enableAutoSizing = true;

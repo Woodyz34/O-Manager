@@ -800,7 +800,7 @@ public class RouteChoiceView : MonoBehaviour
             Image swatch = CourseUI.Panel("Colour", cell.transform, RouteEntry.ColorOf(p, i));
             CourseUI.Place(swatch.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(12, 0), new Vector2(10, 50));
             string status = p.choiceDone ? p.choiceRight + " of " + p.choiceQuestions + " right" : "playing, " + p.choiceAnswered + " answered";
-            TextMeshProUGUI name = CourseUI.Text("Name", cell.transform, PlaceOf(p, players) + ". <b>" + BearMode.Name(p) + "</b>"
+            TextMeshProUGUI name = CourseUI.Text("Name", cell.transform, PlaceOf(p, players) + ". <b>" + BearMode.Name(p) + "</b>" + (me ? " (you)" : "")
                 + "\n<size=80%><b>" + RouteChoiceGame.Points(p.choiceScore) + "</b> <color=#5B7563>· " + status + "</color></size>", 21, CourseUI.Ink);
             CourseUI.Stretch(name.rectTransform, 30, 8, 4, 4);
             name.alignment = TextAlignmentOptions.MidlineLeft;
@@ -1118,7 +1118,7 @@ public class RouteChoiceView : MonoBehaviour
             CourseUI.Place(badge.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(12, 0), new Vector2(46, 46));
             TextMeshProUGUI number = CourseUI.Text("Number", badge.transform, place.ToString(), 24, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);
             CourseUI.Stretch(number.rectTransform);
-            string name = "<b>" + BearMode.Name(p) + "</b>"
+            string name = "<b>" + BearMode.Name(p) + "</b>" + (mine ? " <color=#5B7563>(you)</color>" : "")
                 + "  <size=80%><color=#5B7563>" + p.choiceRight + " of " + p.choiceQuestions + " right" + (p.choiceDone ? "" : ", still playing") + "</color></size>";
             TextMeshProUGUI label = CourseUI.Text("Name", row.transform, name, 24, CourseUI.Ink);
             CourseUI.Stretch(label.rectTransform, 74, 220, 4, 4);
