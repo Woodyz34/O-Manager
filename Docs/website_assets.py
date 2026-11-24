@@ -36,10 +36,27 @@ PICS = {
     "tvforest":  (B + "3d-grantskog-ovan.png", (0.0574, 0.0, 0.9426, 1.0)),
     "tvhouse":   ("tv-kontroll/steg3/hus.jpg", None),
     "tvspruce":  ("tv-kontroll/steg3/tatt-grant.jpg", None),
+    # Run it yourself in 3D (2026-11-24): the controls hint at the bottom is cut away, 16:9 kept
+    "run3dmap":     (B + "3d-karta-i-handen.png", (0.0004, 0.0, 0.915, 0.9139)),
+    "run3dlake":    (B + "3d-sjo-park.png", (0.0382, 0.0092, 0.9664, 0.9147)),
+    "run3dcontrol": (B + "3d-kontroll-skog.png", (0.0507, 0.0, 0.9493, 0.9142)),
+    "run3dtown":    (B + "3d-stad.png", (0.0368, 0.0165, 0.9518, 0.9143)),
+    "run3dbridge":  (B + "3d-bro.png", (0.0383, 0.0038, 0.9399, 0.9141)),
+    "run3dtape":    (B + "3d-snitsel.png", (0.0452, 0.0, 0.9548, 0.9141)),
+    "run3dforest":  (B + "3d-skog.png", (0.0437, 0.0, 0.9367, 0.9146)),
+    # Weekly and daily contests
+    "contestday":   (B + "tavlingar-idag.png", (0.0024, 0.0043, 0.9984, 0.9986)),
+    "contestweek":  (B + "tavlingar-vecka.png", (0.0, 0.0017, 0.9962, 0.995)),
+    "contestboard": (B + "tavlingar-topplista.png", (0.15, 0.156, 0.85, 0.844)),
+    "contestpack":  (B + "dagens-paket.png", (0.24, 0.0, 0.76, 0.9)),
 }
+# ONLY=name1,name2 rebuilds just those pictures and skips the rest of the script
+ONLY = [n for n in os.environ.get("ONLY", "").split(",") if n]
 WIDTHS = [(800, "s"), (1600, "l")]
 
 for name, (src, crop) in PICS.items():
+    if ONLY and name not in ONLY:
+        continue
     im = Image.open(os.path.join(SRC, src)).convert("RGB")
     if crop:
         w, h = im.size
@@ -51,6 +68,9 @@ for name, (src, crop) in PICS.items():
     # Full size for the zoom viewer (opened only when someone clicks a picture)
     im.save(f"{OUT}/{name}-x.webp", quality=82, method=6)
     print(name, im.size)
+
+if ONLY:
+    sys.exit(0)
 
 # Fictional runner portraits for the card stack (Blender placeholder people, not real athletes)
 for name in ["Herr_07", "Dam_21", "Herr_19"]:

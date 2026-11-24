@@ -17,7 +17,7 @@
 <link rel="preload" href="assets/fonts/bigshoulders.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/video/hero-poster.jpg" as="image" fetchpriority="high">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 <script>
   // Pick language before first paint: saved choice, else browser language.
   (function () {
@@ -28,7 +28,7 @@
   })();
 </script>
 <script src="config.js?v=3" defer></script>
-<script src="main.js?v=3" defer></script>
+<script src="main.js?v=4" defer></script>
 </head>
 <body>
 <a class="skip" href="#main"><span data-l="sv">Hoppa till innehållet</span><span data-l="en">Skip to content</span></a>
@@ -42,7 +42,8 @@
     <nav class="links" id="links" aria-label="Meny">
       <a href="#how"><span data-l="sv">Så funkar det</span><span data-l="en">How it works</span></a>
       <a href="#modes"><span data-l="sv">Spellägen</span><span data-l="en">Game modes</span></a>
-      <a href="#tv"><span data-l="sv">TV-kontroller</span><span data-l="en">TV controls</span></a>
+      <a href="#run3d"><span data-l="sv">Spring i 3D</span><span data-l="en">Run in 3D</span></a>
+      <a href="#contests"><span data-l="sv">Tävlingar</span><span data-l="en">Contests</span></a>
       <a href="#news"><span data-l="sv">Nyheter</span><span data-l="en">News</span></a>
       <a href="#faq">FAQ</a>
     </nav>
@@ -226,6 +227,86 @@
         <p><span data-l="sv">Upp till tio sträckor med gafflingar, jaktstart och rygghäng. Precis som Tiomila.</span><span data-l="en">Up to ten legs with forkings, chasing starts and drafting. Just like the big Nordic relays.</span></p>
       </article>
     </div>
+  </div>
+</section>
+
+<!-- ============ RUN IT YOURSELF IN 3D ============ -->
+<section class="run3d" id="run3d">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="kicker light"><span data-l="sv">Nyhet · Spring själv i 3D</span><span data-l="en">New · Run it yourself in 3D</span></p>
+      <h2><span data-l="sv">Ta kartan i handen. Spring själv.</span><span data-l="en">Map in hand. Run it yourself.</span></h2>
+      <p class="sec-lead"><span data-l="sv">Här är det du som är löparen. Banan springs i första person genom en 3D-värld som byggs direkt från kartan, och ingen prick visar var du är. Bara du, kartan och tumkompassen.</span><span data-l="en">This time you are the runner. You run the course in first person through a 3D world built straight from the map, and no dot shows where you are. Just you, the map and the thumb compass.</span></p>
+    </header>
+  </div>
+  <div class="r3-stage" id="r3Stage">
+    <figure class="r3-view shot">
+      <picture><source type="image/avif" srcset="assets/img/run3dmap-s.avif?v=2 800w, assets/img/run3dmap-l.avif?v=2 1264w" sizes="96vw"><img src="assets/img/run3dmap-s.webp?v=2" srcset="assets/img/run3dmap-s.webp?v=2 800w, assets/img/run3dmap-l.webp?v=2 1264w" sizes="96vw" width="1264" height="711" loading="lazy" decoding="async" alt="First person view: the orienteering map held in two hands, with a thumb compass, in a 3D town park"></picture>
+      <span class="r3-hint r3-hint-a"><span data-l="sv">Vänster musknapp lyfter kartan</span><span data-l="en">Left mouse lifts the map</span></span>
+      <span class="r3-hint r3-hint-b"><span data-l="sv">Tumkompassen pekar mot norr</span><span data-l="en">The thumb compass points north</span></span>
+    </figure>
+  </div>
+  <div class="wrap r3-info">
+    <ul class="ticks reveal">
+      <li><span data-l="sv">Skogar och sprintstäder i 3D, med hus, broar, tunnlar, staket och publik som hejar</span><span data-l="en">Forests and sprint towns in 3D, with houses, bridges, tunnels, fences and a cheering crowd</span></li>
+      <li><span data-l="sv">Stämplingen sker av sig själv när du når kontrollen. Missar du en blir du diskad i mål.</span><span data-l="en">You punch automatically when you reach the control. Miss one and you are disqualified at the finish.</span></li>
+      <li><span data-l="sv">Hoppa över staket och stockar, och hör fotstegen byta ljud mellan stig, asfalt och mossa</span><span data-l="en">Jump fences and logs, and hear your footsteps change between path, asphalt and moss</span></li>
+      <li><span data-l="sv">Spring ensam och slå ditt rekord, eller online med jaktstart eller masstart där ni kan krocka</span><span data-l="en">Run alone and beat your record, or online with individual or mass start where you can bump into each other</span></li>
+      <li><span data-l="sv">Efteråt ser du allas vägval i GPS-reprisen</span><span data-l="en">Afterwards you see everyone's routes in the GPS replay</span></li>
+    </ul>
+    <div class="keys reveal" aria-hidden="true">
+      <div class="keys-row"><b class="key k-w">W</b></div>
+      <div class="keys-row"><b class="key k-a">A</b><b class="key k-s">S</b><b class="key k-d">D</b></div>
+      <div class="keys-row"><b class="key key-space k-sp"><span data-l="sv">Mellanslag</span><span data-l="en">Space</span></b></div>
+      <div class="mouse"><i class="mouse-l"></i><i class="mouse-r"></i></div>
+      <p class="keys-cap"><span data-l="sv">Spring med WASD, titta med musen, hoppa med mellanslag och lyft kartan med vänster musknapp</span><span data-l="en">Run with WASD, look with the mouse, jump with space and lift the map with the left mouse button</span></p>
+    </div>
+  </div>
+  <div class="r3-reel" id="r3Reel" aria-label="Run it yourself screenshots">
+    <div class="r3-track" id="r3Track">
+      <figure class="shot"><img src="assets/img/run3dtown-s.webp?v=2" width="800" height="449" loading="lazy" decoding="async" alt="Sprint town in 3D with brick houses"><figcaption><span data-l="sv">Sprint genom stan</span><span data-l="en">Sprint through town</span></figcaption></figure>
+      <figure class="shot"><img src="assets/img/run3dcontrol-s.webp?v=2" width="800" height="450" loading="lazy" decoding="async" alt="A control by a boulder in the 3D forest"><figcaption><span data-l="sv">Kontrollen vid stenen</span><span data-l="en">The control by the boulder</span></figcaption></figure>
+      <figure class="shot"><img src="assets/img/run3dbridge-s.webp?v=2" width="800" height="449" loading="lazy" decoding="async" alt="A fenced path across the water to an island"><figcaption><span data-l="sv">Över bron till ön</span><span data-l="en">Over the bridge to the island</span></figcaption></figure>
+      <figure class="shot"><img src="assets/img/run3dlake-s.webp?v=2" width="800" height="450" loading="lazy" decoding="async" alt="Park by a lake with people watching"><figcaption><span data-l="sv">Publik längs sjön</span><span data-l="en">Crowd by the lake</span></figcaption></figure>
+      <figure class="shot"><img src="assets/img/run3dforest-s.webp?v=2" width="800" height="449" loading="lazy" decoding="async" alt="Pine forest with a path in 3D"><figcaption><span data-l="sv">Tallskog och stigar</span><span data-l="en">Pine forest and paths</span></figcaption></figure>
+      <figure class="shot"><img src="assets/img/run3dtape-s.webp?v=2" width="800" height="449" loading="lazy" decoding="async" alt="Out-of-bounds tape in a park"><figcaption><span data-l="sv">Snitslad avspärrning</span><span data-l="en">Taped out-of-bounds area</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ WEEKLY AND DAILY CONTESTS ============ -->
+<section class="contests topo" id="contests">
+  <div class="wrap ct-in">
+    <div class="ct-copy reveal">
+      <p class="kicker"><span data-l="sv">Nyhet · Tävlingar</span><span data-l="en">New · Contests</span></p>
+      <h2><span data-l="sv">Veckans och dagens tävling</span><span data-l="en">Weekly and daily contests</span></h2>
+      <p><span data-l="sv">Varje dag och varje vecka väntar nya tävlingar där alla spelare kör samma bana: vägvalsspelet, ett vanligt lopp eller spring själv i 3D, i skog eller sprint. Du får ett försök. Sen öppnas topplistan och du kan se hur de bästa sprang.</span><span data-l="en">Every day and every week there are new contests where every player runs the same course: the route choice game, a normal race or run it yourself in 3D, in forest or sprint. You get one try. Then the leaderboard opens and you can see how the best ran.</span></p>
+      <div class="clocks">
+        <div class="clock-card">
+          <small><span data-l="sv">Dagens tävling slutar om</span><span data-l="en">Today's contest ends in</span></small>
+          <b class="clock" id="clockDay">--:--:--</b>
+        </div>
+        <div class="clock-card week">
+          <small><span data-l="sv">Veckans tävling slutar om</span><span data-l="en">This week's contest ends in</span></small>
+          <b class="clock" id="clockWeek">--</b>
+        </div>
+      </div>
+      <p class="clock-note"><span data-l="sv">Dagen går 00:00 till 23:59 och veckan måndag till söndag, svensk tid.</span><span data-l="en">A day runs 00:00 to 23:59 and a week Monday to Sunday, Swedish time.</span></p>
+    </div>
+    <div class="ct-stack reveal">
+      <figure class="ct-main shot"><picture><source type="image/avif" srcset="assets/img/contestday-s.avif?v=2 800w, assets/img/contestday-l.avif?v=2 1243w" sizes="(min-width: 900px) 50vw, 92vw"><img src="assets/img/contestday-s.webp?v=2" srcset="assets/img/contestday-s.webp?v=2 800w, assets/img/contestday-l.webp?v=2 1243w" sizes="(min-width: 900px) 50vw, 92vw" width="1243" height="697" loading="lazy" decoding="async" alt="The contests page with today's three contests"></picture><figcaption class="sr"><span data-l="sv">Dagens tävlingar</span><span data-l="en">Today's contests</span></figcaption></figure>
+      <figure class="ct-board shot"><img src="assets/img/contestboard-s.webp?v=2" width="800" height="449" loading="lazy" decoding="async" alt="Leaderboard for a daily route choice contest"><figcaption class="sr"><span data-l="sv">Topplistan</span><span data-l="en">The leaderboard</span></figcaption></figure>
+      <figure class="ct-pack shot"><span class="rays" aria-hidden="true"></span><img src="assets/img/contestpack-s.webp?v=2" width="788" height="769" loading="lazy" decoding="async" alt="A daily pack being opened with a silver runner card"><figcaption class="sr"><span data-l="sv">Ett vunnet dagspaket</span><span data-l="en">A won daily pack</span></figcaption></figure>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="podium reveal">
+      <div class="pod p2"><span class="pod-medal">2</span><b><span data-l="sv">Paket + pengar</span><span data-l="en">Pack + money</span></b><i></i></div>
+      <div class="pod p1"><span class="pod-medal">1</span><b><span data-l="sv">Veckans paket + pengar</span><span data-l="en">Weekly pack + money</span></b><i></i></div>
+      <div class="pod p3"><span class="pod-medal">3</span><b><span data-l="sv">Dagens paket + pengar</span><span data-l="en">Daily pack + money</span></b><i></i></div>
+    </div>
+    <p class="podium-note reveal"><span data-l="sv">De tre bästa vinner paket med nya löpare, och prispotten växer för varje spelare som går i mål. Alla som går i mål får pengar.</span><span data-l="en">The top three win packs with new runners, and the prize pot grows with every player who finishes. Everyone who finishes gets money.</span></p>
+    <figure class="ct-week shot reveal"><picture><source type="image/avif" srcset="assets/img/contestweek-s.avif?v=2 800w, assets/img/contestweek-l.avif?v=2 1055w" sizes="(min-width: 900px) 70vw, 92vw"><img src="assets/img/contestweek-s.webp?v=2" srcset="assets/img/contestweek-s.webp?v=2 800w, assets/img/contestweek-l.webp?v=2 1055w" sizes="(min-width: 900px) 70vw, 92vw" width="1055" height="590" loading="lazy" decoding="async" alt="This week's contests: route choice game, race and run it yourself in forest and sprint"></picture></figure>
   </div>
 </section>
 
