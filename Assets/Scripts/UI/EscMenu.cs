@@ -6,7 +6,8 @@ using UnityEngine.UI;
 
 // The menu that opens with Esc on every page: resume, volume, back to the main menu and quit the game.
 // The host of a running competition can also end it for everyone and take them back to the lobby.
-// The game keeps running behind the menu (other players are still racing), so nothing is paused.
+// Online the game keeps running behind the menu (other players are still racing). Alone (single player and the
+// weekly/daily contests) the race stands still while the menu is open (GamePause, 2026-11-24).
 // "Key bindings" opens a second page with every key that can be changed, one group per game mode.
 public class EscMenu : MonoBehaviour
 {
@@ -120,6 +121,9 @@ public class EscMenu : MonoBehaviour
 
     void Update()
     {
+        // Alone in a race the game stands still while this menu, or the 3D settings opened from it, is open
+        // (2026-11-24, the user)
+        GamePause.Check(IsOpen || RunSettings.IsOpen);
         if (IsOpen && rebinding != null)
         {
             ListenForKey();

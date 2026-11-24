@@ -575,11 +575,19 @@ public class ContestsPage : MonoBehaviour
         CourseUI.Column(card.gameObject, 10, new RectOffset(26, 26, 24, 24));
 
         TextMeshProUGUI kind = CourseUI.Text("Kind", card.transform, (c.RouteChoice ? "ROUTE CHOICE GAME" : c.Run3D ? "RUN IT YOURSELF (3D)" : "RACE") + "  ·  " + (c.Sprint ? "SPRINT" : "FOREST"), 18, CourseUI.Accent, FontStyles.Bold);
+        kind.enableWordWrapping = false;
+        kind.enableAutoSizing = true;
+        kind.fontSizeMin = 12;
+        kind.fontSizeMax = 18;
         CourseUI.Size(kind, 26);
         string heading = c.RouteChoice ? (c.Sprint ? "Sprint route choices" : "Forest route choices")
                          : c.Run3D ? (c.Sprint ? "Sprint run in 3D" : "Forest run in 3D")
                          : (c.Sprint ? "Sprint race" : "Forest race");
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, heading, 32, CourseUI.Ink, FontStyles.Bold);
+        title.enableWordWrapping = false;
+        title.enableAutoSizing = true;
+        title.fontSizeMin = 20;
+        title.fontSizeMax = 32;
         CourseUI.Size(title, 44);
 
         CourseData course = ContestRun.ReadCourse(c.course);
@@ -619,6 +627,10 @@ public class ContestsPage : MonoBehaviour
         else state = c.entries + (c.entries == 1 ? " player has" : " players have") + " run it. Run it to see the leaderboard.";
         TextMeshProUGUI status = CourseUI.Text("Status", card.transform, state, 20, CourseUI.Ink);
         status.richText = true;
+        status.raycastTarget = false;   // a long text must never sit over the Leaderboard button
+        status.enableAutoSizing = true;
+        status.fontSizeMin = 14;
+        status.fontSizeMax = 20;
         CourseUI.Size(status, 56);
 
         if (c.Started)
@@ -725,14 +737,52 @@ public class ContestsPage : MonoBehaviour
 
     // ---- Leaderboard ----
 
+    // After a DNF the button did nothing (2026-11-24, the user): now the board always opens. Any error is shown and
+    // logged, and when the cloud has no board for you (an older script, a run that never reached it) you still see
+    // yourself as "Did not finish": no place, no prize and no money for the time out.
+    bool boardLoading;
+
     async void ShowBoard(ContestInfo c)
     {
-        ContestBoard board;
-        try { board = await ContestCloud.BoardAsync(c.id); }
-        catch (Exception e) { UIToast.Show(e.Message); return; }
+        if (boardLoading) return;
+        boardLoading = true;
+        ContestBoard board = null;
+        try
+        {
+            board = await ContestCloud.BoardAsync(c.id);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("Contests: leaderboard " + c.id + ": " + e);
+            if (c.Done) UIToast.Show(e.Message);
+            board = null;
+        }
+        finally { boardLoading = false; }
         if (this == null) return;
+        if (board == null)
+        {
+            // Only your own DNF row, so the button never does nothing
+            if (c.Done) return;
+            board = new ContestBoard();
+        }
+        if (board.rows == null) board.rows = new List<ContestRow>();
+        if (!c.Done && board.rows.Find(r => r.me) == null)
+            board.rows.Add(new ContestRow { name = PlayerName, dnf = true, me = true, packs = new List<string>() });
+        // A DNF has no place, prize or packs, whatever came back
+        foreach (ContestRow r in board.rows)
+        {
+            if (!r.dnf) continue;
+            r.place = 0;
+            r.prize = 0;
+            r.packs = new List<string>();
+        }
         if (string.IsNullOrEmpty(board.course)) board.course = c.course;
-        ShowBoardSheet(c, board);
+        try { ShowBoardSheet(c, board); }
+        catch (Exception e)
+        {
+            Debug.LogException(e);
+            UIToast.Show("Could not show the leaderboard: " + e.Message);
+        }
     }
 
     // The leaderboard: a summary (winner, your place, who beat you), every runner with their result and prize, and a
@@ -836,13 +886,17 @@ public class ContestsPage : MonoBehaviour
     static string Summary(ContestInfo c, ContestBoard board)
     {
         List<ContestRow> done = board.rows.FindAll(r => !r.dnf);
-        if (done.Count == 0) return "Nobody has finished yet.";
+        if (done.Count == 0)
+        {
+            ContestRow me = board.rows.Find(r => r.me);
+            return "Nobody has finished yet." + (me != null && me.dnf ? "  You did not finish: no place, no prize and no money for the time out." : "");
+        }
         ContestRow first = done[0];
         List<ContestRow> winners = done.FindAll(r => r.place == 1);
         string text = done.Count + (done.Count == 1 ? " runner" : " runners") + ".  " + (winners.Count > 1 ? "Winners: " : "Winner: ")
             + "<b>" + string.Join(", ", winners.ConvertAll(r => r.name)) + "</b> " + ResultText(c, first.score, first.seconds) + ".";
         ContestRow mine = board.rows.Find(r => r.me);
-        if (mine != null && mine.dnf) text += "  You did not finish.";
+        if (mine != null && mine.dnf) text += "  You did not finish: no place, no prize and no money for the time out.";
         else if (mine != null && mine.place == 1) text += winners.Count > 1 ? "  <b>You share the win!</b>" : "  <b>You won!</b>";
         else if (mine != null)
         {
@@ -923,6 +977,12 @@ public class ContestsPage : MonoBehaviour
         card.gameObject.AddComponent<ClickCatcher>();
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(width, height));
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, heading, 36, CourseUI.Ink, FontStyles.Bold);
+        // One line that shrinks to fit: "Weekly contest: Route choice game · Forest" was cut off in the start pop-up
+        // (2026-11-24, the user)
+        title.enableWordWrapping = false;
+        title.enableAutoSizing = true;
+        title.fontSizeMin = 18;
+        title.fontSizeMax = 36;
         CourseUI.Place(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -30), new Vector2(width - 260, 56));
         Button close = CourseUI.Button("Close", card.transform, "Close", CourseUI.ButtonKind.Light, () => Destroy(dim.gameObject), 22);
         CourseUI.Place((RectTransform)close.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-30, -30), new Vector2(160, 56));
@@ -931,7 +991,7 @@ public class ContestsPage : MonoBehaviour
 
     void Popup(string heading, string text, string action, Action onAction)
     {
-        GameObject sheet = PopupFrame(heading, 900, 440);
+        GameObject sheet = PopupFrame(heading, 1000, 440);
         Transform body = sheet.transform.GetChild(0);
         TextMeshProUGUI label = CourseUI.Text("Text", body, text, 24, CourseUI.Ink);
         label.richText = true;

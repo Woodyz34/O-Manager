@@ -61,7 +61,7 @@ public static class CompetitionFlow
         everyoneDoneAt = -1f;
         sharedPlayed = -1f;
         rememberedImposter = PlayerRef.None;
-        sceneLoadedAt = Time.unscaledTime;
+        sceneLoadedAt = GamePause.PlayClock;
     }
 
     // How long this competition has been played, in real seconds, for the prize money (2026-11-19). Since 2026-11-24
@@ -81,7 +81,7 @@ public static class CompetitionFlow
     {
         get
         {
-            float end = everyoneDoneAt >= 0f ? everyoneDoneAt : ResultsShown ? resultsShownAt : Time.unscaledTime;
+            float end = everyoneDoneAt >= 0f ? everyoneDoneAt : ResultsShown ? resultsShownAt : GamePause.PlayClock;
             return Mathf.Max(0f, end - sceneLoadedAt);
         }
     }
@@ -90,7 +90,7 @@ public static class CompetitionFlow
     public static void MarkEveryoneDone()
     {
         if (everyoneDoneAt >= 0f || ResultsShown || !InCompetition()) return;
-        everyoneDoneAt = Time.unscaledTime;
+        everyoneDoneAt = GamePause.PlayClock;
     }
 
     // The host's played time, sent to everyone with the results
@@ -109,7 +109,7 @@ public static class CompetitionFlow
             return;
         }
         // Give the new scene a moment so values left over from the previous competition are reset first
-        if (Time.unscaledTime - sceneLoadedAt < 3f)
+        if (GamePause.PlayClock - sceneLoadedAt < 3f)
         {
             return;
         }
@@ -150,9 +150,9 @@ public static class CompetitionFlow
             {
                 if (allFinishedSince < 0f)
                 {
-                    allFinishedSince = Time.unscaledTime;
+                    allFinishedSince = GamePause.PlayClock;
                 }
-                else if (!resultsRequested && Time.unscaledTime - allFinishedSince > 1.5f)
+                else if (!resultsRequested && GamePause.PlayClock - allFinishedSince > 1.5f)
                 {
                     resultsRequested = true;
                     local.RPC_ShowResults(HostPlayedSeconds);
@@ -166,9 +166,9 @@ public static class CompetitionFlow
         else if (!RevealStarted && !revealRequested && TryGetImposter(out PlayerRef imposter))
         {
             // Imposter mode: reveal when everyone has guessed, or when the time is up
-            bool everyoneGuessed = Time.unscaledTime - resultsShownAt > 3f
+            bool everyoneGuessed = GamePause.PlayClock - resultsShownAt > 3f
                 && AllPlayers(p => p.hasGuessedImposter || p.Object.StateAuthority == imposter);
-            if (everyoneGuessed || Time.unscaledTime > GuessDeadline)
+            if (everyoneGuessed || GamePause.PlayClock > GuessDeadline)
             {
                 HostRevealImposter();
             }
@@ -240,10 +240,10 @@ public static class CompetitionFlow
             return;
         }
         ResultsShown = true;
-        resultsShownAt = Time.unscaledTime;
+        resultsShownAt = GamePause.PlayClock;
         // The same played time for everyone in the lobby: the host's
         if (hostPlayedSeconds >= 0) sharedPlayed = hostPlayedSeconds;
-        GuessDeadline = Time.unscaledTime + GuessSeconds;
+        GuessDeadline = GamePause.PlayClock + GuessSeconds;
 
         StopLocalRunner();
         if (ImposterOverlay.Instance != null)
