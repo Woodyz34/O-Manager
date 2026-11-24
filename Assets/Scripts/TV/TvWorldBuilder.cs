@@ -962,7 +962,9 @@ public partial class TvWorldBuilder
             float lift = extra * Up;
             float bottom = high + lift - height, low = high - fall;
             // A rock cliff drops at once (a vertical face is built on it, CliffFaces); an earth bank slopes
-            float down = rocky ? Sm(-0.25f, 0.45f, side) : Sm(-0.5f, 0.9f, side);
+            // The ground's own step (a slope a metre wide, as the ground has a corner every metre) lies just above the
+            // line, behind the face, which stands on the line itself (CliffFaces)
+            float down = rocky ? Sm(-0.95f, -0.15f, side) : Sm(-0.5f, 0.9f, side);
             int k = pair.Key;
             float here = BaseHeight(k % N - R, k / N - R);
             // Past the ends of the line the step fades out, so a cliff does not wrap round its own end
@@ -2087,116 +2089,105 @@ public partial class TvWorldBuilder
     }
 
     // A rock cliff stands straight up (2026-11-19, Anders: a cliff is a wall, not a slope): a rough vertical face along
-    // the line, jagged a little along its length, with a rock top on it. The ground has a corner only every metre, so
-    // the drop itself is a slope a metre wide; the face stands at the foot of that slope and the top covers the slope
-    // behind it back to the ground above, so the cliff is one solid block of rock: straight up from the foot, level on
-    // top (2026-11-24, Anders: the face was a thin sheet standing in the slope and stuck up above the ground behind it)
+    // the line with a rock top on it, one solid block of rock. The ground has a corner only every metre, so its own
+    // drop is a slope a metre wide: that slope lies just above the line (Cliff), the face stands on the line in front
+    // of it and the top covers it back to the ground above (2026-11-24, Anders: a thin sheet stuck up above the
+    // ground behind it). The face is one unbroken strip along the whole line, bent at the corners, and is drawn from
+    // both sides, so there is no gap to see through at a corner or from inside (2026-11-24, Anders: gaps in the
+    // cliffs, and the face stood out on the low side, so a runner put their head into the rock before being stopped:
+    // the runner is stopped 0.45 m from the line, RunTerrain.Blocked).
     void CliffFaces()
     {
-        const float Out = 0.75f, Back = 1.15f;
+        const float Out = 0.12f, Back = 1.45f, Gap = 0.7f;
+        const int Rows = 4;   // the face in bands, each bulging a little its own way, so it is not one flat slab
         foreach (var cliff in cliffs)
         {
             float[] c = cliff.xz;
             stepEnds.TryGetValue(c, out var more);
-            float length = 0f;
-            for (int q = 0; q + 3 < c.Length; q += 2)
-                length += (float)Math.Sqrt((c[q + 2] - c[q]) * (c[q + 2] - c[q]) + (c[q + 3] - c[q + 1]) * (c[q + 3] - c[q + 1]));
-            float done = 0f;
-            for (int q = 0; q + 3 < c.Length; q += 2)
+            int corners = c.Length / 2;
+            var along = new float[corners];
+            for (int p = 1; p < corners; p++)
             {
-                float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
-                float sx = bx - ax, sz = bz - az, len = (float)Math.Sqrt(sx * sx + sz * sz);
-                float start = done;
-                done += len;
-                if (len < 0.05f) continue;
-                if (!Inside((ax + bx) / 2f, (az + bz) / 2f, chunk ? 0f : 2f)) continue;
-                // The low side, as the drop was made
-                float nx = cliff.side * sz / len, nz = -cliff.side * sx / len;
-                int steps = Math.Max(1, (int)Math.Ceiling(len / 0.7f));
-                int first = -1, firstTop = -1;
-                const int Rows = 4;   // the face in bands, each bulging a little its own way, so it is not one flat slab
-                for (int k = 0; k <= steps; k++)
-                {
-                    float f = k / (float)steps, px = ax + sx * f, pz = az + sz * f;
-                    float jag = (TvRandom.Noise((px + ox) * 1.7f, (pz + oz) * 1.7f) - 0.5f) * 0.3f;
-                    float fx = px + nx * (Out + jag), fz = pz + nz * (Out + jag);
-                    // The top: level with the ground above the edge (a little over it, so the ground does not show
-                    // through); the foot: in the ground below
-                    float top = Math.Max(H(px - nx * 0.7f, pz - nz * 0.7f), H(px - nx * 0.3f, pz - nz * 0.3f)) + 0.1f;
-                    float foot = H(px + nx * (Out + 0.6f), pz + nz * (Out + 0.6f)) - 0.35f;
-                    // At the cliff's own ends the face sinks into the ground where it stands
-                    float s = start + len * f;
-                    float toEnd = Math.Min(more.before > 0f ? 9f : s, more.after > 0f ? 9f : length - s);
-                    top = Lerp(H(fx, fz) - 0.05f, top, Sm(0f, 1.2f, toEnd));
-                    // A low cliff: the face reaches further into the ground below, never up above the top
-                    if (top < foot + 0.5f) foot = top - 0.5f;
-                    float lean = (TvRandom.Noise((px + ox) * 0.9f + 7f, (pz + oz) * 0.9f) - 0.5f) * 0.3f;
-                    int v0 = -1;
-                    for (int r = 0; r <= Rows; r++)
-                    {
-                        float h = r / (float)Rows;                       // 0 top .. 1 foot
-                        float y = top + (foot - top) * h;
-                        float bulge = r == 0 || r == Rows ? 0f : (TvRandom.Noise((px + ox) * 1.1f + r * 3.1f, (pz + oz) * 1.1f + y * 0.9f) - 0.5f) * 0.3f;
-                        float out0 = -0.05f + 0.1f * h + bulge;
-                        // Grey granite in patches, lichen-pale near the top, darker and damp at the foot
-                        float patch = TvRandom.Noise((px + ox) * 0.45f + y * 0.6f, (pz + oz) * 0.45f - y * 0.4f);
-                        TvColor col = Rock.Lerp(RockDark, Math.Max(0f, Math.Min(1f, patch * 1.3f - 0.15f)));
-                        if (h < 0.3f) col = col.Lerp(LichenRock, (0.3f - h) * 1.6f * TvRandom.Noise((px + ox) * 0.8f, (pz + oz) * 0.8f + 11f));
-                        if (h > 0.75f) col = col.Lerp(RockDark, (h - 0.75f) * 2.4f);
-                        int v = cliffMesh.Vertex(fx + nx * out0, y, fz + nz * out0, nx + lean * nz + bulge * 0.8f * nx, 0.15f - bulge * 0.3f, nz - lean * nx + bulge * 0.8f * nz, col);
-                        if (r == 0) v0 = v;
-                    }
-                    // The rock top: from the face's top edge back over the slope to the ground above
-                    float tex = fx + nx * -0.05f, tez = fz + nz * -0.05f;
-                    float mx = px - nx * 0.45f, mz = pz - nz * 0.45f, bkx = px - nx * Back, bkz = pz - nz * Back;
-                    float lichen = TvRandom.Noise((px + ox) * 0.6f + 3f, (pz + oz) * 0.6f);
-                    TvColor capCol = Rock.Lerp(LichenRock, 0.35f + 0.5f * lichen);
-                    int t0 = cliffMesh.Vertex(tex, top, tez, 0f, 1f, 0f, capCol);
-                    cliffMesh.Vertex(mx, Math.Max(top, H(mx, mz) + 0.06f), mz, 0f, 1f, 0f, capCol);
-                    cliffMesh.Vertex(bkx, H(bkx, bkz) - 0.04f, bkz, 0f, 1f, 0f, capCol.Lerp(Rock, 0.3f));
-                    if (k > 0)
-                    {
-                        // Front faces must run clockwise seen from the low side
-                        float ux = fx - (cliffMesh.positions[first * 3]), uz = fz - (cliffMesh.positions[first * 3 + 2]);
-                        bool flip = (ux * nz - uz * nx) < 0f;
-                        for (int r = 0; r < Rows; r++)
-                        {
-                            int a2 = first + r, b2 = first + r + 1, c2 = v0 + r, d2 = v0 + r + 1;   // a2, c2: upper; b2, d2: lower
-                            if (flip)
-                            {
-                                cliffMesh.triangles.Add(a2); cliffMesh.triangles.Add(c2); cliffMesh.triangles.Add(b2);
-                                cliffMesh.triangles.Add(c2); cliffMesh.triangles.Add(d2); cliffMesh.triangles.Add(b2);
-                            }
-                            else
-                            {
-                                cliffMesh.triangles.Add(a2); cliffMesh.triangles.Add(b2); cliffMesh.triangles.Add(c2);
-                                cliffMesh.triangles.Add(c2); cliffMesh.triangles.Add(b2); cliffMesh.triangles.Add(d2);
-                            }
-                        }
-                        for (int r = 0; r < 2; r++)
-                        {
-                            UpTriangle(cliffMesh, firstTop + r, t0 + r, firstTop + r + 1);
-                            UpTriangle(cliffMesh, t0 + r, t0 + r + 1, firstTop + r + 1);
-                        }
-                    }
-                    first = v0;
-                    firstTop = t0;
-                }
+                float sx = c[p * 2] - c[p * 2 - 2], sz = c[p * 2 + 1] - c[p * 2 - 1];
+                along[p] = along[p - 1] + (float)Math.Sqrt(sx * sx + sz * sz);
             }
+            float length = along[corners - 1];
+            if (length < 0.05f) continue;
+            // Columns at the same places along the line in every piece of the world, so pieces meet without a gap
+            int count = Math.Max(1, (int)Math.Ceiling(length / Gap));
+            float gap = length / count;
+            int lastColumn = -1, lastFace = -1, lastTop = -1;
+            for (int i = 0; i < count; i++)
+            {
+                PointOn(c, along, (i + 0.5f) * gap, out float mx0, out float mz0);
+                if (!Inside(mx0, mz0, chunk ? 0f : 2f)) continue;
+                int faceA, topA;
+                if (lastColumn == i) { faceA = lastFace; topA = lastTop; }
+                else Column(c, along, length, i * gap, cliff.side, more, out faceA, out topA);
+                Column(c, along, length, (i + 1) * gap, cliff.side, more, out int faceB, out int topB);
+                // Both windings: seen from outside or from inside the rock, it is closed
+                for (int r = 0; r < Rows; r++) Quad(cliffMesh, faceA + r, faceA + r + 1, faceB + r, faceB + r + 1);
+                for (int r = 0; r < 2; r++) Quad(cliffMesh, topA + r, topA + r + 1, topB + r, topB + r + 1);
+                lastColumn = i + 1;
+                lastFace = faceB;
+                lastTop = topB;
+            }
+        }
+
+        // One column of the face (Rows + 1 corners from the top down) and of the top (3 corners from the front back),
+        // the distance s along the line
+        void Column(float[] c, float[] along, float length, float s, float side, (float before, float after) more, out int face, out int topFirst)
+        {
+            PointOn(c, along, s, out float px, out float pz);
+            PointOn(c, along, Math.Max(0f, s - 0.75f), out float bx, out float bz);
+            PointOn(c, along, Math.Min(length, s + 0.75f), out float fx0, out float fz0);
+            float sx = fx0 - bx, sz = fz0 - bz, l = (float)Math.Sqrt(sx * sx + sz * sz);
+            if (l < 1e-5f) { sx = c[2] - c[0]; sz = c[3] - c[1]; l = Math.Max(1e-5f, (float)Math.Sqrt(sx * sx + sz * sz)); }
+            // The low side, as the drop was made
+            float nx = side * sz / l, nz = -side * sx / l;
+            float jag = (TvRandom.Noise((px + ox) * 1.7f, (pz + oz) * 1.7f) - 0.5f) * 0.16f;
+            float fx = px + nx * (Out + jag), fz = pz + nz * (Out + jag);
+            // The top: level with the ground above the step (a little over it, so the ground does not show through);
+            // the foot: in the ground below
+            float top = Math.Max(H(px - nx * 1.1f, pz - nz * 1.1f), H(px - nx * 1.45f, pz - nz * 1.45f)) + 0.1f;
+            float foot = H(px + nx * 0.8f, pz + nz * 0.8f) - 0.4f;
+            // At the cliff's own ends the face sinks into the ground where it stands
+            float toEnd = Math.Min(more.before > 0f ? 9f : s, more.after > 0f ? 9f : length - s);
+            top = Lerp(H(fx, fz) - 0.05f, top, Sm(0f, 1.2f, toEnd));
+            // A low cliff: the face reaches further into the ground below, never up above the top
+            if (top < foot + 0.5f) foot = top - 0.5f;
+            float lean = (TvRandom.Noise((px + ox) * 0.9f + 7f, (pz + oz) * 0.9f) - 0.5f) * 0.3f;
+            face = -1;
+            for (int r = 0; r <= Rows; r++)
+            {
+                float h = r / (float)Rows;                       // 0 top .. 1 foot
+                float y = top + (foot - top) * h;
+                float bulge = r == 0 || r == Rows ? 0f : (TvRandom.Noise((px + ox) * 1.1f + r * 3.1f, (pz + oz) * 1.1f + y * 0.9f) - 0.5f) * 0.16f;
+                float out0 = 0.06f * h + bulge;
+                // Grey granite in patches, lichen-pale near the top, darker and damp at the foot
+                float patch = TvRandom.Noise((px + ox) * 0.45f + y * 0.6f, (pz + oz) * 0.45f - y * 0.4f);
+                TvColor col = Rock.Lerp(RockDark, Math.Max(0f, Math.Min(1f, patch * 1.3f - 0.15f)));
+                if (h < 0.3f) col = col.Lerp(LichenRock, (0.3f - h) * 1.6f * TvRandom.Noise((px + ox) * 0.8f, (pz + oz) * 0.8f + 11f));
+                if (h > 0.75f) col = col.Lerp(RockDark, (h - 0.75f) * 2.4f);
+                int v = cliffMesh.Vertex(fx + nx * out0, y, fz + nz * out0, nx + lean * nz + bulge * 0.8f * nx, 0.15f - bulge * 0.3f, nz - lean * nx + bulge * 0.8f * nz, col);
+                if (r == 0) face = v;
+            }
+            // The rock top: from the face's top edge back over the ground's step to the ground above
+            float mx = px - nx * 0.75f, mz = pz - nz * 0.75f, kx = px - nx * Back, kz = pz - nz * Back;
+            float lichen = TvRandom.Noise((px + ox) * 0.6f + 3f, (pz + oz) * 0.6f);
+            TvColor capCol = Rock.Lerp(LichenRock, 0.35f + 0.5f * lichen);
+            topFirst = cliffMesh.Vertex(fx, top, fz, 0f, 1f, 0f, capCol);
+            cliffMesh.Vertex(mx, Math.Max(top, H(mx, mz) + 0.06f), mz, 0f, 1f, 0f, capCol);
+            cliffMesh.Vertex(kx, H(kx, kz) - 0.04f, kz, 0f, 1f, 0f, capCol.Lerp(Rock, 0.3f));
         }
     }
 
-    // A triangle that faces up (clockwise seen from above, as Unity draws front faces)
-    static void UpTriangle(TvMesh mesh, int a, int b, int c)
+    // A four-cornered piece (a, b one edge; c, d the next, b and d the far corners) drawn from both sides
+    static void Quad(TvMesh mesh, int a, int b, int c, int d)
     {
-        var p = mesh.positions;
-        float abx = p[b * 3] - p[a * 3], abz = p[b * 3 + 2] - p[a * 3 + 2];
-        float acx = p[c * 3] - p[a * 3], acz = p[c * 3 + 2] - p[a * 3 + 2];
-        // The y of (b - a) x (c - a): positive when a, b, c run clockwise seen from above
-        float y = abz * acx - abx * acz;
-        mesh.triangles.Add(a);
-        if (y >= 0f) { mesh.triangles.Add(b); mesh.triangles.Add(c); }
-        else { mesh.triangles.Add(c); mesh.triangles.Add(b); }
+        var t = mesh.triangles;
+        t.Add(a); t.Add(b); t.Add(c); t.Add(c); t.Add(b); t.Add(d);
+        t.Add(a); t.Add(c); t.Add(b); t.Add(c); t.Add(d); t.Add(b);
     }
 
     // ---- Walls, fences, power lines, towers, buildings, fallen trees, springs ----
