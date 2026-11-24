@@ -46,7 +46,8 @@ public partial class RunSession
         var list = new List<NetworkPlayer>();
         foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (p != null && p.Object != null && p.Object.IsValid) list.Add(p);
+            // A player who joined in the middle only watches: not one of the runners
+            if (NetworkPlayer.Races(p)) list.Add(p);
         }
         list.Sort((a, b) => a.Object.StateAuthority.PlayerId.CompareTo(b.Object.StateAuthority.PlayerId));
         return list;

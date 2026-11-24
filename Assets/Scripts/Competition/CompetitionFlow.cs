@@ -115,7 +115,7 @@ public static class CompetitionFlow
         }
 
         // Tell everyone when we have reached the last control, with the exact time the clock stopped at
-        if (!ResultsShown && !local.raceFinished && local.agentMovement != null && local.agentMovement.hasFinished)
+        if (!ResultsShown && !local.spectator && !local.raceFinished && local.agentMovement != null && local.agentMovement.hasFinished)
         {
             Clock clock = local.clock;
             if (clock != null)
@@ -410,11 +410,12 @@ public static class CompetitionFlow
         return null;
     }
 
+    // The players in the race: a player who joined in the middle only watches (NetworkPlayer.spectator)
     static IEnumerable<NetworkPlayer> ValidPlayers()
     {
         foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (p.Object != null && p.Object.IsValid)
+            if (NetworkPlayer.Races(p))
             {
                 yield return p;
             }

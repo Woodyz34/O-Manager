@@ -121,7 +121,7 @@ public class WaitingScreen : MonoBehaviour
         List<string> choosing = new List<string>();
         foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (p.Object == null || !p.Object.IsValid) continue;
+            if (!NetworkPlayer.Races(p)) continue;
             string name = p.nickName.ToString();
             if (string.IsNullOrEmpty(name)) name = "Player";
             (p.HasChoosenRunner ? ready : choosing).Add(name);

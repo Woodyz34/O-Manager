@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using Fusion;
 using Newtonsoft.Json;
 using UnityEngine;
 
@@ -57,13 +58,16 @@ public static class CourseLibrary
     public static void ApplyFromHost()
     {
         NetworkPlayer local = NetworkPlayer.Local;
-        if (local == null || local.Runner == null || local.Runner.IsSharedModeMasterClient)
+        // A player who joins a lobby that is out racing comes straight into the race, before its own player is there
+        // (2026-11-24): the runner of the session tells whether we are the host
+        NetworkRunner runner = local != null && local.Runner != null ? local.Runner : UnityEngine.Object.FindAnyObjectByType<NetworkRunner>();
+        if (runner == null || !runner.IsRunning || runner.GameMode == GameMode.Single || runner.IsSharedModeMasterClient)
         {
             return;
         }
         foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player != local && player.Object != null && player.Object.IsValid && player.lobbyCourse.Length > 0)
+            if (player != local && player.Object != null && player.Object.IsValid && !player.Object.HasStateAuthority && player.lobbyCourse.Length > 0)
             {
                 ApplyLobbyString(player.LobbyCourseText());
                 return;

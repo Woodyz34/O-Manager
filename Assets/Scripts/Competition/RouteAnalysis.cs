@@ -270,7 +270,7 @@ public static class RouteAnalysis
         List<string> names = new List<string>();
         foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player.Object == null || !player.Object.IsValid || player.analysisDone) continue;
+            if (!NetworkPlayer.Races(player) || player.analysisDone) continue;
             names.Add(player.Object.HasStateAuthority ? "you" : BearMode.Name(player));
         }
         return names;

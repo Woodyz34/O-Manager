@@ -14,9 +14,13 @@ public class CourseLoader : MonoBehaviour
 
     public static CourseData Loaded { get; private set; }
     public static MapDefinition LoadedMap { get; private set; }
+    // The scene the course above was set up in (a spectator checks that the map it sees is this race's, Spectator)
+    public static int LoadedScene { get; private set; }
+
 
     void Awake()
     {
+        LoadedScene = 0;
         CourseLibrary.ApplyFromHost();
         CourseData course = CourseLibrary.CurrentOrDefault;
         MapDefinition map = course != null ? MapDefinition.Find(course.mapId) : null;
@@ -27,6 +31,7 @@ public class CourseLoader : MonoBehaviour
         }
         Loaded = course;
         LoadedMap = map;
+        LoadedScene = gameObject.scene.handle;
         Debug.Log($"CourseLoader: loading course '{course.name}' by {course.author} on {map.displayName}");
 
         MapBackground background = map.GetBackground(course.background);

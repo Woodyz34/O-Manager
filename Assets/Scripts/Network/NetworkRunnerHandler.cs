@@ -77,7 +77,7 @@ public class NetworkRunnerHandler : MonoBehaviour
     // Photon's 100 CCU are for all lobbies together: when that is reached nobody is thrown out, a new player just gets the "multiplayer is full" message (SessionGuard).
     public const int MaxPlayersPerLobby = 100;
 
-    protected virtual async Task InitializeNetworkRunner(NetworkRunner runner, GameMode gameMode, byte[] connectionToken, string sessionName, NetAddress address, SceneRef  scene, Action<NetworkRunner> initialized)
+    protected virtual async Task InitializeNetworkRunner(NetworkRunner runner, GameMode gameMode, byte[] connectionToken, string sessionName, NetAddress address, SceneRef  scene, Action<NetworkRunner> initialized, Dictionary<string, SessionProperty> properties = null)
     {
         var sceneManager = GetSceneManager(runner);
 
@@ -93,6 +93,8 @@ public class NetworkRunnerHandler : MonoBehaviour
             PlayerCount = MaxPlayersPerLobby,
             SceneManager = sceneManager,
             ConnectionToken = connectionToken,
+            // Only when the lobby is created: the "racing" flag (SessionRacing) is then shown in the lobby list
+            SessionProperties = properties,
             CustomPhotonAppSettings = PhotonRegion.Settings() // same region for everyone, see PhotonRegion
         });
         if (!result.Ok)
@@ -231,13 +233,18 @@ public class NetworkRunnerHandler : MonoBehaviour
     {
         Debug.Log($"Create session {sessionName} scene {sceneName} build index {SceneUtility.GetBuildIndexByScenePath($"scenes/{sceneName}")}");
 
-        var clientTask = InitializeNetworkRunner(networkRunner, GameMode.Shared, GameManager.Instance.GetConnectionsToken(), sessionName, NetAddress.Any(), SceneRef.FromIndex(SceneUtility.GetBuildIndexByScenePath($"scenes/{sceneName}")), null);
+        var clientTask = InitializeNetworkRunner(networkRunner, GameMode.Shared, GameManager.Instance.GetConnectionsToken(), sessionName, NetAddress.Any(), SceneRef.FromIndex(SceneUtility.GetBuildIndexByScenePath($"scenes/{sceneName}")), null, SessionRacing.NewLobbyProperties());
     }
 
     public void JoinGame(SessionInfo sessionInfo)
     {
         Debug.Log($"Join session {sessionInfo.Name}");
         GameAnalytics.Record("lobby_joined", "players", sessionInfo.PlayerCount);
+        // A lobby out on a race: the player watches it until it is back in the lobby (Spectator)
+        if (SessionRacing.IsRacing(sessionInfo))
+        {
+            UIToast.Show("This lobby is racing. You watch the race and join the next one from the lobby.", 5f);
+        }
 
         var clientTask = InitializeNetworkRunner(networkRunner, GameMode.Shared, GameManager.Instance.GetConnectionsToken(), sessionInfo.Name, NetAddress.Any(), SceneRef.FromIndex(SceneManager.GetActiveScene().buildIndex), null);
     }
