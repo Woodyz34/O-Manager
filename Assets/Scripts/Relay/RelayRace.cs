@@ -595,6 +595,8 @@ public class RelayRace : MonoBehaviour, IRaceStats
         // After the last leg: the statistics come up once every team is in, before the results
         if (leg >= 0 && leg == course.legs - 1 && statsShownForLeg < leg && statsDueForLeg < leg && AllTeamsFinished(leg))
         {
+            // The played time for the prize money stops when the last team is in (2026-11-24)
+            CompetitionFlow.MarkEveryoneDone();
             AskForStats(true);
         }
         if (leg >= 0 && statsDueForLeg == leg && statsShownForLeg < leg && !TvHoldsStats())
