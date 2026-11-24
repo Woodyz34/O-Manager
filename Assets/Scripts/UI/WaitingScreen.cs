@@ -97,6 +97,9 @@ public class WaitingScreen : MonoBehaviour
         nextRefresh = Time.unscaledTime + 0.25f;
 
         NetworkPlayer local = NetworkPlayer.Local;
+        // After End competition / leaving, the runner is shut down and despawned but Local may linger: its networked
+        // properties throw when read then, so treat it as gone (2026-11-24)
+        if (local != null && (local.Object == null || !local.Object.IsValid)) local = null;
         PathfindingManager manager = local != null ? local.manager : null;
         // Single player has nobody to wait for: only the dimmed map shows for the moment before the race
         bool multiplayer = manager != null && manager.multiplayer;
