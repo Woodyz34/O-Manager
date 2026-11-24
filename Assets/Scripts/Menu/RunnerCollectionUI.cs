@@ -29,6 +29,10 @@ public class RunnerCollectionUI : MonoBehaviour
 
     bool wired;
     TextMeshProUGUI meritsText;
+    Button historyButton;
+    GameObject historyPopup;
+    // The chart shows when a runner has this many rating updates (2026-11-24, the user: "när det har fått 3 punkter")
+    const int MinHistoryPoints = 3;
     CardData shownCard;
     RaceResults openResults;
     // Only the cards that can be seen are made (VirtualGrid); they show the runners in 'shownCards'
@@ -47,6 +51,7 @@ public class RunnerCollectionUI : MonoBehaviour
         if (detailClose != null) detailClose.onClick.AddListener(() => detailPanel.SetActive(false));
         cellTemplate.gameObject.SetActive(false);
         MakeMeritsText();
+        MakeHistoryButton();
         FastScroll.Add(scroll);
         virtualGrid = new VirtualGrid(scroll, grid, MakeCell, FillCell);
     }
@@ -107,6 +112,7 @@ public class RunnerCollectionUI : MonoBehaviour
 
     void OnDisable()
     {
+        if (historyPopup != null) Destroy(historyPopup);
         RunnerCollection.Changed -= Rebuild;
         filters.Changed -= Rebuild;
     }
@@ -163,7 +169,77 @@ public class RunnerCollectionUI : MonoBehaviour
                 (card.countryGuessed ? "  </b><color=#FBF4DABB><size=24>guessed from club</size></color><b>" : "")) +
             Row("Club", string.IsNullOrEmpty(card.clubName) ? "-" : card.clubName);
         if (meritsText != null) meritsText.text = MeritsText(card, -1);
+        if (historyPopup != null) Destroy(historyPopup);
+        if (historyButton != null) historyButton.gameObject.SetActive(card.history != null && card.history.Count >= MinHistoryPoints);
         detailPanel.SetActive(true);
+    }
+
+    // "Rating history" at the top right of the numbers, for runners with at least three rating updates. Made here so
+    // the saved scene needs no rebuild.
+    void MakeHistoryButton()
+    {
+        if (detailInfo == null || historyButton != null) return;
+        historyButton = CourseUI.Button("Rating history", detailInfo.transform, "Rating history", CourseUI.ButtonKind.Primary, ShowHistory, 22);
+        CourseUI.Place((RectTransform)historyButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(0, 0), new Vector2(250, 50));
+        HoverTip.Add(historyButton, "How this runner's physics, speed and technique have changed at each rating update");
+        historyButton.gameObject.SetActive(false);
+    }
+
+    // A line chart of the runner's physics, speed and technique at every rating update
+    void ShowHistory()
+    {
+        if (shownCard == null || shownCard.history == null || detailPanel == null) return;
+        if (historyPopup != null) Destroy(historyPopup);
+        // Its own canvas over everything, so it is the same size whatever the size of the close-up
+        GameObject go = new GameObject("Rating history", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        Canvas canvas = go.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 400;
+        ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
+        historyPopup = go;
+        Image dim = CourseUI.Panel("Dim", go.transform, new Color(0.05f, 0.1f, 0.07f, 0.6f), false);
+        CourseUI.Stretch(dim.rectTransform);
+        Button outside = dim.gameObject.AddComponent<Button>();
+        outside.transition = Selectable.Transition.None;
+        outside.onClick.AddListener(() => Destroy(go));
+        Image card = CourseUI.CardPanel("Card", dim.transform);
+        card.color = CourseUI.CardSolid;
+        card.gameObject.AddComponent<ClickCatcher>();
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1400, 780));
+        TextMeshProUGUI title = CourseUI.Text("Title", card.transform, shownCard.RunnerName, 36, CourseUI.Ink, FontStyles.Bold);
+        CourseUI.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40, -26), new Vector2(1200, 50));
+        TextMeshProUGUI sub = CourseUI.Text("Sub", card.transform, "Physics, speed and technique at each rating update", 22, CourseUI.InkMuted);
+        CourseUI.Place(sub.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40, -78), new Vector2(1200, 32));
+        Button close = CourseUI.Button("Close", card.transform, "X", CourseUI.ButtonKind.Light, () => Destroy(go), 24);
+        CourseUI.Place((RectTransform)close.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-20, -20), new Vector2(56, 56));
+
+        LineChart chart = LineChart.Build(card.transform);
+        RectTransform rect = chart.Rect;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = new Vector2(40, 40);
+        rect.offsetMax = new Vector2(-40, -124);
+        List<string> labels = new List<string>();
+        LineChart.Series physics = new LineChart.Series { name = "Physics", color = CourseUI.Hex("3F7D54") };
+        LineChart.Series speed = new LineChart.Series { name = "Speed", color = CourseUI.Hex("2E6DA4") };
+        LineChart.Series technique = new LineChart.Series { name = "Technique", color = CourseUI.Accent };
+        foreach (RatingPoint point in shownCard.history)
+        {
+            labels.Add(DayText(point.d));
+            physics.values.Add(point.p);
+            speed.values.Add(point.s >= 0 ? point.s : float.NaN);
+            technique.values.Add(point.t);
+        }
+        System.Func<float, string> whole = v => Mathf.RoundToInt(v).ToString();
+        physics.format = speed.format = technique.format = whole;
+        chart.Set(labels, new List<LineChart.Series> { physics, speed, technique });
+    }
+
+    static string DayText(string day)
+    {
+        if (!DateTime.TryParseExact(day, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime date))
+            return day;
+        return date.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     void OpenResults(int index)

@@ -48,6 +48,15 @@
 //   claim                        the prizes (money and packs) of contests that are over and not paid yet (paid once)
 //   recent                       the contests that ended lately and still have their leaderboard and GPS routes
 //                                (daily 7 days, weekly 30 days): winner, number of runners and my place
+//   ranking                      the world ranking (2026-11-24): the best players of the last 30 days, overall and
+//                                per game and map type, see "World ranking" below; brings it up to date first
+//   rankHistory { player }       one player's ranking day by day, for the line chart
+//
+// The world ranking is kept in:
+//   Private custom data "contests_rank"         key "window": the contests of the last RANK_DAYS days with every
+//                                                player's points; key "lists": the ranking lists as last worked out
+//   Private custom data "contests_rank_hist_<n>" key "h": the ranking history of the players whose id hashes to n
+//                                                (RANK_HIST_SHARDS parts), one entry per day, kept for years
 
 const { DataApi } = require("@unity-services/cloud-save-1.4");
 
@@ -113,6 +122,8 @@ module.exports = async ({ params, context, logger }) => {
     case "replays": return await replays(api, context, me, payload, now);
     case "claim": return await claim(api, context, me, now, logger);
     case "recent": return await recent(api, context, me, now, logger);
+    case "ranking": return await ranking(api, context, me, now, logger);
+    case "rankHistory": return await rankHistory(api, context, payload);
     default: throw new Error("Unknown action " + action);
   }
 };
@@ -561,6 +572,9 @@ async function claim(api, context, me, now, logger) {
     paid.push({ id: h.id, sprint: isSprint(h.id), place: row ? row.place : 0, of: list.length, prize: row ? row.prize : 0, packs: row ? row.packs : [], finished: !!row });
   }
   if (changed) await saveHistory(api, context, me, history);
+  // The game claims every time the main menu opens, so this keeps the world ranking (and everyone's ranking
+  // history) up to date once a day even when nobody opens the ranking page
+  try { await updateRanking(api, context, now, logger); } catch (err) { logger.warning("updateRanking: " + err); }
   return { paid };
 }
 
@@ -605,4 +619,226 @@ async function recent(api, context, me, now, logger) {
     }
   }
   return { contests: out };
+}
+
+// ---- World ranking (2026-11-24, the user: "vem är den bästa spelaren i O-Manager") ----
+//
+// Every weekly and daily contest that is over gives each player who finished it points:
+//   races and 3D runs        100 * winner's time / own time       (the winner 100, twice the winner's time 50)
+//   route choice game        100 * own score / winner's score
+// so the gap to the winner counts, not only the place. A contest counts only when at least RANK_MIN_FINISHERS
+// finished (winning alone is no feat). A weekly contest weighs RANK_WEIGHT.w (2), a daily one RANK_WEIGHT.d (1).
+//
+// A player's points in a list are the weighted average of their contests in the list during the last RANK_DAYS (30)
+// days, but divided by at least RANK_FULL (4): with less weight than that the missing part counts as 0, so one lucky
+// win is not enough to top the list (one daily win alone gives 25). From 4 dailies, or 2 weeklies, it is the plain
+// average.
+//   Lists: rc, race, run (each game), and each game on forest and on sprint maps ("rc-forest" ...).
+//   overall = the average of the three games (a game never played counts as 0): the best all-round player.
+//
+// The ranking is worked out again once a day, when the daily contest is final (3 hours after midnight, when late
+// runs are in): the first "ranking" or "claim" call after that does it. Each player's places and points of that day
+// are then added to their ranking history (kept for years, for the line chart).
+
+const RANK_DAYS = 30;
+const RANK_WEIGHT = { d: 1, w: 2 };
+const RANK_FULL = 4;
+const RANK_MIN_FINISHERS = 2;
+const RANK_LOADS_PER_CALL = 400;   // contest boards read per call (the first time reads 30 days back, ~250 boards, most of them empty)
+const RANK_TOP = 200;              // rows sent per list (plus my own row)
+const RANK_HIST_SHARDS = 32;
+const RANK_HIST_KEEP = 3650;       // days of history per player
+const RANK_GAMES = ["rc", "race", "run"];
+const RANK_LISTS = ["overall", "rc", "race", "run", "rc-forest", "rc-sprint", "race-forest", "race-sprint", "run-forest", "run-sprint"];
+
+function gameOf(id) { return id.substring(id.indexOf("_") + 1).split("-")[0]; }
+function round1(x) { return Math.round(x * 10) / 10; }
+
+// The last day whose daily contest is final: { id: "2026-11-23", end: UTC ms of its end }
+function lastRankDay(now) {
+  const running = periods(now - LATE_MINUTES * 60000).d;
+  const prev = periods(running.startsAt - 1).d;
+  return { id: prev.id.substring(1), end: running.startsAt };
+}
+
+// Each finisher's ranking points in one contest, or null when the contest does not count
+function contestPoints(id, list) {
+  if (list.length < RANK_MIN_FINISHERS) return null;
+  const rc = gameOf(id) === "rc";
+  const best = rc ? list[0].score : list[0].seconds;
+  if (!(best > 0)) return null;
+  return list.map(r => {
+    let pts = 0;
+    if (rc) pts = 100 * r.score / best;
+    else if (r.seconds > 0) pts = 100 * best / r.seconds;
+    return [r.playerId, Math.round(Math.max(0, Math.min(100, pts)) * 100) / 100, r.place];
+  });
+}
+
+async function loadRankItem(api, context, customId, key) {
+  const item = await getItem(api, context.projectId, customId, key);
+  if (!item) return { value: null, writeLock: undefined };
+  return { value: typeof item.value === "string" ? JSON.parse(item.value) : item.value, writeLock: item.writeLock };
+}
+
+// All lists from the contests in the window. prev: the lists of the last update, for the change in place.
+function computeLists(contests, names, prev) {
+  const per = {};
+  const add = (pid, key, w, pts) => {
+    const p = per[pid] || (per[pid] = {});
+    const a = p[key] || (p[key] = { w: 0, wp: 0, c: 0 });
+    a.w += w; a.wp += w * pts; a.c++;
+  };
+  for (const c of contests) {
+    for (const [pid, pts] of c.rows) {
+      add(pid, c.g, c.w, pts);
+      add(pid, c.g + "-" + (c.s ? "sprint" : "forest"), c.w, pts);
+    }
+  }
+  const value = a => a.wp / Math.max(a.w, RANK_FULL);
+  const lists = {};
+  for (const key of RANK_LISTS) {
+    const rows = [];
+    for (const pid of Object.keys(per)) {
+      const p = per[pid];
+      if (key === "overall") {
+        const parts = RANK_GAMES.map(g => p[g] ? round1(value(p[g])) : 0);
+        const c = RANK_GAMES.reduce((sum, g) => sum + (p[g] ? p[g].c : 0), 0);
+        rows.push({ p: pid, n: names[pid] ? names[pid].n : "Runner", pts: round1((parts[0] + parts[1] + parts[2]) / 3), c, parts });
+      } else if (p[key]) {
+        const a = p[key];
+        rows.push({ p: pid, n: names[pid] ? names[pid].n : "Runner", pts: round1(value(a)), avg: round1(a.wp / a.w), c: a.c });
+      }
+    }
+    rows.sort((a, b) => b.pts - a.pts || b.c - a.c || (a.n < b.n ? -1 : a.n > b.n ? 1 : 0));
+    const was = {};
+    if (prev && prev[key]) for (const r of prev[key]) was[r.p] = r.place;
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].place = i > 0 && rows[i - 1].pts === rows[i].pts ? rows[i - 1].place : i + 1;
+      rows[i].was = was[rows[i].p] || 0;
+    }
+    lists[key] = rows;
+  }
+  return lists;
+}
+
+function histShard(pid) { return seedOf(pid) % RANK_HIST_SHARDS; }
+
+// Brings the ranking up to date when a new day's contests are final. Returns true when it changed it.
+async function updateRanking(api, context, now, logger) {
+  const day = lastRankDay(now);
+  const w = await loadRankItem(api, context, "contests_rank", "window");
+  let win = w.value;
+  if (!win || !Array.isArray(win.contests)) win = { day: "", done: [], contests: [], names: {} };
+  if (!Array.isArray(win.done)) win.done = [];
+  if (!win.names) win.names = {};
+  if (win.day === day.id) return false;
+
+  const from = day.end - RANK_DAYS * 86400000;
+  const todo = finishedIds(now, LATE_MINUTES * 60000, RANK_DAYS + 8)
+    .filter(id => endOf(id) > from && endOf(id) <= day.end && win.done.indexOf(id) < 0);
+  const part = todo.slice(0, RANK_LOADS_PER_CALL);
+  for (let i = 0; i < part.length; i += 20) {
+    const ids = part.slice(i, i + 20);
+    const loaded = await Promise.all(ids.map(async id => {
+      try { return await loadBoard(api, context, id); } catch (err) { logger.warning("ranking: " + id + " " + err); return undefined; }
+    }));
+    for (let k = 0; k < ids.length; k++) {
+      const id = ids[k];
+      if (loaded[k] === undefined) continue;          // try again next time
+      win.done.push(id);
+      if (!loaded[k].writeLock) continue;             // nobody ran it
+      const list = standings(id, loaded[k].board);
+      const rows = contestPoints(id, list);
+      if (!rows) continue;
+      const end = endOf(id);
+      win.contests.push({ id, end, g: gameOf(id), s: isSprint(id), w: RANK_WEIGHT[id[0]], rows });
+      for (const r of list) {
+        const old = win.names[r.playerId];
+        if (!old || old.at <= end) win.names[r.playerId] = { n: r.name, at: end };
+      }
+    }
+  }
+  win.contests = win.contests.filter(c => c.end > from);
+  win.done = win.done.filter(id => endOf(id) > from - 10 * 86400000);
+  const complete = todo.length <= part.length;
+  if (complete) {
+    const playing = {};
+    for (const c of win.contests) for (const r of c.rows) playing[r[0]] = true;
+    for (const pid of Object.keys(win.names)) if (!playing[pid]) delete win.names[pid];
+    win.day = day.id;
+  }
+  const windowBody = { key: "window", value: win };
+  if (w.writeLock) windowBody.writeLock = w.writeLock;
+  try {
+    await api.setPrivateCustomItem(context.projectId, "contests_rank", windowBody);
+  } catch (err) {
+    const status = err && err.response ? err.response.status : 0;
+    if (status === 409 || status === 412) return false;   // someone else is updating it right now
+    throw err;
+  }
+  if (!complete) return false;
+
+  const before = await loadRankItem(api, context, "contests_rank", "lists");
+  const lists = computeLists(win.contests, win.names, before.value ? before.value.lists : null);
+  await api.setPrivateCustomItem(context.projectId, "contests_rank", { key: "lists", value: { day: day.id, updatedAt: now, lists } });
+  logger.info("ranking: " + day.id + ", " + win.contests.length + " contests, " + lists.overall.length + " players");
+
+  // Today's places and points into each player's history
+  const entries = {};
+  for (const key of RANK_LISTS) {
+    const of = lists[key].length;
+    for (const r of lists[key]) {
+      const e = entries[r.p] || (entries[r.p] = {});
+      e[key] = [r.pts, r.place, of];
+    }
+  }
+  const shards = {};
+  for (const pid of Object.keys(entries)) {
+    const n = histShard(pid);
+    (shards[n] || (shards[n] = [])).push(pid);
+  }
+  const numbers = Object.keys(shards);
+  for (let i = 0; i < numbers.length; i += 8) {
+    await Promise.all(numbers.slice(i, i + 8).map(async n => {
+      try {
+        const item = await loadRankItem(api, context, "contests_rank_hist_" + n, "h");
+        const hist = item.value && item.value.players ? item.value : { players: {} };
+        for (const pid of shards[n]) {
+          let list = hist.players[pid] || [];
+          list = list.filter(x => x.d !== day.id);
+          list.push({ d: day.id, n: win.names[pid] ? win.names[pid].n : undefined, r: entries[pid] });
+          if (list.length > RANK_HIST_KEEP) list = list.slice(list.length - RANK_HIST_KEEP);
+          hist.players[pid] = list;
+        }
+        await api.setPrivateCustomItem(context.projectId, "contests_rank_hist_" + n, { key: "h", value: hist });
+      } catch (err) { logger.warning("ranking history " + n + ": " + err); }
+    }));
+  }
+  return true;
+}
+
+async function ranking(api, context, me, now, logger) {
+  try { await updateRanking(api, context, now, logger); } catch (err) { logger.warning("updateRanking: " + err); }
+  const item = await loadRankItem(api, context, "contests_rank", "lists");
+  const stored = item.value || { day: "", updatedAt: 0, lists: {} };
+  const lists = {}, mine = {}, counts = {};
+  for (const key of RANK_LISTS) {
+    const rows = stored.lists && stored.lists[key] ? stored.lists[key] : [];
+    lists[key] = rows.slice(0, RANK_TOP);
+    counts[key] = rows.length;
+    mine[key] = rows.find(r => r.p === me) || null;
+  }
+  return {
+    day: stored.day, updatedAt: stored.updatedAt, me, lists, mine, counts,
+    rules: { days: RANK_DAYS, weekly: RANK_WEIGHT.w, daily: RANK_WEIGHT.d, full: RANK_FULL, minFinishers: RANK_MIN_FINISHERS }
+  };
+}
+
+async function rankHistory(api, context, payload) {
+  const pid = String(payload.player || "");
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(pid)) throw new Error("Bad player");
+  const item = await loadRankItem(api, context, "contests_rank_hist_" + histShard(pid), "h");
+  const list = item.value && item.value.players && item.value.players[pid] ? item.value.players[pid] : [];
+  return { player: pid, days: list };
 }

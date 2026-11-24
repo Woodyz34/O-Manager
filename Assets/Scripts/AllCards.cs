@@ -63,6 +63,7 @@ public class AllCards : MonoBehaviour
             card.clubName = r.club;
             card.inPacks = r.inPacks;
             if (r.merits != null) card.merits = r.merits;
+            if (r.history != null) card.history = r.history;
             AllCardsList.Add(card);
         }
     }
@@ -98,5 +99,6 @@ public class AllCards : MonoBehaviour
         public float sprintTechnique = -1f;
         public bool inPacks;
         public List<RunnerMerit> merits;
+        public List<RatingPoint> history;
     }
 }

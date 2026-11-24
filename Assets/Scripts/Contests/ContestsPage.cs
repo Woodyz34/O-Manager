@@ -84,9 +84,7 @@ public class ContestsPage : MonoBehaviour
         foreach (ContestRun.TimePaid p in paid)
         {
             total += p.kr;
-            lines.Add(DescribeId(p.id));
-            lines.Add("You were out <b>" + CompetitionRewards.Duration(p.seconds) + "</b> and got <b>+" + Kr(p.kr) + "</b>");
-            lines.Add("");
+            lines.Add(DescribeId(p.id) + ": you were out <b>" + CompetitionRewards.Duration(p.seconds) + "</b> and got <b>+" + Kr(p.kr) + "</b>");
         }
         lines.Add("<size=85%><color=#5B7563>" + MoneyLabel.Format(CompetitionRewards.PerHalfMinute) + " for every 30 seconds out (at most "
             + MoneyLabel.Format(CompetitionRewards.MaxForTime) + "). The prize for your place comes when the contest is over.</color></size>");

@@ -98,6 +98,47 @@ public class ContestRecent
     public ContestInfo Info() => new ContestInfo { id = id, span = span, kind = kind, sprint = sprint, endsAt = endsAt };
 }
 
+// One player in a world ranking list
+public class RankRow
+{
+    public string p;          // player id
+    public string n;          // name
+    public float pts;         // ranking points: the weighted average, at least RANK_FULL weight
+    public float avg;         // the plain weighted average of the contests (game lists only)
+    public int c;             // contests in the list during the last 30 days
+    public float[] parts;     // overall only: route choice game, race, 3D
+    public int place;
+    public int was;           // place at the update before, 0 = not in the list then
+}
+
+public class RankRules
+{
+    public int days;          // the window, 30
+    public int weekly;        // weight of a weekly contest, 2
+    public int daily;         // weight of a daily contest, 1
+    public int full;          // the least weight a player is divided by, 4
+    public int minFinishers;  // a contest counts when at least this many finished, 2
+}
+
+public class RankingData
+{
+    public string day;        // the last day whose daily contest is in, "2026-11-23"
+    public long updatedAt;
+    public string me;
+    public Dictionary<string, List<RankRow>> lists;   // "overall", "rc", "race", "run", "rc-forest", "rc-sprint", ...
+    public Dictionary<string, RankRow> mine;
+    public Dictionary<string, int> counts;            // players in each list (only the top 200 are sent)
+    public RankRules rules;
+}
+
+// One day of a player's ranking history: list -> [points, place, players in the list]
+public class RankDay
+{
+    public string d;
+    public string n;
+    public Dictionary<string, float[]> r;
+}
+
 public class ContestPrizeRules
 {
     public int[] top;
@@ -168,6 +209,24 @@ public static class ContestCloud
             foreach (var pair in replays) result[pair.Key] = (string)pair.Value;
         }
         return result;
+    }
+
+    // The world ranking (2026-11-24): the lists, my own row in each and the rules (Contests.js, "World ranking")
+    public static async Task<RankingData> RankingAsync()
+    {
+        JObject output = await Call("ranking", null);
+        RankingData data = output.ToObject<RankingData>() ?? new RankingData();
+        if (data.lists == null) data.lists = new Dictionary<string, List<RankRow>>();
+        if (data.mine == null) data.mine = new Dictionary<string, RankRow>();
+        if (data.counts == null) data.counts = new Dictionary<string, int>();
+        return data;
+    }
+
+    // One player's ranking day by day, oldest first
+    public static async Task<List<RankDay>> RankHistoryAsync(string playerId)
+    {
+        JObject output = await Call("rankHistory", new { player = playerId });
+        return output["days"] != null ? output["days"].ToObject<List<RankDay>>() : new List<RankDay>();
     }
 
     public static async Task<List<ContestPaid>> ClaimAsync()
