@@ -38,24 +38,27 @@ public class LeaderboardFrame : MonoBehaviour
         scale = Mathf.Clamp(PlayerPrefs.GetFloat(ScaleKey, DefaultScale), MinScale, MaxScale);
         hidden = PlayerPrefs.GetInt(HiddenKey, 0) == 1;
 
+        // The buttons are drawn signs (2026-11-24): white minus and plus, and a green arrow in and out of the edge;
+        // the tab that brings it back has the arrow too.
         // The controls sit inside the card, in the top right corner beside the "Leaderboard" heading (2026-11-19, the
         // user: a box of their own beside the card did not look like part of it): smaller, bigger, hide
         RectTransform controls = CourseUI.Rect("Leaderboard controls", panel);
         CourseUI.Place(controls, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-14f, -14f), new Vector2(3 * 36f + 2 * 6f, 36f));
         controls.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;   // the card may have a layout of its own
         CourseUI.Row(controls.gameObject, 6, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
-        Button smaller = CourseUI.Button("Smaller", controls, "-", CourseUI.ButtonKind.Light, () => Resize(-Step), 24);
+        Button smaller = CourseUI.IconButton("Smaller", controls, CourseUI.Icon.Minus, CourseUI.ButtonKind.Light, () => Resize(-Step));
         Fixed(smaller);
-        Button bigger = CourseUI.Button("Bigger", controls, "+", CourseUI.ButtonKind.Light, () => Resize(Step), 24);
+        Button bigger = CourseUI.IconButton("Bigger", controls, CourseUI.Icon.Plus, CourseUI.ButtonKind.Light, () => Resize(Step));
         Fixed(bigger);
-        toggle = CourseUI.Button("Hide", controls, "<", CourseUI.ButtonKind.Secondary, Toggle, 22);
+        toggle = CourseUI.IconButton("Hide", controls, CourseUI.Icon.Arrow, CourseUI.ButtonKind.Secondary, Toggle);
         Fixed(toggle);
 
         // While hidden only this tab shows, at the edge of the screen, joined to the card's right side
         Image tab = CourseUI.Panel("Leaderboard tab", panel, CourseUI.Card);
         CourseUI.Place(tab.rectTransform, new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, 0f), new Vector2(46f, 52f));
         tab.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-        Button show = CourseUI.Button("Show", tab.transform, ">", CourseUI.ButtonKind.Secondary, Toggle, 22);
+        Button show = CourseUI.IconButton("Show", tab.transform, CourseUI.Icon.Arrow, CourseUI.ButtonKind.Secondary, Toggle);
+        CourseUI.PointIcon(show, true);
         CourseUI.Place((RectTransform)show.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(36f, 36f));
         showTab = tab.gameObject;
         HoverTip.Add(show, "Show the leaderboard again.");

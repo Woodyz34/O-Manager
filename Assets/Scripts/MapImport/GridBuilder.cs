@@ -187,6 +187,11 @@ namespace MapImport
                 else for (int i = 0; i < n; i++) if (stairs[i]) crossers[i] = true;
                 int gates = OpenPathCrossings(map, sprint, g, ox, oy, scale, lineSpeed, hard, crossers);
                 log?.Invoke($"Paths and stairs through impassable lines: {gates} crossings opened");
+                if (!sprint)
+                {
+                    int along = OpenPathsAlongLines(map, sprint, g, ox, oy, scale, lineSpeed, hard, crossers, stairs);
+                    log?.Invoke($"Paths beside impassable lines: {along} cells opened (the line moved off the path)");
+                }
             }
 
             // 5. Bridges and crossing points
@@ -474,6 +479,138 @@ namespace MapImport
                         break;
                     }
                 });
+            }
+            return opened;
+        }
+
+        // Forest maps (10 m cells): a road that runs close beside an impassable line without crossing it (a road along
+        // the foot of a cliff, a fence or a lake shore) shares cells with the line, and the line closed them, so the
+        // road was cut off (2026-11-24, Delsjön: the road over the water could not be drawn the last bit to the shore
+        // because a cliff runs a few metres beside it). Such a cell is opened again when the whole bit of path in it
+        // lies on one side of the line; the line is then moved off the path instead: the neighbour cells on the far
+        // side of the line are closed, so the line still can't be crossed there. Where there is a path on the far side
+        // too, or the path touches the line, the cell stays shut. Returns the number of cells opened.
+        static int OpenPathsAlongLines(MapFile map, bool sprint, MapGrid2 g, double ox, double oy, double scale,
+                                       Dictionary<int, float> lineSpeed, bool[] hard, bool[] path, bool[] stairs)
+        {
+            var todo = new HashSet<int>();
+            foreach (var kv in lineSpeed) if (g.speed[kv.Key] <= 0f && !stairs[kv.Key]) todo.Add(kv.Key);
+            if (todo.Count == 0) return 0;
+
+            int cols = g.cols, rows = g.rows;
+            var segs = new List<double[]>();
+            var lineNear = new Dictionary<int, List<int>>();                    // todo cell -> line segments through its 3 x 3 cells
+            var pathPoints = new Dictionary<int, List<(double x, double y)>>(); // todo cell -> points of paths inside it
+            foreach (MapObject o in map.objects)
+            {
+                if (o.kind != SymbolKind.Line) continue;
+                TerrainRule rule = SymbolRules.For(o.symbol, sprint, map.terrain);
+                bool blocking = rule.role == TerrainRole.BlockingLine;
+                bool isPath = rule.role == TerrainRole.Path;
+                if (!blocking && !isPath) continue;
+                foreach (double[] p in o.parts)
+                {
+                    for (int i = 0; i + 3 < p.Length; i += 2)
+                    {
+                        double[] seg = { (p[i] - ox) * scale, (p[i + 1] - oy) * scale, (p[i + 2] - ox) * scale, (p[i + 3] - oy) * scale };
+                        if (isPath)
+                        {
+                            double len = Math.Sqrt((seg[2] - seg[0]) * (seg[2] - seg[0]) + (seg[3] - seg[1]) * (seg[3] - seg[1]));
+                            int steps = Math.Max(1, (int)Math.Ceiling(len * 4));
+                            for (int s = 0; s <= steps; s++)
+                            {
+                                double t = (double)s / steps;
+                                double x = seg[0] + (seg[2] - seg[0]) * t, y = seg[1] + (seg[3] - seg[1]) * t;
+                                int c = (int)Math.Floor(x), r = (int)Math.Floor(y);
+                                if (c < 0 || r < 0 || c >= cols || r >= rows) continue;
+                                int idx = r * cols + c;
+                                if (!todo.Contains(idx)) continue;
+                                if (!pathPoints.TryGetValue(idx, out var list)) pathPoints[idx] = list = new List<(double, double)>();
+                                list.Add((x, y));
+                            }
+                            continue;
+                        }
+                        int k = segs.Count;
+                        segs.Add(seg);
+                        Supercover(seg[0], seg[1], seg[2], seg[3], cols, rows, (c, r) =>
+                        {
+                            for (int dr = -1; dr <= 1; dr++)
+                                for (int dc = -1; dc <= 1; dc++)
+                                {
+                                    int rr = r + dr, cc = c + dc;
+                                    if (rr < 0 || cc < 0 || rr >= rows || cc >= cols) continue;
+                                    int idx = rr * cols + cc;
+                                    if (!todo.Contains(idx)) continue;
+                                    if (!lineNear.TryGetValue(idx, out List<int> list)) lineNear[idx] = list = new List<int>();
+                                    if (!list.Contains(k)) list.Add(k);
+                                }
+                        });
+                    }
+                }
+            }
+
+            // Which side of the nearest line segment a point is on (+1 / -1), and how far from it (cells)
+            int Side(List<int> near, double x, double y, out double distance)
+            {
+                distance = double.MaxValue;
+                int side = 0;
+                foreach (int k in near)
+                {
+                    double[] s = segs[k];
+                    double dx = s[2] - s[0], dy = s[3] - s[1], l2 = dx * dx + dy * dy;
+                    double t = l2 < 1e-12 ? 0 : Math.Max(0, Math.Min(1, ((x - s[0]) * dx + (y - s[1]) * dy) / l2));
+                    double px = s[0] + t * dx - x, py = s[1] + t * dy - y;
+                    double d = Math.Sqrt(px * px + py * py);
+                    if (d >= distance) continue;
+                    distance = d;
+                    double cross = dx * (y - s[1]) - dy * (x - s[0]);
+                    side = cross > 0 ? 1 : cross < 0 ? -1 : 0;
+                }
+                return side;
+            }
+
+            var cells = new List<int>(todo);
+            cells.Sort();
+            var close = new List<int>();
+            int opened = 0;
+            foreach (int idx in cells)
+            {
+                if (!pathPoints.TryGetValue(idx, out var points) || !lineNear.TryGetValue(idx, out List<int> near)) continue;
+                // The whole bit of path in the cell must be on one side of the line, clear of it
+                int pathSide = 0;
+                bool ok = true;
+                foreach (var (x, y) in points)
+                {
+                    int s = Side(near, x, y, out double d);
+                    if (s == 0 || d < 0.05) { ok = false; break; }
+                    if (pathSide == 0) pathSide = s;
+                    else if (s != pathSide) { ok = false; break; }
+                }
+                if (!ok || pathSide == 0) continue;
+                // The neighbours on the far side of the line take its place
+                int r = idx / cols, c = idx % cols;
+                close.Clear();
+                for (int dr = -1; dr <= 1 && ok; dr++)
+                    for (int dc = -1; dc <= 1 && ok; dc++)
+                    {
+                        if (dr == 0 && dc == 0) continue;
+                        int rr = r + dr, cc = c + dc;
+                        if (rr < 0 || cc < 0 || rr >= rows || cc >= cols) continue;
+                        int n = rr * cols + cc;
+                        int s = Side(near, cc + 0.5, rr + 0.5, out _);
+                        if (s == 0 || s == pathSide) continue;
+                        if (path[n]) { ok = false; break; }   // a path on the other side too: the line has no room
+                        if (g.speed[n] > 0f) close.Add(n);
+                    }
+                if (!ok) continue;
+                g.speed[idx] = lineSpeed[idx];
+                hard[idx] = false;
+                foreach (int n in close)
+                {
+                    g.speed[n] = 0f;
+                    hard[n] = true;
+                }
+                opened++;
             }
             return opened;
         }

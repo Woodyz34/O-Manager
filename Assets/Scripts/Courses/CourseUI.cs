@@ -138,6 +138,61 @@ public static class CourseUI
         button.GetComponentInChildren<TextMeshProUGUI>().color = kind == ButtonKind.Light ? Ink : Color.white;
     }
 
+    // Buttons with a drawn sign instead of a character (2026-11-24): "+", "<" and ">" were cut away in the small round
+    // buttons of the leaderboards (the label is narrower than the sign), so only an empty circle showed. The signs
+    // are made of plain bars, so they always show, in the label's colour.
+    public enum Icon { Minus, Plus, Arrow }
+
+    public static Button IconButton(string name, Transform parent, Icon icon, ButtonKind kind, UnityAction onClick, float iconSize = 18f)
+    {
+        Button button = Button(name, parent, "", kind, onClick);
+        RectTransform box = Rect("Icon", button.transform);
+        box.anchorMin = box.anchorMax = box.pivot = new Vector2(0.5f, 0.5f);
+        box.sizeDelta = new Vector2(iconSize, iconSize);
+        box.anchoredPosition = Vector2.zero;
+        Color color = kind == ButtonKind.Light ? Ink : Color.white;
+        float thick = Mathf.Max(2.5f, iconSize * 0.2f);
+        switch (icon)
+        {
+            case Icon.Minus:
+                Bar(box, color, Vector2.zero, new Vector2(iconSize, thick), 0f, new Vector2(0.5f, 0.5f));
+                break;
+            case Icon.Plus:
+                Bar(box, color, Vector2.zero, new Vector2(iconSize, thick), 0f, new Vector2(0.5f, 0.5f));
+                Bar(box, color, Vector2.zero, new Vector2(thick, iconSize), 0f, new Vector2(0.5f, 0.5f));
+                break;
+            case Icon.Arrow:
+                // Points left; PointIcon turns it round
+                float tip = -iconSize * 0.45f;
+                Bar(box, color, new Vector2(tip + thick * 0.3f, 0f), new Vector2(iconSize * 0.9f - thick * 0.3f, thick), 0f, new Vector2(0f, 0.5f));
+                Bar(box, color, new Vector2(tip, 0f), new Vector2(iconSize * 0.55f, thick), 42f, new Vector2(0f, 0.5f));
+                Bar(box, color, new Vector2(tip, 0f), new Vector2(iconSize * 0.55f, thick), -42f, new Vector2(0f, 0.5f));
+                break;
+        }
+        return button;
+    }
+
+    // Turns an arrow button's sign to the right (true) or the left (false)
+    public static void PointIcon(Button button, bool right)
+    {
+        if (button == null) return;
+        Transform box = button.transform.Find("Icon");
+        if (box != null) box.localScale = new Vector3(right ? -1f : 1f, 1f, 1f);
+    }
+
+    static void Bar(RectTransform box, Color color, Vector2 at, Vector2 size, float angle, Vector2 pivot)
+    {
+        RectTransform bar = Rect("Bar", box);
+        bar.anchorMin = bar.anchorMax = new Vector2(0.5f, 0.5f);
+        bar.pivot = pivot;
+        bar.sizeDelta = size;
+        bar.anchoredPosition = at;
+        bar.localRotation = Quaternion.Euler(0f, 0f, angle);
+        Image image = bar.gameObject.AddComponent<Image>();
+        image.color = color;
+        image.raycastTarget = false;
+    }
+
     public static TMP_InputField Input(string name, Transform parent, string placeholder, int characterLimit, Action<string> onChanged)
     {
         Image frame = Panel(name, parent, Color.white);

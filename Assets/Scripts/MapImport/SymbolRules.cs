@@ -45,7 +45,9 @@ namespace MapImport
         //    hollows everywhere), and ticks drawn as a point of 101.0 itself count for the grid's heights too.
         // 6 (2026-11-23): the world layer keeps the outlines of gardens and out-of-bounds areas, so the 3D town's garden
         //    edges (hedges, walls, fences) run straight along them instead of the zigzag of the 2 m cells.
-        public const int RulesVersion = 6;
+        // 7 (2026-11-24): forest maps: a road close beside a cliff, fence or shore it does not cross is no longer cut
+        //    off by it (GridBuilder.OpenPathsAlongLines; the road over the water at Delsjön).
+        public const int RulesVersion = 7;
 
         // Stairs: up (and on the flat) as quick as a road (Anders, 2026-11-20: running up stairs is quick), down slowly.
         // Which way is down is worked out from the heights when the grid is loaded (StairsSlopes).

@@ -112,10 +112,13 @@ public class LeaderboardManager : NetworkBehaviour
     private const float orderRefreshInterval = 1f;
     private float nextOrderRefresh;
 
-    // Puts the rows in the order of the standings, when it has changed; a new or departed player builds the list again
+    // Puts the rows in the order of the standings, when it has changed; a new or departed player builds the list again.
+    // Also when the list is still empty (2026-11-24): the board is made when the scene starts, often before the
+    // players are there, and then it stayed empty until someone punched a control. Now everyone in the game shows
+    // up within a second, before anyone has drawn or run.
     void RefreshOrder()
     {
-        if (contentParent == null || entries.Count == 0) return;
+        if (contentParent == null) return;
         var players = Standings();
         bool same = players.Count == shownOrder.Count;
         for (int i = 0; same && i < players.Count; i++) same = players[i].Object.InputAuthority == shownOrder[i];

@@ -49,11 +49,12 @@ public class SidePanelFrame : MonoBehaviour
         scale = Mathf.Clamp(PlayerPrefs.GetFloat(key + ".Scale", defaultScale), MinScale, MaxScale);
         hidden = PlayerPrefs.GetInt(key + ".Hidden", 0) == 1;
 
-        Button smaller = CourseUI.Button("Smaller", controls, "-", CourseUI.ButtonKind.Light, () => Resize(-Step), 24);
+        Button smaller = CourseUI.IconButton("Smaller", controls, CourseUI.Icon.Minus, CourseUI.ButtonKind.Light, () => Resize(-Step));
         Fixed(smaller);
-        Button bigger = CourseUI.Button("Bigger", controls, "+", CourseUI.ButtonKind.Light, () => Resize(Step), 24);
+        Button bigger = CourseUI.IconButton("Bigger", controls, CourseUI.Icon.Plus, CourseUI.ButtonKind.Light, () => Resize(Step));
         Fixed(bigger);
-        hideButton = CourseUI.Button("Hide", controls, right ? ">" : "<", CourseUI.ButtonKind.Secondary, Toggle, 22);
+        hideButton = CourseUI.IconButton("Hide", controls, CourseUI.Icon.Arrow, CourseUI.ButtonKind.Secondary, Toggle);
+        CourseUI.PointIcon(hideButton, right);
         Fixed(hideButton);
         HoverTip.Add(smaller, "Make this panel smaller, so the map gets more room.");
         HoverTip.Add(bigger, "Make this panel bigger.");
@@ -62,7 +63,8 @@ public class SidePanelFrame : MonoBehaviour
         // While hidden only this tab shows, in the middle of the screen edge
         Image tab = CourseUI.CardPanel("Show " + panel.name, parent);
         CourseUI.Place(tab.rectTransform, new Vector2(side, 0.5f), new Vector2(side, 0.5f), Vector2.zero, new Vector2(52f, 72f));
-        Button show = CourseUI.Button("Show", tab.transform, right ? "<" : ">", CourseUI.ButtonKind.Secondary, Toggle, 22);
+        Button show = CourseUI.IconButton("Show", tab.transform, CourseUI.Icon.Arrow, CourseUI.ButtonKind.Secondary, Toggle);
+        CourseUI.PointIcon(show, !right);
         CourseUI.Place((RectTransform)show.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(38f, 52f));
         HoverTip.Add(show, "Show the panel again.");
         showTab = tab.gameObject;
