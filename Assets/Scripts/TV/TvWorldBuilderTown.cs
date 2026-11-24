@@ -233,7 +233,7 @@ public partial class TvWorldBuilder
     {
         public float ax, az, ux, uz, len, half, fa, fb;
         public bool underHouse;         // a passage through a house: the house stands over it, no road is raised
-        public float extA, extB;        // how far the road over it runs on as a causeway over water, each side (level)
+        public Causeway wayA, wayB;     // the road over it running on as a causeway over water, each side (or null)
         public float FloorAt(float t) => fa + (fb - fa) * Math.Max(0f, Math.Min(1f, t / Math.Max(0.1f, len)));
     }
     List<TunnelPlan> tunnelPlans;
@@ -279,32 +279,137 @@ public partial class TvWorldBuilder
             float mid = (sy - slope * st) / Math.Max(1f, sw);
             p.fa = mid;
             p.fb = mid + slope * len;
-            p.extA = Causeway(p, -1f);
-            p.extB = Causeway(p, 1f);
+            p.wayA = FindCauseway(p, -1f);
+            p.wayB = FindCauseway(p, 1f);
         }
     }
 
-    // How far out from a tunnel's side the road over it has water beside it (2026-11-24, Anders: the road over the
-    // Tranås tunnel runs on over the water between walls; it should stay level at the tunnel's top all the way to the
-    // other shore, not bow down to the water like a banana). 0 where the road meets land at once.
-    float Causeway(TunnelPlan p, float side)
+    // The road over a tunnel where it runs on as a causeway over water (2026-11-24, Anders: the road over the Tranås
+    // tunnel runs on over the water between fences; it should stay level at the tunnel's top all the way to the other
+    // shore, the whole width of it with its fences, not bow down to the water like a banana or lie half on the ground)
+    class Causeway
+    {
+        public float ext;               // how far out from the tunnel's middle line it runs over water
+        public float c0, c1, w;         // its middle (along the tunnel, from the tunnel's middle) at distance s: c0 + c1 s; its width
+        public float[] lo, hi;          // its land's edges at each whole metre out, along the tunnel (NaN: not known)
+        public float len, half;         // the tunnel's length and half width
+        public float a0, a1, b0, b1;    // its two sides (along the tunnel) at distance s: a0 + a1 s and b0 + b1 s
+
+        // Its edges at s metres out, along the tunnel: a straight road (the 2 m cells' edges zigzag), out of the
+        // tunnel's mouths at first, so the wing walls hold its sides there
+        public void Edges(float s, out float a, out float b)
+        {
+            float k = Math.Max(0f, Math.Min(1f, (s - half - 2f) / 10f));
+            a = -len / 2f + (a0 + a1 * s - 0.4f + len / 2f) * k;
+            b = len / 2f + (b0 + b1 * s + 0.4f - len / 2f) * k;
+        }
+    }
+
+    Causeway FindCauseway(TunnelPlan p, float side)
     {
         float nx = -p.uz * side, nz = p.ux * side, mx = p.ax + p.ux * p.len / 2f, mz = p.az + p.uz * p.len / 2f;
+        float reach = p.len / 2f + 10f;
+        var cw = new Causeway { lo = new float[300], hi = new float[300], len = p.len, half = p.half };
+        for (int i = 0; i < 300; i++) { cw.lo[i] = float.NaN; cw.hi[i] = float.NaN; }
+        bool Wet(float s, float q) => Base(CellAt(mx + nx * s + p.ux * q, mz + nz * s + p.uz * q)) == WorldCell.Water;
         float last = 0f;
-        for (float s = p.half + 3f; s < 300f; s += 1f)
+        var ss = new List<float>(); var cs = new List<float>(); var ws = new List<float>();
+        for (int si = (int)Math.Ceiling(p.half + 3f); si < 300; si++)
         {
-            float cx = mx + nx * s, cz = mz + nz * s;
-            bool wet = false;
-            for (float k = 1f; k <= 10f && !wet; k += 1f)
-                foreach (float lr in new[] { -1f, 1f })
-                {
-                    float q = lr * (p.len / 2f + k);
-                    if (Base(CellAt(cx + p.ux * q, cz + p.uz * q)) == WorldCell.Water) { wet = true; break; }
-                }
-            if (wet) last = s;
+            float s = si;
+            float lo = float.NaN, hi = float.NaN;
+            if (!Wet(s, 0f))
+            {
+                for (float q = 0.5f; q <= reach; q += 0.5f) if (Wet(s, -q)) { lo = -q + 0.5f; break; }
+                for (float q = 0.5f; q <= reach; q += 0.5f) if (Wet(s, q)) { hi = q - 0.5f; break; }
+            }
+            if (!float.IsNaN(lo) || !float.IsNaN(hi)) last = s;
             else if (s - last > 8f) break;
+            if (!float.IsNaN(lo) && !float.IsNaN(hi))
+            {
+                cw.lo[si] = lo; cw.hi[si] = hi;
+                ss.Add(s); cs.Add((lo + hi) / 2f); ws.Add(hi - lo);
+            }
         }
-        return last > 0f ? last + 2f - (p.half + 0.4f) : 0f;
+        if (last <= 0f) return null;
+        cw.ext = last + 1f;
+        cw.w = p.len; cw.c0 = 0f; cw.c1 = 0f;
+        // Its sides: the map's fences and walls along it where it has them (the 2 m cells of the water zigzag)
+        var fences = new List<float[]>();
+        float bx0 = Math.Min(mx, mx + nx * cw.ext) - reach - 2f, bx1 = Math.Max(mx, mx + nx * cw.ext) + reach + 2f;
+        float bz0 = Math.Min(mz, mz + nz * cw.ext) - reach - 2f, bz1 = Math.Max(mz, mz + nz * cw.ext) + reach + 2f;
+        foreach (WorldLine line in layer.lines)
+        {
+            switch (line.kind)
+            {
+                case WorldLineKind.Fence: case WorldLineKind.HighFence: case WorldLineKind.Wall: case WorldLineKind.HighWall:
+                case WorldLineKind.Barrier:
+                    break;
+                default:
+                    continue;
+            }
+            float[] xy = line.xy;
+            var loc = new float[xy.Length];
+            float lx = float.MaxValue, lz = float.MaxValue, hx = float.MinValue, hz = float.MinValue;
+            for (int i = 0; i + 1 < xy.Length; i += 2)
+            {
+                loc[i] = (float)(xy[i] - input.centerE); loc[i + 1] = (float)(xy[i + 1] - input.centerN);
+                lx = Math.Min(lx, loc[i]); hx = Math.Max(hx, loc[i]); lz = Math.Min(lz, loc[i + 1]); hz = Math.Max(hz, loc[i + 1]);
+            }
+            if (hx < bx0 || lx > bx1 || hz < bz0 || lz > bz1) continue;
+            fences.Add(loc);
+        }
+        // The first fence from the middle out along the tunnel's way, each side
+        float Hit(float s, float dir)
+        {
+            float cx = mx + nx * s, cz = mz + nz * s, dx = p.ux * dir, dz = p.uz * dir, best = float.NaN;
+            foreach (float[] f in fences)
+                for (int i = 0; i + 3 < f.Length; i += 2)
+                {
+                    float ex = f[i + 2] - f[i], ez = f[i + 3] - f[i + 1];
+                    float den = dx * ez - dz * ex;
+                    if (Math.Abs(den) < 1e-5f) continue;
+                    float wx = f[i] - cx, wz = f[i + 1] - cz;
+                    float t = (wx * ez - wz * ex) / den, u = (wx * dz - wz * dx) / den;
+                    if (t < 0.5f || t > reach || u < 0f || u > 1f) continue;
+                    if (float.IsNaN(best) || t < best) best = t;
+                }
+            return best;
+        }
+        var la = new List<(float s, float v)>(); var lb = new List<(float s, float v)>();
+        for (int si = (int)Math.Ceiling(p.half + 3f); si <= (int)cw.ext; si++)
+        {
+            if (float.IsNaN(cw.lo[si])) continue;
+            float c = (cw.lo[si] + cw.hi[si]) / 2f;
+            float ha = Hit(si, -1f), hb = Hit(si, 1f);
+            // A fence near the water's edge is the side; else the water's edge
+            la.Add((si, !float.IsNaN(ha) && Math.Abs(-ha - cw.lo[si]) < 3f ? -ha : cw.lo[si]));
+            lb.Add((si, !float.IsNaN(hb) && Math.Abs(hb - cw.hi[si]) < 3f ? hb : cw.hi[si]));
+        }
+        void Fit(List<(float s, float v)> pts, float fallback, out float f0, out float f1)
+        {
+            f0 = fallback; f1 = 0f;
+            if (pts.Count < 3) return;
+            float n = pts.Count, st = 0f, sv = 0f, stt = 0f, stv = 0f;
+            foreach (var q in pts) { st += q.s; sv += q.v; stt += q.s * q.s; stv += q.s * q.v; }
+            float den = n * stt - st * st;
+            f1 = Math.Abs(den) > 1e-4f ? (n * stv - st * sv) / den : 0f;
+            f0 = (sv - f1 * st) / n;
+        }
+        Fit(la, -p.len / 2f, out cw.a0, out cw.a1);
+        Fit(lb, p.len / 2f, out cw.b0, out cw.b1);
+        if (ss.Count >= 3)
+        {
+            // A straight middle line through the land's middles, and its usual width
+            float n = ss.Count, st = 0f, sc = 0f, stt = 0f, stc = 0f;
+            for (int i = 0; i < ss.Count; i++) { st += ss[i]; sc += cs[i]; stt += ss[i] * ss[i]; stc += ss[i] * cs[i]; }
+            float den = n * stt - st * st;
+            cw.c1 = Math.Abs(den) > 1e-4f ? (n * stc - st * sc) / den : 0f;
+            cw.c0 = (sc - cw.c1 * st) / n;
+            ws.Sort();
+            cw.w = ws[ws.Count / 2];
+        }
+        return cw;
     }
 
     // The tunnel whose inside (pad metres more all round) holds this point, or null
@@ -413,46 +518,100 @@ public partial class TvWorldBuilder
                     // Only where the road was raised over the tunnel (a wall of the map holds its own drop)
                     if (top - low < 0.4f || top - Plain(ix, iz) < 0.4f) break;
                     var b = new TvShapeBuilder(random);
-                    b.Box(-0.52f, low - 0.4f - top, -0.2f, 0.52f, 0.15f, 0.2f, concrete);
-                    townBuiltMesh.Add(b.Done(), x, top, z, 1f, 1f, 1f, (float)Math.Atan2(-nz, nx));
+                    // From the mouth's face in under the raised road, where the ground rises behind it (TunnelHeights)
+                    b.Box(-0.52f, low - 0.4f - top, -0.8f, 0.52f, 0.15f, 0.8f, concrete);
+                    townBuiltMesh.Add(b.Done(), x - p.ux * out0 * 0.6f, top, z - p.uz * out0 * 0.6f, 1f, 1f, 1f, (float)Math.Atan2(-nz, nx));
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.3f });
                 }
             }
         }
     }
 
-    // The tunnel's floor, and the road over it raised to its roof
+    // Concrete walls along a causeway's sides, from the water up to the road (the ground's 1 m squares would slope)
+    void CausewayWalls(TunnelPlan p, TvColor concrete)
+    {
+        foreach (float side in new[] { -1f, 1f })
+        {
+            Causeway cw = side < 0f ? p.wayA : p.wayB;
+            if (cw == null) continue;
+            float nx = -p.uz * side, nz = p.ux * side, mx = p.ax + p.ux * p.len / 2f, mz = p.az + p.uz * p.len / 2f;
+            float yaw = (float)Math.Atan2(-nz, nx);
+            for (float s = p.half + 2.5f; s < cw.ext + 30f; s += 1f)
+            {
+                cw.Edges(s, out float ea, out float eb);
+                foreach (float o in new[] { -1f, 1f })
+                {
+                    float edge = o < 0f ? ea : eb;
+                    float cx = mx + nx * s, cz = mz + nz * s;
+                    float x = cx + p.ux * (edge + o * 0.3f), z = cz + p.uz * (edge + o * 0.3f);
+                    if (!Inside(x, z, 0f)) continue;
+                    // The road's own height (the ground's 1 m squares slope down at its edge)
+                    float top = s <= cw.ext ? p.FloorAt(p.len / 2f + edge) + TunnelRoof
+                        : Math.Max(H(cx + p.ux * (edge - o * 0.6f), cz + p.uz * (edge - o * 0.6f)), H(cx + p.ux * (edge - o * 1.2f), cz + p.uz * (edge - o * 1.2f)));
+                    float low = Math.Min(H(cx + p.ux * (edge + o * 1.3f), cz + p.uz * (edge + o * 1.3f)), H(x, z));
+                    if (top - low < 0.4f) continue;
+                    var b = new TvShapeBuilder(random);
+                    b.Box(-0.53f, low - 2.5f - top, -0.3f, 0.53f, 0.12f, 0.3f, concrete);
+                    townBuiltMesh.Add(b.Done(), x, top, z, 1f, 1f, 1f, yaw);
+                }
+            }
+        }
+    }
+
+    // The tunnel's floor, and the road over it raised to its roof. The floor reaches in under the walls and the raised
+    // ground starts behind them, so the slope between lies hidden in the walls and under the slab (2026-11-24, Anders:
+    // ground stuck out in spikes along a tunnel's walls and beside its mouths)
     void TunnelHeights()
     {
         foreach (TunnelPlan p in tunnelPlans)
         {
             float ex = p.ax + p.ux * p.len, ez = p.az + p.uz * p.len;
-            ForNear(p.ax, p.az, ex, ez, p.half + 45f + Math.Max(p.extA, p.extB), (k, d, qx, qz) =>
+            float far = Math.Max(p.wayA != null ? p.wayA.ext : 0f, p.wayB != null ? p.wayB.ext : 0f);
+            ForNear(p.ax, p.az, ex, ez, p.half + 45f + far, (k, d, qx, qz) =>
             {
                 float x = k % N - R, z = k / N - R;
                 float dx = x - p.ax, dz = z - p.az, t = dx * p.ux + dz * p.uz, across = -dx * p.uz + dz * p.ux;
                 float a = Math.Abs(across);
-                if (a > p.half + 45f && (t < -2f || t > p.len + 2f)) return;
                 float floor = p.FloorAt(t);
-                if (t < 0f || t > p.len)
+                bool under = t >= 0f && t <= p.len;
+                if (under && a <= p.half + 0.6f) { F[k] = floor; return; }
+                if (!under && a <= p.half + 0.5f)
                 {
                     // In front of a mouth: the floor runs out into the ground over 4 m
                     float out0 = t < 0f ? -t : t - p.len;
-                    if (a <= p.half + 0.5f && out0 < 4f) F[k] = Lerp(floor, F[k], Sm(0.3f, 4f, out0));
+                    if (out0 < 4f) F[k] = Lerp(floor, F[k], Sm(0.3f, 4f, out0));
                     return;
                 }
-                if (a <= p.half + 0.15f) { F[k] = floor; return; }
                 if (p.underHouse) return;
-                if (Base(CellAt(x, z)) == WorldCell.Building || Base(CellAt(x, z)) == WorldCell.Water) return;
-                if (wLvl != null && wLvl[k] > -0.6f) return;
-                // Over the tunnel: the road on its roof, down to the land along the road at about 1 in 10
-                float roof = floor + TunnelRoof, rise = roof - F[k];
+                if (Base(CellAt(x, z)) == WorldCell.Building) return;
+                float roof = floor + TunnelRoof;
+                Causeway cw = across < 0f ? p.wayA : p.wayB;
+                bool overTunnel = t >= 0.3f && t <= p.len - 0.3f;
+                bool onWay = false;
+                if (cw != null && a >= p.half + 1.6f)
+                {
+                    cw.Edges(a, out float lo, out float hi);
+                    float q = t - p.len / 2f;
+                    onWay = q >= lo && q <= hi;
+                }
+                if (!overTunnel && !onWay) return;
+                bool overWater = onWay && a <= cw.ext;
+                if (!overWater)
+                {
+                    if (Base(CellAt(x, z)) == WorldCell.Water) return;
+                    if (wLvl != null && wLvl[k] > -0.6f) return;
+                }
+                if (a < p.half + 1.6f)
+                {
+                    // Behind the tunnel's wall, under its slab
+                    F[k] = Math.Max(F[k], Lerp(floor, roof, Sm(p.half + 0.6f, p.half + 1.6f, a)));
+                    return;
+                }
+                // Level over the water; then down to the land along the road at about 1 in 10
+                float rise = roof - F[k];
                 if (rise <= 0f) return;
-                float ramp = Math.Max(6f, Math.Min(40f, rise * 10f));
-                // Over the causeway (the road's own width, straight on from the tunnel) it stays level
-                if (t >= -2f && t <= p.len + 2f) a = Math.Max(p.half + 0.4f, a - (across < 0f ? p.extA : p.extB));
-                else if (a > p.half + 45f) return;
-                F[k] = Math.Max(F[k], Lerp(roof, F[k], Sm(p.half + 0.4f, p.half + 0.4f + ramp, a)));
+                float ramp = Math.Max(6f, Math.Min(40f, rise * 10f)), from = onWay ? Math.Max(p.half + 1.6f, cw.ext) : p.half + 1.6f;
+                F[k] = Math.Max(F[k], Lerp(roof, F[k], Sm(from, from + ramp, a)));
             });
         }
     }
@@ -1445,6 +1604,11 @@ public partial class TvWorldBuilder
         TvColor concrete = old ? TvColor.Hex("#a69d8c") : TvColor.Hex("#9a9893"), dark = TvColor.Hex("#3b3936"),
             stepC = old ? TvColor.Hex("#a49c8e") : TvColor.Hex("#8f8d88");
         CanopyAreas();
+        if (input.town != null)
+        {
+            PlanTunnels();
+            foreach (TunnelPlan p in tunnelPlans) CausewayWalls(p, concrete);
+        }
         foreach (var l in townLines)
         {
             float[] c = l.xz;
@@ -1480,7 +1644,7 @@ public partial class TvWorldBuilder
                             b.Box(-pl / 2f, -0.4f, s * (W / 2f + 0.2f) - 0.2f, pl / 2f, Top, s * (W / 2f + 0.2f) + 0.2f, concrete);
                             world.solids.Add(new TvSolid { x = x + dz * s * (W / 2f + 0.25f), z = z - dx * s * (W / 2f + 0.25f), r = 0.3f });
                         }
-                        b.Box(-pl / 2f, Top, -W / 2f - 0.6f, pl / 2f, Top + 0.6f, W / 2f + 0.6f, concrete.Shade(0.92f));
+                        b.Box(-pl / 2f, Top, -W / 2f - 1.8f, pl / 2f, Top + 0.6f, W / 2f + 1.8f, concrete.Shade(0.92f));
                         b.Box(-pl / 2f, Top - 0.05f, -W / 2f, pl / 2f, Top, W / 2f, dark);
                         townBuiltMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, yaw);
                     }

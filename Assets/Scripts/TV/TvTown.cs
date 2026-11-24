@@ -98,6 +98,7 @@ public class TvTown
                     case 3: stairs.Add(xy); stairWidths.Add(Footprint(name)); break;
                     case 5: paths.Add(Path(xy, name)); break;
                     case 6: pavedEdges.Add(xy); break;
+                    case 7: houseEdges.Add(xy); break;
                     case 4:
                         if (xy.Length >= 8 && Math.Abs(xy[0] - xy[xy.Length - 2]) < 0.6f && Math.Abs(xy[1] - xy[xy.Length - 1]) < 0.6f) canopies.Add(xy);
                         else canopyPieces.Add(xy);
@@ -112,6 +113,10 @@ public class TvTown
 
     // The edge lines of the paved areas (ISSprOM 501.1 edge, "Konturlinje"): the 3D paving is cut along them
     public readonly List<float[]> pavedEdges = new List<float[]>();
+
+    // The outlines of the buildings (ISSprOM 521, "Byggnad (konturlinje)"): the houses' outside walls stand on them
+    // (2026-11-24, Anders: a straight house front on the map was a zigzag of the 2 m cells in 3D)
+    public readonly List<float[]> houseEdges = new List<float[]>();
 
     static TvBridges.PathLine Path(float[] xy, string name)
     {
@@ -239,7 +244,7 @@ public class TvTown
         }
     }
 
-    // 1 bridge, 2 tunnel or underpass, 3 stairs, 4 canopy outline, 0 anything else
+    // 1 bridge, 2 tunnel or underpass, 3 stairs, 4 canopy outline, 5 path, 6 paved edge, 7 building outline, 0 anything else
     static int Kind(string name)
     {
         string n = name.ToLowerInvariant();
@@ -255,6 +260,7 @@ public class TvTown
         if (code == 501 && (n.Contains("stig") || n.Contains("footprint") || n.Contains("path") || n.Contains("väg"))
             && !n.Contains("kontur") && !n.Contains("edge") && !n.Contains("step") && !n.Contains("kant")) return 5;
         if ((code == 501 || code == 523) && (n.Contains("kontur") || n.Contains("edge") || n.Contains("kant"))) return 6;
+        if (code == 521 && (n.Contains("kontur") || n.Contains("outline") || n.Contains("edge"))) return 7;
         return 0;
     }
 
