@@ -252,9 +252,12 @@ public static class Passages
     }
 
     // "516001 Staket / stängsel": the import's own rule for the symbol says if nobody can cross it
-    static bool Blocks(string layer, bool sprint)
+    static bool Blocks(string layer, bool sprint) => Rule(layer, sprint).role == TerrainRole.BlockingLine;
+
+    // The import's rule for a line of lines.json, by its layer ("503000 Smal väg")
+    public static TerrainRule Rule(string layer, bool sprint)
     {
-        if (layer.Length < 6 || !int.TryParse(layer.Substring(0, 6), out int number)) return false;
+        if (layer == null || layer.Length < 6 || !int.TryParse(layer.Substring(0, 6), out int number)) return TerrainRule.None;
         var symbol = new MapSymbol
         {
             major = number / 1000,
@@ -265,11 +268,11 @@ public static class Passages
         symbol.code = symbol.major + (symbol.minor > 0 ? "." + symbol.minor : "");
         try
         {
-            return SymbolRules.For(symbol, sprint).role == TerrainRole.BlockingLine;
+            return SymbolRules.For(symbol, sprint);
         }
         catch (Exception)
         {
-            return false;
+            return TerrainRule.None;
         }
     }
 
