@@ -227,6 +227,8 @@ public partial class TvWorldBuilder
     TvMesh cliffMesh;
     TvMesh[] treeMeshes, tuftMeshes;
     TvMesh litterMesh;                  // needles, twigs and cones lying on the forest floor (TvWorldBuilderFlora.Litter)
+    TvMesh woodMesh;                    // fallen trunks and stumps with weathered wood and bark (TvWorldBuilderFlora)
+    TvMesh pathMesh;                    // the trodden earth of the paths (TvWorldBuilderFlora.PathStrips)
     // A piece of the run-yourself world: the trees as they are drawn far away, and the young trees of the thickets
     TvMesh treeFarMesh, thicketMesh;
     readonly bool chunk;
@@ -469,6 +471,8 @@ public partial class TvWorldBuilder
         rockMesh = new TvMesh { name = "Rocks" };
         cliffMesh = new TvMesh { name = "Ground cliffs" };
         thingMesh = new TvMesh { name = "Things" };
+        woodMesh = new TvMesh { name = "Dead wood" };
+        pathMesh = new TvMesh { name = "Paths", castShadows = false };
         wireMesh = new TvMesh { name = "Wires", castShadows = false };
         waterMesh = new TvMesh { name = "Water", castShadows = false };
         litterMesh = new TvMesh { name = "Litter", castShadows = false };
@@ -498,6 +502,8 @@ public partial class TvWorldBuilder
         ControlFlag();
         CameraSpot();
         Trees();
+        Stumps();
+        PathStrips();
         Undergrowth();
         Litter();
 
@@ -507,6 +513,8 @@ public partial class TvWorldBuilder
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { rockMesh }, "Rocks", true, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { cliffMesh }, "Ground cliffs", true, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { thingMesh }, "Things", true, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { woodMesh }, "Dead wood", true, R, DrawTiles));
+        world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { pathMesh }, "Paths", false, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { waterMesh }, "Water", false, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh> { wireMesh }, "Wires", false, R, DrawTiles));
         world.meshes.AddRange(TvMesh.SplitIntoTiles(new List<TvMesh>(treeMeshes), "Trees", true, R, DrawTiles));
@@ -567,6 +575,8 @@ public partial class TvWorldBuilder
         rockMesh = new TvMesh { name = "Rocks" };
         cliffMesh = new TvMesh { name = "Ground cliffs" };
         thingMesh = new TvMesh { name = "Things" };
+        woodMesh = new TvMesh { name = "Dead wood" };
+        pathMesh = new TvMesh { name = "Paths", castShadows = false };
         wireMesh = new TvMesh { name = "Wires", castShadows = false };
         waterMesh = new TvMesh { name = "Water", castShadows = false };
         treeMeshes = new[] { new TvMesh { name = "Trees", group = TvMesh.Near } };
@@ -612,6 +622,8 @@ public partial class TvWorldBuilder
         Flags();
         int treeSolids = world.solids.Count;
         Trees();
+        Stumps();
+        PathStrips();
         OpenPassages(treeSolids, world.solids.Count);
         if (pavedCorner != null) KeepTown();
         CutGroundEdges();
@@ -622,6 +634,8 @@ public partial class TvWorldBuilder
         Keep(rockMesh);
         Keep(cliffMesh);
         Keep(thingMesh);
+        Keep(woodMesh);
+        Keep(pathMesh);
         Keep(wireMesh);
         Keep(treeMeshes[0]);
         Keep(treeFarMesh);
@@ -1876,7 +1890,7 @@ public partial class TvWorldBuilder
         TvShape RockShape(float sx, float sy, float sz, float oy, int detail, int cuts, TvColor c)
         {
             var b = new TvShapeBuilder(random);
-            b.Rock(sx, sy, sz, oy, detail, cuts, 0.3f, c, mossG, mossy, 0.12f);
+            b.Rock(sx, sy, sz, oy, detail, cuts, 0.3f, c, mossG, mossy, 0.12f, -0.35f, true);
             return b.Done();
         }
         rocks = new[]
@@ -2182,17 +2196,29 @@ public partial class TvWorldBuilder
                 TvColor col = Rock.Lerp(RockDark, Math.Max(0f, Math.Min(1f, patch * 1.3f - 0.15f)));
                 if (h < 0.3f) col = col.Lerp(LichenRock, (0.3f - h) * 1.6f * TvRandom.Noise((px + ox) * 0.8f, (pz + oz) * 0.8f + 11f));
                 if (h > 0.75f) col = col.Lerp(RockDark, (h - 0.75f) * 2.4f);
-                int v = cliffMesh.Vertex(fx + nx * out0, y, fz + nz * out0, nx + lean * nz + bulge * 0.8f * nx, 0.15f - bulge * 0.3f, nz - lean * nx + bulge * 0.8f * nz, col);
+                int v = cliffMesh.Vertex(fx + nx * out0, y, fz + nz * out0, nx + lean * nz + bulge * 0.8f * nx, 0.15f - bulge * 0.3f, nz - lean * nx + bulge * 0.8f * nz, RockTint(col));
+                // The cliff rock picture (2026-11-25): layers, wet streaks, moss in the cracks, laid along the line
+                CliffUv(v, s / 3.6f, y / 3.6f, TvAtlas.CliffRock);
                 if (r == 0) face = v;
             }
             // The rock top: from the face's top edge back over the ground's step to the ground above
             float mx = px - nx * 0.75f, mz = pz - nz * 0.75f, kx = px - nx * Back, kz = pz - nz * Back;
             float lichen = TvRandom.Noise((px + ox) * 0.6f + 3f, (pz + oz) * 0.6f);
             TvColor capCol = Rock.Lerp(LichenRock, 0.35f + 0.5f * lichen);
-            topFirst = cliffMesh.Vertex(fx, top, fz, 0f, 1f, 0f, capCol);
-            cliffMesh.Vertex(mx, Math.Max(top, H(mx, mz) + 0.06f), mz, 0f, 1f, 0f, capCol);
-            cliffMesh.Vertex(kx, H(kx, kz) - 0.04f, kz, 0f, 1f, 0f, capCol.Lerp(Rock, 0.3f));
+            topFirst = cliffMesh.Vertex(fx, top, fz, 0f, 1f, 0f, RockTint(capCol));
+            CliffUv(topFirst, s / 2f, 0f, TvAtlas.Granite);
+            CliffUv(cliffMesh.Vertex(mx, Math.Max(top, H(mx, mz) + 0.06f), mz, 0f, 1f, 0f, RockTint(capCol)), s / 2f, 0.75f / 2f, TvAtlas.Granite);
+            CliffUv(cliffMesh.Vertex(kx, H(kx, kz) - 0.04f, kz, 0f, 1f, 0f, RockTint(capCol.Lerp(Rock, 0.3f))), s / 2f, Back / 2f, TvAtlas.Granite);
         }
+    }
+
+    // The cliff's colours are tints over the rock picture: the plain grey made lighter, the patches kept
+    static TvColor RockTint(TvColor c) => c.Shade(1.45f);
+
+    void CliffUv(int vertex, float u, float v, int tile)
+    {
+        cliffMesh.PadUvs(vertex);
+        cliffMesh.uvs.Add(u); cliffMesh.uvs.Add(v); cliffMesh.uvs.Add(tile);
     }
 
     // A four-cornered piece (a, b one edge; c, d the next, b and d the far corners) drawn from both sides
@@ -2462,7 +2488,7 @@ public partial class TvWorldBuilder
                     {
                         float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
                         if (chunk ? !Inside((ax + bx) / 2f, (az + bz) / 2f, 0f) : !Inside(ax, az, 2f) || !Inside(bx, bz, 2f)) continue;
-                        Bar(thingMesh, ax, H(ax, az) + 0.2f, az, bx, H(bx, bz) + 0.2f, bz, 0.19f, 0.13f, 6, TvColor.Hex("#5e5346"));
+                        Log(ax, H(ax, az) + 0.2f, az, bx, H(bx, bz) + 0.2f, bz, 0.19f, 0.13f);
                         // Runners jump over a fallen trunk, so it is not a solid to go round
                         world.AddHurdle(ax, az, bx, bz, 0.4f);
                     }
@@ -2631,7 +2657,7 @@ public partial class TvWorldBuilder
                     thingMesh.Add(rootPlate, x, y - 0.3f, z, 1.2f, 1.1f, 1.2f, yaw);
                     // The trunk lies away from the plate
                     float tx = (float)Math.Sin(yaw), tz = (float)Math.Cos(yaw);
-                    Bar(thingMesh, x + tx * 0.3f, y + 0.55f, z + tz * 0.3f, x + tx * 7f, H(x + tx * 7f, z + tz * 7f) + 0.2f, z + tz * 7f, 0.2f, 0.12f, 6, TvColor.Hex("#5e5346"));
+                    Log(x + tx * 0.3f, y + 0.55f, z + tz * 0.3f, x + tx * 7f, H(x + tx * 7f, z + tz * 7f) + 0.2f, z + tz * 7f, 0.2f, 0.12f);
                     world.AddHurdle(x + tx * 1.2f, z + tz * 1.2f, x + tx * 7f, z + tz * 7f, 0.4f);
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.9f });
                     break;
@@ -3255,15 +3281,20 @@ public partial class TvWorldBuilder
             if (open || marsh)
             {
                 if (random.Value() > 0.75f) continue;
-                shape = tuftGrass;
+                float r = random.Value();
+                // Sedge tussocks in the marsh; grass with flowers here and there and now and then a juniper in the open
+                shape = marsh ? (r < 0.7f ? tuftSedge : tuftGrass) : r < 0.12f ? tuftFlowers : r < 0.125f && kind != WorldCell.Plot ? tuftJuniper : r < 0.45f ? tuftShort : tuftGrass;
                 s = Rr(0.7f, 1.5f) * (marsh ? 1.25f : 1f);
                 tint = Rr(0.8f, 1.15f);
+                if (shape == tuftJuniper) { s = Rr(0.6f, 1.3f); tint = Rr(0.75f, 1f); }
+                else if (shape == tuftShort) s *= 1.4f;
             }
             else if (roughOpen)
             {
                 if (random.Value() > 0.8f) continue;
-                shape = random.Value() < 0.6f ? tuftGrass : tuftHeath;
-                s = Rr(0.8f, 1.6f);
+                float r = random.Value();
+                shape = r < 0.5f ? tuftGrass : r < 0.8f ? tuftHeath : r < 0.94f ? tuftLingon : tuftJuniper;
+                s = r < 0.94f ? Rr(0.8f, 1.6f) : Rr(0.6f, 1.3f);
                 tint = Rr(0.75f, 1.1f);
             }
             else
@@ -3277,11 +3308,12 @@ public partial class TvWorldBuilder
                 {
                     case TerrainLook.Heather: shape = r < 0.8f ? tuftHeath : tuftBerry; s *= 1.15f; tint = Rr(0.7f, 1f); break;
                     case TerrainLook.Grass: shape = r < 0.85f ? tuftGrass : tuftFern; s = Rr(0.9f, 1.8f); tint = Rr(0.8f, 1.1f); break;
-                    case TerrainLook.Hard: shape = r < 0.6f ? tuftBerry : tuftDry; break;
+                    case TerrainLook.Hard: shape = r < 0.45f ? tuftBerry : r < 0.75f ? tuftLingon : tuftDry; break;
                     case TerrainLook.Sand: shape = r < 0.6f ? tuftDry : tuftHeath; tint = Rr(0.8f, 1.05f); break;
                     case TerrainLook.Stone: shape = r < 0.8f ? tuftShort : tuftDry; tint = Rr(0.8f, 1.05f); break;
-                    case TerrainLook.Lichen: shape = r < 0.6f ? tuftHeath : tuftBerry; s *= 0.8f; tint = Rr(0.7f, 0.95f); break;
-                    default: shape = r < 0.8f ? tuftBerry : r < 0.93f ? tuftHeath : tuftFern; break;
+                    case TerrainLook.Lichen: shape = r < 0.5f ? tuftHeath : r < 0.8f ? tuftLingon : tuftBerry; s *= 0.8f; tint = Rr(0.7f, 0.95f); break;
+                    // Moss forest: mostly bilberry, lingonberry where it is a little drier, some heather and ferns
+                    default: shape = r < 0.66f ? tuftBerry : r < 0.8f ? tuftLingon : r < 0.88f ? tuftHeath : r < 0.96f ? tuftFern : tuftGrass; break;
                 }
                 // Under broad-leaved trees: ferns and grass more than blueberry
                 if ((look.forest == TerrainLook.Beech || look.forest == TerrainLook.Birch) && look.ground == TerrainLook.Moss && r < 0.5f)

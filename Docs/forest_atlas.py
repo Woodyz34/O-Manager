@@ -750,22 +750,25 @@ def sedge():
 
 
 def juniper():
-    """A juniper spray: stiff, prickly, blue-green needles in threes along upright shoots."""
+    """A whole juniper bush on one card: a dense upright column of prickly grey-green shoots, pointed at the top."""
     c = Canvas()
     g = np.random.default_rng(181)
-    for k in range(9):
-        x = R(0.2, 0.8)
-        pts = bezier((x, 0.0), (x + R(-0.15, 0.15), 0.5), (x + R(-0.2, 0.2), R(0.75, 0.98)), 14)
-        c.taper(pts, 4, 1.4, rgba('#5a4434'))
-        for j, (px, py) in enumerate(pts[1:]):
-            for m in range(10):
-                a = math.pi / 2 + R(-1.5, 1.5)
-                ln = R(0.025, 0.04)
-                c.taper([(px, py), (px + math.cos(a) * ln, py + math.sin(a) * ln)], 2.0, 0.8, mix('#2c4a36', '#4a6a54', g.random()), mix('#7a9a8a', '#9ab0a0', g.random()))
-        for j in range(4):
-            px, py = pts[int(R(3, 13))]
-            c.ellipse(px + R(-0.02, 0.02), py, 0.012, 0.012, rgba('#3a4a6a'))
-            c.ellipse(px - 0.003, py + 0.003, 0.006, 0.006, rgba('#8a9ab8', 200))
+    for k in range(34):
+        x = R(0.18, 0.82)
+        top = 0.97 - abs(x - 0.5) * 1.1 + R(-0.08, 0.04)
+        x2 = 0.5 + (x - 0.5) * R(0.5, 0.9)
+        pts = bezier((0.5 + (x - 0.5) * 0.3, 0.0), (x, top * 0.45), (x2, top), 14)
+        c.taper(pts, 3.5, 1.2, rgba('#4a3a2e'))
+        for j, (px, py) in enumerate(pts[2:]):
+            for m in range(9):
+                a = math.pi / 2 + R(-1.9, 1.9)
+                ln = R(0.035, 0.06)
+                c.taper([(px, py), (px + math.cos(a) * ln, py + math.sin(a) * ln)], 3.0, 1.0,
+                        mix('#2a4430', '#45624a', g.random()), mix('#6e8c72', '#94ab92', g.random()))
+        if g.random() < 0.35:
+            px, py = pts[int(R(5, 13))]
+            c.ellipse(px + R(-0.02, 0.02), py, 0.011, 0.011, rgba('#34405a'))
+            c.ellipse(px - 0.003, py + 0.003, 0.005, 0.005, rgba('#8a9ab8', 200))
     return c.done()
 
 
@@ -798,42 +801,67 @@ def flowers():
     return c.done()
 
 
+def lichen_mask(s, seed, cover, size=1.6):
+    """Crusty lichen spots: noise thresholded and broken up at the edges by fine noise, so no round blobs."""
+    big = fft_noise(s, size, seed)
+    fine = fft_noise(s, 0.9, seed + 1)
+    m = big * 0.75 + fine * 0.25
+    t = np.quantile(m, 1 - cover)
+    return smooth(t, t + 0.03, m)
+
+
 def granite():
-    """Grey granite with grains, darker cracks and pale lichen rosettes (repeats)."""
+    """Grey granite (boulders, cliff tops): fine grains, a few dark cracks, faint grey-green crust lichen (repeats)."""
     s = IN
     base = fft_noise(s, 1.7, 301)
-    grain = np.random.default_rng(302).random((s, s))
-    rgb = lerp(col('#77746e'), col('#9a978e'), base[..., None])
-    rgb *= (0.86 + 0.24 * grain)[..., None]
-    pink = smooth(0.7, 0.9, fft_noise(s, 0.8, 303))
-    rgb = lerp(rgb, col('#a08a80'), pink[..., None] * 0.3)
-    dark = smooth(0.75, 0.95, fft_noise(s, 0.9, 304))
-    rgb = lerp(rgb, col('#3e3c3a'), dark[..., None] * 0.5)
-    f1, f2, _ = voronoi(s, 9, 305, warp=60)
-    crack = smooth(2.5, 0.0, f2 - f1)
-    rgb = lerp(rgb, col('#2e2c2a'), crack[..., None] * 0.7)
-    lich = smooth(0.66, 0.74, fft_noise(s, 1.6, 306))
-    rgb = lerp(rgb, col('#c4c6b2'), lich[..., None] * 0.7)
-    lich2 = smooth(0.7, 0.76, fft_noise(s, 1.5, 307))
-    rgb = lerp(rgb, col('#b0aa6a'), lich2[..., None] * 0.6)
+    g = np.random.default_rng(302)
+    grain = g.random((s, s))
+    rgb = lerp(col('#6c6a65'), col('#8f8c85'), base[..., None])
+    rgb *= (0.84 + 0.26 * grain)[..., None]
+    feld = (g.random((s, s)) > 0.965)
+    rgb = lerp(rgb, col('#b9b2a8'), feld[..., None] * 0.5)
+    mica = (g.random((s, s)) > 0.98)
+    rgb = lerp(rgb, col('#2c2a28'), mica[..., None] * 0.6)
+    pink = smooth(0.65, 0.9, fft_noise(s, 0.8, 303))
+    rgb = lerp(rgb, col('#94827a'), pink[..., None] * 0.25)
+    f1, f2, _ = voronoi(s, 7, 305, warp=70)
+    crack = smooth(2.0, 0.0, f2 - f1)
+    rgb = lerp(rgb, col('#2e2c2a'), crack[..., None] * 0.6)
+    rgb = lerp(rgb, col('#a9ab9a'), lichen_mask(s, 306, 0.07)[..., None] * 0.35)
+    rgb = lerp(rgb, col('#8e8c5c'), lichen_mask(s, 308, 0.04)[..., None] * 0.35)
+    rgb = lerp(rgb, col('#2f302a'), lichen_mask(s, 310, 0.05, 1.3)[..., None] * 0.3)
     return to_img(rgb)
 
 
 def cliff_rock():
-    """A cliff face: layered grey rock, dark wet streaks running down, moss in the cracks (repeats)."""
+    """A cliff face: tall blocks split by mostly upright joints and a few ledges, each block lit as a rounded slab,
+    dark water stains running down from the joints, faint crust lichen and a little moss on the ledges (repeats)."""
     s = IN
-    layers = fft_noise(s, 1.8, 311, (0.25, 1.0))
-    rgb = lerp(col('#5e5c58'), col('#8a877f'), layers[..., None])
+    f1, f2, cid = voronoi(s, 10, 314, (1.0, 0.33), warp=40)
+    edge = f2 - f1
+    joint = smooth(2.2, 0.0, edge)
+    # every block its own shade
+    shade = (np.random.default_rng(317).random(10)[cid] - 0.5) * 0.16
+    height = smooth(0.0, 26.0, edge) + fft_noise(s, 1.9, 318) * 0.35
+    lit = relief(height * 40.0, 0.03)
+    bed = fft_noise(s, 1.8, 311, (0.2, 1.0))
+    rgb = lerp(col('#5f5d59'), col('#86837c'), bed[..., None])
+    rgb *= (1.0 + shade)[..., None]
     rgb *= (0.88 + 0.2 * np.random.default_rng(312).random((s, s)))[..., None]
-    streak = smooth(0.55, 0.85, fft_noise(s, 1.6, 313, (1.0, 0.12)))
-    rgb = lerp(rgb, col('#34322e'), streak[..., None] * 0.55)
-    f1, f2, _ = voronoi(s, 12, 314, (1.0, 0.5), warp=50)
-    crack = smooth(3.0, 0.0, f2 - f1)
-    moss = smooth(0.5, 0.7, fft_noise(s, 1.5, 315))
-    rgb = lerp(rgb, col('#232220'), crack[..., None] * 0.7)
-    rgb = lerp(rgb, col('#4f6a2c'), (smooth(6.0, 0.0, f2 - f1) * moss)[..., None] * 0.8)
-    lich = smooth(0.7, 0.77, fft_noise(s, 1.4, 316))
-    rgb = lerp(rgb, col('#bfc2ae'), lich[..., None] * 0.6)
+    rgb *= np.clip(lit, 0.7, 1.25)[..., None]
+    # stains: run down from the joints (top of the picture is up), long and thin
+    st = fft_noise(s, 1.5, 313, (0.08, 1.0))
+    stain = smooth(0.58, 0.8, st)
+    rgb = lerp(rgb, col('#2f2e2b'), stain[..., None] * 0.45)
+    rust = smooth(0.72, 0.85, fft_noise(s, 1.4, 319, (0.15, 1.0)))
+    rgb = lerp(rgb, col('#6a5848'), rust[..., None] * 0.3)
+    rgb = lerp(rgb, col('#1e1d1b'), joint[..., None] * 0.75)
+    # ledges: the flat-ish tops of blocks (just under a joint, seen from the side), with moss
+    below = np.roll(joint, -5, 0) * (1 - joint)
+    moss = smooth(0.45, 0.65, fft_noise(s, 1.5, 315))
+    rgb = lerp(rgb, col('#4d6530'), (below * moss)[..., None] * 0.7)
+    rgb = lerp(rgb, col('#a4a796'), lichen_mask(s, 316, 0.06)[..., None] * 0.3)
+    rgb = lerp(rgb, col('#2c2d27'), lichen_mask(s, 320, 0.06, 1.3)[..., None] * 0.3)
     return to_img(rgb)
 
 
@@ -860,9 +888,9 @@ def path_soil():
     img = to_img(rgb)
     d = ImageDraw.Draw(img)
     g = np.random.default_rng(333)
-    for _ in range(300):
-        x, y, r = g.random() * s, g.random() * s, 1.5 + g.random() * 4
-        c_ = tuple(int(v) for v in lerp(col('#7a766e'), col('#b4b0a6'), g.random())) + (255,)
+    for _ in range(170):
+        x, y, r = g.random() * s, g.random() * s, 1.5 + g.random() * 3.5
+        c_ = tuple(int(v) for v in lerp(col('#6a665e'), col('#9a958a'), g.random())) + (255,)
         for ox in (-s, 0, s):
             for oy in (-s, 0, s):
                 d.ellipse([x + ox - r, y + oy - r * 0.8, x + ox + r, y + oy + r * 0.8], fill=c_)
@@ -873,7 +901,17 @@ def path_soil():
         for ox in (-s, 0, s):
             for oy in (-s, 0, s):
                 d.line([(x + ox, y + oy), (x + ox + math.cos(a) * ln, y + oy + math.sin(a) * ln)], fill=c_, width=1)
-    return img.filter(ImageFilter.GaussianBlur(0.5))
+    img = img.filter(ImageFilter.GaussianBlur(0.5))
+    # Ragged edges across (u): the path strip's sides fray into the moss; a little greener and darker near them
+    rgb = np.asarray(img).astype(np.float32)[..., :3]
+    xs = np.mgrid[0:s, 0:s][1].astype(np.float32)
+    edge = np.minimum(xs, s - 1 - xs) / s
+    rag = fft_noise(s, 1.3, 334) * 0.7 + fft_noise(s, 0.7, 335) * 0.3
+    limit = 0.05 + 0.22 * rag
+    alpha = smooth(limit - 0.012, limit + 0.012, edge) * 255
+    near = smooth(limit + 0.12, limit, edge)
+    rgb = lerp(rgb, col('#4e5530'), near[..., None] * 0.45)
+    return to_img(rgb, alpha)
 
 
 def moss_tex():

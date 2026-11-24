@@ -12,7 +12,8 @@ public static class TvAtlas
 
     public const int PineBarkLow = 0, PineBarkHigh = 1, SpruceBark = 2, BirchBark = 3, BeechBark = 4,
         PineNeedles = 5, SpruceSpray = 6, BirchLeaves = 7, BroadLeaves = 8, Bilberry = 9, Grass = 10, Fern = 11,
-        Heather = 12, Litter = 13, Twig = 14, DeadTwigs = 15;
+        Heather = 12, Litter = 13, Twig = 14, DeadTwigs = 15, Lingonberry = 16, Sedge = 17, Juniper = 18, Flowers = 19,
+        Granite = 20, CliffRock = 21, DeadWood = 22, PathSoil = 23, Moss = 24;
 
     // Tiles from this one on are leaves and plants: lit softly through, as light comes through a leaf
     public const int FirstFoliage = 5;
@@ -97,6 +98,49 @@ public partial class TvShapeBuilder
         x /= l; y /= l; z /= l;
     }
 
+    // A flat triangle with a repeating picture laid on it from the side it faces most (a stone's face): `scale` metres
+    // per repeat. Faces away from (cx, cy, cz).
+    public void FlatTriTex(float ax, float ay, float az, float bx, float by, float bz, float qx, float qy, float qz,
+                           float cx, float cy, float cz, TvColor col, int tile, float scale, float shift = 0f)
+    {
+        float ux = bx - ax, uy = by - ay, uz = bz - az, vx = qx - ax, vy = qy - ay, vz = qz - az;
+        float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        float ox = (ax + bx + qx) / 3f - cx, oy = (ay + by + qy) / 3f - cy, oz = (az + bz + qz) / 3f - cz;
+        bool flip = nx * ox + ny * oy + nz * oz < 0f;
+        if (flip) { nx = -nx; ny = -ny; nz = -nz; }
+        float len = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+        if (len < 1e-9f) return;
+        nx /= len; ny /= len; nz /= len;
+        float k = 1f / scale;
+        float ax2 = Math.Abs(nx), ay2 = Math.Abs(ny), az2 = Math.Abs(nz);
+        void UV(float x, float y, float z, out float u, out float v)
+        {
+            if (ay2 >= ax2 && ay2 >= az2) { u = x * k + shift; v = z * k; }
+            else if (ax2 >= az2) { u = z * k + shift; v = y * k; }
+            else { u = x * k + shift; v = y * k; }
+        }
+        UV(ax, ay, az, out float u0, out float v0);
+        UV(bx, by, bz, out float u1, out float v1);
+        UV(qx, qy, qz, out float u2, out float v2);
+        int a = VT(ax, ay, az, nx, ny, nz, col, u0, v0, tile);
+        int b = flip ? VT(qx, qy, qz, nx, ny, nz, col, u2, v2, tile) : VT(bx, by, bz, nx, ny, nz, col, u1, v1, tile);
+        int q = flip ? VT(bx, by, bz, nx, ny, nz, col, u1, v1, tile) : VT(qx, qy, qz, nx, ny, nz, col, u2, v2, tile);
+        t.Add(a); t.Add(b); t.Add(q);
+    }
+
+    // A round flat disc facing up (the cut top of a stump): the picture laid across it
+    public void Disk(float x, float y, float z, float r, int sides, int tile, TvColor col, float scale)
+    {
+        int centre = VT(x, y, z, 0f, 1f, 0f, col, 0.5f, 0.5f, tile);
+        int first = p.Count / 3;
+        for (int i = 0; i <= sides; i++)
+        {
+            float a = i / (float)sides * 6.2831853f, ca = (float)Math.Cos(a), sa = (float)Math.Sin(a);
+            VT(x + ca * r, y, z + sa * r, 0f, 1f, 0f, col, 0.5f + ca * r / scale, 0.5f + sa * r / scale, tile);
+        }
+        for (int i = 0; i < sides; i++) { t.Add(centre); t.Add(first + i + 1); t.Add(first + i); }
+    }
+
     // ---- Cards: a flat picture (needles, leaves, a plant), drawn from both sides ----
     // Corners: o (where v = 0, u = 0.5: the base of the picture), along the side vector s (u from 0 to 1 across, s is
     // half the width) and up the vector up (v from v0 to v1). The light uses the normal given (for a tree crown: out of
@@ -157,6 +201,41 @@ public partial class TvShapeBuilder
             Card(px, y, pz, ca * w, 0f, sa * w, upx, h, upz, -sa * l * 0.5f, 1f, ca * l * 0.5f, tile, bottom, top,
                  0f, 0f, 1f, random.Value() < 0.5f ? 0f : 1f, random.Value() < 0.5f ? 1f : 0f);
         }
+    }
+
+    // A strip lying on the ground along a line (a path's trodden earth): points xs, zs with their distance along vs,
+    // five corners across, each at the ground's own height (lifted a little) with the ground's slope as its normal.
+    // u runs across (0.02 .. 0.98, so the picture's ragged edges show), v along.
+    public void Strip(float[] xs, float[] zs, float[] vs, float half, Func<float, float, float> height, int tile, TvColor color, float lift)
+    {
+        const int Across = 5;
+        int rows = xs.Length;
+        if (rows < 2) return;
+        int first = p.Count / 3;
+        for (int i = 0; i < rows; i++)
+        {
+            int a = Math.Max(0, i - 1), b = Math.Min(rows - 1, i + 1);
+            float dx = xs[b] - xs[a], dz = zs[b] - zs[a];
+            float len = (float)Math.Sqrt(dx * dx + dz * dz);
+            if (len < 1e-5f) { dx = 1f; dz = 0f; len = 1f; }
+            float sx = -dz / len, sz = dx / len;
+            for (int k = 0; k < Across; k++)
+            {
+                float f = k / (float)(Across - 1), off = (f * 2f - 1f) * half;
+                float x = xs[i] + sx * off, z = zs[i] + sz * off;
+                float y = height(x, z);
+                float gx = height(x - 0.5f, z) - height(x + 0.5f, z), gz = height(x, z - 0.5f) - height(x, z + 0.5f);
+                float nl = (float)Math.Sqrt(gx * gx + 1f + gz * gz);
+                VT(x, y + lift, z, gx / nl, 1f / nl, gz / nl, color, 0.02f + f * 0.96f, vs[i], tile);
+            }
+        }
+        for (int i = 0; i + 1 < rows; i++)
+            for (int k = 0; k + 1 < Across; k++)
+            {
+                int a = first + i * Across + k, b = a + 1, c2 = a + Across, d = c2 + 1;
+                t.Add(a); t.Add(c2); t.Add(b);
+                t.Add(b); t.Add(c2); t.Add(d);
+            }
     }
 
     // A card lying on the ground (litter, a stick): corners at the ground's own heights, normals the ground's

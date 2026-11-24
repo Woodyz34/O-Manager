@@ -327,8 +327,10 @@ public partial class TvShapeBuilder
     // ---- A rock: a lumpy ball broken by flat planes, every face coloured on its own ----
     // Stretched (sx, sy, sz) round (0, oy, 0); cuts flat breaks; moss covers that share of the faces that look up;
     // lichen: the share of faces with pale spots. Looks like split granite rather than a smooth pebble.
+    // textured (2026-11-25): the faces get the granite picture of the forest atlas (TvAtlas.Granite), the mossy ones
+    // the moss picture; the colours are then light tints over the pictures.
     public void Rock(float sx, float sy, float sz, float oy, int detail, int cuts, float jitter, TvColor stone, TvColor moss,
-                     float mossShare, float lichen, float bottom = -0.35f)
+                     float mossShare, float lichen, float bottom = -0.35f, bool textured = false)
     {
         float[] sv = detail > 0 ? ico1V : IcoV;
         int[] sf = detail > 0 ? ico1F : IcoF;
@@ -379,6 +381,16 @@ public partial class TvShapeBuilder
             // Damp and shaded low down
             col = col.Lerp(dark, Smooth(0.15f, -0.3f, cy / Math.Max(0.01f, sy)) * 0.7f);
             float up = Smooth(0.45f, 0.9f, ny) * Smooth(0.42f, 0.6f, TvRandom.Noise(cx * 1.8f - seed, cz * 1.8f + 3f) + mossShare - 0.5f);
+            if (textured)
+            {
+                // The picture brings the grain, cracks and lichen; the colour only shades it (damp foot, faces)
+                float shade = 0.82f + 0.3f * grain - 0.25f * Smooth(0.15f, -0.3f, cy / Math.Max(0.01f, sy));
+                bool mossy = up > 0.35f;
+                TvColor tint = mossy ? new TvColor(235, 240, 225).Shade(0.85f + 0.2f * grain) : new TvColor(255, 252, 246).Shade(shade);
+                FlatTriTex(v[a], v[a + 1], v[a + 2], v[b], v[b + 1], v[b + 2], v[q], v[q + 1], v[q + 2], 0f, oy, 0f, tint,
+                           mossy ? TvAtlas.Moss : TvAtlas.Granite, 0.9f, seed);
+                continue;
+            }
             if (up > 0.02f) col = col.Lerp(moss.Shade(0.9f + 0.2f * grain), Math.Min(1f, up * 1.15f));
             else if (random.Value() < lichen) col = col.Lerp(random.Value() < 0.6f ? pale : yellow, 0.55f);
             FlatTri(v[a], v[a + 1], v[a + 2], v[b], v[b + 1], v[b + 2], v[q], v[q + 1], v[q + 2], 0f, oy, 0f, col, col, col);
