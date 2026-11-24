@@ -178,8 +178,28 @@ public class MainMenuUI : MonoBehaviour
     }
 
 
+    bool shopLookDone;
+
+    // The shop sells the Bronze pack: its picture and heading say so (the scene still holds the old green pack)
+    void ShowBronzeLook()
+    {
+        if (shopLookDone || packImage == null) return;
+        shopLookDone = true;
+        Image picture = packImage.GetComponent<Image>();
+        Sprite bronze = PackKinds.Pack(PackKinds.Bronze);
+        if (picture != null && bronze != null) picture.sprite = bronze;
+        if (shopPanel != null)
+        {
+            foreach (TextMeshProUGUI text in shopPanel.GetComponentsInChildren<TextMeshProUGUI>(true))
+            {
+                if (text.text == "Runner Pack") text.text = "Bronze Pack";
+            }
+        }
+    }
+
     void Refresh()
     {
+        ShowBronzeLook();
         int total = RunnerCards.InPacks().Count;
         int owned = RunnerCollection.OwnedCount();
         int price = PackShop.CurrentPrice();
@@ -187,7 +207,7 @@ public class MainMenuUI : MonoBehaviour
         bool canBuy = PackShop.CanBuy();
 
         if (runnersCaption != null) runnersCaption.text = owned + " of " + total + " runners collected";
-        if (shopCaption != null) shopCaption.text = price == 0 ? "Your first pack is free" : "Runner packs for " + MoneyLabel.Format(price);
+        if (shopCaption != null) shopCaption.text = price == 0 ? "Your first pack is free" : "Bronze packs for " + MoneyLabel.Format(price);
 
         if (buyButton != null) buyButton.interactable = canBuy;
         if (buyLabel != null) buyLabel.text = price == 0 ? "Open free pack" : "Open pack   " + MoneyLabel.Format(price);
