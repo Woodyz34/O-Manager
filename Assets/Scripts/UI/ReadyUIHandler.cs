@@ -150,7 +150,8 @@ public class ReadyUIHandler : NetworkBehaviour
             return;
         }
 
-        Runner.SessionInfo.IsOpen = false;
+        // The lobby stays open while it races: a player who joins now watches the race (SessionRacing, Spectator)
+        SessionRacing.Set(Runner, true);
 
         // If no game mode was selected, default to "Your runners"
         string selectedMode = GameModes.YourRunners;

@@ -57,7 +57,7 @@ public class ReturnToLobby : MonoBehaviour
             return;
         }
 
-        runner.SessionInfo.IsOpen = true;
+        SessionRacing.Set(runner, false);
         // Se till att alla spelare inte förstörs
         GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
         foreach (var player in players)

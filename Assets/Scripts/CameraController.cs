@@ -234,6 +234,18 @@ public class CameraController : MonoBehaviour
         }
     }
 
+    // A spectator (joined while the lobby was racing) follows another player's runner, with Follow runner on
+    public void Follow(Transform runner)
+    {
+        Watched = runner;
+        followRunner = runner != null;
+        RefreshFollowButtonText();
+        if (runner != null && cam != null)
+        {
+            cam.transform.position = new Vector3(runner.position.x, runner.position.y, cam.transform.position.z);
+        }
+    }
+
     public void ToggleFollowRunner()
     {
         followRunner = !followRunner;

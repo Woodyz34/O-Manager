@@ -51,7 +51,7 @@ public static class RelayStats
         List<RelayTeamResult> teams = new List<RelayTeamResult>();
         foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player.Object == null || !player.Object.IsValid) continue;
+            if (!NetworkPlayer.Races(player)) continue;
             RelayTeamResult result = new RelayTeamResult
             {
                 player = player,
@@ -256,7 +256,7 @@ public class RelayHistory
         Dictionary<NetworkPlayer, string> names = new Dictionary<NetworkPlayer, string>();
         foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player.Object == null || !player.Object.IsValid) continue;
+            if (!NetworkPlayer.Races(player)) continue;
             names[player] = player.relayRunnerName.ToString();
         }
         runners[leg] = names;

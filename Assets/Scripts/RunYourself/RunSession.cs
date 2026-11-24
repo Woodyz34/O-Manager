@@ -45,6 +45,19 @@ public partial class RunSession : MonoBehaviour
         if (Active == null) new GameObject("Run it yourself").AddComponent<RunSession>();
     }
 
+    // A player who joined while the race was on (Spectator, 2026-11-24): the forest is built, but there is no runner
+    // of its own; straight to the list of runners on the left, watching through their eyes until the results
+    public static void Spectate()
+    {
+        if (Active != null) return;
+        RunSession session = new GameObject("Run it yourself (watching)").AddComponent<RunSession>();
+        session.watchOnly = true;
+    }
+
+    bool watchOnly;
+    bool autoPicked;
+    bool everyoneInShown;
+
     // The best time on a course on this computer (real-life seconds), or 0
     public static float Best(string courseId) => PlayerPrefs.GetFloat(LocalPrefs.Key("RunYourself.Best." + courseId), 0f);
 
@@ -107,7 +120,7 @@ public partial class RunSession : MonoBehaviour
 
     void Start()
     {
-        if (IndividualRace.Active != null) IndividualRace.Active.ManualStats = true;
+        if (IndividualRace.Active != null && !watchOnly) IndividualRace.Active.ManualStats = true;
         RouteAnalysis.RealTimer = TimeRoute;
         Load();
     }
@@ -241,6 +254,17 @@ public partial class RunSession : MonoBehaviour
         EnsureListener();
 
         track = new RelayTrack { label = RunnerName, isLocal = true, color = TrackColour(), runnerClock = true };
+        if (watchOnly)
+        {
+            // Nothing to run: the others are already out, so straight to watching them
+            player.gameSpeed = 4f;
+            phase = Phase.Finished;
+            player.controlsOn = false;
+            bigText.text = "";
+            hintText.text = "You joined while the race was on: click a runner on the left to see what they see. You race from the next race.";
+            OpenWatchList();
+            return;
+        }
         phase = Online ? Phase.Waiting : Phase.Countdown;
         waitingSince = Time.unscaledTime;
         countdown = 5.2f;
@@ -328,6 +352,12 @@ public partial class RunSession : MonoBehaviour
             nextHide = Time.unscaledTime + 0.5f;
             HideCanvases();
         }
+        if (watchOnly && !atResults && CompetitionFlow.ResultsShown)
+        {
+            // The host showed the results: back to the 2D map, where they open
+            LeaveForResults();
+            return;
+        }
         if (player == null || atResults) return;
         float dt = Time.deltaTime;
         bool playing = phase == Phase.Waiting || phase == Phase.Countdown || phase == Phase.Running;
@@ -400,12 +430,14 @@ public partial class RunSession : MonoBehaviour
                 nextSample = gameSeconds + SampleEvery;
                 SampleOthers(gameSeconds * player.gameSpeed);
             }
+            WatchOnlyTick();
             WatchTick(dt);
         }
 
         player.Tick(dt);
         handMap.Tick(dt, phase == Phase.Running && !menuOpen);
         clockText.text = phase == Phase.Countdown || phase == Phase.Waiting ? "0:00"
+            : watchOnly && !(Watching && watching.raceFinished) ? "LIVE"
             : Watching ? (watching.raceFinished ? RaceTime(watching.relayTotals[0]) : RaceTime(gameSeconds * player.gameSpeed))
             : RaceTime(player.raceSeconds);
         if (Input.GetKeyDown(KeyCode.F4)) showFacts = !showFacts;
@@ -625,6 +657,53 @@ public partial class RunSession : MonoBehaviour
         Debug.Log("RunSession: finished, statistics shown (" + (IndividualRace.Active != null) + ")");
     }
 
+    // Watching only: the results are on, so the 3D view closes and the 2D race (where the results open) shows again
+    void LeaveForResults()
+    {
+        if (this == null) return;
+        CloseWatchList();
+        if (bigText != null) bigText.text = "";
+        atResults = true;
+        twoDHidden = false;
+        foreach (Canvas c in hiddenCanvases) if (c != null) c.enabled = true;
+        hiddenCanvases.Clear();
+        foreach (Renderer r in hiddenRenderers) if (r != null) r.enabled = true;
+        hiddenRenderers.Clear();
+        if (cameraController != null) cameraController.enabled = true;
+        ShowTwoDMap(true);
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    // Watching only, every frame after the forest is built: the first runner still out is watched at once, and when
+    // everyone is in it says so until the host shows the results
+    void WatchOnlyTick()
+    {
+        if (!watchOnly || phase != Phase.Finished) return;
+        if (!autoPicked && watching == null)
+        {
+            foreach (NetworkPlayer p in Players())
+            {
+                if (p == NetworkPlayer.Local || p.raceFinished || !remotes.ContainsKey(p)) continue;
+                autoPicked = true;
+                Watch(p);
+                break;
+            }
+        }
+        int inCount = 0, all = 0;
+        foreach (NetworkPlayer p in Players())
+        {
+            all++;
+            if (p.raceFinished) inCount++;
+        }
+        bool everyoneIn = all > 0 && inCount >= all;
+        if (everyoneIn != everyoneInShown)
+        {
+            everyoneInShown = everyoneIn;
+            bigText.text = everyoneIn ? "<size=40%>Everyone is in. The results come when the host shows them.</size>" : "";
+        }
+    }
+
     // The replay is drawn on the 2D map, so the 3D view is switched off while it plays
     void ShowTwoDMap(bool show)
     {
@@ -735,6 +814,13 @@ public partial class RunSession : MonoBehaviour
 
     void Fail(string message)
     {
+        if (watchOnly)
+        {
+            // Only watching: the simple waiting card instead (Spectator), and the 2D race is shown again
+            Spectator.ThreeDFailed(message);
+            Destroy(gameObject);
+            return;
+        }
         phase = Phase.Failed;
         if (loadingCard != null) loadingCard.Close();
         loadingCard = null;

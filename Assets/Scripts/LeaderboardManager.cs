@@ -97,11 +97,12 @@ public class LeaderboardManager : NetworkBehaviour
     // control the one with the least time. Before, the list was only put in order of time when someone punched (in
     // relays only at the end of each leg). Everything it needs is already networked on the players, so each client
     // works it out itself once a second; nothing is sent.
-    List<NetworkPlayer> Standings()
+    public static List<NetworkPlayer> Standings()
     {
-        // A player who has just left is still found for a moment, but its networked values can not be read any more
+        // A player who has just left is still found for a moment, but its networked values can not be read any more.
+        // A player who only watches (joined in the middle of the race) has no row.
         return FindObjectsOfType<NetworkPlayer>()
-            .Where(p => p.Object != null && p.Object.IsValid)
+            .Where(p => NetworkPlayer.Races(p))
             .OrderByDescending(p => Mathf.Max(0, p.relayLeg))
             .ThenByDescending(p => p.relayLeg < 0 ? 0f : p.relayProgress)
             .ThenBy(p => p.hourCount * 3600 + p.minuterCount * 60 + p.secoundCount)

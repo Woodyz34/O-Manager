@@ -337,7 +337,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
         int firstTime = ourTime;
         foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player.Object == null || !player.Object.IsValid) continue;
+            if (!NetworkPlayer.Races(player)) continue;
             firstTime = Mathf.Min(firstTime, TeamSeconds(player));
         }
         int waitSeconds = Mathf.Max(0, ourTime - firstTime);
@@ -628,7 +628,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
         int count = 0;
         foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player.Object == null || !player.Object.IsValid) continue;
+            if (!NetworkPlayer.Races(player)) continue;
             count++;
             if (player.relayTotals[legIndex] <= 0) return false;
         }

@@ -933,7 +933,7 @@ public class RouteChoiceView : MonoBehaviour
         List<NetworkPlayer> players = new List<NetworkPlayer>();
         foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (p.Object != null && p.Object.IsValid) players.Add(p);
+            if (NetworkPlayer.Races(p)) players.Add(p);
         }
         players.Sort((a, b) => b.choiceScore.CompareTo(a.choiceScore));
         foreach (NetworkPlayer p in players)

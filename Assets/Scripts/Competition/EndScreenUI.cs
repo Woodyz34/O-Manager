@@ -107,7 +107,7 @@ public class EndScreenUI : MonoBehaviour
         CompetitionFlow.TryGetImposter(out PlayerRef imposter);
         foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
         {
-            if (player.Object == null || !player.Object.IsValid || player.Object.StateAuthority == imposter) continue;
+            if (!NetworkPlayer.Races(player) || player.Object.StateAuthority == imposter) continue;
             if (!player.hasGuessedImposter) waiting++;
         }
         string hint = waiting == 0 ? "Everyone has guessed." : waiting == 1 ? "1 player has not guessed yet." : waiting + " players have not guessed yet.";
@@ -263,6 +263,13 @@ public class EndScreenUI : MonoBehaviour
 
         Standing me = LocalStanding();
         bool amImposter = me != null && me.player == imposter;
+        // Joined in the middle and only watched: nothing to guess
+        if (me == null && NetworkPlayer.LocalWatches)
+        {
+            voteTitleText.text = "The others are guessing";
+            voteHintText.text = "You watched this race, so you don't guess. You race with them next time.";
+            return;
+        }
         if (amImposter)
         {
             voteTitleText.text = "You were the imposter";

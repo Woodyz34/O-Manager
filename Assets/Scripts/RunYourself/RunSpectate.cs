@@ -224,8 +224,9 @@ public partial class RunSession
         });
         int inCount = 0;
         foreach (NetworkPlayer p in all) if (p.raceFinished) inCount++;
-        string clock = RaceTime(gameSeconds * player.gameSpeed);
-        watchTitle.text = "Watch a runner\n<size=70%><color=#5B7563>" + inCount + " of " + all.Count + " in   Race clock " + clock + "</color></size>";
+        // Someone who joined in the middle of the race has no clock of the race (it started before they came)
+        string clock = watchOnly ? "" : "   Race clock " + RaceTime(gameSeconds * player.gameSpeed);
+        watchTitle.text = "Watch a runner\n<size=70%><color=#5B7563>" + inCount + " of " + all.Count + " in" + clock + "</color></size>";
 
         int place = 0;
         foreach (NetworkPlayer p in all)

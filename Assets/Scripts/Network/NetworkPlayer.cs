@@ -76,6 +76,20 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // True when this player has reached the last control, so everyone can see who has finished
     [Networked] public bool raceFinished { get; set; }
 
+    // A player who joined while the lobby was out racing (2026-11-24): only watches this race (Spectator) and races
+    // from the next one. Spectators are left out of everything in the race: waiting for everyone, standings,
+    // leaderboards, results, relays. Set by the player itself when it arrives in the middle of a race, cleared in the lobby.
+    [Networked] public NetworkBool spectator { get; set; }
+
+    // A player in the race: valid and not only watching. Use this wherever "every player" means "every runner".
+    public static bool Races(NetworkPlayer p) => p != null && p.Object != null && p.Object.IsValid && !p.spectator;
+
+    // True for the local player while it only watches the race
+    public static bool LocalWatches => Local != null && Local.Object != null && Local.Object.IsValid && Local.spectator;
+
+    // This player's object has been in the lobby (a late joiner's has not: it arrives straight in the race)
+    bool beenInLobby;
+
     // Imposter mode. The host stores who the imposter is on its own player object when the game starts,
     // and every player stores their own guess at the end of the competition.
     [Networked] public PlayerRef imposter { get; set; }
@@ -273,6 +287,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     public void RPC_RelayStartLeg(int leg)
     {
+        // Someone who only watches has no leg to draw
+        if (LocalWatches) return;
         if (RelayRace.Active != null)
         {
             RelayRace.Active.OnHostStartsLeg(leg);
@@ -302,6 +318,14 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         }
         string options = HostSettings.ToPublish;
         if (hostOptions.ToString() != options) hostOptions = options;
+        if (spectator)
+        {
+            // Watching: nothing to tell the others about a race of its own
+            if (relayLeg != -1) relayLeg = -1;
+            if (relayRunning) relayRunning = false;
+            if (drawingNow) drawingNow = false;
+            return;
+        }
         // Still drawing (the others see it on the leaderboard, 2026-11-19)
         ManualPathDrawer drawing = agentMovement.manualPathDrawer;
         bool drawingNowValue = ActiveScene.Name != "Lobby" && drawing != null && drawing.timeToDraw
@@ -446,6 +470,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                 case nameof(playerColor):
                     UpdateAppearance();
                     break;
+                case nameof(spectator):
+                    ApplySpectatorLook();
+                    break;
             }
         }
 
@@ -480,7 +507,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     {
         foreach (var p in FindObjectsOfType<NetworkPlayer>())
         {
-            if (p.Object == null || !p.Object.IsValid)
+            // Spectators are not waited for
+            if (!Races(p))
             {
                 continue;
             }
@@ -555,8 +583,25 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
             if (isReadyScene)
             {
+                beenInLobby = true;
+                if (spectator) spectator = false;
+            }
+            else if (!beenInLobby && Runner.GameMode != GameMode.Single && ActiveScene.Name == CourseScenes.Competition
+                && SessionRacing.IsRacing(Runner.SessionInfo))
+            {
+                // Joined while the lobby was out racing: watch this race, race the next one. (Playing the competition
+                // scene straight from the editor makes a test lobby that is not marked as racing: that one is raced.)
+                spectator = true;
+            }
+
+            if (isReadyScene)
+            {
                 StartCoroutine(AlignCameraNextFrame());
                 localCamera.cam.enabled = false;
+            }
+            else if (spectator)
+            {
+                BeginSpectating(localCamera);
             }
             else
             {
@@ -645,6 +690,76 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
         OnNickNameChanged();
         UpdateAppearance();
+        ApplySpectatorLook();
+    }
+
+    // ---- Watching a race (a player who joined while the lobby was out racing) ----
+
+    readonly List<Renderer> spectatorHiddenRenderers = new List<Renderer>();
+    readonly List<Canvas> spectatorHiddenCanvases = new List<Canvas>();
+
+    // A spectator has no runner on the map: its dot, trail and name tag are hidden for everyone, and it is not one of
+    // the runners others can run behind (PackRegistry). Shown again when it is back in the lobby.
+    void ApplySpectatorLook()
+    {
+        bool hide = IsValidRunner && spectator;
+        if (hide)
+        {
+            PackRegistry.Remove(this);
+            foreach (Renderer r in GetComponentsInChildren<Renderer>(true))
+            {
+                if (r == null || !r.enabled) continue;
+                r.enabled = false;
+                spectatorHiddenRenderers.Add(r);
+            }
+            foreach (Canvas c in GetComponentsInChildren<Canvas>(true))
+            {
+                if (c == null || !c.enabled) continue;
+                c.enabled = false;
+                spectatorHiddenCanvases.Add(c);
+            }
+            return;
+        }
+        if (spectatorHiddenRenderers.Count == 0 && spectatorHiddenCanvases.Count == 0) return;
+        foreach (Renderer r in spectatorHiddenRenderers) if (r != null) r.enabled = true;
+        foreach (Canvas c in spectatorHiddenCanvases) if (c != null) c.enabled = true;
+        spectatorHiddenRenderers.Clear();
+        spectatorHiddenCanvases.Clear();
+        if (IsValidRunner) PackRegistry.Add(this);
+        TrailRenderer trail = GetComponent<TrailRenderer>();
+        if (trail != null) trail.Clear();
+    }
+
+    // The local player arrived in the middle of a race: no runner, no drawing; the camera and the watching are
+    // set up by Spectator
+    void BeginSpectating(CameraController localCamera)
+    {
+        AgentMovement agent = GetComponent<AgentMovement>();
+        manager = FindObjectOfType<PathfindingManager>(true);
+        HasChoosenRunner = true;
+        hasDrawn = true;
+        hasReachedControl = true;
+        if (agent != null)
+        {
+            agent.WaitingForAllPlayersToChooseRunner = false;
+            agent.WaitingForAllPlayersToDraw = false;
+            agent.WaitingForAllPlayersToReachKontroll = false;
+            agent.canRunNextSegment = false;
+            if (agent.manualPathDrawer != null)
+            {
+                agent.manualPathDrawer.timeToDraw = false;
+                agent.manualPathDrawer.isDrawing = false;
+            }
+            // Out of the way: at the start, hidden
+            Vector3 at = manager != null && manager.controlPoints != null && manager.controlPoints.Count > 0
+                ? manager.controlPoints[0].position : transform.position;
+            agent.SetInitialPosition(at);
+            transform.position = at;
+        }
+        if (manager != null && manager.ChooseRunnerPanel != null) manager.ChooseRunnerPanel.SetActive(false);
+        if (localCamera != null && localCamera.cam != null) localCamera.cam.enabled = true;
+        Debug.Log("NetworkPlayer: joined while the lobby is racing, watching this race");
+        Spectator.Begin(this);
     }
 
     // The competition scene has no course to run: say so and go back to where the player started from
@@ -952,6 +1067,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             return;
         }
+        if (scene.name == "Lobby")
+        {
+            // Back in the lobby: a spectator races from the next race on
+            beenInLobby = true;
+            if (spectator) spectator = false;
+            ApplySpectatorLook();
+        }
         Debug.Log($"{Time.time} OnSceneLoaded: {scene.name}");
 
         if (scene.name != "Lobby")
@@ -1194,7 +1316,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         bool allReady = true;
         foreach (var p in players)
         {
-            if (p.Object == null || !p.Object.IsValid)
+            if (!Races(p))
             {
                 continue;
             }
@@ -1328,6 +1450,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             "mode", RelayRace.Active != null ? "relay" : RouteAnalysis.On ? "route_analysis" : RouteChoiceGame.On ? "route_choice" : "normal",
             "terrain", raced != null && raced.IsSprint() ? "sprint" : "forest",
             "players", FindObjectsOfType<NetworkPlayer>().Length);
+
     }
 
 
