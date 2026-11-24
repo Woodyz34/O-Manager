@@ -16,8 +16,20 @@ public class TvMesh
     public readonly List<float> normals = new List<float>();
     public readonly List<byte> colors = new List<byte>();        // r, g, b (sRGB)
     public readonly List<int> triangles = new List<int>();
+    // Textured meshes only (the bark and the leaves of the trees, the undergrowth, the forest floor's litter;
+    // TvAtlas): u, v and which picture of the atlas, for each corner. Empty for the plain coloured meshes.
+    public readonly List<float> uvs = new List<float>();
 
     public int VertexCount => positions.Count / 3;
+
+    public bool Textured => uvs.Count > 0;
+
+    // Fills in "no picture" (tile -1) for the corners before `count` that have no u, v yet: a mesh that holds both
+    // textured and plain shapes gives every corner a u, v, tile
+    public void PadUvs(int count)
+    {
+        while (uvs.Count < count * 3) { uvs.Add(0f); uvs.Add(0f); uvs.Add(-1f); }
+    }
 
     public int Vertex(float x, float y, float z, float nx, float ny, float nz, TvColor c)
     {
@@ -52,6 +64,12 @@ public class TvMesh
         }
         int[] t = shape.triangles;
         for (int i = 0; i < t.Length; i++) triangles.Add(first + t[i]);
+        if (shape.uvs != null)
+        {
+            PadUvs(first);
+            uvs.AddRange(shape.uvs);
+        }
+        else if (uvs.Count > 0) PadUvs(VertexCount);
     }
 
     // Cuts meshes into square tiles (tiles x tiles over the square of 2 x radius round the control), each triangle to
@@ -64,6 +82,8 @@ public class TvMesh
         float size = 2f * radius / tiles;
         foreach (TvMesh source in sources)
         {
+            // Corners added after the last textured one get "no picture" too
+            if (source.uvs.Count > 0) source.PadUvs(source.VertexCount);
             List<float> p = source.positions, n = source.normals;
             List<byte> c = source.colors;
             List<int> t = source.triangles;
@@ -98,6 +118,12 @@ public class TvMesh
                             tile.positions.Add(p[v * 3]); tile.positions.Add(p[v * 3 + 1]); tile.positions.Add(p[v * 3 + 2]);
                             tile.normals.Add(n[v * 3]); tile.normals.Add(n[v * 3 + 1]); tile.normals.Add(n[v * 3 + 2]);
                             tile.colors.Add(c[v * 3]); tile.colors.Add(c[v * 3 + 1]); tile.colors.Add(c[v * 3 + 2]);
+                            if (source.uvs.Count > 0)
+                            {
+                                tile.PadUvs(nv);
+                                tile.uvs.Add(source.uvs[v * 3]); tile.uvs.Add(source.uvs[v * 3 + 1]); tile.uvs.Add(source.uvs[v * 3 + 2]);
+                            }
+                            else if (tile.uvs.Count > 0) tile.PadUvs(nv + 1);
                             remap[v] = nv + 1;
                         }
                         tile.triangles.Add(nv);
@@ -106,7 +132,12 @@ public class TvMesh
             }
         }
         var list = new List<TvMesh>();
-        foreach (TvMesh m in result) if (m != null && m.VertexCount > 0) list.Add(m);
+        foreach (TvMesh m in result)
+            if (m != null && m.VertexCount > 0)
+            {
+                if (m.uvs.Count > 0) m.PadUvs(m.VertexCount);
+                list.Add(m);
+            }
         return list;
     }
 
@@ -150,10 +181,11 @@ public class TvShape
     public float[] positions, normals;
     public byte[] colors;
     public int[] triangles;
+    public float[] uvs;          // u, v, atlas tile for each corner (TvAtlas), or null for a plain coloured shape
 }
 
 // Puts a shape together from blobs, cylinders and cones
-public class TvShapeBuilder
+public partial class TvShapeBuilder
 {
     readonly List<float> p = new List<float>(), n = new List<float>();
     readonly List<byte> c = new List<byte>();
@@ -162,9 +194,18 @@ public class TvShapeBuilder
 
     public TvShapeBuilder(TvRandom random) { this.random = random; }
 
+    // The u, v and atlas tile of every corner, only once a textured part (TvFlora.cs) has been added
+    readonly List<float> uv = new List<float>();
+
     public TvShape Done()
     {
-        return new TvShape { positions = p.ToArray(), normals = n.ToArray(), colors = c.ToArray(), triangles = t.ToArray() };
+        float[] uvs = null;
+        if (uv.Count > 0)
+        {
+            while (uv.Count < p.Count) { uv.Add(0f); uv.Add(0f); uv.Add(-1f); }
+            uvs = uv.ToArray();
+        }
+        return new TvShape { positions = p.ToArray(), normals = n.ToArray(), colors = c.ToArray(), triangles = t.ToArray(), uvs = uvs };
     }
 
     int V(float x, float y, float z, float nx, float ny, float nz, TvColor col)
@@ -172,6 +213,7 @@ public class TvShapeBuilder
         p.Add(x); p.Add(y); p.Add(z);
         n.Add(nx); n.Add(ny); n.Add(nz);
         c.Add(col.r); c.Add(col.g); c.Add(col.b);
+        if (uv.Count > 0) { uv.Add(0f); uv.Add(0f); uv.Add(-1f); }
         return p.Count / 3 - 1;
     }
 
@@ -287,8 +329,10 @@ public class TvShapeBuilder
     // ---- A rock: a lumpy ball broken by flat planes, every face coloured on its own ----
     // Stretched (sx, sy, sz) round (0, oy, 0); cuts flat breaks; moss covers that share of the faces that look up;
     // lichen: the share of faces with pale spots. Looks like split granite rather than a smooth pebble.
+    // textured (2026-11-25): the faces get the granite picture of the forest atlas (TvAtlas.Granite), the mossy ones
+    // the moss picture; the colours are then light tints over the pictures.
     public void Rock(float sx, float sy, float sz, float oy, int detail, int cuts, float jitter, TvColor stone, TvColor moss,
-                     float mossShare, float lichen, float bottom = -0.35f)
+                     float mossShare, float lichen, float bottom = -0.35f, bool textured = false)
     {
         float[] sv = detail > 0 ? ico1V : IcoV;
         int[] sf = detail > 0 ? ico1F : IcoF;
@@ -339,6 +383,16 @@ public class TvShapeBuilder
             // Damp and shaded low down
             col = col.Lerp(dark, Smooth(0.15f, -0.3f, cy / Math.Max(0.01f, sy)) * 0.7f);
             float up = Smooth(0.45f, 0.9f, ny) * Smooth(0.42f, 0.6f, TvRandom.Noise(cx * 1.8f - seed, cz * 1.8f + 3f) + mossShare - 0.5f);
+            if (textured)
+            {
+                // The picture brings the grain, cracks and lichen; the colour only shades it (damp foot, faces)
+                float shade = 0.82f + 0.3f * grain - 0.25f * Smooth(0.15f, -0.3f, cy / Math.Max(0.01f, sy));
+                bool mossy = up > 0.35f;
+                TvColor tint = mossy ? new TvColor(235, 240, 225).Shade(0.85f + 0.2f * grain) : new TvColor(255, 252, 246).Shade(shade);
+                FlatTriTex(v[a], v[a + 1], v[a + 2], v[b], v[b + 1], v[b + 2], v[q], v[q + 1], v[q + 2], 0f, oy, 0f, tint,
+                           mossy ? TvAtlas.Moss : TvAtlas.Granite, 0.9f, seed);
+                continue;
+            }
             if (up > 0.02f) col = col.Lerp(moss.Shade(0.9f + 0.2f * grain), Math.Min(1f, up * 1.15f));
             else if (random.Value() < lichen) col = col.Lerp(random.Value() < 0.6f ? pale : yellow, 0.55f);
             FlatTri(v[a], v[a + 1], v[a + 2], v[b], v[b + 1], v[b + 2], v[q], v[q + 1], v[q + 2], 0f, oy, 0f, col, col, col);

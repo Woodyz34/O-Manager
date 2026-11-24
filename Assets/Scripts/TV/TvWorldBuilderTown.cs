@@ -1746,7 +1746,11 @@ public partial class TvWorldBuilder
                 // Trees on wide streets and squares
                 if (min >= 3f && across >= 12f && h > 0.3f && h < 0.42f && FarFrom(x, z, 9f, 7) && Free(x, z, 2.5f) && !TownKeepOut(x, z, 3.2f))
                 {
-                    townThingMesh.Add(Shape(Thing.Tree, look % 4, style), x, y, z, 1f, 1f, 1f, h2 * 6.28f);
+                    // A real tree with bark and leaves (2026-11-25): a lime-like broad-leaved tree, now and then a birch;
+                    // the old town keeps its orange trees in pots
+                    if (Old || beechNear == null) townThingMesh.Add(Shape(Thing.Tree, look % 4, style), x, y, z, 1f, 1f, 1f, h2 * 6.28f);
+                    else if (look % 4 == 2) townThingMesh.Add(birchNear[(int)(h2 * 97f) % birchNear.Length], x, y, z, 0.62f, 0.62f, 0.62f, h2 * 6.28f);
+                    else townThingMesh.Add(beechNear[(int)(h2 * 97f) % beechNear.Length], x, y, z, 0.5f, 0.52f, 0.5f, h2 * 6.28f);
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.3f });
                     Mark(x, z, 1.5f, 7);
                     continue;

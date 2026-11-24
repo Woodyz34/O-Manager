@@ -36,7 +36,8 @@ public class RunWorld : MonoBehaviour
     public float baseHeight;            // the map height at Origin
     RunSettings.Look look;
 
-    Material plainMaterial, groundMaterial, pavedMaterial;
+    Material plainMaterial, groundMaterial, pavedMaterial, atlasMaterial;
+    int quality;                        // RunSettings.Level when the race started, 0..3
     RunPeople people;
     Light sun;
     float savedShadowDistance;
@@ -250,10 +251,13 @@ public class RunWorld : MonoBehaviour
     void Make()
     {
         look = RunSettings.Current;
+        quality = (int)RunSettings.Level;
         plainMaterial = TvWorldView.NewObjectMaterial();
-        groundMaterial = TvWorldView.NewMaterial(Color.white);
-        groundMaterial.SetTexture("_DetailTex", TvWorldView.Grain());
-        groundMaterial.SetFloat("_Detail", 1f);
+        // The forest floor's moss and needles on the ground; only a hint of it on a town's lawns
+        groundMaterial = TvWorldView.NewGroundMaterial(data.town != null ? 0.35f : 1f);
+        // Bark, needles, leaves, undergrowth and litter (TvAtlasLit); no wind on Low
+        atlasMaterial = TvWorldView.NewAtlasMaterial();
+        atlasMaterial.SetFloat("_Wind", quality == 0 ? 0f : 1f);
         if (data.town != null)
         {
             // A town's streets and squares: asphalt, or cobbles in the old stone town
@@ -271,7 +275,7 @@ public class RunWorld : MonoBehaviour
             pavedMaterial.SetTexture("_DetailTex", RunPeople.Asphalt());
             pavedMaterial.SetFloat("_Detail", 0.75f);
         }
-        foreach (Material m in new[] { plainMaterial, groundMaterial, pavedMaterial })
+        foreach (Material m in new[] { plainMaterial, groundMaterial, pavedMaterial, atlasMaterial })
         {
             if (m == null) continue;
             // The fog thickens towards the view distance, where the world ends
@@ -298,8 +302,8 @@ public class RunWorld : MonoBehaviour
         savedProjection = QualitySettings.shadowProjection;
         QualitySettings.shadowDistance = look.shadowDistance;
         QualitySettings.shadows = look.shadows == 0 ? ShadowQuality.Disable : look.shadows == 1 ? ShadowQuality.HardOnly : ShadowQuality.All;
-        QualitySettings.shadowCascades = look.shadows == 2 ? 2 : 1;
-        QualitySettings.shadowResolution = look.shadows == 2 ? ShadowResolution.High : ShadowResolution.Medium;
+        QualitySettings.shadowCascades = look.shadows >= 3 ? 4 : look.shadows == 2 ? 2 : 1;
+        QualitySettings.shadowResolution = look.shadows >= 3 ? ShadowResolution.VeryHigh : look.shadows == 2 ? ShadowResolution.High : ShadowResolution.Medium;
         QualitySettings.shadowProjection = ShadowProjection.StableFit;
     }
 
@@ -319,6 +323,7 @@ public class RunWorld : MonoBehaviour
         if (plainMaterial != null) Destroy(plainMaterial);
         if (groundMaterial != null) Destroy(groundMaterial);
         if (pavedMaterial != null) Destroy(pavedMaterial);
+        if (atlasMaterial != null) Destroy(atlasMaterial);
         if (tapeMesh != null) Destroy(tapeMesh);
     }
 
@@ -617,8 +622,9 @@ public class RunWorld : MonoBehaviour
             seed = 1,
             town = data.town,
             passable = passable,
-            // The houses in full detail only on the High 3D quality; the others draw the leaner ones close by too
-            townRich = look.undergrowth > 0.15f
+            // The houses in full detail only on the High and Ultra 3D qualities; the others draw the leaner ones close by too
+            townRich = quality >= (int)RunSettings.Quality.High,
+            quality = quality
         };
     }
 
@@ -722,7 +728,8 @@ public class RunWorld : MonoBehaviour
         go.transform.SetParent(parent, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         var r = go.AddComponent<MeshRenderer>();
-        r.sharedMaterial = source.name == "Ground paved" && pavedMaterial != null ? pavedMaterial
+        r.sharedMaterial = source.uvs != null ? atlasMaterial
+            : source.name == "Ground paved" && pavedMaterial != null ? pavedMaterial
             : source.name.StartsWith("Ground", StringComparison.Ordinal) ? groundMaterial : plainMaterial;
         r.shadowCastingMode = source.castShadows && look.shadows > 0 ? ShadowCastingMode.On : ShadowCastingMode.Off;
         r.receiveShadows = look.shadows > 0;

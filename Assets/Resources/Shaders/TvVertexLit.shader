@@ -4,6 +4,7 @@
 // into the sky colour far away. The colour comes from every corner of the mesh (written in sRGB), times _Color. The
 // ground also gets a fine grain (_DetailTex, repeated every 5 metres). Also used by the run-yourself game mode's world
 // (RunYourself/RunWorld.cs), which sets the fog to its own view distance.
+// The ground can also get the forest floor (_FloorTex, 2026-11-25): moss, needles and twigs multiplied on its colour.
 // Everything else (houses, trees, stones, people) can get a surface grain too (_Surface, 2026-11-20, Anders: the
 // objects as lively as the ground): soft patches and specks from noise worked out of the place in 3D, never repeating,
 // lighter and darker and richer in colour, so no face is one flat colour.
@@ -15,6 +16,8 @@ Shader "O-Manager/TvVertexLit"
         _DetailTex ("Ground grain", 2D) = "white" {}
         _Detail ("Ground grain strength", Range(0,1)) = 0
         _Surface ("Surface grain strength", Range(0,1)) = 0
+        _FloorTex ("Forest floor", 2D) = "white" {}
+        _Floor ("Forest floor strength", Range(0,1)) = 0
         _FogStart ("Fog start (m)", Float) = 45
         _FogEnd ("Fog end (m)", Float) = 230
     }
@@ -37,6 +40,8 @@ Shader "O-Manager/TvVertexLit"
         fixed4 _Color;
         sampler2D _DetailTex;
         half _Detail;
+        sampler2D _FloorTex;
+        half _Floor;
         half _Surface;
         // The TV's fog starts at 45 m and the sky takes over at 230 m; the run-yourself world sets its own (RunWorld)
         float _FogStart;
@@ -106,6 +111,9 @@ Shader "O-Manager/TvVertexLit"
             float2 g = IN.worldPos.xz;
             half grain = tex2D(_DetailTex, g * 0.2).r * 0.5 + tex2D(_DetailTex, float2(g.x * 0.4161 + g.y * 0.9093, g.y * 0.4161 - g.x * 0.9093) * 0.1367 + 0.3).r * 0.5;
             c *= lerp(1.0, grain, _Detail);
+            // The forest floor (2026-11-25): moss cushions, needles, twigs and leaves, every 2.5 m, about 1 on average
+            // (not on steep faces such as cliffs, where it would run down in stripes)
+            if (_Floor > 0.001) c *= lerp((half3)1.0, tex2D(_FloorTex, g * 0.4).rgb * 1.1, _Floor * saturate(IN.worldNormal.y * 2.5 - 1.25));
             if (_Surface > 0.001)
             {
                 half v = TvSurfaceGrain(IN.worldPos, IN.tvDepth);

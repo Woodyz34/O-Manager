@@ -72,6 +72,45 @@ public class TvWorldView : MonoBehaviour
         return m;
     }
 
+    static Shader atlasShader;
+    static Texture2D atlas, floor;
+
+    // The material of the trees, plants and litter with bark, needles and leaves (TvAtlasLit, TV/TvFlora.cs)
+    public static Material NewAtlasMaterial()
+    {
+        if (atlasShader == null) atlasShader = Resources.Load<Shader>("Shaders/TvAtlasLit");
+        if (atlasShader == null) atlasShader = Shader.Find("O-Manager/TvAtlasLit");
+        if (atlas == null) atlas = Resources.Load<Texture2D>("Textures/TvForestAtlas");
+        var material = new Material(atlasShader != null ? atlasShader : Shader.Find("Legacy Shaders/Transparent/Cutout/Diffuse"));
+        material.mainTexture = atlas;
+        material.SetFloat("_Tiles", TvAtlas.PerSide);
+        material.SetFloat("_Pad", TvAtlas.Padding);
+        material.SetFloat("_Cutoff", 0.5f);
+        return material;
+    }
+
+    // The forest floor's moss, needles and twigs, multiplied on the ground's colour (repeats every 2.5 m)
+    public static Texture2D ForestFloor()
+    {
+        if (floor == null) floor = Resources.Load<Texture2D>("Textures/TvForestFloor");
+        return floor;
+    }
+
+    // The ground's material: its colours, the fine grain, and (forest = 1, a town's lawns less) the forest floor
+    public static Material NewGroundMaterial(float forestFloor)
+    {
+        Material m = NewMaterial(Color.white);
+        m.SetTexture("_DetailTex", Grain());
+        m.SetFloat("_Detail", 1f);
+        Texture2D f = ForestFloor();
+        if (f != null && forestFloor > 0f)
+        {
+            m.SetTexture("_FloorTex", f);
+            m.SetFloat("_Floor", forestFloor);
+        }
+        return m;
+    }
+
     public static Material NewMaterial(Color color)
     {
         if (shader == null) shader = Resources.Load<Shader>("Shaders/TvVertexLit");
@@ -102,6 +141,7 @@ public class TvWorldView : MonoBehaviour
         public Vector3[] vertices, normals;
         public Color32[] colors;
         public int[] triangles;
+        public Vector3[] uvs;       // textured meshes (TvAtlas): u, v and the atlas tile; null for plain coloured ones
 
         public MeshArrays(TvMesh source)
         {
@@ -121,6 +161,13 @@ public class TvWorldView : MonoBehaviour
                 colors[i] = new Color32(c[i * 3], c[i * 3 + 1], c[i * 3 + 2], 255);
             }
             triangles = source.triangles.ToArray();
+            if (source.uvs.Count > 0)
+            {
+                source.PadUvs(count);
+                List<float> u = source.uvs;
+                uvs = new Vector3[count];
+                for (int i = 0; i < count; i++) uvs[i] = new Vector3(u[i * 3], u[i * 3 + 1], u[i * 3 + 2]);
+            }
         }
     }
 
@@ -131,6 +178,7 @@ public class TvWorldView : MonoBehaviour
         mesh.vertices = source.vertices;
         mesh.normals = source.normals;
         mesh.colors32 = source.colors;
+        if (source.uvs != null) mesh.SetUVs(0, source.uvs);
         mesh.SetTriangles(source.triangles, 0);
         mesh.RecalculateBounds();
         return mesh;
@@ -153,6 +201,8 @@ public class TvWorldView : MonoBehaviour
             centerN = control.n,
             radius = 110f,
             seed = 1,
+            // The TV pictures are made as on High, or Ultra when the player chose it for "Run it yourself"
+            quality = Math.Max(2, (int)RunSettings.Level),
             start = start,
             camDirX = camDirX,
             camDirZ = camDirZ,
@@ -201,7 +251,7 @@ public class TvWorldView : MonoBehaviour
     }
 
     Transform drawn;            // the meshes; switched off while this world is not on TV
-    Material plainMaterial, groundMaterial;
+    Material plainMaterial, groundMaterial, atlasMaterial;
 
     void AddMesh(MeshArrays source)
     {
@@ -212,7 +262,7 @@ public class TvWorldView : MonoBehaviour
         go.transform.SetParent(drawn, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         var r = go.AddComponent<MeshRenderer>();
-        r.sharedMaterial = source.name.StartsWith("Ground", StringComparison.Ordinal) ? groundMaterial : plainMaterial;
+        r.sharedMaterial = source.uvs != null ? atlasMaterial : source.name.StartsWith("Ground", StringComparison.Ordinal) ? groundMaterial : plainMaterial;
         r.shadowCastingMode = source.castShadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
         r.receiveShadows = true;
         r.lightProbeUsage = LightProbeUsage.Off;
@@ -224,10 +274,10 @@ public class TvWorldView : MonoBehaviour
         plainMaterial = NewObjectMaterial();
         materials.Add(plainMaterial);
         // The ground has a fine grain, so it does not look painted
-        groundMaterial = NewMaterial(Color.white);
-        groundMaterial.SetTexture("_DetailTex", Grain());
-        groundMaterial.SetFloat("_Detail", 1f);
+        groundMaterial = NewGroundMaterial(1f);
         materials.Add(groundMaterial);
+        atlasMaterial = NewAtlasMaterial();
+        materials.Add(atlasMaterial);
         drawn = new GameObject("Meshes").transform;
         drawn.SetParent(transform, false);
         drawn.gameObject.SetActive(false);   // until it is on TV
