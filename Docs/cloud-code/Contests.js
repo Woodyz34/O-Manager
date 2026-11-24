@@ -80,6 +80,7 @@ function isSprint(id) {
 const MAX_COURSE_CHARS = 120000;
 const MAX_REPLAY_CHARS = 400000;
 const MAX_NAME = 24;
+const RUNNING_MINUTES = 180;       // a started run without a result is shown as "Did not finish" to the others after this
 const LATE_MINUTES = 180;          // a run started before the end may be handed in up to 3 hours after it
 const HISTORY_KEEP = 120;
 const CLEAN_DAYS = 45;             // how far back clean-up looks (in case nobody opened the game for a while)
@@ -525,11 +526,13 @@ async function board(api, context, me, payload, now) {
   const b = await mayLook(api, context, me, id, now);
   const over = now > endOf(id);
   const rows = publicRows(standings(id, b), me);
-  // Started but no result: "Did not finish" at the bottom. While the contest runs only your own such row is shown,
-  // since the others may still be running
+  // Started but no result: "Did not finish" at the bottom, for everyone, so all can see who ran but did not finish
+  // (2026-11-24, the user). While the contest runs another player counts as out only RUNNING_MINUTES after the start,
+  // since they may still be running
   for (const playerId of Object.keys(b.entries)) {
     const e = b.entries[playerId];
-    if (!e || e.state === "done" || (!over && playerId !== me)) continue;
+    if (!e || e.state === "done") continue;
+    if (!over && playerId !== me && now - (e.at || 0) < RUNNING_MINUTES * 60000) continue;
     rows.push({ playerId, name: e.name, score: 0, seconds: 0, place: 0, prize: 0, packs: [], dnf: true, me: playerId === me });
   }
   return { rows, course: b.course, over, sprint: isSprint(id), endsAt: endOf(id), replaysUntil: replaysUntil(id) };

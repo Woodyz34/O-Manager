@@ -785,11 +785,21 @@ public class ForestMistakes
         float[] left = new float[own.Count];
         for (int i = own.Count - 2; i >= 0; i--) left[i] = left[i + 1] + Vector2Int.Distance(own[i], own[i + 1]) * cellMetres;
         const float OffPlan = 1.35f;
+        int from = Mathf.Clamp(planIndex, 0, own.Count - 1);
+        // Back to the nearby part of its own route, not to a point far ahead: the way there is found by the path
+        // search, so a join point far ahead let it take the fastest route choice to the control instead of its own
+        // (2026-11-24, the user: after a mistake go back to your route choice, not the fastest one). Only points
+        // little further off than the nearest one count.
+        float nearest = float.MaxValue;
+        for (int i = from; i < own.Count; i++) nearest = Mathf.Min(nearest, Vector2Int.Distance(here, own[i]) * cellMetres);
+        float reach = nearest + Mathf.Max(40f, 0.5f * nearest);
         int best = own.Count - 1;
         float bestCost = float.MaxValue;
-        for (int i = Mathf.Clamp(planIndex, 0, own.Count - 1); i < own.Count; i++)
+        for (int i = from; i < own.Count; i++)
         {
-            float cost = Vector2Int.Distance(here, own[i]) * cellMetres * OffPlan + left[i];
+            float off = Vector2Int.Distance(here, own[i]) * cellMetres;
+            if (off > reach) continue;
+            float cost = off * OffPlan + left[i];
             if (cost < bestCost)
             {
                 bestCost = cost;

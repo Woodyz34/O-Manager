@@ -86,8 +86,8 @@ public class ContestsPage : MonoBehaviour
             total += p.kr;
             lines.Add(DescribeId(p.id, p.sprint) + ": you were out <b>" + CompetitionRewards.Duration(p.seconds) + "</b> and got <b>+" + Kr(p.kr) + "</b>");
         }
-        lines.Add("<size=85%><color=#5B7563>" + MoneyLabel.Format(CompetitionRewards.PerHalfMinute) + " for every 30 seconds out (at most "
-            + MoneyLabel.Format(CompetitionRewards.MaxForTime) + "). The prize for your place comes when the contest is over.</color></size>");
+        // How the time money is counted is not told (2026-11-24, the user: only the developer needs to know)
+        lines.Add("<size=85%><color=#5B7563>The prize for your place comes when the contest is over.</color></size>");
         ShowPrizePopup(lines, new List<string>(), total, 0, "You got " + Kr(total) + " for your run!");
     }
 
@@ -671,7 +671,7 @@ public class ContestsPage : MonoBehaviour
     {
         return "Golden pack: " + PrizePacks.Odds(PrizePacks.Weekly) + ".\nSilver pack: " + PrizePacks.Odds(PrizePacks.Daily)
                + ".\nBronze pack: the shop's pack.\nPacks only hold runners you do not have yet."
-               + "\nAt the finish you also get " + MoneyLabel.Format(CompetitionRewards.PerHalfMinute) + " for every 30 seconds out.";
+               + "\nAt the finish you also get money for the time you were out.";
     }
 
     // ---- Starting ----
