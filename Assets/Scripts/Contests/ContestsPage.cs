@@ -24,6 +24,12 @@ public class ContestsPage : MonoBehaviour
     }
 
     bool weekly = false;   // Today first (2026-11-19, the user)
+    // The "Results" tab: the contests that are over, with their leaderboards and GPS routes (2026-11-24, the user)
+    bool results;
+    List<ContestRecent> recent;
+    string recentError;
+    bool recentBusy;
+    Button resultsTab;
     List<ContestInfo> contests;
     string error;
     bool busy;
@@ -129,10 +135,13 @@ public class ContestsPage : MonoBehaviour
         CourseUI.Place(head.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -34), new Vector2(1180, 200));
         TextMeshProUGUI title = CourseUI.Text("Title", head.transform, "Contests", 44, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32, -18), new Vector2(400, 60));
-        dayTab = CourseUI.Button("Day", head.transform, "Today", CourseUI.ButtonKind.Primary, () => { weekly = false; Fill(); }, 24);
+        dayTab = CourseUI.Button("Day", head.transform, "Today", CourseUI.ButtonKind.Primary, () => { weekly = false; results = false; Fill(); }, 24);
         CourseUI.Place((RectTransform)dayTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32, -90), new Vector2(200, 58));
-        weekTab = CourseUI.Button("Week", head.transform, "This week", CourseUI.ButtonKind.Light, () => { weekly = true; Fill(); }, 24);
+        weekTab = CourseUI.Button("Week", head.transform, "This week", CourseUI.ButtonKind.Light, () => { weekly = true; results = false; Fill(); }, 24);
         CourseUI.Place((RectTransform)weekTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(246, -90), new Vector2(200, 58));
+        resultsTab = CourseUI.Button("Results", head.transform, "Results", CourseUI.ButtonKind.Light, ShowResults, 24);
+        CourseUI.Place((RectTransform)resultsTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(460, -90), new Vector2(200, 58));
+        HoverTip.Add(resultsTab, "Contests that are over: leaderboards and everyone's GPS routes (daily contests 7 days, weekly 30 days)");
         info = CourseUI.Text("Info", head.transform, "", 20, CourseUI.InkMuted);
         info.richText = true;
         CourseUI.Place(info.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(32, 6), new Vector2(1116, 44));
@@ -314,7 +323,7 @@ public class ContestsPage : MonoBehaviour
         foreach (ContestPaid p in paid)
         {
             total += p.prize;
-            string what = DescribeId(p.id);
+            string what = DescribeId(p.id, p.sprint);
             if (!p.finished)
             {
                 lines.Add(what + ": did not finish");
@@ -331,13 +340,13 @@ public class ContestsPage : MonoBehaviour
             lines.Add(what + ": " + CompetitionFlow.Ordinal(p.place) + " of " + p.of + "  <b>+" + string.Join(" + ", won) + "</b>");
         }
         if (total > 0 && Money.Instance != null) Money.Instance.AddMoney(total);
-        ShowPrizePopup(lines, total, packs);
+        ShowPrizePopup(lines, paid.ConvertAll(p => p.id), total, packs);
     }
 
     // "Weekly route choice game · Forest (week 47)"
-    static string DescribeId(string id)
+    static string DescribeId(string id, bool sprint)
     {
-        ContestInfo c = new ContestInfo { id = id, span = id.Substring(0, 1), kind = id.Substring(id.IndexOf('_') + 1) };
+        ContestInfo c = new ContestInfo { id = id, span = id.Substring(0, 1), kind = id.Substring(id.IndexOf('_') + 1), sprint = sprint };
         string when = c.Weekly ? "week " + id.Substring(6, 2).TrimStart('0') : id.Substring(1, 10);
         return ContestRun.SpanName(c) + " " + ContestRun.Title(c) + " (" + when + ")";
     }
@@ -347,13 +356,20 @@ public class ContestsPage : MonoBehaviour
     void Fill()
     {
         if (cards == null) return;
-        CourseUI.SetButtonColor(weekTab, weekly ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
-        CourseUI.SetButtonColor(dayTab, weekly ? CourseUI.ButtonKind.Light : CourseUI.ButtonKind.Primary);
+        CourseUI.SetButtonColor(weekTab, weekly && !results ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        CourseUI.SetButtonColor(dayTab, !weekly && !results ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        if (resultsTab != null) CourseUI.SetButtonColor(resultsTab, results ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
         foreach (Transform child in cards) Destroy(child.gameObject);
         shownCount = 0;
         cards.sizeDelta = new Vector2(CardsWidth, cards.sizeDelta.y);
         cards.anchoredPosition = Vector2.zero;
         ShowScroll();
+        if (results)
+        {
+            if (loadingBox != null) loadingBox.SetActive(recentBusy);
+            FillResults();
+            return;
+        }
 
         if (loadingBox != null) loadingBox.SetActive(busy);
         if (busy)
@@ -385,6 +401,110 @@ public class ContestsPage : MonoBehaviour
         shownCount = n;
         foreach (ContestInfo c in shown) Card(c);
         ShowScroll();
+    }
+
+    // ---- Results: the contests that are over ----
+
+    async void ShowResults()
+    {
+        results = true;
+        if (recentBusy) { Fill(); return; }
+        recentBusy = true;
+        recentError = null;
+        Fill();
+        try { recent = await ContestCloud.RecentAsync(); }
+        catch (Exception e) { recentError = e.Message; }
+        if (this == null) return;
+        recentBusy = false;
+        if (results) Fill();
+    }
+
+    void FillResults()
+    {
+        info.text = "Contests that are over. GPS routes are kept <b>7 days</b> after a daily contest and <b>30 days</b> after a weekly one.";
+        if (recentBusy) return;
+        if (recent == null)
+        {
+            Message("Could not load the results.\n\n" + recentError, false);
+            return;
+        }
+        if (recent.Count == 0)
+        {
+            Message("No contests have ended lately.", false);
+            return;
+        }
+        Image card = CourseUI.CardPanel("Results", cards);
+        CourseUI.Size(card, 700, CardsWidth);
+        RectTransform list = CourseUI.ScrollList("Rows", card.transform, out ScrollRect scroll);
+        RectTransform viewport = (RectTransform)scroll.transform;
+        viewport.anchorMin = Vector2.zero;
+        viewport.anchorMax = Vector2.one;
+        viewport.offsetMin = new Vector2(30, 24);
+        viewport.offsetMax = new Vector2(-30, -24);
+        CourseUI.Column(list.gameObject, 8, new RectOffset(0, 0, 0, 0));
+        FastScroll.Add(scroll);
+        foreach (ContestRecent r in recent)
+        {
+            ContestRecent item = r;
+            ContestInfo c = r.Info();
+            Image row = CourseUI.Panel("Row", list, r.mine != null ? CourseUI.Hex("E8742A", 0.14f) : CourseUI.Soft);
+            CourseUI.Size(row, 74);
+            TextMeshProUGUI what = CourseUI.Text("What", row.transform, "<b>" + ContestRun.SpanName(c) + ": " + ContestRun.Title(c) + "</b>\n<size=18><color=#5B7563>"
+                + WhenText(c) + "</color></size>", 23, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            what.richText = true;
+            CourseUI.Place(what.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(18, 0), new Vector2(620, 70));
+            string winner = r.winner != null ? "Winner: <b>" + r.winner.name + "</b>  " + ResultText(c, r.winner.score, r.winner.seconds) : "Nobody finished";
+            TextMeshProUGUI won = CourseUI.Text("Winner", row.transform, winner + "\n<size=18><color=#5B7563>" + r.entries + (r.entries == 1 ? " runner" : " runners") + "</color></size>",
+                22, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            won.richText = true;
+            CourseUI.Place(won.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(650, 0), new Vector2(520, 70));
+            string mine = r.mine == null ? "<color=#5B7563>You did not run it</color>"
+                : !r.mine.finished ? "<color=#C0392B>You did not finish</color>"
+                : "You: <b>" + CompetitionFlow.Ordinal(r.mine.place) + "</b> of " + r.entries + "  " + ResultText(c, r.mine.score, r.mine.seconds);
+            TextMeshProUGUI me = CourseUI.Text("Mine", row.transform, mine, 22, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            me.richText = true;
+            CourseUI.Place(me.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(1190, 0), new Vector2(330, 70));
+            Button open = CourseUI.Button("Open", row.transform, c.RouteChoice ? "Leaderboard & routes" : "Leaderboard & GPS", CourseUI.ButtonKind.Secondary, () => ShowPastBoard(item.id), 20);
+            CourseUI.Place((RectTransform)open.transform, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-12, 0), new Vector2(250, 56));
+        }
+    }
+
+    // "Saturday 22 November" or "Week 47 (17-23 Nov)"
+    static string WhenText(ContestInfo c)
+    {
+        System.Globalization.CultureInfo english = System.Globalization.CultureInfo.InvariantCulture;
+        DateTime end = c.endsAt > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(c.endsAt).LocalDateTime : DateTime.Now;
+        if (!c.Weekly) return end.AddHours(-12).ToString("dddd d MMMM", english);
+        DateTime monday = end.AddDays(-7);
+        string week = c.id != null && c.id.Length >= 8 ? c.id.Substring(6, 2).TrimStart('0') : "";
+        return "Week " + week + " (" + monday.ToString("d MMM", english) + " - " + end.AddHours(-12).ToString("d MMM", english) + ")";
+    }
+
+    static string ResultText(ContestInfo c, int score, int seconds)
+    {
+        return c.RouteChoice ? RouteChoiceGame.Points(score) + " p" : CompetitionFlow.FormatTime(seconds);
+    }
+
+    // A contest that is over, from the results list or the prize pop-up
+    async void ShowPastBoard(string id)
+    {
+        ContestBoard board;
+        try { board = await ContestCloud.BoardAsync(id); }
+        catch (Exception e) { UIToast.Show(e.Message); return; }
+        if (this == null) return;
+        ContestInfo c = new ContestInfo
+        {
+            id = id, span = id.Substring(0, 1), kind = id.Substring(id.IndexOf('_') + 1),
+            sprint = board.sprint, endsAt = board.endsAt, course = board.course
+        };
+        ShowBoardSheet(c, board);
+    }
+
+    // From the prize pop-up (over any screen): the contests page with that contest's leaderboard on top
+    public static void OpenPast(string id)
+    {
+        if (open == null) Open();
+        if (open != null) open.ShowPastBoard(id);
     }
 
     // How far the cards are scrolled: arrows only where there is more, the bar and "1-4 of 6" only when not all fit
@@ -587,76 +707,160 @@ public class ContestsPage : MonoBehaviour
 
     async void ShowBoard(ContestInfo c)
     {
-        List<ContestRow> rows;
-        try { rows = await ContestCloud.BoardAsync(c.id); }
+        ContestBoard board;
+        try { board = await ContestCloud.BoardAsync(c.id); }
         catch (Exception e) { UIToast.Show(e.Message); return; }
         if (this == null) return;
+        if (string.IsNullOrEmpty(board.course)) board.course = c.course;
+        ShowBoardSheet(c, board);
+    }
 
-        // As tall as the rows need, so the button sits just under the last row even with one runner (2026-11-19, the user)
-        float height = Mathf.Clamp(140 + 120 + rows.Count * 58f, 420f, 900f);
-        GameObject sheet = PopupFrame(ContestRun.SpanName(c) + ": " + ContestRun.Title(c), 1100, height);
+    // The leaderboard: a summary (winner, your place, who beat you), every runner with their result and prize, and a
+    // GPS switch on each row to pick whose routes to watch, up to 10 at a time (2026-11-24, the user)
+    void ShowBoardSheet(ContestInfo c, ContestBoard board)
+    {
+        List<ContestRow> rows = board.rows;
+        float height = Mathf.Clamp(140 + 200 + rows.Count * 58f, 480f, 940f);
+        GameObject sheet = PopupFrame(ContestRun.SpanName(c) + ": " + ContestRun.Title(c), 1260, height);
         Transform body = sheet.transform.GetChild(0);
-        int finished = rows.FindAll(r => !r.dnf).Count;
-        TextMeshProUGUI note = CourseUI.Text("Note", body, finished + (finished == 1 ? " runner" : " runners")
-            + ". Prize money is paid when the contest is over; it can still change as more players run.", 20, CourseUI.InkMuted);
-        CourseUI.Place(note.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -96), new Vector2(1020, 34));
+
+        TextMeshProUGUI note = CourseUI.Text("Summary", body, Summary(c, board), 21, CourseUI.Ink);
+        note.richText = true;
+        CourseUI.Place(note.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -92), new Vector2(1180, 76));
 
         RectTransform list = CourseUI.ScrollList("Rows", body, out ScrollRect scroll);
         RectTransform viewport = (RectTransform)scroll.transform;
         viewport.anchorMin = Vector2.zero;
         viewport.anchorMax = Vector2.one;
         viewport.offsetMin = new Vector2(40, 120);
-        viewport.offsetMax = new Vector2(-40, -140);
+        viewport.offsetMax = new Vector2(-40, -176);
         CourseUI.Column(list.gameObject, 6, new RectOffset(0, 0, 0, 0));
         FastScroll.Add(scroll);
+
+        // Picked for the map: the top three and you at first
+        bool kept = board.ReplaysKept;
+        List<ContestRow> picked = rows.FindAll(r => !r.dnf && (r.place <= 3 || r.me));
+        if (picked.Count > ContestCloud.MaxReplays) picked = picked.GetRange(0, ContestCloud.MaxReplays);
+        Button watch = null;
+        void ShowWatch()
+        {
+            if (watch == null) return;
+            string what = c.RouteChoice ? "See route choices" : "Watch GPS replay";
+            CourseUI.SetButtonText(watch, !kept ? "GPS routes deleted" : what + " (" + picked.Count + ")");
+            watch.interactable = kept && picked.Count > 0;
+        }
+
         foreach (ContestRow r in rows)
         {
-            Image row = CourseUI.Panel("Row", list, r.me ? CourseUI.Hex("E8742A", 0.22f) : CourseUI.Soft);
-            CourseUI.Size(row, 52);
-            string result = r.dnf ? "Did not finish" : c.RouteChoice ? RouteChoiceGame.Points(r.score) + " p" : CompetitionFlow.FormatTime(r.seconds);
-            TextMeshProUGUI place = CourseUI.Text("Place", row.transform, r.dnf ? "-" : r.place + ".", 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+            ContestRow row = r;
+            Image line = CourseUI.Panel("Row", list, r.me ? CourseUI.Hex("E8742A", 0.22f) : CourseUI.Soft);
+            CourseUI.Size(line, 52);
+            string result = r.dnf ? "Did not finish" : ResultText(c, r.score, r.seconds);
+            TextMeshProUGUI place = CourseUI.Text("Place", line.transform, r.dnf ? "-" : r.place + ".", 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
             CourseUI.Place(place.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(10, 0), new Vector2(60, 50));
-            TextMeshProUGUI who = CourseUI.Text("Name", row.transform, r.name + (r.me ? "  (you)" : ""), 24, CourseUI.Ink, r.me ? FontStyles.Bold : FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            CourseUI.Place(who.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(90, 0), new Vector2(520, 50));
-            TextMeshProUGUI res = CourseUI.Text("Result", row.transform, result, 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+            TextMeshProUGUI who = CourseUI.Text("Name", line.transform, r.name + (r.me ? "  (you)" : ""), 24, CourseUI.Ink, r.me ? FontStyles.Bold : FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            CourseUI.Place(who.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(90, 0), new Vector2(440, 50));
+            TextMeshProUGUI res = CourseUI.Text("Result", line.transform, result, 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
             res.enableAutoSizing = true;
             res.fontSizeMin = 16;
             res.fontSizeMax = 24;
-            CourseUI.Place(res.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(620, 0), new Vector2(180, 50));
+            CourseUI.Place(res.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(540, 0), new Vector2(160, 50));
+            // The gap to the winner
+            ContestRow first = rows.Count > 0 && !rows[0].dnf ? rows[0] : null;
+            string gap = r.dnf || first == null || r.place <= 1 ? "" : c.RouteChoice
+                ? "-" + RouteChoiceGame.Points(first.score - r.score) + " p"
+                : "+" + RelayStats.Gap(r.seconds - first.seconds);
+            TextMeshProUGUI behind = CourseUI.Text("Gap", line.transform, gap, 20, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.MidlineRight);
+            CourseUI.Place(behind.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(710, 0), new Vector2(110, 50));
             List<string> won = new List<string>();
             if (r.packs != null) foreach (string kind in r.packs) won.Add(PrizePacks.Name(kind));
             if (r.prize > 0) won.Add(Kr(r.prize));
-            TextMeshProUGUI prize = CourseUI.Text("Prize", row.transform, string.Join(" + ", won), 20, CourseUI.Forest, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
+            TextMeshProUGUI prize = CourseUI.Text("Prize", line.transform, string.Join(" + ", won), 20, CourseUI.Forest, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
             prize.enableAutoSizing = true;
             prize.fontSizeMin = 14;
             prize.fontSizeMax = 20;
-            CourseUI.Place(prize.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(800, 0), new Vector2(210, 50));
+            CourseUI.Place(prize.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(830, 0), new Vector2(200, 50));
+            if (r.dnf || !kept) continue;
+            Button toggle = null;
+            toggle = CourseUI.Button("GPS", line.transform, "", CourseUI.ButtonKind.Light, () =>
+            {
+                if (picked.Contains(row)) picked.Remove(row);
+                else if (picked.Count >= ContestCloud.MaxReplays) { UIToast.Show("At most " + ContestCloud.MaxReplays + " runners at a time."); return; }
+                else picked.Add(row);
+                ShowToggle(toggle, picked.Contains(row), c.RouteChoice);
+                ShowWatch();
+            }, 18);
+            CourseUI.Place((RectTransform)toggle.transform, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-8, 0), new Vector2(124, 40));
+            HoverTip.Add(toggle, c.RouteChoice ? "Show this runner's picks" : "Show this runner's GPS route on the map");
+            ShowToggle(toggle, picked.Contains(row), c.RouteChoice);
         }
 
-        // The top three and you, on the map
-        List<ContestRow> picked = rows.FindAll(r => !r.dnf && (r.place <= 3 || r.me));
-        if (picked.Count > 6) picked = picked.GetRange(0, 6);
-        string label = c.RouteChoice ? "See the top 3's route choices" : "Watch the top 3's replay";
-        Button watch = CourseUI.Button("Watch", body, label, CourseUI.ButtonKind.Primary, () => OpenReplays(c, picked), 24);
-        CourseUI.Place((RectTransform)watch.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 34), new Vector2(460, 64));
-        watch.interactable = picked.Count > 0;
+        string keptText = board.replaysUntil <= 0 ? "" : kept
+            ? "GPS routes are kept until " + DateTimeOffset.FromUnixTimeMilliseconds(board.replaysUntil).LocalDateTime.ToString("d MMMM", System.Globalization.CultureInfo.InvariantCulture) + "."
+            : "The GPS routes of this contest have been deleted.";
+        TextMeshProUGUI keep = CourseUI.Text("Kept", body, (c.RouteChoice ? "Pick runners on the right, then see their picks leg by leg. " : "Pick runners on the right, then watch their routes: the whole course or one leg at a time. ") + keptText,
+            18, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+        CourseUI.Place(keep.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 34), new Vector2(700, 64));
+        watch = CourseUI.Button("Watch", body, "", CourseUI.ButtonKind.Primary, () => OpenReplays(c, board, new List<ContestRow>(picked)), 24);
+        CourseUI.Place((RectTransform)watch.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 34), new Vector2(420, 64));
+        ShowWatch();
     }
 
-    async void OpenReplays(ContestInfo c, List<ContestRow> picked)
+    static void ShowToggle(Button toggle, bool on, bool routeChoice)
     {
-        CourseData course = ContestRun.ReadCourse(c.course);
+        CourseUI.SetButtonColor(toggle, on ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        CourseUI.SetButtonText(toggle, on ? (routeChoice ? "Shown" : "On map") : (routeChoice ? "Show" : "GPS"));
+    }
+
+    // "14 runners. Winner: Bo 31:20. You: 5th, +2:31 behind the winner; 4 runners beat you."
+    static string Summary(ContestInfo c, ContestBoard board)
+    {
+        List<ContestRow> done = board.rows.FindAll(r => !r.dnf);
+        if (done.Count == 0) return "Nobody has finished yet.";
+        ContestRow first = done[0];
+        List<ContestRow> winners = done.FindAll(r => r.place == 1);
+        string text = done.Count + (done.Count == 1 ? " runner" : " runners") + ".  " + (winners.Count > 1 ? "Winners: " : "Winner: ")
+            + "<b>" + string.Join(", ", winners.ConvertAll(r => r.name)) + "</b> " + ResultText(c, first.score, first.seconds) + ".";
+        ContestRow mine = board.rows.Find(r => r.me);
+        if (mine != null && mine.dnf) text += "  You did not finish.";
+        else if (mine != null && mine.place == 1) text += winners.Count > 1 ? "  <b>You share the win!</b>" : "  <b>You won!</b>";
+        else if (mine != null)
+        {
+            int ahead = done.FindAll(r => r.place < mine.place).Count;
+            string gap = c.RouteChoice ? RouteChoiceGame.Points(first.score - mine.score) + " points" : RelayStats.Gap(mine.seconds - first.seconds);
+            text += "  You: <b>" + CompetitionFlow.Ordinal(mine.place) + "</b>, " + gap + " behind the winner; " + ahead + (ahead == 1 ? " runner beat you." : " runners beat you.");
+            ContestRow next = done.FindLast(r => r.place < mine.place);
+            if (next != null && next.place > 1)
+            {
+                string nextGap = c.RouteChoice ? RouteChoiceGame.Points(next.score - mine.score) + " points" : RelayStats.Gap(mine.seconds - next.seconds);
+                text += " Just ahead of you: " + next.name + " (" + nextGap + ").";
+            }
+        }
+        text += board.over ? "" : "\n<color=#5B7563>Prize money is paid when the contest is over; it can still change as more players run.</color>";
+        return text;
+    }
+
+    async void OpenReplays(ContestInfo c, ContestBoard board, List<ContestRow> picked)
+    {
+        if (picked.Count == 0) return;
+        CourseData course = ContestRun.ReadCourse(board.course);
+        if (course == null) course = ContestRun.ReadCourse(c.course);
         if (course == null)
         {
-            // The status was read before the course was laid: read it again
+            // Read the board again: the course may have been laid since
             try
             {
-                contests = await ContestCloud.StatusAsync();
-                ContestInfo fresh = contests.Find(x => x.id == c.id);
-                course = fresh != null ? ContestRun.ReadCourse(fresh.course) : null;
+                ContestBoard fresh = await ContestCloud.BoardAsync(c.id);
+                course = ContestRun.ReadCourse(fresh.course);
             }
             catch (Exception) { }
         }
-        if (course == null || CourseLibrary.StartProblem(course) != null)
+        if (course == null)
+        {
+            UIToast.Show("The course of this contest is gone (it is deleted together with the GPS routes).");
+            return;
+        }
+        if (CourseLibrary.StartProblem(course) != null)
         {
             UIToast.Show("The map of this contest is not on this computer.");
             return;
@@ -666,6 +870,7 @@ public class ContestsPage : MonoBehaviour
         catch (Exception e) { UIToast.Show(e.Message); return; }
         if (this == null) return;
         List<ContestReplay.Runner> runners = new List<ContestReplay.Runner>();
+        picked.Sort((a, b) => a.place.CompareTo(b.place));
         foreach (ContestRow r in picked)
         {
             if (!replays.TryGetValue(r.playerId, out string json)) continue;
@@ -674,9 +879,10 @@ public class ContestsPage : MonoBehaviour
         }
         if (runners.Count == 0)
         {
-            UIToast.Show("No replays saved for these runners.");
+            UIToast.Show("No GPS routes saved for these runners.");
             return;
         }
+        if (runners.Count < picked.Count) UIToast.Show((picked.Count - runners.Count) + " of the runners have no GPS route saved.");
         ContestReplay.Open(course, c.RouteChoice, runners, null);
     }
 
@@ -718,8 +924,9 @@ public class ContestsPage : MonoBehaviour
         CourseUI.Place((RectTransform)go.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 34), new Vector2(320, 70));
     }
 
-    // The prize money that was just paid, over whatever screen is showing
-    static void ShowPrizePopup(List<string> lines, int total, int packs)
+    // The prize money that was just paid, over whatever screen is showing. Each contest has a Leaderboard button
+    // that opens its leaderboard and GPS routes (2026-11-24, the user: more fun than only the money)
+    static void ShowPrizePopup(List<string> lines, List<string> ids, int total, int packs)
     {
         GameObject go = new GameObject("Contest prizes", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         Canvas canvas = go.GetComponent<Canvas>();
@@ -734,15 +941,39 @@ public class ContestsPage : MonoBehaviour
         Image card = CourseUI.CardPanel("Card", dim.transform);
         card.color = CourseUI.CardSolid;
         card.gameObject.AddComponent<ClickCatcher>();
-        float height = 260 + 40 * lines.Count;
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, Mathf.Min(900, height)));
+        float height = 270 + 66 * lines.Count;
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1200, Mathf.Min(940, height)));
         string heading = packs > 0 ? "You won " + (packs == 1 ? "a runner pack" : packs + " runner packs") + (total > 0 ? " and " + Kr(total) : "") + "!"
                          : total > 0 ? "Contest prize money: +" + Kr(total) : "Contest results";
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, heading, 38, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
-        CourseUI.Place(title.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(940, 56));
-        TextMeshProUGUI text = CourseUI.Text("Lines", card.transform, string.Join("\n", lines), 24, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.Top);
-        text.richText = true;
-        CourseUI.Stretch(text.rectTransform, 40, 40, 100, 110);
+        CourseUI.Place(title.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(1140, 56));
+        RectTransform list = CourseUI.ScrollList("Lines", card.transform, out ScrollRect scroll);
+        RectTransform viewport = (RectTransform)scroll.transform;
+        viewport.anchorMin = Vector2.zero;
+        viewport.anchorMax = Vector2.one;
+        viewport.offsetMin = new Vector2(40, 110);
+        viewport.offsetMax = new Vector2(-40, -100);
+        CourseUI.Column(list.gameObject, 6, new RectOffset(0, 0, 0, 0));
+        for (int i = 0; i < lines.Count; i++)
+        {
+            string id = i < ids.Count ? ids[i] : null;
+            Image row = CourseUI.Panel("Line", list, CourseUI.Soft);
+            CourseUI.Size(row, 60);
+            TextMeshProUGUI text = CourseUI.Text("Text", row.transform, lines[i], 22, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            text.richText = true;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 15;
+            text.fontSizeMax = 22;
+            CourseUI.Stretch(text.rectTransform, 16, 250, 4, 4);
+            if (id == null) continue;
+            Button board = CourseUI.Button("Leaderboard", row.transform, "Leaderboard & GPS", CourseUI.ButtonKind.Secondary, () =>
+            {
+                Destroy(go);
+                OpenPast(id);
+            }, 18);
+            CourseUI.Place((RectTransform)board.transform, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-8, 0), new Vector2(226, 46));
+            HoverTip.Add(board, "See where you came, who beat you, and watch everyone's GPS routes");
+        }
         if (packs > 0)
         {
             Button open = CourseUI.Button("Open", card.transform, packs == 1 ? "Open it now" : "Open them now", CourseUI.ButtonKind.Primary, () =>

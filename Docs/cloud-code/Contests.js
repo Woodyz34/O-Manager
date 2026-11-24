@@ -22,9 +22,11 @@
 // <id> is the period and the kind, e.g. "w2026-47_rc-forest" or "d2026-11-19_race-sprint".
 //   Private custom data "contests_meta"         key "cleaned": { ids: [ contests already cleaned up ] }
 //
-// Clean-up: once a contest is over (and its 3 late hours have passed) the next "status" call deletes its replays
-// and its course. The small list of names and results stays KEEP_DAYS (30) more days, so players who come back
-// later still get their prize money; then it is deleted too.
+// Clean-up: the replays (the GPS routes) and the course of a contest that is over are kept REPLAY_DAYS, so the
+// players can look at the leaderboard and everyone's routes afterwards (2026-11-24, the user): a daily contest 7
+// days, a weekly one 30 days. Then the next "status" call deletes them. The small list of names and results stays
+// KEEP_DAYS (30) days after the end, so players who come back later still get their prize money; then it is
+// deleted too.
 //
 // The first player of a contest lays its AI course in the game and sends it with "start"; everyone after runs
 // the same course. The course (and so the map) is only ever sent to a player who has used their try, or when the
@@ -42,8 +44,10 @@
 //                                and a course on a map not in it is refused without using the try
 //   submit     { id, score, seconds, replay }   my result (after start, once)
 //   board      { id }            the leaderboard: only after my own run, or when the contest is over
-//   replays    { id, players }   replays of up to 6 players (comma separated ids), same rule as board
+//   replays    { id, players }   replays of up to 10 players (comma separated ids), same rule as board
 //   claim                        the prizes (money and packs) of contests that are over and not paid yet (paid once)
+//   recent                       the contests that ended lately and still have their leaderboard and GPS routes
+//                                (daily 7 days, weekly 30 days): winner, number of runners and my place
 
 const { DataApi } = require("@unity-services/cloud-save-1.4");
 
@@ -68,8 +72,14 @@ const MAX_REPLAY_CHARS = 400000;
 const MAX_NAME = 24;
 const LATE_MINUTES = 180;          // a run started before the end may be handed in up to 3 hours after it
 const HISTORY_KEEP = 120;
-const CLEAN_DAYS = 28;             // how far back clean-up looks (in case nobody opened the game for a while)
+const CLEAN_DAYS = 45;             // how far back clean-up looks (in case nobody opened the game for a while)
 const KEEP_DAYS = 30;              // the leaderboard (names and results) is kept this long for late prize claims
+// How long the replays (GPS routes) and the course are kept after the end (2026-11-24, the user: "radera dem en
+// vecka efter eller en månad efter"): daily contests 7 days, weekly 30 days
+const REPLAY_DAYS = { d: 7, w: 30 };
+const MAX_REPLAY_PLAYERS = 10;
+
+function replaysUntil(id) { return endOf(id) + REPLAY_DAYS[id[0]] * 86400000; }
 const CLEANED_KEEP = 400;
 
 // Prizes (2026-11-19, the user): runner packs for the best, money for the rest.
@@ -102,6 +112,7 @@ module.exports = async ({ params, context, logger }) => {
     case "board": return await board(api, context, me, payload, now);
     case "replays": return await replays(api, context, me, payload, now);
     case "claim": return await claim(api, context, me, now, logger);
+    case "recent": return await recent(api, context, me, now, logger);
     default: throw new Error("Unknown action " + action);
   }
 };
@@ -349,8 +360,8 @@ function finishedIds(now, minAge, daysBack) {
   return ids;
 }
 
-// Two steps: 3 hours after a contest ends its replays and course go; KEEP_DAYS after that the leaderboard goes
-// too. Does at most one contest with something in it per call (and skips up to 8 empty ones), so opening the
+// Two steps: REPLAY_DAYS after a contest ends its replays and course go; KEEP_DAYS after the end the leaderboard
+// goes too. Does at most one contest with something in it per call (and skips up to 8 empty ones), so opening the
 // contests page stays quick.
 async function cleanUp(api, context, now, logger) {
   const item = await getItem(api, context.projectId, "contests_meta", "cleaned");
@@ -361,6 +372,7 @@ async function cleanUp(api, context, now, logger) {
   const todo = [];
   const drops = finishedIds(now, KEEP_DAYS * 86400000, KEEP_DAYS + CLEAN_DAYS);
   for (const id of finishedIds(now, LATE_MINUTES * 60000, CLEAN_DAYS)) {
+    if (now <= replaysUntil(id)) continue;     // the GPS routes are still kept
     if (meta.ids.indexOf(id) < 0 && drops.indexOf(id) < 0) todo.push({ id, drop: false });
   }
   for (const id of drops) {
@@ -508,13 +520,13 @@ async function board(api, context, me, payload, now) {
     if (!e || e.state === "done" || (!over && playerId !== me)) continue;
     rows.push({ playerId, name: e.name, score: 0, seconds: 0, place: 0, prize: 0, packs: [], dnf: true, me: playerId === me });
   }
-  return { rows, course: b.course, over };
+  return { rows, course: b.course, over, sprint: isSprint(id), endsAt: endOf(id), replaysUntil: replaysUntil(id) };
 }
 
 async function replays(api, context, me, payload, now) {
   const id = checkId(payload.id);
   await mayLook(api, context, me, id, now);
-  const players = String(payload.players || "").split(",").map(s => s.trim()).filter(s => /^[A-Za-z0-9_-]{1,64}$/.test(s)).slice(0, 6);
+  const players = String(payload.players || "").split(",").map(s => s.trim()).filter(s => /^[A-Za-z0-9_-]{1,64}$/.test(s)).slice(0, MAX_REPLAY_PLAYERS);
   const out = {};
   if (players.length === 0) return { replays: out };
   try {
@@ -546,8 +558,51 @@ async function claim(api, context, me, now, logger) {
     changed = true;
     if (gone) continue;
     const row = list.find(r => r.playerId === me);
-    paid.push({ id: h.id, place: row ? row.place : 0, of: list.length, prize: row ? row.prize : 0, packs: row ? row.packs : [], finished: !!row });
+    paid.push({ id: h.id, sprint: isSprint(h.id), place: row ? row.place : 0, of: list.length, prize: row ? row.prize : 0, packs: row ? row.packs : [], finished: !!row });
   }
   if (changed) await saveHistory(api, context, me, history);
   return { paid };
+}
+
+// The contests that ended lately and still have their GPS routes (daily 7 days, weekly 30 days), newest first, each
+// with its winner, how many finished and my own place. Opened from the contests page ("Results") and from the prize
+// pop-up, so the players can go through the leaderboard and the routes after they got their prizes (2026-11-24).
+async function recent(api, context, me, now, logger) {
+  const history = await loadHistory(api, context, me);
+  const ran = history.list.map(h => h.id);
+  const days = Math.max(REPLAY_DAYS.d, REPLAY_DAYS.w) + 7;
+  const ids = finishedIds(now, 0, days).filter(id => {
+    if (now > replaysUntil(id)) return false;
+    const kind = id.substring(id.indexOf("_") + 1);
+    return KINDS[id[0]].indexOf(kind) >= 0 || ran.indexOf(id) >= 0;
+  });
+  ids.sort((a, b) => endOf(b) - endOf(a));
+  const out = [];
+  for (let i = 0; i < ids.length; i += 10) {
+    const part = ids.slice(i, i + 10);
+    const loaded = await Promise.all(part.map(async id => {
+      try { return await loadBoard(api, context, id); } catch (err) { logger.warning("recent: " + id + " " + err); return null; }
+    }));
+    for (let k = 0; k < part.length; k++) {
+      const id = part[k];
+      const kind = id.substring(id.indexOf("_") + 1);
+      const item = loaded[k];
+      const took = ran.indexOf(id) >= 0;
+      if (!item || !item.writeLock) {
+        if (took) out.push({ id, span: id[0], kind, sprint: isSprint(id), endsAt: endOf(id), replaysUntil: replaysUntil(id), entries: 0, winner: null, mine: { place: 0, finished: false } });
+        continue;
+      }
+      const list = standings(id, item.board);
+      if (list.length === 0 && !took) continue;
+      const row = list.find(r => r.playerId === me);
+      const win = list[0];
+      out.push({
+        id, span: id[0], kind, sprint: isSprint(id), endsAt: endOf(id), replaysUntil: replaysUntil(id),
+        entries: list.length,
+        winner: win ? { name: win.name, score: win.score, seconds: win.seconds } : null,
+        mine: took ? (row ? { place: row.place, score: row.score, seconds: row.seconds, finished: true } : { place: 0, finished: false }) : null
+      });
+    }
+  }
+  return { contests: out };
 }
