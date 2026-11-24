@@ -395,6 +395,8 @@ public partial class TvWorldBuilder
     {
         var list = new List<(WorldLineKind, float[])>();
         float lo = -R - margin, hi = R + margin;
+        stepEnds.Clear();
+        Dictionary<WorldLine, (float before, float after)> chains = null;
         foreach (WorldLine line in layer.lines)
         {
             if (line.xy == null || line.xy.Length < 4) continue;
@@ -406,6 +408,11 @@ public partial class TvWorldBuilder
                 xz[i + 1] = (float)(line.xy[i + 1] - input.centerN);
             }
             list.Add((line.kind, xz));
+            if (IsStepLine(line.kind))
+            {
+                if (chains == null) chains = CliffChains(layer);
+                if (chains.TryGetValue(line, out var ends)) stepEnds[xz] = ends;
+            }
         }
         return list;
     }
@@ -762,6 +769,7 @@ public partial class TvWorldBuilder
             }
         }
 
+        cliffStep = new float[N * N];
         foreach (var line in lines)
         {
             float[] c = line.xz;
@@ -769,9 +777,11 @@ public partial class TvWorldBuilder
             {
                 // As high as the ground makes them, but never lower than this (2026-11-20, Anders: an impassable
                 // cliff was a decimetre high where the contours showed no drop)
-                case WorldLineKind.Cliff: Cliff(c, 2.6f, true); break;
-                case WorldLineKind.SmallCliff: Cliff(c, 1.2f, true); break;
-                case WorldLineKind.EarthBank: Cliff(c, 0.7f, false); break;
+                // ... and at most this high in the middle where the ground drops more; the rest of that drop stays
+                // a slope below the face (2026-11-24, Anders: 2-6 m in the middle, gentler at the ends)
+                case WorldLineKind.Cliff: Cliff(c, 2.0f, 6f, true); break;
+                case WorldLineKind.SmallCliff: Cliff(c, 1.0f, 2f, true); break;
+                case WorldLineKind.EarthBank: Cliff(c, 0.6f, 1.8f, false); break;
                 case WorldLineKind.EarthWall: Groove(c, 0.6f, 1.6f, 0.5f, false); break;
                 case WorldLineKind.Gully: Groove(c, -0.9f, 2.6f, 0.5f, false); break;
                 case WorldLineKind.Ditch: Groove(c, -0.45f, 1.3f, 0.7f, false); break;
@@ -785,6 +795,9 @@ public partial class TvWorldBuilder
                     break;
             }
         }
+
+        for (int k = 0; k < F.Length; k++) F[k] += cliffStep[k];
+        cliffStep = null;
 
         // Lakes and ponds lie a little lower than their shores: lowered by how far inside the water's edge a corner
         // is, so the shore where the ground meets the water follows the map's bank line
@@ -839,8 +852,11 @@ public partial class TvWorldBuilder
         }
     }
 
-    // A cliff is a step in the ground: the side the ground falls towards drops, and the face shows bare rock
-    void Cliff(float[] c, float drop, bool rocky)
+    // A cliff is a step in the ground: the side the ground falls towards drops, and the face shows bare rock.
+    // minDrop and maxDrop: how high the face is in the middle of the cliff, whatever the ground says; towards the
+    // ends it is lower (2026-11-24, Anders: cliffs stuck up a little too high and made small pits; a cliff should be
+    // its full height, 2-6 m, in the middle and gentler at its ends, and fit the contours as a person would see it)
+    void Cliff(float[] c, float minDrop, float maxDrop, bool rocky)
     {
         // Which side is low, from the map's heights 5 m either side of the whole line (2026-11-20, Anders: a cliff
         // faced the wrong way; it was decided by the slope at the line's middle alone, and one direction for the
@@ -858,7 +874,56 @@ public partial class TvWorldBuilder
         float lowSide = vote < -0.02f * total ? -1f : 1f;
         if (rocky) cliffs.Add((lowSide, c));
 
-        var best = new Dictionary<int, (float d, float side, float qx, float qz, float nx, float nz)>();
+        // How far along the line each corner is
+        int corners = c.Length / 2;
+        var along = new float[corners];
+        for (int p = 1; p < corners; p++)
+        {
+            float sx = c[p * 2] - c[p * 2 - 2], sz = c[p * 2 + 1] - c[p * 2 - 1];
+            along[p] = along[p - 1] + (float)Math.Sqrt(sx * sx + sz * sz);
+        }
+        float length = along[corners - 1];
+        // The cliff may go on in another piece of line drawn end to end with this one: it tapers only at its real ends
+        stepEnds.TryGetValue(c, out var more);
+        float whole = length + more.before + more.after;
+        float endLength = Math.Max(1.5f, Math.Min(6f, whole * 0.35f));
+
+        // Stations every metre or so along the line: the ground's height a few metres above the edge and down at the
+        // foot, evened out along the line, so the cliff's height changes smoothly along it and one odd spot in the
+        // map's heights (a hollow or a knoll by the foot) does not make a pit or a bump at the cliff
+        const float Reach = 6f, TopReach = 3f, Up = 0.55f, LiftBack = 6f;
+        int stations = Math.Max(2, (int)Math.Ceiling(length / 1f) + 1);
+        float gap = length / (stations - 1);
+        var top = new float[stations];
+        var foot = new float[stations];
+        for (int t = 0; t < stations; t++)
+        {
+            float s = t * gap;
+            PointOn(c, along, s, out float px, out float pz);
+            PointOn(c, along, Math.Max(0f, s - 0.75f), out float bx, out float bz);
+            PointOn(c, along, Math.Min(length, s + 0.75f), out float fx, out float fz);
+            float sx = fx - bx, sz = fz - bz, l = (float)Math.Sqrt(sx * sx + sz * sz);
+            if (l < 1e-5f) { sx = c[2] - c[0]; sz = c[3] - c[1]; l = Math.Max(1e-5f, (float)Math.Sqrt(sx * sx + sz * sz)); }
+            float nx = sz / l * lowSide, nz = -sx / l * lowSide;
+            top[t] = (BaseHeight(px - nx * (TopReach - 0.5f), pz - nz * (TopReach - 0.5f)) + BaseHeight(px - nx * (TopReach + 0.5f), pz - nz * (TopReach + 0.5f))) * 0.5f;
+            foot[t] = (BaseHeight(px + nx * (Reach - 1f), pz + nz * (Reach - 1f)) + BaseHeight(px + nx * (Reach + 0.5f), pz + nz * (Reach + 0.5f))) * 0.5f;
+        }
+        EvenOut(top, 3);
+        EvenOut(foot, 3);
+        // The face's height at each station: what the ground drops there, held between the least and the most height,
+        // and lower towards the cliff's ends (a third of it at the very end)
+        var step = new float[stations];
+        var drop = new float[stations];
+        for (int t = 0; t < stations; t++)
+        {
+            float s = t * gap;
+            float toEnd = Math.Min(s + more.before, length - s + more.after);
+            float taper = 0.35f + 0.65f * Sm(0f, endLength, toEnd);
+            drop[t] = Math.Max(0f, top[t] - foot[t]);
+            step[t] = Math.Max(minDrop, Math.Min(maxDrop, drop[t])) * taper;
+        }
+
+        var best = new Dictionary<int, (float d, float side, float s, float nx, float nz)>();
         for (int q = 0; q + 3 < c.Length; q += 2)
         {
             float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
@@ -866,56 +931,179 @@ public partial class TvWorldBuilder
             if (nl < 1e-6f) continue;
             nx *= lowSide / nl;
             nz *= lowSide / nl;
+            float s0 = along[q / 2];
             ForNear(ax, az, bx, bz, 13f, (k, d, qx, qz) =>
             {
                 if (best.TryGetValue(k, out var known) && known.d <= d) return;
                 float px = k % N - R, pz = k / N - R;
-                best[k] = (d, (px - qx) * nx + (pz - qz) * nz, qx, qz, nx, nz);
+                float s = s0 + (float)Math.Sqrt((qx - ax) * (qx - ax) + (qz - az) * (qz - az));
+                best[k] = (d, (px - qx) * nx + (pz - qz) * nz, s, nx, nz);
             });
         }
         // The map's heights already have the cliff's height as a slope across it (the contours bunch up there). The
-        // slope is gathered into a step: the ground just above is kept flat at the height a few metres above the
-        // edge, and the ground below is lowered to the height a few metres below, so the foot is flat and the cliff
-        // rises straight from it. The cliff is only as high as the ground says: nothing is lifted above the ground
-        // round it, so the top never sticks up (2026-11-19, Anders: cliffs of a fixed height stood up above the
-        // hill they sit in and bent the contours; let the ground decide their size).
-        // Where the ground's own drop is less than the cliff's least height (drop), the rest is made up: mostly by
-        // lifting the ground above the edge (a cliff stands up and is seen from afar), a little by lowering the foot.
-        // Both go back to the map's height further out (1 in 2.5), so the land round it still looks right
-        // (2026-11-21, Anders: dug down only, a cliff sat in a hollow and was not seen until you were there).
-        const float Reach = 6f, TopReach = 3f, Back = 2.5f;
+        // slope is gathered into a step: the ground just above is kept at the height a few metres above the edge, and
+        // the ground below starts at the face's foot and runs on down to the height a few metres out. Where the
+        // ground drops more than the face is high, the rest stays a slope below it; where it drops less, the rest is
+        // made up, a little more by lifting the ground above the edge (a cliff stands up and is seen from afar,
+        // 2026-11-21) than by lowering the foot, and both go back to the map's height gently, so there is no lip on
+        // top and no pit at the foot.
         foreach (var pair in best)
         {
             float d = pair.Value.d, side = pair.Value.side;
-            if (d > Reach + drop * Back + 1f) continue;
-            float qx = pair.Value.qx, qz = pair.Value.qz, nx = pair.Value.nx, nz = pair.Value.nz;
-            float high = BaseHeight(qx - nx * TopReach, qz - nz * TopReach), foot = BaseHeight(qx + nx * Reach, qz + nz * Reach);
-            float low = Math.Min(foot, high);
-            float extra = Math.Max(0f, drop - (high - low));
+            if (d > 12f) continue;
+            float at = Math.Max(0f, Math.Min(stations - 1.001f, pair.Value.s / gap));
+            int t0 = (int)at;
+            float f = at - t0;
+            float high = Lerp(top[t0], top[t0 + 1], f), height = Lerp(step[t0], step[t0 + 1], f), fall = Lerp(drop[t0], drop[t0 + 1], f);
+            float extra = Math.Max(0f, height - fall);
+            float lift = extra * Up;
+            float bottom = high + lift - height, low = high - fall;
             // A rock cliff drops at once (a vertical face is built on it, CliffFaces); an earth bank slopes
             float down = rocky ? Sm(-0.25f, 0.45f, side) : Sm(-0.5f, 0.9f, side);
-            float want = high + (low - high) * down;
             int k = pair.Key;
             float here = BaseHeight(k % N - R, k / N - R);
-            // Above the edge only the strip next to it is made flat; below, the whole slope down to the foot
-            float reach = side < 0f ? TopReach : Reach;
             // Past the ends of the line the step fades out, so a cliff does not wrap round its own end
             float beyond = (float)Math.Sqrt(Math.Max(0f, d * d - side * side));
             float ends = 1f - Sm(0.5f, 3f, beyond);
-            float weight = (1f - Sm(reach - 1.5f, reach + 1f, d)) * ends;
-            F[k] += (want - here) * weight;
-            if (extra > 0f)
-            {
-                const float Up = 0.7f;   // the share of the missing height that is lifted above the edge
-                if (side > 0f) F[k] -= extra * (1f - Up) * down * (1f - Sm(Reach * 0.5f, Reach + extra * Back, side)) * ends;
-                // Above: the top is lifted right up to the edge (rock), then slopes back down into the hillside
-                float lift = 1f - Sm(1f, 1f + extra * Up * Back * 1.5f, -side);
-                F[k] += extra * Up * (1f - down) * lift * ends;
-            }
-            float face = Sm(-0.8f, 0.2f, side) * (1f - Sm(1.3f, 2.6f, d));
-            if (rocky) rock[pair.Key] = Math.Max(rock[pair.Key], face);
-            else soil[pair.Key] = Math.Max(soil[pair.Key], face * 0.8f);
+            // Above the edge only the strip next to it is made level; below, the slope from the foot of the face
+            float aboveWeight = 1f - Sm(TopReach - 1.5f, TopReach + 1f, d);
+            float belowWeight = 1f - Sm(Reach - 1.5f, Reach + 1f, d);
+            float below = bottom + (low - bottom) * Sm(0.4f, Reach, side);
+            float delta = (1f - down) * (high - here) * aboveWeight + down * (below - here) * belowWeight;
+            // The lifted top slopes back gently into the hillside, so it is a shoulder and not a lip on the edge
+            if (lift > 0f) delta += lift * (1f - down) * (1f - Sm(0.5f, 3.5f + lift * LiftBack, -side));
+            AddCliffStep(k, delta * ends);
+            float face = Sm(-0.8f, 0.2f, side) * (1f - Sm(1.3f, 2.6f, d)) * (height > 0.6f ? 1f : height / 0.6f);
+            if (rocky) rock[k] = Math.Max(rock[k], face);
+            else soil[k] = Math.Max(soil[k], face * 0.8f);
         }
+    }
+
+    // Two cliffs side by side or end to end must not both lower (or lift) the same ground, or it sinks into a pit:
+    // of two changes the same way the larger one is kept; opposite ones add up
+    float[] cliffStep;
+    void AddCliffStep(int k, float v)
+    {
+        float o = cliffStep[k];
+        if (o == 0f || (o < 0f) != (v < 0f)) cliffStep[k] = o + v;
+        else if (Math.Abs(v) > Math.Abs(o)) cliffStep[k] = v;
+    }
+
+    // The point the distance s along a line (along: how far along it each corner is)
+    static void PointOn(float[] c, float[] along, float s, out float x, out float z)
+    {
+        int p = 1;
+        while (p < along.Length - 1 && along[p] < s) p++;
+        float l = along[p] - along[p - 1], f = l > 1e-5f ? Math.Max(0f, Math.Min(1f, (s - along[p - 1]) / l)) : 0f;
+        x = Lerp(c[p * 2 - 2], c[p * 2], f);
+        z = Lerp(c[p * 2 - 1], c[p * 2 + 1], f);
+    }
+
+    // Evens out a row of values: the mean of each value and its neighbours up to reach away, twice over
+    static void EvenOut(float[] v, int reach)
+    {
+        var copy = new float[v.Length];
+        for (int pass = 0; pass < 2; pass++)
+        {
+            Array.Copy(v, copy, v.Length);
+            for (int i = 0; i < v.Length; i++)
+            {
+                float sum = 0f;
+                int count = 0;
+                for (int j = Math.Max(0, i - reach); j <= Math.Min(v.Length - 1, i + reach); j++) { sum += copy[j]; count++; }
+                v[i] = sum / count;
+            }
+        }
+    }
+
+    // ---- Cliffs drawn in pieces: the lines of a cliff (or a small cliff, or an earth bank) drawn end to end are one
+    // cliff, so it gets lower only at its real ends. For every such line: how far the cliff goes on past its first
+    // corner (before) and past its last (after). Worked out once for the whole map, so every piece of the
+    // run-yourself world sees the same cliff.
+
+    // The step lines near this world and how far each goes on past its ends (by the line's points, set in NearLines)
+    readonly Dictionary<float[], (float before, float after)> stepEnds = new Dictionary<float[], (float before, float after)>();
+
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<WorldLayer, Dictionary<WorldLine, (float before, float after)>> cliffChains
+        = new System.Runtime.CompilerServices.ConditionalWeakTable<WorldLayer, Dictionary<WorldLine, (float before, float after)>>();
+
+    static bool IsStepLine(WorldLineKind k) => k == WorldLineKind.Cliff || k == WorldLineKind.SmallCliff || k == WorldLineKind.EarthBank;
+
+    static Dictionary<WorldLine, (float before, float after)> CliffChains(WorldLayer layer)
+    {
+        lock (cliffChains)
+        {
+            if (cliffChains.TryGetValue(layer, out var known)) return known;
+            var made = MakeCliffChains(layer);
+            cliffChains.Add(layer, made);
+            return made;
+        }
+    }
+
+    static Dictionary<WorldLine, (float before, float after)> MakeCliffChains(WorldLayer layer)
+    {
+        var result = new Dictionary<WorldLine, (float before, float after)>();
+        var steps = new List<WorldLine>();
+        foreach (WorldLine line in layer.lines)
+            if (IsStepLine(line.kind) && line.xy != null && line.xy.Length >= 4) steps.Add(line);
+        int n = steps.Count;
+        var length = new float[n];
+        // Line ends in 1 m squares: end e is line e / 2, its first corner when e is even, its last when odd
+        var squares = new Dictionary<long, List<int>>();
+        float EndX(int e) { float[] xy = steps[e / 2].xy; return (e & 1) == 0 ? xy[0] : xy[xy.Length - 2]; }
+        float EndZ(int e) { float[] xy = steps[e / 2].xy; return (e & 1) == 0 ? xy[1] : xy[xy.Length - 1]; }
+        long Square(float x, float z) => ((long)Math.Floor(x) << 32) ^ (long)(uint)(int)Math.Floor(z);
+        for (int i = 0; i < n; i++)
+        {
+            float[] xy = steps[i].xy;
+            for (int p = 2; p + 1 < xy.Length; p += 2)
+                length[i] += (float)Math.Sqrt((xy[p] - xy[p - 2]) * (xy[p] - xy[p - 2]) + (xy[p + 1] - xy[p - 1]) * (xy[p + 1] - xy[p - 1]));
+            for (int e = i * 2; e <= i * 2 + 1; e++)
+            {
+                long key = Square(EndX(e), EndZ(e));
+                if (!squares.TryGetValue(key, out var list)) squares[key] = list = new List<int>();
+                list.Add(e);
+            }
+        }
+        // Each end's nearest end of another line of the same kind, within a metre
+        const float Join = 1f;
+        var next = new int[n * 2];
+        for (int e = 0; e < n * 2; e++)
+        {
+            next[e] = -1;
+            float x = EndX(e), z = EndZ(e), bestD = Join * Join;
+            int fx = (int)Math.Floor(x), fz = (int)Math.Floor(z);
+            for (int dz = -1; dz <= 1; dz++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    if (!squares.TryGetValue(((long)(fx + dx) << 32) ^ (long)(uint)(fz + dz), out var list)) continue;
+                    foreach (int o in list)
+                    {
+                        if (o / 2 == e / 2 || steps[o / 2].kind != steps[e / 2].kind) continue;
+                        float ddx = EndX(o) - x, ddz = EndZ(o) - z, dd = ddx * ddx + ddz * ddz;
+                        if (dd <= bestD) { bestD = dd; next[e] = o; }
+                    }
+                }
+            }
+        }
+        // How far the cliff goes on past an end: along the joined lines, far enough for the taper (20 m)
+        float Past(int e)
+        {
+            float sum = 0f;
+            var seen = new HashSet<int> { e / 2 };
+            int at = e;
+            while (sum < 20f)
+            {
+                int o = next[at];
+                if (o < 0 || !seen.Add(o / 2)) break;
+                sum += length[o / 2];
+                at = o ^ 1;   // on out from the joined line's other end
+            }
+            return sum;
+        }
+        for (int i = 0; i < n; i++) result[steps[i]] = (Past(i * 2), Past(i * 2 + 1));
+        return result;
     }
 
     // ---- Paths and roads: a colour on the ground, and no trees on them ----
