@@ -17,7 +17,9 @@ using UnityEngine.UI;
 public partial class RunSession : MonoBehaviour
 {
     public const string RunnerName = "You";
-    const float PunchReach = 0.6f;      // metres from the punching unit (the flag) that punch it
+    // Metres from the punching unit (the flag) that punch it. Was 0.6 m: easy to run past a control without the punch
+    // (2026-11-24, Anders: about 2 m so a control is not missed)
+    const float PunchReach = 2f;
     const float SampleEvery = 0.25f;    // seconds between GPS points
 
     public static bool On => (ExtraModes.Is(ExtraMode.RunYourself) || ExtraModes.Is(ExtraMode.RunMass)) && RelayRace.Active == null;
@@ -475,18 +477,24 @@ public partial class RunSession : MonoBehaviour
             world.Flag(i, out double fe, out double fn);
             if (SegmentDistance(fe, fn, ae, an, be, bn) > PunchReach) continue;
             if (i == lastPunched) continue;
+            bool finish = i == world.FlagCount - 1;
+            // Only the control the runner is on the way to counts: running past another control of the course (control
+            // 12 on the way to 4) does nothing, no punch, no beep and the map stays on the leg (2026-11-24, Anders).
+            // The finish always ends the race (a missed control is then told there).
+            if (i != inOrder && !finish) continue;
             lastPunched = i;
             punches.Add(i);
             if (i == inOrder) inOrder++;
             punchTimes.Add(player.raceSeconds);
-            if (i == world.FlagCount - 1)
+            if (finish)
             {
                 Finish();
                 return;
             }
             sounds.Punch();
-            // The map shows the next leg from the control just punched (if it is the next one on the course)
+            // The map shows the next leg from the control just punched
             if (handMap != null && i + 1 > handMap.Leg) handMap.FrameLeg(i + 1);
+            return;   // one punch per step (two controls of the course can stand close together)
         }
     }
 

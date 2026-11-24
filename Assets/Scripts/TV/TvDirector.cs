@@ -243,6 +243,7 @@ public class TvDirector : MonoBehaviour
         float want;
         if (!slow) want = isActiveAndEnabled && NetworkPlayer.Local != null ? RacePace.MapPace(NetworkPlayer.Local.agentMovement) : 1f;
         else want = HostSettings.TvSpeed / PackRunning.GameSecondsPerSecond;
+        if (GamePause.Active) return;   // the Esc menu has stopped the game
         if (!Mathf.Approximately(Time.timeScale, want)) Time.timeScale = want;
     }
 

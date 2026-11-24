@@ -32,6 +32,7 @@ public static class RacePace
     public static void Apply(AgentMovement agent)
     {
         if (TvDirector.Active != null) return;   // the TV production sets the pace
+        if (GamePause.Active) return;            // the Esc menu has stopped the game; its pace comes back after
         float want = MapPace(agent);
         if (!Mathf.Approximately(Time.timeScale, want)) Time.timeScale = want;
     }

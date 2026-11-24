@@ -199,7 +199,7 @@ public class EndScreenUI : MonoBehaviour
                     guessed++;
                 }
             }
-            int secondsLeft = Mathf.Max(0, Mathf.CeilToInt(CompetitionFlow.GuessDeadline - Time.unscaledTime));
+            int secondsLeft = Mathf.Max(0, Mathf.CeilToInt(CompetitionFlow.GuessDeadline - GamePause.PlayClock));
             voteStatusText.text = voters > 0
                 ? guessed + " of " + voters + " have guessed. Reveal in " + secondsLeft + " s."
                 : "The reveal is coming...";
