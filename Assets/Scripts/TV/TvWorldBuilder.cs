@@ -2330,6 +2330,24 @@ public partial class TvWorldBuilder
         int reach = chunk ? R + (input.town != null ? 90 : 40) : R;
         double e0 = Math.Floor((input.centerE - reach - layer.minE) / layer.cell), n0 = Math.Floor((input.centerN - reach - layer.minN) / layer.cell);
         int cells = (int)(2 * reach / layer.cell) + 2;
+        if (chunk && input.town != null)
+        {
+            // Every block a house of this piece can belong to, whole (2026-11-24, Anders: a big house was see-through
+            // now and then). A block longer than the piece's look was cut into houses differently by each piece that
+            // saw a part of it, so the wall a house left to its neighbour was missing where the neighbour, built by
+            // another piece, stood elsewhere. The window now holds all of every block that reaches into the piece.
+            double i0 = e0, j0 = n0, i1 = e0 + cells, j1 = n0 + cells;
+            double pi0 = Math.Floor((input.centerE - R - 2 - layer.minE) / layer.cell), pi1 = Math.Floor((input.centerE + R + 2 - layer.minE) / layer.cell);
+            double pj0 = Math.Floor((input.centerN - R - 2 - layer.minN) / layer.cell), pj1 = Math.Floor((input.centerN + R + 2 - layer.minN) / layer.cell);
+            foreach (int[] bb in TownBlocks())
+            {
+                if (bb[2] < pi0 || bb[0] > pi1 || bb[3] < pj0 || bb[1] > pj1) continue;
+                i0 = Math.Min(i0, bb[0] - 1); j0 = Math.Min(j0, bb[1] - 1); i1 = Math.Max(i1, bb[2] + 2); j1 = Math.Max(j1, bb[3] + 2);
+            }
+            e0 = i0;
+            n0 = j0;
+            cells = (int)Math.Max(i1 - i0, j1 - j0) + 1;
+        }
         var isHouse = new bool[cells * cells];
         if (input.town != null) TownLines();
         // A town: no house where the 2D race lets a runner through, except over a passage through a house (a tunnel)
@@ -2374,6 +2392,72 @@ public partial class TvWorldBuilder
             if (input.town != null) TownBlock(group, cells, CellX, CellZ, e0, n0);
             else House(group, cells, CellX, CellZ);
         }
+    }
+
+    // The town's blocks of joined house cells (as Buildings joins them), each as its cells' box: min col, min row,
+    // max col, max row of the world layer. Worked out once for the whole map.
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TvTown, Tuple<TvPassable, List<int[]>>> blockBoxes =
+        new System.Runtime.CompilerServices.ConditionalWeakTable<TvTown, Tuple<TvPassable, List<int[]>>>();
+
+    List<int[]> TownBlocks()
+    {
+        TvTown town = input.town;
+        lock (blockBoxes)
+        {
+            if (blockBoxes.TryGetValue(town, out var known) && known.Item1 == input.passable) return known.Item2;
+        }
+        int C = layer.cols, Rw = layer.rows;
+        var house = new bool[C * Rw];
+        for (int j = 0; j < Rw; j++)
+            for (int i = 0; i < C; i++)
+            {
+                double e = layer.minE + (i + 0.5) * layer.cell, n = layer.minN + (j + 0.5) * layer.cell;
+                if ((layer.At(e, n) & WorldCell.BaseMask) != WorldCell.Building) continue;
+                if (input.passable != null && input.passable.NoHouse(e, n) && !NearTunnel(town, e, n, 1.8)) continue;
+                house[j * C + i] = true;
+            }
+        var boxes = new List<int[]>();
+        var seen = new bool[C * Rw];
+        var todo = new Stack<int>();
+        for (int s = 0; s < house.Length; s++)
+        {
+            if (!house[s] || seen[s]) continue;
+            int[] bb = { s % C, s / C, s % C, s / C };
+            seen[s] = true;
+            todo.Push(s);
+            while (todo.Count > 0)
+            {
+                int k = todo.Pop(), ci = k % C, cj = k / C;
+                bb[0] = Math.Min(bb[0], ci); bb[1] = Math.Min(bb[1], cj); bb[2] = Math.Max(bb[2], ci); bb[3] = Math.Max(bb[3], cj);
+                for (int d = 0; d < 4; d++)
+                {
+                    int ni = ci + (d == 0 ? 1 : d == 1 ? -1 : 0), nj = cj + (d == 2 ? 1 : d == 3 ? -1 : 0);
+                    if (ni < 0 || nj < 0 || ni >= C || nj >= Rw) continue;
+                    int nk = nj * C + ni;
+                    if (house[nk] && !seen[nk]) { seen[nk] = true; todo.Push(nk); }
+                }
+            }
+            boxes.Add(bb);
+        }
+        lock (blockBoxes)
+        {
+            blockBoxes.Remove(town);
+            blockBoxes.Add(town, Tuple.Create(input.passable, boxes));
+        }
+        return boxes;
+    }
+
+    static bool NearTunnel(TvTown town, double e, double n, double reach)
+    {
+        foreach (float[] c in town.tunnels)
+            for (int q = 0; q + 3 < c.Length; q += 2)
+            {
+                double sx = c[q + 2] - c[q], sz = c[q + 3] - c[q + 1], l2 = sx * sx + sz * sz;
+                double t = l2 < 1e-6 ? 0 : Math.Max(0, Math.Min(1, ((e - c[q]) * sx + (n - c[q + 1]) * sz) / l2));
+                double dx = c[q] + sx * t - e, dz = c[q + 1] + sz * t - n;
+                if (dx * dx + dz * dz < reach * reach) return true;
+            }
+        return false;
     }
 
     // A pitched roof along x: two thick slabs meeting at the ridge, reaching out over the walls by over

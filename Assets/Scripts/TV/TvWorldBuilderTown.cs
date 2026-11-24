@@ -187,6 +187,7 @@ public partial class TvWorldBuilder
             if (plan != null) plans.Add(plan);
         }
         PlanTunnels();
+        FitTunnelFloors();
         JoinStairs(plans);
         // Every end's ground first, then every flight: one stairs' way in never digs under another flight
         // (2026-11-23, Anders: a flight hung in the air over the dug way of the stairs below it)
@@ -232,6 +233,7 @@ public partial class TvWorldBuilder
     {
         public float ax, az, ux, uz, len, half, fa, fb;
         public bool underHouse;         // a passage through a house: the house stands over it, no road is raised
+        public float extA, extB;        // how far the road over it runs on as a causeway over water, each side (level)
         public float FloorAt(float t) => fa + (fb - fa) * Math.Max(0f, Math.Min(1f, t / Math.Max(0.1f, len)));
     }
     List<TunnelPlan> tunnelPlans;
@@ -249,7 +251,18 @@ public partial class TvWorldBuilder
             float len = (float)Math.Sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
             if (len < 2f) continue;
             var p = new TunnelPlan { ax = ax, az = az, ux = (bx - ax) / len, uz = (bz - az) / len, len = len, half = TunnelWidth(l.w) / 2f };
-            // The floor: a straight line through the map's heights along its middle, at most 1 in 8
+            tunnelPlans.Add(p);
+        }
+    }
+
+    // The floor: a straight line through the map's heights along its middle, at most 1 in 8. Fitted only once the
+    // ground's base height is known (2026-11-24, Anders: tunnels stood 10 m up in the air: they were planned while the
+    // lines were cleared, before Heights() set baseHeight, so the floor kept the map's raw height)
+    void FitTunnelFloors()
+    {
+        foreach (TunnelPlan p in tunnelPlans)
+        {
+            float ax = p.ax, az = p.az, len = p.len;
             float sw = 0f, st = 0f, sy = 0f, stt = 0f, sty = 0f;
             for (float t = len * 0.15f; t <= len * 0.85f + 0.01f; t += 0.5f)
             {
@@ -266,8 +279,32 @@ public partial class TvWorldBuilder
             float mid = (sy - slope * st) / Math.Max(1f, sw);
             p.fa = mid;
             p.fb = mid + slope * len;
-            tunnelPlans.Add(p);
+            p.extA = Causeway(p, -1f);
+            p.extB = Causeway(p, 1f);
         }
+    }
+
+    // How far out from a tunnel's side the road over it has water beside it (2026-11-24, Anders: the road over the
+    // Tranås tunnel runs on over the water between walls; it should stay level at the tunnel's top all the way to the
+    // other shore, not bow down to the water like a banana). 0 where the road meets land at once.
+    float Causeway(TunnelPlan p, float side)
+    {
+        float nx = -p.uz * side, nz = p.ux * side, mx = p.ax + p.ux * p.len / 2f, mz = p.az + p.uz * p.len / 2f;
+        float last = 0f;
+        for (float s = p.half + 3f; s < 300f; s += 1f)
+        {
+            float cx = mx + nx * s, cz = mz + nz * s;
+            bool wet = false;
+            for (float k = 1f; k <= 10f && !wet; k += 1f)
+                foreach (float lr in new[] { -1f, 1f })
+                {
+                    float q = lr * (p.len / 2f + k);
+                    if (Base(CellAt(cx + p.ux * q, cz + p.uz * q)) == WorldCell.Water) { wet = true; break; }
+                }
+            if (wet) last = s;
+            else if (s - last > 8f) break;
+        }
+        return last > 0f ? last + 2f - (p.half + 0.4f) : 0f;
     }
 
     // The tunnel whose inside (pad metres more all round) holds this point, or null
@@ -390,10 +427,12 @@ public partial class TvWorldBuilder
         foreach (TunnelPlan p in tunnelPlans)
         {
             float ex = p.ax + p.ux * p.len, ez = p.az + p.uz * p.len;
-            ForNear(p.ax, p.az, ex, ez, p.half + 45f, (k, d, qx, qz) =>
+            ForNear(p.ax, p.az, ex, ez, p.half + 45f + Math.Max(p.extA, p.extB), (k, d, qx, qz) =>
             {
                 float x = k % N - R, z = k / N - R;
-                float dx = x - p.ax, dz = z - p.az, t = dx * p.ux + dz * p.uz, a = Math.Abs(-dx * p.uz + dz * p.ux);
+                float dx = x - p.ax, dz = z - p.az, t = dx * p.ux + dz * p.uz, across = -dx * p.uz + dz * p.ux;
+                float a = Math.Abs(across);
+                if (a > p.half + 45f && (t < -2f || t > p.len + 2f)) return;
                 float floor = p.FloorAt(t);
                 if (t < 0f || t > p.len)
                 {
@@ -410,6 +449,9 @@ public partial class TvWorldBuilder
                 float roof = floor + TunnelRoof, rise = roof - F[k];
                 if (rise <= 0f) return;
                 float ramp = Math.Max(6f, Math.Min(40f, rise * 10f));
+                // Over the causeway (the road's own width, straight on from the tunnel) it stays level
+                if (t >= -2f && t <= p.len + 2f) a = Math.Max(p.half + 0.4f, a - (across < 0f ? p.extA : p.extB));
+                else if (a > p.half + 45f) return;
                 F[k] = Math.Max(F[k], Lerp(roof, F[k], Sm(p.half + 0.4f, p.half + 0.4f + ramp, a)));
             });
         }
