@@ -261,6 +261,7 @@ public static class ContestRun
         public string id;
         public int seconds;
         public int kr;
+        public bool sprint;
     }
 
     static void PayTime(ContestInfo c)
@@ -269,7 +270,7 @@ public static class ContestRun
         int kr = CompetitionRewards.ForTime(seconds);
         if (kr > 0 && Money.Instance != null) Money.Instance.AddMoney(kr);
         List<TimePaid> list = ReadTimePaid();
-        list.Add(new TimePaid { id = c.id, seconds = seconds, kr = kr });
+        list.Add(new TimePaid { id = c.id, seconds = seconds, kr = kr, sprint = c.Sprint });
         PlayerPrefs.SetString(LocalPrefs.Key(TimePaidKey), JsonConvert.SerializeObject(list));
         PlayerPrefs.Save();
     }
