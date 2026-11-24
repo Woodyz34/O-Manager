@@ -170,7 +170,10 @@ public class RelayStatsUI : MonoBehaviour
         tabButtons[which] = button;
     }
 
-    void OpenReplay()
+    void OpenReplay() => OpenReplay(0);
+
+    // leg 0 = the whole course; else that leg alone, everyone starting it together (individual races)
+    void OpenReplay(int leg)
     {
         if (tracks == null || tracks.Count == 0) return;
         root.SetActive(false);
@@ -178,7 +181,8 @@ public class RelayStatsUI : MonoBehaviour
         {
             replay = null;
             if (root != null && !CompetitionFlow.ResultsShown) root.SetActive(true);
-        });
+        }, race.IsRelay ? null : race);
+        if (leg > 0) replay.ShowLeg(leg);
     }
 
     // Everyone's routes on one leg, on the map (individual competitions)
@@ -236,7 +240,7 @@ public class RelayStatsUI : MonoBehaviour
         footnote.text = tab == Tab.Legs
             ? (Alone ? "Each leg: leg time, then the total time after the leg." : "Each leg: leg time (place on the leg), then the team's total time (place after the leg).")
             : tab == Tab.Routes
-            ? "Click a leg to see everyone's route on the map, next to the computer's fastest route."
+            ? "Show routes: everyone's route on the leg next to the computer's fastest. GPS replay: the leg played back with everyone starting it together."
             : Alone ? ""
             : "Mistakes (est.): every split is compared with the fastest 25 % of the runners on it, adjusted to the runner's own pace on the other splits. A split that took more than 30 s and 25 % longer than that is marked red, and the time lost is shown.";
     }
@@ -383,7 +387,7 @@ public class RelayStatsUI : MonoBehaviour
         int points = race.Course.Route(leg, null).CommonCount;
         List<RelayTeamResult> players = new List<RelayTeamResult>(teams);
         players.Sort((a, b) => b.isLocal.CompareTo(a.isLocal));
-        List<CellData> header = new List<CellData> { Cell("Leg", 230), Cell("", 190) };
+        List<CellData> header = new List<CellData> { Cell("Leg", 230), Cell("", 190), Cell("", 170) };
         foreach (RelayTeamResult t in players) header.Add(Cell(t.team + (t.isLocal ? " (you)" : ""), 190));
         Row(48, true, header.ToArray());
         for (int c = 1; c < points; c++)
@@ -394,6 +398,10 @@ public class RelayStatsUI : MonoBehaviour
             CellData open = Cell("<color=" + Green + "><b>Show routes ></b></color>", 190);
             open.click = () => OpenRoutes(captured);
             cells.Add(open);
+            // The GPS replay of this leg alone (2026-11-24, the user)
+            CellData gps = Cell("<color=" + Green + "><b>GPS replay ></b></color>", 170);
+            gps.click = () => OpenReplay(captured);
+            cells.Add(gps);
             foreach (RelayTeamResult t in players)
             {
                 if (!t.hasSplits)

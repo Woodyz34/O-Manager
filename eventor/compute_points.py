@@ -715,6 +715,7 @@ def write_game_file(runners, today, groups, merged_ids=None):
         })
     clubs_by_hand(cards)
     countries_by_hand(cards)
+    add_history(cards, previous, old_file.get("computed") if previous else None, today)
     now = {c["id"] for c in cards}
     by_id = {c["id"]: c for c in cards}
     merged_ids = merged_ids or {}
@@ -763,6 +764,23 @@ def write_game_file(runners, today, groups, merged_ids=None):
     write_emblem_list(cards, today)
     write_results(groups, cards)
     return frozen
+
+
+def add_history(cards, previous, previous_day, today):
+    """Each card keeps its physics, speed and technique from every update ("history", oldest first), so My Runners
+    can show a line chart of how the runner has changed (2026-11-24, the user; the chart shows from 3 updates).
+    A card that had no history yet starts with the numbers it had in the last file, on that file's day.
+    Running again on the same day replaces that day's point. Frozen cards (no longer in packs) keep theirs as it is."""
+    day = today.isoformat()
+    for c in cards:
+        old = previous.get(c["id"])
+        history = list(old.get("history", [])) if old else []
+        if old and not history and previous_day:
+            o = upgrade_card(old)
+            history.append({"d": previous_day, "p": o.get("physics", 0), "s": o.get("speed", -1), "t": o.get("technique", 0)})
+        history = [h for h in history if h.get("d") != day]
+        history.append({"d": day, "p": c["physics"], "s": c["speed"], "t": c["technique"]})
+        c["history"] = history
 
 
 def sprint_value(v):

@@ -231,11 +231,13 @@ public static class ContestRun
     // ---- Results ----
 
     // A normal race is over: the time and the runner's way round, for the replay
-    public static void OnRaceFinished(int seconds, RelayTrack track)
+    // legEnds: the track point at each control (RouteCompareView.LegEnds), so the replay can show one leg at a time
+    public static void OnRaceFinished(int seconds, RelayTrack track, int[] legEnds = null)
     {
         if (!InRace || resultSent || Active.RouteChoice) return;
         resultSent = true;
-        Send(Active, 0, seconds, EncodeRace(track));
+        Send(Active, 0, seconds, EncodeRace(track, legEnds));
+        PayTime(Active);
     }
 
     // The route choice game is over: the points and every leg's routes with the one picked
@@ -244,6 +246,52 @@ public static class ContestRun
         if (!InRace || resultSent || !Active.RouteChoice) return;
         resultSent = true;
         Send(Active, score, 0, EncodeChoices(legs));
+        PayTime(Active);
+    }
+
+    // ---- Money for the time played ----
+
+    // A contest pays for the time you were out, like a lobby race, as soon as you are in (2026-11-24, the user: a
+    // long free run can take very long). The prize for the place still comes when the contest is over. The payment
+    // waits on this computer until the contests page has shown it.
+    const string TimePaidKey = "Contests.TimePaid";
+
+    public class TimePaid
+    {
+        public string id;
+        public int seconds;
+        public int kr;
+    }
+
+    static void PayTime(ContestInfo c)
+    {
+        int seconds = Mathf.RoundToInt(CompetitionFlow.PlayedSeconds);
+        int kr = CompetitionRewards.ForTime(seconds);
+        if (kr > 0 && Money.Instance != null) Money.Instance.AddMoney(kr);
+        List<TimePaid> list = ReadTimePaid();
+        list.Add(new TimePaid { id = c.id, seconds = seconds, kr = kr });
+        PlayerPrefs.SetString(LocalPrefs.Key(TimePaidKey), JsonConvert.SerializeObject(list));
+        PlayerPrefs.Save();
+    }
+
+    static List<TimePaid> ReadTimePaid()
+    {
+        string json = PlayerPrefs.GetString(LocalPrefs.Key(TimePaidKey), "");
+        if (string.IsNullOrEmpty(json)) return new List<TimePaid>();
+        try { return JsonConvert.DeserializeObject<List<TimePaid>>(json) ?? new List<TimePaid>(); }
+        catch { return new List<TimePaid>(); }
+    }
+
+    // The time money not shown yet; shown once
+    public static List<TimePaid> TakeTimePaid()
+    {
+        List<TimePaid> list = ReadTimePaid();
+        if (list.Count > 0)
+        {
+            PlayerPrefs.DeleteKey(LocalPrefs.Key(TimePaidKey));
+            PlayerPrefs.Save();
+        }
+        return list;
     }
 
     const string UnsentKey = "Contests.Unsent";
@@ -331,7 +379,10 @@ public static class ContestRun
          .Append(Mathf.RoundToInt((float)((p.n - origin.n) * 10.0)).ToString(CultureInfo.InvariantCulture));
     }
 
-    static string EncodeRace(RelayTrack track)
+    // "t" the times (game seconds x 10), "p" the points, "c" the time each control was reached (game seconds x 10,
+    // controls 1.. and the finish), so the leg splits can be shown (2026-11-24). The points at the controls are
+    // always kept.
+    static string EncodeRace(RelayTrack track, int[] legEnds)
     {
         MapDefinition map = CourseLoader.LoadedMap;
         if (track == null || map == null || track.positions.Count == 0) return "";
@@ -341,9 +392,22 @@ public static class ContestRun
         StringBuilder times = new StringBuilder();
         bool firstPoint = true;
         Vector3 last = track.positions[0];
+        HashSet<int> keep = new HashSet<int>();
+        StringBuilder controls = new StringBuilder();
+        if (legEnds != null)
+        {
+            for (int k = 1; k < legEnds.Length; k++)
+            {
+                int index = Mathf.Clamp(legEnds[k], 0, Mathf.Min(track.positions.Count, track.times.Count) - 1);
+                keep.Add(index);
+                if (k > 1) controls.Append(',');
+                float at = index < track.times.Count ? track.times[index] * PackRunning.GameSecondsPerSecond : 0f;
+                controls.Append(Mathf.RoundToInt(at * 10f).ToString(CultureInfo.InvariantCulture));
+            }
+        }
         for (int i = 0; i < track.positions.Count; i++)
         {
-            bool end = i == 0 || i == track.positions.Count - 1;
+            bool end = i == 0 || i == track.positions.Count - 1 || keep.Contains(i);
             if (!end && Vector2.Distance(last, track.positions[i]) < minStep) continue;
             last = track.positions[i];
             if (!firstPoint) times.Append(',');
@@ -351,7 +415,8 @@ public static class ContestRun
             times.Append(Mathf.RoundToInt(gameSeconds * 10f).ToString(CultureInfo.InvariantCulture));
             AppendPoint(points, map, origin, track.positions[i], ref firstPoint);
         }
-        return "{\"v\":1,\"k\":\"race\",\"t\":[" + times + "],\"p\":[" + points + "]}";
+        return "{\"v\":1,\"k\":\"race\",\"t\":[" + times + "],\"p\":[" + points + "]"
+               + (controls.Length > 0 ? ",\"c\":[" + controls + "]" : "") + "}";
     }
 
     static string EncodeChoices(List<ContestReplay.ChoiceLeg> legs)

@@ -22,9 +22,11 @@
 // <id> is the period and the kind, e.g. "w2026-47_rc-forest" or "d2026-11-19_race-sprint".
 //   Private custom data "contests_meta"         key "cleaned": { ids: [ contests already cleaned up ] }
 //
-// Clean-up: once a contest is over (and its 3 late hours have passed) the next "status" call deletes its replays
-// and its course. The small list of names and results stays KEEP_DAYS (30) more days, so players who come back
-// later still get their prize money; then it is deleted too.
+// Clean-up: the replays (the GPS routes) and the course of a contest that is over are kept REPLAY_DAYS, so the
+// players can look at the leaderboard and everyone's routes afterwards (2026-11-24, the user): a daily contest 7
+// days, a weekly one 30 days. Then the next "status" call deletes them. The small list of names and results stays
+// KEEP_DAYS (30) days after the end, so players who come back later still get their prize money; then it is
+// deleted too.
 //
 // The first player of a contest lays its AI course in the game and sends it with "start"; everyone after runs
 // the same course. The course (and so the map) is only ever sent to a player who has used their try, or when the
@@ -42,8 +44,20 @@
 //                                and a course on a map not in it is refused without using the try
 //   submit     { id, score, seconds, replay }   my result (after start, once)
 //   board      { id }            the leaderboard: only after my own run, or when the contest is over
-//   replays    { id, players }   replays of up to 6 players (comma separated ids), same rule as board
+//   replays    { id, players }   replays of up to 10 players (comma separated ids), same rule as board
 //   claim                        the prizes (money and packs) of contests that are over and not paid yet (paid once)
+//   recent                       the contests that ended lately and still have their leaderboard and GPS routes
+//                                (daily 7 days, weekly 30 days): winner, number of runners and my place
+//   ranking                      the world ranking (2026-11-24): the best players of the last 30 days, overall and
+//                                per game and map type, see "World ranking" below; brings it up to date first
+//   rankHistory { player }       one player's ranking day by day, for the line chart, and their wins of all time
+//
+// The world ranking is kept in:
+//   Private custom data "contests_rank"         key "window": the contests of the last RANK_DAYS days with every
+//                                                player's points; key "lists": the ranking lists as last worked out;
+//                                                key "wins": every player's weekly/daily wins of all time
+//   Private custom data "contests_rank_hist_<n>" key "h": the ranking history of the players whose id hashes to n
+//                                                (RANK_HIST_SHARDS parts), one entry per day, kept for years
 
 const { DataApi } = require("@unity-services/cloud-save-1.4");
 
@@ -68,8 +82,14 @@ const MAX_REPLAY_CHARS = 400000;
 const MAX_NAME = 24;
 const LATE_MINUTES = 180;          // a run started before the end may be handed in up to 3 hours after it
 const HISTORY_KEEP = 120;
-const CLEAN_DAYS = 28;             // how far back clean-up looks (in case nobody opened the game for a while)
+const CLEAN_DAYS = 45;             // how far back clean-up looks (in case nobody opened the game for a while)
 const KEEP_DAYS = 30;              // the leaderboard (names and results) is kept this long for late prize claims
+// How long the replays (GPS routes) and the course are kept after the end (2026-11-24, the user: "radera dem en
+// vecka efter eller en månad efter"): daily contests 7 days, weekly 30 days
+const REPLAY_DAYS = { d: 7, w: 30 };
+const MAX_REPLAY_PLAYERS = 10;
+
+function replaysUntil(id) { return endOf(id) + REPLAY_DAYS[id[0]] * 86400000; }
 const CLEANED_KEEP = 400;
 
 // Prizes (2026-11-19, the user): runner packs for the best, money for the rest.
@@ -102,6 +122,9 @@ module.exports = async ({ params, context, logger }) => {
     case "board": return await board(api, context, me, payload, now);
     case "replays": return await replays(api, context, me, payload, now);
     case "claim": return await claim(api, context, me, now, logger);
+    case "recent": return await recent(api, context, me, now, logger);
+    case "ranking": return await ranking(api, context, me, now, logger);
+    case "rankHistory": return await rankHistory(api, context, payload);
     default: throw new Error("Unknown action " + action);
   }
 };
@@ -349,8 +372,8 @@ function finishedIds(now, minAge, daysBack) {
   return ids;
 }
 
-// Two steps: 3 hours after a contest ends its replays and course go; KEEP_DAYS after that the leaderboard goes
-// too. Does at most one contest with something in it per call (and skips up to 8 empty ones), so opening the
+// Two steps: REPLAY_DAYS after a contest ends its replays and course go; KEEP_DAYS after the end the leaderboard
+// goes too. Does at most one contest with something in it per call (and skips up to 8 empty ones), so opening the
 // contests page stays quick.
 async function cleanUp(api, context, now, logger) {
   const item = await getItem(api, context.projectId, "contests_meta", "cleaned");
@@ -361,6 +384,7 @@ async function cleanUp(api, context, now, logger) {
   const todo = [];
   const drops = finishedIds(now, KEEP_DAYS * 86400000, KEEP_DAYS + CLEAN_DAYS);
   for (const id of finishedIds(now, LATE_MINUTES * 60000, CLEAN_DAYS)) {
+    if (now <= replaysUntil(id)) continue;     // the GPS routes are still kept
     if (meta.ids.indexOf(id) < 0 && drops.indexOf(id) < 0) todo.push({ id, drop: false });
   }
   for (const id of drops) {
@@ -508,13 +532,13 @@ async function board(api, context, me, payload, now) {
     if (!e || e.state === "done" || (!over && playerId !== me)) continue;
     rows.push({ playerId, name: e.name, score: 0, seconds: 0, place: 0, prize: 0, packs: [], dnf: true, me: playerId === me });
   }
-  return { rows, course: b.course, over };
+  return { rows, course: b.course, over, sprint: isSprint(id), endsAt: endOf(id), replaysUntil: replaysUntil(id) };
 }
 
 async function replays(api, context, me, payload, now) {
   const id = checkId(payload.id);
   await mayLook(api, context, me, id, now);
-  const players = String(payload.players || "").split(",").map(s => s.trim()).filter(s => /^[A-Za-z0-9_-]{1,64}$/.test(s)).slice(0, 6);
+  const players = String(payload.players || "").split(",").map(s => s.trim()).filter(s => /^[A-Za-z0-9_-]{1,64}$/.test(s)).slice(0, MAX_REPLAY_PLAYERS);
   const out = {};
   if (players.length === 0) return { replays: out };
   try {
@@ -546,8 +570,302 @@ async function claim(api, context, me, now, logger) {
     changed = true;
     if (gone) continue;
     const row = list.find(r => r.playerId === me);
-    paid.push({ id: h.id, place: row ? row.place : 0, of: list.length, prize: row ? row.prize : 0, packs: row ? row.packs : [], finished: !!row });
+    paid.push({ id: h.id, sprint: isSprint(h.id), place: row ? row.place : 0, of: list.length, prize: row ? row.prize : 0, packs: row ? row.packs : [], finished: !!row });
   }
   if (changed) await saveHistory(api, context, me, history);
+  // The game claims every time the main menu opens, so this keeps the world ranking (and everyone's ranking
+  // history) up to date once a day even when nobody opens the ranking page
+  try { await updateRanking(api, context, now, logger); } catch (err) { logger.warning("updateRanking: " + err); }
   return { paid };
+}
+
+// The contests that ended lately and still have their GPS routes (daily 7 days, weekly 30 days), newest first, each
+// with its winner, how many finished and my own place. Opened from the contests page ("Results") and from the prize
+// pop-up, so the players can go through the leaderboard and the routes after they got their prizes (2026-11-24).
+async function recent(api, context, me, now, logger) {
+  const history = await loadHistory(api, context, me);
+  const ran = history.list.map(h => h.id);
+  const days = Math.max(REPLAY_DAYS.d, REPLAY_DAYS.w) + 7;
+  const ids = finishedIds(now, 0, days).filter(id => {
+    if (now > replaysUntil(id)) return false;
+    const kind = id.substring(id.indexOf("_") + 1);
+    return KINDS[id[0]].indexOf(kind) >= 0 || ran.indexOf(id) >= 0;
+  });
+  ids.sort((a, b) => endOf(b) - endOf(a));
+  const out = [];
+  for (let i = 0; i < ids.length; i += 10) {
+    const part = ids.slice(i, i + 10);
+    const loaded = await Promise.all(part.map(async id => {
+      try { return await loadBoard(api, context, id); } catch (err) { logger.warning("recent: " + id + " " + err); return null; }
+    }));
+    for (let k = 0; k < part.length; k++) {
+      const id = part[k];
+      const kind = id.substring(id.indexOf("_") + 1);
+      const item = loaded[k];
+      const took = ran.indexOf(id) >= 0;
+      if (!item || !item.writeLock) {
+        if (took) out.push({ id, span: id[0], kind, sprint: isSprint(id), endsAt: endOf(id), replaysUntil: replaysUntil(id), entries: 0, winner: null, mine: { place: 0, finished: false } });
+        continue;
+      }
+      const list = standings(id, item.board);
+      if (list.length === 0 && !took) continue;
+      const row = list.find(r => r.playerId === me);
+      const win = list[0];
+      out.push({
+        id, span: id[0], kind, sprint: isSprint(id), endsAt: endOf(id), replaysUntil: replaysUntil(id),
+        entries: list.length,
+        winner: win ? { name: win.name, score: win.score, seconds: win.seconds } : null,
+        mine: took ? (row ? { place: row.place, score: row.score, seconds: row.seconds, finished: true } : { place: 0, finished: false }) : null
+      });
+    }
+  }
+  return { contests: out };
+}
+
+// ---- World ranking (2026-11-24, the user: "vem är den bästa spelaren i O-Manager") ----
+//
+// Every weekly and daily contest that is over gives each player who finished it points:
+//   races and 3D runs        100 * winner's time / own time       (the winner 100, twice the winner's time 50)
+//   route choice game        100 * own score / winner's score
+// so the gap to the winner counts, not only the place. A contest counts only when at least RANK_MIN_FINISHERS
+// finished (winning alone is no feat). A weekly contest weighs RANK_WEIGHT.w (2), a daily one RANK_WEIGHT.d (1).
+//
+// A player's points in a list are the weighted average of their contests in the list during the last RANK_DAYS (30)
+// days, but divided by at least RANK_FULL (4): with less weight than that the missing part counts as 0, so one lucky
+// win is not enough to top the list (one daily win alone gives 25). From 4 dailies, or 2 weeklies, it is the plain
+// average.
+//   Lists: rc, race, run (each game), and each game on forest and on sprint maps ("rc-forest" ...).
+//   overall = the average of the three games (a game never played counts as 0): the best all-round player.
+//
+// The ranking is worked out again once a day, when the daily contest is final (3 hours after midnight, when late
+// runs are in): the first "ranking" or "claim" call after that does it. Each player's places and points of that day
+// are then added to their ranking history (kept for years, for the line chart).
+
+const RANK_DAYS = 30;
+const RANK_WEIGHT = { d: 1, w: 2 };
+const RANK_FULL = 4;
+const RANK_MIN_FINISHERS = 2;
+const RANK_LOADS_PER_CALL = 400;   // contest boards read per call (the first time reads 30 days back, ~250 boards, most of them empty)
+const RANK_TOP = 200;              // rows sent per list (plus my own row)
+const RANK_HIST_SHARDS = 32;
+const RANK_HIST_KEEP = 3650;       // days of history per player
+const RANK_GAMES = ["rc", "race", "run"];
+const RANK_LISTS = ["overall", "rc", "race", "run", "rc-forest", "rc-sprint", "race-forest", "race-sprint", "run-forest", "run-sprint"];
+
+function gameOf(id) { return id.substring(id.indexOf("_") + 1).split("-")[0]; }
+function round1(x) { return Math.round(x * 10) / 10; }
+
+// The last day whose daily contest is final: { id: "2026-11-23", end: UTC ms of its end }
+function lastRankDay(now) {
+  const running = periods(now - LATE_MINUTES * 60000).d;
+  const prev = periods(running.startsAt - 1).d;
+  return { id: prev.id.substring(1), end: running.startsAt };
+}
+
+// Each finisher's ranking points in one contest, or null when the contest does not count
+function contestPoints(id, list) {
+  if (list.length < RANK_MIN_FINISHERS) return null;
+  const rc = gameOf(id) === "rc";
+  const best = rc ? list[0].score : list[0].seconds;
+  if (!(best > 0)) return null;
+  return list.map(r => {
+    let pts = 0;
+    if (rc) pts = 100 * r.score / best;
+    else if (r.seconds > 0) pts = 100 * best / r.seconds;
+    return [r.playerId, Math.round(Math.max(0, Math.min(100, pts)) * 100) / 100, r.place];
+  });
+}
+
+async function loadRankItem(api, context, customId, key) {
+  const item = await getItem(api, context.projectId, customId, key);
+  if (!item) return { value: null, writeLock: undefined };
+  return { value: typeof item.value === "string" ? JSON.parse(item.value) : item.value, writeLock: item.writeLock };
+}
+
+// All lists from the contests in the window. prev: the lists of the last update, for the change in place.
+function computeLists(contests, names, prev) {
+  const per = {};
+  const add = (pid, key, w, pts) => {
+    const p = per[pid] || (per[pid] = {});
+    const a = p[key] || (p[key] = { w: 0, wp: 0, c: 0 });
+    a.w += w; a.wp += w * pts; a.c++;
+  };
+  for (const c of contests) {
+    for (const [pid, pts] of c.rows) {
+      add(pid, c.g, c.w, pts);
+      add(pid, c.g + "-" + (c.s ? "sprint" : "forest"), c.w, pts);
+    }
+  }
+  const value = a => a.wp / Math.max(a.w, RANK_FULL);
+  const lists = {};
+  for (const key of RANK_LISTS) {
+    const rows = [];
+    for (const pid of Object.keys(per)) {
+      const p = per[pid];
+      if (key === "overall") {
+        const parts = RANK_GAMES.map(g => p[g] ? round1(value(p[g])) : 0);
+        const c = RANK_GAMES.reduce((sum, g) => sum + (p[g] ? p[g].c : 0), 0);
+        rows.push({ p: pid, n: names[pid] ? names[pid].n : "Runner", pts: round1((parts[0] + parts[1] + parts[2]) / 3), c, parts });
+      } else if (p[key]) {
+        const a = p[key];
+        rows.push({ p: pid, n: names[pid] ? names[pid].n : "Runner", pts: round1(value(a)), avg: round1(a.wp / a.w), c: a.c });
+      }
+    }
+    rows.sort((a, b) => b.pts - a.pts || b.c - a.c || (a.n < b.n ? -1 : a.n > b.n ? 1 : 0));
+    const was = {};
+    if (prev && prev[key]) for (const r of prev[key]) was[r.p] = r.place;
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].place = i > 0 && rows[i - 1].pts === rows[i].pts ? rows[i - 1].place : i + 1;
+      rows[i].was = was[rows[i].p] || 0;
+    }
+    lists[key] = rows;
+  }
+  return lists;
+}
+
+function histShard(pid) { return seedOf(pid) % RANK_HIST_SHARDS; }
+
+// Brings the ranking up to date when a new day's contests are final. Returns true when it changed it.
+async function updateRanking(api, context, now, logger) {
+  const day = lastRankDay(now);
+  const w = await loadRankItem(api, context, "contests_rank", "window");
+  let win = w.value;
+  if (!win || !Array.isArray(win.contests)) win = { day: "", done: [], contests: [], names: {} };
+  if (!Array.isArray(win.done)) win.done = [];
+  if (!win.names) win.names = {};
+  if (win.day === day.id) return false;
+
+  const from = day.end - RANK_DAYS * 86400000;
+  const todo = finishedIds(now, LATE_MINUTES * 60000, RANK_DAYS + 8)
+    .filter(id => endOf(id) > from && endOf(id) <= day.end && win.done.indexOf(id) < 0);
+  const part = todo.slice(0, RANK_LOADS_PER_CALL);
+  // Wins of all time (2026-11-24, the user: "hur många gånger man har vunnit"): each player's weekly and daily
+  // contest wins, counted once when a contest comes into the ranking (so only contests with 2+ finishers)
+  const winsItem = await loadRankItem(api, context, "contests_rank", "wins");
+  const wins = winsItem.value && winsItem.value.players ? winsItem.value : { players: {} };
+  let winsChanged = false;
+  for (let i = 0; i < part.length; i += 20) {
+    const ids = part.slice(i, i + 20);
+    const loaded = await Promise.all(ids.map(async id => {
+      try { return await loadBoard(api, context, id); } catch (err) { logger.warning("ranking: " + id + " " + err); return undefined; }
+    }));
+    for (let k = 0; k < ids.length; k++) {
+      const id = ids[k];
+      if (loaded[k] === undefined) continue;          // try again next time
+      win.done.push(id);
+      if (!loaded[k].writeLock) continue;             // nobody ran it
+      const list = standings(id, loaded[k].board);
+      const rows = contestPoints(id, list);
+      if (!rows) continue;
+      const end = endOf(id);
+      win.contests.push({ id, end, g: gameOf(id), s: isSprint(id), w: RANK_WEIGHT[id[0]], rows });
+      for (const r of list) {
+        if (r.place !== 1) continue;
+        const x = wins.players[r.playerId] || (wins.players[r.playerId] = { w: 0, d: 0 });
+        x[id[0]] = (x[id[0]] || 0) + 1;
+        const g = gameOf(id);
+        x[g] = (x[g] || 0) + 1;
+        winsChanged = true;
+      }
+      for (const r of list) {
+        const old = win.names[r.playerId];
+        if (!old || old.at <= end) win.names[r.playerId] = { n: r.name, at: end };
+      }
+    }
+  }
+  win.contests = win.contests.filter(c => c.end > from);
+  win.done = win.done.filter(id => endOf(id) > from - 10 * 86400000);
+  const complete = todo.length <= part.length;
+  if (complete) {
+    const playing = {};
+    for (const c of win.contests) for (const r of c.rows) playing[r[0]] = true;
+    for (const pid of Object.keys(win.names)) if (!playing[pid]) delete win.names[pid];
+    win.day = day.id;
+  }
+  const windowBody = { key: "window", value: win };
+  if (w.writeLock) windowBody.writeLock = w.writeLock;
+  try {
+    await api.setPrivateCustomItem(context.projectId, "contests_rank", windowBody);
+  } catch (err) {
+    const status = err && err.response ? err.response.status : 0;
+    if (status === 409 || status === 412) return false;   // someone else is updating it right now
+    throw err;
+  }
+  if (winsChanged) await api.setPrivateCustomItem(context.projectId, "contests_rank", { key: "wins", value: wins });
+  if (!complete) return false;
+
+  const before = await loadRankItem(api, context, "contests_rank", "lists");
+  const lists = computeLists(win.contests, win.names, before.value ? before.value.lists : null);
+  await api.setPrivateCustomItem(context.projectId, "contests_rank", { key: "lists", value: { day: day.id, updatedAt: now, lists } });
+  logger.info("ranking: " + day.id + ", " + win.contests.length + " contests, " + lists.overall.length + " players");
+
+  // Today's places and points into each player's history
+  const entries = {};
+  for (const key of RANK_LISTS) {
+    const of = lists[key].length;
+    for (const r of lists[key]) {
+      const e = entries[r.p] || (entries[r.p] = {});
+      e[key] = [r.pts, r.place, of];
+    }
+  }
+  const shards = {};
+  for (const pid of Object.keys(entries)) {
+    const n = histShard(pid);
+    (shards[n] || (shards[n] = [])).push(pid);
+  }
+  const numbers = Object.keys(shards);
+  for (let i = 0; i < numbers.length; i += 8) {
+    await Promise.all(numbers.slice(i, i + 8).map(async n => {
+      try {
+        const item = await loadRankItem(api, context, "contests_rank_hist_" + n, "h");
+        const hist = item.value && item.value.players ? item.value : { players: {} };
+        for (const pid of shards[n]) {
+          let list = hist.players[pid] || [];
+          list = list.filter(x => x.d !== day.id);
+          list.push({ d: day.id, n: win.names[pid] ? win.names[pid].n : undefined, r: entries[pid] });
+          if (list.length > RANK_HIST_KEEP) list = list.slice(list.length - RANK_HIST_KEEP);
+          hist.players[pid] = list;
+        }
+        await api.setPrivateCustomItem(context.projectId, "contests_rank_hist_" + n, { key: "h", value: hist });
+      } catch (err) { logger.warning("ranking history " + n + ": " + err); }
+    }));
+  }
+  return true;
+}
+
+async function ranking(api, context, me, now, logger) {
+  try { await updateRanking(api, context, now, logger); } catch (err) { logger.warning("updateRanking: " + err); }
+  const item = await loadRankItem(api, context, "contests_rank", "lists");
+  const stored = item.value || { day: "", updatedAt: 0, lists: {} };
+  const winsItem = await loadRankItem(api, context, "contests_rank", "wins");
+  const wins = winsItem.value && winsItem.value.players ? winsItem.value.players : {};
+  // Each row gets the player's wins: ww weekly, wd daily (all time)
+  const withWins = r => {
+    if (!r) return null;
+    const x = wins[r.p] || {};
+    return Object.assign({}, r, { ww: x.w || 0, wd: x.d || 0 });
+  };
+  const lists = {}, mine = {}, counts = {};
+  for (const key of RANK_LISTS) {
+    const rows = stored.lists && stored.lists[key] ? stored.lists[key] : [];
+    lists[key] = rows.slice(0, RANK_TOP).map(withWins);
+    counts[key] = rows.length;
+    mine[key] = withWins(rows.find(r => r.p === me));
+  }
+  const myWins = wins[me] || {};
+  return {
+    day: stored.day, updatedAt: stored.updatedAt, me, lists, mine, counts,
+    myWins: { ww: myWins.w || 0, wd: myWins.d || 0, rc: myWins.rc || 0, race: myWins.race || 0, run: myWins.run || 0 },
+    rules: { days: RANK_DAYS, weekly: RANK_WEIGHT.w, daily: RANK_WEIGHT.d, full: RANK_FULL, minFinishers: RANK_MIN_FINISHERS }
+  };
+}
+
+async function rankHistory(api, context, payload) {
+  const pid = String(payload.player || "");
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(pid)) throw new Error("Bad player");
+  const item = await loadRankItem(api, context, "contests_rank_hist_" + histShard(pid), "h");
+  const list = item.value && item.value.players && item.value.players[pid] ? item.value.players[pid] : [];
+  const winsItem = await loadRankItem(api, context, "contests_rank", "wins");
+  const x = winsItem.value && winsItem.value.players && winsItem.value.players[pid] ? winsItem.value.players[pid] : {};
+  return { player: pid, days: list, wins: { ww: x.w || 0, wd: x.d || 0, rc: x.rc || 0, race: x.race || 0, run: x.run || 0 } };
 }

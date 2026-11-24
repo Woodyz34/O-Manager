@@ -152,7 +152,19 @@ public class IndividualRace : MonoBehaviour, IRaceStats
         if (local == null || local.Object == null || !local.Object.IsValid || !local.raceFinished) return;
         int seconds = local.hourCount * 3600 + local.minuterCount * 60 + local.secoundCount;
         RelayTrack track = (ownTracks ?? recorder.Tracks).Find(t => t != null && t.isLocal);
-        ContestRun.OnRaceFinished(seconds, track);
+        // Where each control was reached, so the contest replay can show the leg splits (2026-11-24)
+        int[] ends = null;
+        PathfindingManager manager = FindObjectOfType<PathfindingManager>();
+        if (track != null && manager != null && manager.controlPoints != null && manager.controlPoints.Count > 1)
+        {
+            try
+            {
+                RelayTeamResult result = RouteCompareView.ResultFor(RelayStats.ForLeg(this, 0), track);
+                ends = RouteCompareView.LegEnds(track, result, manager.controlPoints, manager.controlPoints.Count - 1, out bool[] _);
+            }
+            catch (System.Exception e) { Debug.LogWarning("Contest replay: no leg splits (" + e.Message + ")"); }
+        }
+        ContestRun.OnRaceFinished(seconds, track, ends);
     }
 
     static bool AllFinished()

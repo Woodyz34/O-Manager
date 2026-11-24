@@ -936,6 +936,8 @@ public class RouteChoiceView : MonoBehaviour
             if (p.Object != null && p.Object.IsValid) players.Add(p);
         }
         players.Sort((a, b) => b.choiceScore.CompareTo(a.choiceScore));
+        // Everyone is done: the played time for the prize money stops here, the same for all (2026-11-24)
+        if (players.Count > 0 && players.TrueForAll(p => p.choiceDone)) CompetitionFlow.MarkEveryoneDone();
         foreach (NetworkPlayer p in players)
         {
             if (!p.Object.HasStateAuthority) continue;

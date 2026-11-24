@@ -29,6 +29,10 @@ public static class CompetitionFlow
     static float sceneLoadedAt;
     static float resultsShownAt;
     static float allFinishedSince;
+    // When the last runner reached the finish (the statistics / GPS screen), or -1 while someone is still out
+    static float everyoneDoneAt;
+    // The host's played time for the whole lobby, sent with the results so everyone gets the same, or -1
+    static float sharedPlayed;
     static bool resultsRequested;
     static bool revealRequested;
 
@@ -54,12 +58,43 @@ public static class CompetitionFlow
         resultsRequested = false;
         revealRequested = false;
         allFinishedSince = -1f;
+        everyoneDoneAt = -1f;
+        sharedPlayed = -1f;
         rememberedImposter = PlayerRef.None;
         sceneLoadedAt = Time.unscaledTime;
     }
 
-    // How long this competition has been played, in real seconds, up to the results (the prize money, 2026-11-19)
-    public static float PlayedSeconds => Mathf.Max(0f, (ResultsShown ? resultsShownAt : Time.unscaledTime) - sceneLoadedAt);
+    // How long this competition has been played, in real seconds, for the prize money (2026-11-19). Since 2026-11-24
+    // (the user) it is the same for everyone in the lobby: from entering the competition until the last runner is
+    // in (the statistics / GPS screen), so a fast runner who waits for the others is not paid less. The host's
+    // value comes with the results; before that, and alone, it is this computer's own clock.
+    public static float PlayedSeconds
+    {
+        get
+        {
+            if (sharedPlayed >= 0f) return sharedPlayed;
+            return LocalPlayedSeconds;
+        }
+    }
+
+    static float LocalPlayedSeconds
+    {
+        get
+        {
+            float end = everyoneDoneAt >= 0f ? everyoneDoneAt : ResultsShown ? resultsShownAt : Time.unscaledTime;
+            return Mathf.Max(0f, end - sceneLoadedAt);
+        }
+    }
+
+    // Every runner is in: the played time stops here, also while the statistics / GPS screen stays open
+    public static void MarkEveryoneDone()
+    {
+        if (everyoneDoneAt >= 0f || ResultsShown || !InCompetition()) return;
+        everyoneDoneAt = Time.unscaledTime;
+    }
+
+    // The host's played time, sent to everyone with the results
+    static int HostPlayedSeconds => Mathf.RoundToInt(LocalPlayedSeconds);
 
     static bool InCompetition()
     {
@@ -99,6 +134,12 @@ public static class CompetitionFlow
 
         if (!ResultsShown)
         {
+            // A race without a relay: the played time stops when the last runner is in (a relay stops it after the
+            // last leg, RelayRace)
+            if (RelayRace.Active == null && AllPlayers(p => p.raceFinished))
+            {
+                MarkEveryoneDone();
+            }
             // Everyone is in: show the results automatically. In a relay the host shows them from the statistics screen.
             if ((RelayRace.Active != null && !RelayRace.Active.FinalResultsAllowed)
                 || (IndividualRace.Active != null && !IndividualRace.Active.FinalResultsAllowed))
@@ -114,7 +155,7 @@ public static class CompetitionFlow
                 else if (!resultsRequested && Time.unscaledTime - allFinishedSince > 1.5f)
                 {
                     resultsRequested = true;
-                    local.RPC_ShowResults();
+                    local.RPC_ShowResults(HostPlayedSeconds);
                 }
             }
             else
@@ -156,7 +197,7 @@ public static class CompetitionFlow
             return;
         }
         resultsRequested = true;
-        NetworkPlayer.Local.RPC_ShowResults();
+        NetworkPlayer.Local.RPC_ShowResults(HostPlayedSeconds);
     }
 
     public static void HostRevealImposter()
@@ -192,7 +233,7 @@ public static class CompetitionFlow
 
     // ---- Received by every player ----
 
-    public static void OnShowResults()
+    public static void OnShowResults(int hostPlayedSeconds)
     {
         if (ResultsShown || !InCompetition())
         {
@@ -200,6 +241,8 @@ public static class CompetitionFlow
         }
         ResultsShown = true;
         resultsShownAt = Time.unscaledTime;
+        // The same played time for everyone in the lobby: the host's
+        if (hostPlayedSeconds >= 0) sharedPlayed = hostPlayedSeconds;
         GuessDeadline = Time.unscaledTime + GuessSeconds;
 
         StopLocalRunner();
@@ -418,6 +461,13 @@ public static class CompetitionRewards
     {
         if (seconds < MinPlayedSeconds) return 0;
         return Mathf.Min(MaxForTime, Mathf.FloorToInt(seconds / 30f) * PerHalfMinute);
+    }
+
+    // "23 min 10 s"
+    public static string Duration(float seconds)
+    {
+        int minutes = Mathf.FloorToInt(seconds / 60f);
+        return (minutes > 0 ? minutes + " min " : "") + Mathf.FloorToInt(seconds % 60f) + " s";
     }
 
     public static string TimeLabel(float seconds)

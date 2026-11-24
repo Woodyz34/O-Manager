@@ -1447,9 +1447,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     // Sent by the host from its own player: the competition is over, everyone opens the results screen
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    public void RPC_ShowResults()
+    public void RPC_ShowResults(int playedSeconds)
     {
-        CompetitionFlow.OnShowResults();
+        CompetitionFlow.OnShowResults(playedSeconds);
     }
 
     // Sent by the host in imposter mode when the guessing is done: everyone plays the reveal

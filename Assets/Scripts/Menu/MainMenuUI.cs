@@ -76,8 +76,12 @@ public class MainMenuUI : MonoBehaviour
     {
         if (homePanel == null || homePanel.transform.Find("Contests") != null) return;
         Button contests = CourseUI.Button("Contests", homePanel.transform, "Weekly & daily contests", CourseUI.ButtonKind.Primary, ContestsPage.Open, 26);
-        CourseUI.Place((RectTransform)contests.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 44), new Vector2(420, 56));
+        CourseUI.Place((RectTransform)contests.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-220, 44), new Vector2(420, 56));
         HoverTip.Add(contests, "This week's and today's contests: one try each, a shared leaderboard and prize money for the best.");
+        // The world ranking (2026-11-24): the best players of the contests, next to the contests button
+        Button ranking = CourseUI.Button("Ranking", homePanel.transform, "World ranking", CourseUI.ButtonKind.Secondary, RankingPage.Open, 26);
+        CourseUI.Place((RectTransform)ranking.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(220, 44), new Vector2(420, 56));
+        HoverTip.Add(ranking, "Who is the best player in O-Manager? The top players of the weekly and daily contests, overall and in each game.");
     }
 
     static void BackGoesToLobby(GameObject panel)

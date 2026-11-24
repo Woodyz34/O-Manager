@@ -31,6 +31,8 @@ public class CardData
     public string clubName;
     public bool inPacks = true;  // false = frozen: kept by players who own it, no longer in packs
     public List<RunnerMerit> merits = new List<RunnerMerit>();   // best races of the last year, best first
+    // Physics, speed and technique at every rating update, oldest first (2026-11-24): the line chart in My Runners
+    public List<RatingPoint> history = new List<RatingPoint>();
 
     public CardData(string Name, float Speed, float Technique, Sprite Country, Sprite Clubb, string Klass, bool Man, Sprite Profile)
     {
@@ -75,4 +77,14 @@ public class RunnerMerit
     public float score;
     public float field;       // mean rating of the 5 best runners in the class
     public string results;    // file in Resources/Runners/Results with the whole class and split times
+}
+
+// A runner's numbers at one rating update (eventor/compute_points.py, add_history)
+[System.Serializable]
+public class RatingPoint
+{
+    public string d;     // yyyy-mm-dd
+    public float p;      // physics
+    public float s = -1; // speed (sprint), -1 = none
+    public float t;      // technique
 }
