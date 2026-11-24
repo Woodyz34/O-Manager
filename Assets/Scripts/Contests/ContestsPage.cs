@@ -64,6 +64,27 @@ public class ContestsPage : MonoBehaviour
         open = go.AddComponent<ContestsPage>();
         open.Build();
         open.Reload();
+        ShowTimePaid();
+    }
+
+    // "You were out 23 min 10 s and got 460 kr" after a contest run (2026-11-24, the user). No place here: you run
+    // alone, so it would always say 1 of 1. The prize for the place comes when the contest is over.
+    static void ShowTimePaid()
+    {
+        List<ContestRun.TimePaid> paid = ContestRun.TakeTimePaid();
+        if (paid.Count == 0) return;
+        int total = 0;
+        List<string> lines = new List<string>();
+        foreach (ContestRun.TimePaid p in paid)
+        {
+            total += p.kr;
+            lines.Add(DescribeId(p.id));
+            lines.Add("You were out <b>" + CompetitionRewards.Duration(p.seconds) + "</b> and got <b>+" + Kr(p.kr) + "</b>");
+            lines.Add("");
+        }
+        lines.Add("<size=85%><color=#5B7563>" + MoneyLabel.Format(CompetitionRewards.PerHalfMinute) + " for every 30 seconds out (at most "
+            + MoneyLabel.Format(CompetitionRewards.MaxForTime) + "). The prize for your place comes when the contest is over.</color></size>");
+        ShowPrizePopup(lines, total, 0, "You got " + Kr(total) + " for your run!");
     }
 
     void OnEnable() { Money.Changed += ShowMoney; PrizePacks.Changed += ShowPacks; }
@@ -519,7 +540,8 @@ public class ContestsPage : MonoBehaviour
     static string PacksTip(ContestInfo c)
     {
         return "Weekly pack: " + PrizePacks.Odds(PrizePacks.Weekly) + ".\nDaily pack: " + PrizePacks.Odds(PrizePacks.Daily)
-               + ".\nRunner pack: the shop's pack.\nPacks only hold runners you do not have yet.";
+               + ".\nRunner pack: the shop's pack.\nPacks only hold runners you do not have yet."
+               + "\nAt the finish you also get " + MoneyLabel.Format(CompetitionRewards.PerHalfMinute) + " for every 30 seconds out.";
     }
 
     // ---- Starting ----
@@ -719,7 +741,7 @@ public class ContestsPage : MonoBehaviour
     }
 
     // The prize money that was just paid, over whatever screen is showing
-    static void ShowPrizePopup(List<string> lines, int total, int packs)
+    static void ShowPrizePopup(List<string> lines, int total, int packs, string headingText = null)
     {
         GameObject go = new GameObject("Contest prizes", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         Canvas canvas = go.GetComponent<Canvas>();
@@ -738,6 +760,7 @@ public class ContestsPage : MonoBehaviour
         CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, Mathf.Min(900, height)));
         string heading = packs > 0 ? "You won " + (packs == 1 ? "a runner pack" : packs + " runner packs") + (total > 0 ? " and " + Kr(total) : "") + "!"
                          : total > 0 ? "Contest prize money: +" + Kr(total) : "Contest results";
+        if (headingText != null) heading = headingText;
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, heading, 38, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Place(title.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(940, 56));
         TextMeshProUGUI text = CourseUI.Text("Lines", card.transform, string.Join("\n", lines), 24, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.Top);
