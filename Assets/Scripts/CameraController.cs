@@ -333,8 +333,8 @@ public class CameraController : MonoBehaviour
         }
 
         // Never in a replay (2026-11-20, Anders: it does nothing there and is in the way)
-        // 2026-11-24 (Anders): the button is gone from the top left corner in every game mode
-        bool show = false;
+        // Never in a replay or the route choice game (IsRunPhase), but always while playing, relays too (2026-11-24, Anders)
+        bool show = IsRunPhase() && RelayReplayView.Current == null;
         if (followButton.gameObject.activeSelf != show)
         {
             followButton.gameObject.SetActive(show);
