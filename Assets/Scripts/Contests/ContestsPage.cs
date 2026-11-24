@@ -494,7 +494,7 @@ public class ContestsPage : MonoBehaviour
         }
     }
 
-    // "Prizes: 1st Weekly pack, 2nd Daily pack + Runner pack, 3rd Daily pack, 4th-6th 250 kr+, everyone who finishes 200 kr."
+    // "Prizes: 1st Golden pack, 2nd Silver pack + Bronze pack, 3rd Silver pack, 4th-6th 250 kr+, everyone who finishes 200 kr."
     static string PrizeText(ContestInfo c)
     {
         if (!ContestCloud.PrizeRules.TryGetValue(c.span, out ContestPrizeRules rules) || rules.top == null || rules.top.Length < 3) return "";
@@ -518,8 +518,8 @@ public class ContestsPage : MonoBehaviour
 
     static string PacksTip(ContestInfo c)
     {
-        return "Weekly pack: " + PrizePacks.Odds(PrizePacks.Weekly) + ".\nDaily pack: " + PrizePacks.Odds(PrizePacks.Daily)
-               + ".\nRunner pack: the shop's pack.\nPacks only hold runners you do not have yet.";
+        return "Golden pack: " + PrizePacks.Odds(PrizePacks.Weekly) + ".\nSilver pack: " + PrizePacks.Odds(PrizePacks.Daily)
+               + ".\nBronze pack: the shop's pack.\nPacks only hold runners you do not have yet.";
     }
 
     // ---- Starting ----

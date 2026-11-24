@@ -107,7 +107,8 @@ public class PackOpening : MonoBehaviour
     static readonly Vector2 ChipRight = new Vector2(650f, 405f);
     static readonly Vector2 ChipClub = new Vector2(-545f, 405f);   // next to the flag in the corner
     const float ClubSize = 300f;
-    static readonly Color Neutral = new Color(1f, 0.93f, 0.78f, 1f);
+    // The light before the runner shows: tinted by the kind of pack (bronze, silver, golden), never by the runner's tier
+    static Color Neutral = new Color(1f, 0.93f, 0.78f, 1f);
 
     PackResult result;
     Action<Exit> onClosed;
@@ -150,12 +151,29 @@ public class PackOpening : MonoBehaviour
     // Called once when the player opens the pack (clicks it). The shop pays for the pack and adds the runner then.
     public Action Opened;
 
+    // Which pack this is: "bronze" (the shop's), "silver" or "gold" (prizes). Set before Play. Swaps the pack pictures
+    // (Resources/UI/Packs, made by Docs/make_pack_variants.py), tints the light and names the pack on the hint.
+    public string packKind = PackKinds.Bronze;
+
+    void ApplyKind()
+    {
+        Neutral = PackKinds.Light(packKind);
+        lightColor = lightTarget = Neutral;
+        Sprite body = Resources.Load<Sprite>("UI/Packs/" + packKind + "_pack_body");
+        Sprite top = Resources.Load<Sprite>("UI/Packs/" + packKind + "_pack_top");
+        if (body != null) packBody.sprite = body;
+        if (top != null) packTop.sprite = top;
+        hint.text = "CLICK THE " + PackKinds.Name(packKind).ToUpperInvariant() + " TO OPEN";
+        hint.color = PackKinds.Text(packKind);
+    }
+
     public void Play(PackResult packResult, Action<Exit> closed)
     {
         result = packResult;
         onClosed = closed;
         tier = RunnerCards.Tier(result.card);
         tierColor = RunnerCards.TierColor(tier);
+        ApplyKind();
         showColor = Neutral;
         card.Show(result.card);
         Prepare();
@@ -169,8 +187,9 @@ public class PackOpening : MonoBehaviour
     string loanButton;
     bool onLoan = true;
 
-    public void PlayLoan(CardData runner, string title, string buttonText, Action closed, bool loan = true)
+    public void PlayLoan(CardData runner, string title, string buttonText, Action closed, bool loan = true, string kind = PackKinds.Bronze)
     {
+        packKind = kind;
         loanTitle = title;
         loanButton = buttonText;
         onLoan = loan;
