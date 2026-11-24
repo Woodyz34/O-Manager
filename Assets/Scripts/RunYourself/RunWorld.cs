@@ -337,7 +337,16 @@ public class RunWorld : MonoBehaviour
     {
         int ix = (int)Math.Floor((e - anchorE) / PieceSize), iz = (int)Math.Floor((n - anchorN) / PieceSize);
         if (pieces.TryGetValue(Key(ix, iz), out Piece p) && p.world != null)
-            return p.world.HeightAt((float)(e - p.ce), (float)(n - p.cn));
+        {
+            float g = p.world.HeightAt((float)(e - p.ce), (float)(n - p.cn));
+            // Beside a tunnel, over its walls: the top of its slab (the ground under it rises behind the walls)
+            if (p.world.tunnels.Count > 0)
+            {
+                TunnelSpot s = Tunnel(e, n);
+                if (s.slab) return Mathf.Max(g, s.roof);
+            }
+            return g;
+        }
         return terrain.MapHeight(e, n) - baseHeight;
     }
 
@@ -356,7 +365,7 @@ public class RunWorld : MonoBehaviour
     // the road over it, or in it), and the height of its roof's top there
     public struct TunnelSpot
     {
-        public bool inside, between;
+        public bool inside, between, slab;     // slab: over the tunnel's wall, beside its inside
         public float roof;
     }
 
@@ -378,6 +387,11 @@ public class RunWorld : MonoBehaviour
                 s.inside = true;
                 s.roof = Mathf.Lerp(t[i + 6], t[i + 7], along / Mathf.Max(0.1f, len)) + TvWorldBuilder.TunnelRoof;
                 return s;
+            }
+            if (across <= half + 1.9f)
+            {
+                s.slab = true;
+                s.roof = Mathf.Lerp(t[i + 6], t[i + 7], along / Mathf.Max(0.1f, len)) + TvWorldBuilder.TunnelRoof;
             }
         }
         return s;

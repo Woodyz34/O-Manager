@@ -293,8 +293,11 @@ public partial class TvWorldBuilder
             {
                 byte c = layer.At(layer.minE + (i0 + di - 1 + 0.5) * layer.cell, layer.minN + (j0 + dj - 1 + 0.5) * layer.cell);
                 int kind = Base(c) == WorldCell.Building ? WorldCell.Paved : Base(c);
-                voteWeight[kind] += wx[di] * wz[dj];
                 cells[dj * 4 + di] = c;
+                // A cell green only from a hedge drawn through it has no say: the hedge stands on the ground round it
+                // (2026-11-24, Anders: patches of grass stuck out from a hedge onto the asphalt)
+                if (HedgeCell(i0 + di - 1, j0 + dj - 1) && kind != WorldCell.Paved && kind != WorldCell.Water) { cells[dj * 4 + di] = 0xFF; continue; }
+                voteWeight[kind] += wx[di] * wz[dj];
             }
         int ownKind = Base(own), best = ownKind;
         for (int k = 0; k < 16; k++)
@@ -305,12 +308,48 @@ public partial class TvWorldBuilder
         float near = float.MaxValue;
         for (int q = 0; q < 16; q++)
         {
+            if (cells[q] == 0xFF) continue;
             int kind = Base(cells[q]) == WorldCell.Building ? WorldCell.Paved : Base(cells[q]);
             if (kind != best) continue;
             float dx = (q % 4) - 1 - tx, dz = (q / 4) - 1 - tz, d = dx * dx + dz * dz;
             if (d < near) { near = d; pick = q; }
         }
         return (byte)((cells[pick] & ~WorldCell.BaseMask) | best);
+    }
+
+    HashSet<long> hedgeCells;
+
+    // A 2 m cell of the map a hedge line runs through (in a town)
+    bool HedgeCell(int i, int j)
+    {
+        if (input.town == null || lines == null) return false;
+        if (hedgeCells == null)
+        {
+            hedgeCells = new HashSet<long>();
+            foreach (var line in lines)
+            {
+                if (line.kind != WorldLineKind.Hedge) continue;
+                float[] c = line.xz;
+                for (int q = 0; q + 3 < c.Length; q += 2)
+                {
+                    float dx = c[q + 2] - c[q], dz = c[q + 3] - c[q + 1], len = (float)Math.Sqrt(dx * dx + dz * dz);
+                    for (float t = 0f; t <= len; t += 0.4f)
+                    {
+                        float f = len > 0f ? t / len : 0f;
+                        double e = input.centerE + c[q] + dx * f, n = input.centerN + c[q + 1] + dz * f;
+                        for (int a = -1; a <= 1; a++)
+                            for (int b = -1; b <= 1; b++)
+                            {
+                                // The cells whose middle is within 1.3 m of the hedge's line
+                                int ci = (int)Math.Floor((e - layer.minE) / layer.cell) + a, cj = (int)Math.Floor((n - layer.minN) / layer.cell) + b;
+                                double mx = layer.minE + (ci + 0.5) * layer.cell - e, mz = layer.minN + (cj + 0.5) * layer.cell - n;
+                                if (mx * mx + mz * mz <= 1.3 * 1.3) hedgeCells.Add(((long)ci << 32) ^ (uint)cj);
+                            }
+                    }
+                }
+            }
+        }
+        return hedgeCells.Count > 0 && hedgeCells.Contains(((long)i << 32) ^ (uint)j);
     }
 
     // Uniform cubic B-spline weights of the four cells round a point t (0..1) past the second one's middle
