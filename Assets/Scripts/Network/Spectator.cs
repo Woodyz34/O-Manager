@@ -150,9 +150,12 @@ public class Spectator : MonoBehaviour
         barTitle = CourseUI.Text("Title", bar, "", 30, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Stretch(barTitle.rectTransform, 96, 96, 12, 56);
         barTitle.richText = true;
-        barHint = CourseUI.Text("Hint", bar, "You joined while the race was on, so you watch this one and race from the next race. Click a runner on the leaderboard to watch them.",
+        barHint = CourseUI.Text("Hint", bar, "Click a runner on the leaderboard to watch them.",
             18, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
         CourseUI.Stretch(barHint.rectTransform, 96, 96, 58, 8);
+        Button hide = CourseUI.Button("Hide", bar, "X", CourseUI.ButtonKind.Secondary, () => { if (bar != null) bar.gameObject.SetActive(false); }, 22);
+        CourseUI.Place((RectTransform)hide.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-4f, -4f), new Vector2(34f, 34f));
+        HoverTip.Add(hide, "Hide this bar");
 
         // The leader to begin with
         List<NetworkPlayer> runners = LeaderboardManager.Standings();
@@ -212,6 +215,7 @@ public class Spectator : MonoBehaviour
     void ShowCard()
     {
         view = View.Card;
+        if (cardClosed) return;
         BuildCanvas();
         if (bar != null) bar.gameObject.SetActive(false);
         if (card != null) return;
@@ -222,9 +226,24 @@ public class Spectator : MonoBehaviour
         CourseUI.Place(cardTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(800f, 56f));
         cardBody = CourseUI.Text("Body", card, "", 24, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.TopLeft);
         CourseUI.Stretch(cardBody.rectTransform, 40, 40, 96, 30);
+        // The card can be closed: the one who watches may not want it in the way (2026-11-25, Anders)
+        Button close = CourseUI.Button("Close", card, "X", CourseUI.ButtonKind.Secondary, CloseCard, 28);
+        CourseUI.Place((RectTransform)close.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(56f, 56f));
+        HoverTip.Add(close, "Close this");
         cardBody.richText = true;
         cardBody.overflowMode = TextOverflowModes.Truncate;
         RefreshCard();
+    }
+
+    bool cardClosed;
+
+    void CloseCard()
+    {
+        cardClosed = true;
+        if (card != null) Destroy(card.gameObject);
+        card = null;
+        cardBody = null;
+        cardTitle = null;
     }
 
     void RefreshCard()
