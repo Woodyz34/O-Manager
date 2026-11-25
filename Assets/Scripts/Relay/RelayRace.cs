@@ -118,7 +118,116 @@ public class RelayRace : MonoBehaviour, IRaceStats
     {
         picks.Clear();
         pool = null;
+        // The Monday relay has no host to wait for the slowest: the picks are made for you when the time is up
+        if (pickDeadline < 0f) pickDeadline = Time.unscaledTime + MondayRelay.PickSeconds;
         ShowCardsForNextPick();
+    }
+
+    // ---- The Monday relay: nobody is the host, so time limits keep the relay going (MondayRelay) ----
+
+    float pickDeadline = -1f;      // when the runners are picked for you
+    float drawDeadline = -1f;      // when the rest of the leg is run straight on the compass
+    float statsShownAt = -1f;      // when the statistics came up
+    bool monday;
+    float nextMondayCheck;
+
+    bool Monday
+    {
+        get
+        {
+            if (Time.unscaledTime >= nextMondayCheck)
+            {
+                nextMondayCheck = Time.unscaledTime + 2f;
+                monday = MondayRelay.Active;
+            }
+            return monday;
+        }
+    }
+
+    // Seconds until the next leg starts (or the results come) by themselves, or -1 when it is up to the host
+    public float MondayContinueIn
+    {
+        get
+        {
+            if (!Monday || statsShownAt < 0f || statsShownForLeg != leg) return -1f;
+            float wait = leg >= course.legs - 1 ? MondayRelay.FinalStatsSeconds : MondayRelay.StatsSeconds;
+            return Mathf.Max(0f, statsShownAt + wait - Time.unscaledTime);
+        }
+    }
+
+    bool PickingNow()
+    {
+        NetworkPlayer local = NetworkPlayer.Local;
+        if (local == null || local.HasChoosenRunner || picks.Count >= course.legs) return false;
+        GameObject panel = pathfinding != null ? pathfinding.ChooseRunnerPanel : null;
+        return panel != null && panel.activeInHierarchy;
+    }
+
+    // Time is up: a random allowed runner for every leg not picked yet
+    void AutoPickRest()
+    {
+        CardManager cards = FindObjectOfType<CardManager>();
+        System.Random random = new System.Random();
+        while (picks.Count < course.legs)
+        {
+            List<CardData> left = RunnerRules.AllowedList(Pool(), picks, LegSexes, RunnerRules.Cap);
+            if (left.Count == 0) left = Pool().FindAll(c => RunnerRules.Fits(c, LegSexes[picks.Count]));
+            if (left.Count == 0) left = new List<CardData>(Pool());
+            left = GameModes.WithSameStats(left, picks.Count);
+            if (left.Count == 0) break;
+            picks.Add(left[random.Next(left.Count)]);
+        }
+        if (cards != null) cards.ClearOffered();
+        RunnerFilterBar.ClearRules();
+        if (pickHeader != null) pickHeader.transform.parent.gameObject.SetActive(false);
+        if (pathfinding.ChooseRunnerPanel != null) pathfinding.ChooseRunnerPanel.SetActive(false);
+        if (NetworkPlayer.Local != null) NetworkPlayer.Local.SetHasChoosenRunner();
+        UIToast.Show("Time is up: the rest of your team was picked for you.", 4f);
+    }
+
+    void MondayTick()
+    {
+        if (!Monday) return;
+        // Picking the runners
+        if (PickingNow())
+        {
+            if (pickDeadline >= 0f && Time.unscaledTime >= pickDeadline)
+            {
+                AutoPickRest();
+            }
+            else if (pickHeader != null && Time.unscaledTime >= nextHeaderRefresh)
+            {
+                nextHeaderRefresh = Time.unscaledTime + 1f;
+                RefreshPickHeader();
+            }
+        }
+        // Drawing the leg
+        ManualPathDrawer drawer = NetworkPlayer.Local != null && NetworkPlayer.Local.agentMovement != null ? NetworkPlayer.Local.agentMovement.manualPathDrawer : null;
+        if (leg >= 0 && !raceStarted && drawDeadline >= 0f && drawer != null && drawer.relayMode && drawer.timeToDraw && Time.unscaledTime >= drawDeadline)
+        {
+            drawDeadline = -1f;
+            UIToast.Show("Time is up: the rest of the leg is run straight on the compass.", 5f);
+            drawer.DrawRestStraight();
+        }
+        // The statistics: the host's game goes on by itself
+        if (statsShownAt >= 0f && statsShownForLeg == leg && !CompetitionFlow.ResultsShown && CompetitionFlow.LocalIsHost()
+            && MondayContinueIn <= 0f && Time.unscaledTime >= nextContinueTry)
+        {
+            nextContinueTry = Time.unscaledTime + 3f;   // once more after a moment if the message got lost
+            HostContinue();
+        }
+    }
+
+    float nextHeaderRefresh;
+    float nextContinueTry;
+
+    // "Time left to draw: 2:31" (empty when there is no limit)
+    string DrawTimeLeft()
+    {
+        if (!Monday || raceStarted || drawDeadline < 0f) return "";
+        ManualPathDrawer drawer = NetworkPlayer.Local != null && NetworkPlayer.Local.agentMovement != null ? NetworkPlayer.Local.agentMovement.manualPathDrawer : null;
+        if (drawer == null || !drawer.timeToDraw) return "";
+        return "\n<color=#E8742A>Time left to draw: " + MondayRelay.SecondsText(drawDeadline - Time.unscaledTime) + "</color>";
     }
 
     // A card was clicked. Returns true when every leg has a runner and the competition can go on.
@@ -151,7 +260,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
         for (int legIndex = 0; legIndex < course.legs; legIndex++)
         {
             LegSex sex = LegSexes[Mathf.Clamp(legIndex, 0, LegSexes.Count - 1)];
-            picks.Add(GameModes.SameStatsRunner(playerName, legIndex, sex != LegSex.Women));
+            picks.Add(GameModes.SameStatsRunner(playerName, legIndex, !RunnerRules.IsWomen(sex)));
         }
         RunnerFilterBar.ClearRules();
         if (pickHeader != null) pickHeader.transform.parent.gameObject.SetActive(false);
@@ -196,7 +305,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
 
         // A women's or men's leg shows only them; an open leg in "Open packs" shows both
         LegSex sex = LegSexes[picks.Count];
-        RunnerFilterBar.SexRule = sex == LegSex.Women ? true : sex == LegSex.Men ? false : (bool?)null;
+        RunnerFilterBar.SexRule = RunnerRules.IsWomen(sex) ? true : RunnerRules.IsMen(sex) ? false : (bool?)null;
         RunnerFilterBar.BothSexes = sex == LegSex.Any && RunnerRules.OpenPacksRound;
 
         foreach (CardData data in left)
@@ -244,7 +353,9 @@ public class RelayRace : MonoBehaviour, IRaceStats
         string team = picks.Count > 0 ? "\n<size=90%><color=#5B7563>Team so far:  " + PickedList() + "</color></size>" : "\n<size=90%><color=#5B7563>Speed decides how long a runner can hang on to someone faster.</color></size>";
         // Women's or men's leg, and the max average overall
         LegSex sex = LegSexes[Mathf.Clamp(picks.Count, 0, LegSexes.Count - 1)];
-        string rules = sex != LegSex.Any ? "   <color=#E8742A>" + (sex == LegSex.Women ? "Women only" : "Men only") + "</color>" : "";
+        string rules = sex != LegSex.Any ? "   <color=#E8742A>" + RunnerRules.RuleText(sex) + "</color>" : "";
+        // The Monday relay: the time left to pick
+        if (Monday && pickDeadline >= 0f) rules += "   <color=#C0392B>Time left: " + MondayRelay.SecondsText(pickDeadline - Time.unscaledTime) + "</color>";
         string cap = RunnerRules.CapText(picks, course.legs);
         if (cap.Length > 0) rules += "   <color=#E8742A>" + cap + "</color>";
         // "Same stats": the values every runner gets on this leg
@@ -313,6 +424,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
 
         waitMessage = "";
         legMessage = "Draw the whole leg, from the start to the finish, before the start.";
+        drawDeadline = Monday ? Time.unscaledTime + MondayRelay.DrawSeconds : -1f;
         BuildHud();
         if (hud != null) hud.SetActive(true);
         RefreshHud();
@@ -501,6 +613,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     void ShowStats(bool final)
     {
         statsShownForLeg = leg;
+        statsShownAt = Time.unscaledTime;
         recorder.Stop();
         if (hud != null) hud.SetActive(false);
         if (statsUI == null)
@@ -591,6 +704,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     {
         // The host's race clock of the leg runs until every team is in (RelayClock)
         RelayClock.Tick(Time.deltaTime);
+        MondayTick();
         if (leg >= 0 && AllTeamsFinished(leg)) RelayClock.LegOver();
         // After the last leg: the statistics come up once every team is in, before the results
         if (leg >= 0 && leg == course.legs - 1 && statsShownForLeg < leg && statsDueForLeg < leg && AllTeamsFinished(leg))
@@ -612,6 +726,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
         NetworkPlayer local = NetworkPlayer.Local;
         PackRunning pack = local != null && local.agentMovement != null ? local.agentMovement.packRunning : null;
         string text = waitMessage != "" ? waitMessage : legMessage;
+        if (legMessage != "" && waitMessage == "") text += DrawTimeLeft();
         if (text == "" && pack != null) text = pack.Status;
         if (text == "" && pack != null && LegIsStraight)
         {

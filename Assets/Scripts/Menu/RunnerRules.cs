@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Who may run a relay leg (set per leg in the course builder, CourseData.legSex)
-public enum LegSex { Any, Women, Men }
+// Who may run a relay leg (set per leg in the course builder, CourseData.legSex). The classes (D18 ... H21) are only
+// given by the Monday relay (MondayRelay.LegClasses): only runners of that class (CardData.klass) may run the leg.
+public enum LegSex { Any, Women, Men, D18, H18, D20, H20, D21, H21 }
 
 // Women and men in the same race, and the host's rules for which runners a team may use (2026-11-13).
 //
@@ -66,10 +67,25 @@ public static class RunnerRules
     public static bool Fits(CardData card, LegSex sex)
     {
         if (card == null) return false;
-        return sex == LegSex.Any || (sex == LegSex.Women ? !card.man : card.man);
+        if (sex == LegSex.Any) return true;
+        if (sex == LegSex.Women) return !card.man;
+        if (sex == LegSex.Men) return card.man;
+        return card.klass == sex.ToString();   // a class leg: D18, H20 ...
     }
 
-    public static string SexName(LegSex sex) => sex == LegSex.Women ? "Women" : sex == LegSex.Men ? "Men" : "Any";
+    // A leg only women may run: a women's leg or a D class
+    public static bool IsWomen(LegSex sex) => sex == LegSex.Women || sex == LegSex.D18 || sex == LegSex.D20 || sex == LegSex.D21;
+    // A leg only men may run: a men's leg or an H class
+    public static bool IsMen(LegSex sex) => sex == LegSex.Men || sex == LegSex.H18 || sex == LegSex.H20 || sex == LegSex.H21;
+    public static bool IsClass(LegSex sex) => sex != LegSex.Any && sex != LegSex.Women && sex != LegSex.Men;
+
+    public static string SexName(LegSex sex) => sex == LegSex.Women ? "Women" : sex == LegSex.Men ? "Men" : sex == LegSex.Any ? "Any" : sex.ToString();
+
+    // "Women only", "Men only", "D18 only", or empty for an open leg
+    public static string RuleText(LegSex sex) => sex == LegSex.Any ? "" : SexName(sex) + " only";
+
+    // The order the cheapest runners are handed out in: the narrowest rules first
+    static readonly LegSex[] Passes = { LegSex.D18, LegSex.H18, LegSex.D20, LegSex.H20, LegSex.D21, LegSex.H21, LegSex.Women, LegSex.Men, LegSex.Any };
 
     // ---- The rules of the round being played (set on each player when the runner picking starts) ----
 
@@ -103,6 +119,9 @@ public static class RunnerRules
     // The leg rules of a course: one per leg in a relay, a single Any for an individual course
     public static List<LegSex> LegSexes(CourseData course)
     {
+        // The Monday relay gives every leg a class of its own
+        List<LegSex> monday = MondayRelay.ActiveLegRules(course);
+        if (monday != null) return monday;
         List<LegSex> legs = new List<LegSex>();
         if (course != null && course.IsRelay())
         {
@@ -133,7 +152,7 @@ public static class RunnerRules
     {
         used = new HashSet<string>();
         total = 0;
-        foreach (LegSex pass in new[] { LegSex.Women, LegSex.Men, LegSex.Any })
+        foreach (LegSex pass in Passes)
         {
             foreach (LegSex leg in legs)
             {
@@ -225,8 +244,28 @@ public static class RunnerRules
             }
             foreach (LegSex leg in legs)
             {
-                if (leg == LegSex.Women) womenLegs++;
-                else if (leg == LegSex.Men) menLegs++;
+                if (IsWomen(leg)) womenLegs++;
+                else if (IsMen(leg)) menLegs++;
+            }
+            // Class legs (the Monday relay): enough runners of each class first
+            foreach (LegSex rule in Passes)
+            {
+                if (!IsClass(rule)) continue;
+                int need = 0;
+                foreach (LegSex leg in legs) if (leg == rule) need++;
+                int have = 0;
+                foreach (CardData card in pool) if (Fits(card, rule)) have++;
+                while (have < need)
+                {
+                    List<CardData> fitting = spare.FindAll(c => Fits(c, rule));
+                    if (fitting.Count == 0) break;
+                    CardData next = fitting[random.Next(fitting.Count)];
+                    spare.Remove(next);
+                    pool.Add(next);
+                    lent.Add(next);
+                    if (next.man) men++; else women++;
+                    have++;
+                }
             }
             void LendOne(bool? man)
             {
@@ -250,6 +289,16 @@ public static class RunnerRules
             {
                 if (CanFill(pool, legs, budget)) break;
                 CardData next = spare.Find(c => c.man == man);
+                if (next == null) continue;
+                spare.Remove(next);
+                pool.Add(next);
+                lent.Add(next);
+            }
+            // Class legs: the cheapest runner of each class the legs ask for
+            foreach (LegSex rule in Passes)
+            {
+                if (!IsClass(rule) || !legs.Contains(rule) || CanFill(pool, legs, budget)) continue;
+                CardData next = spare.Find(c => Fits(c, rule));
                 if (next == null) continue;
                 spare.Remove(next);
                 pool.Add(next);

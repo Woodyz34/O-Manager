@@ -88,6 +88,18 @@ public class RelayStatsUI : MonoBehaviour
             nextRefresh = Time.unscaledTime + 0.5f;
             Refresh();
         }
+        MondayCountdown();
+    }
+
+    // The Monday relay (MondayRelay): no Continue button, the next leg (or the results) comes by itself
+    void MondayCountdown()
+    {
+        RelayRace relay = race as RelayRace;
+        float left = relay != null ? relay.MondayContinueIn : -1f;
+        if (left < 0f) return;
+        if (continueButton.gameObject.activeSelf) continueButton.gameObject.SetActive(false);
+        if (!waitingText.gameObject.activeSelf) waitingText.gameObject.SetActive(true);
+        waitingText.text = (final ? "The results come in " : "Leg " + (leg + 2) + " starts in ") + MondayRelay.SecondsText(left);
     }
 
     // ---- Layout ----

@@ -83,6 +83,12 @@ public static class HostSettings
         {
             if (cachedFrame == Time.frameCount) return cached;
             cachedFrame = Time.frameCount;
+            // The Monday relay has no real host: the normal values for everyone
+            if (MondayRelay.Active)
+            {
+                cached = Defaults;
+                return cached;
+            }
             cached = Mine;
             NetworkPlayer local = NetworkPlayer.Local;
             if (local == null || CompetitionFlow.LocalIsHost()) return cached;

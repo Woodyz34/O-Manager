@@ -77,8 +77,9 @@ public static class CloudCourses
         await CloudSaveService.Instance.Data.Player.SaveAsync(data, new PlayerData.SaveOptions(new PlayerData.PublicWriteAccessClassOptions()));
     }
 
-    // Every course other players have published, newest first
-    public static async Task<List<CourseData>> FetchCommunityAsync()
+    // Every course other players have published, newest first. includeMine: this player's published courses too (the
+    // Monday relay picks among everyone's relays, also the ones of the player whose game picks them).
+    public static async Task<List<CourseData>> FetchCommunityAsync(bool includeMine = false)
     {
         await SignInAsync();
         List<EntityData> results = new List<EntityData>();
@@ -100,7 +101,7 @@ public static class CloudCourses
         SharedMaps.BeginListing();
         foreach (EntityData entity in results)
         {
-            if (entity.Id == me || entity.Data == null)
+            if ((entity.Id == me && !includeMine) || entity.Data == null)
             {
                 continue;
             }
@@ -108,6 +109,7 @@ public static class CloudCourses
             {
                 if (item.Key == SharedMaps.SharedKey)
                 {
+                    if (entity.Id == me) continue;   // my own maps are on this computer already
                     SharedMaps.AddListed(entity.Id, item.Value.GetAs<string>());
                     continue;
                 }

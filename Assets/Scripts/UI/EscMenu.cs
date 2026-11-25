@@ -247,7 +247,8 @@ public class EscMenu : MonoBehaviour
         NetworkRunner runner = ActiveRunner();
         bool inCompetition = InCompetition(runner);
         bool single = runner != null && runner.GameMode == GameMode.Single;
-        bool host = inCompetition && CompetitionFlow.IsHostRunner(runner);
+        // The Monday relay's host is just whoever came first: it can't end the relay for everyone
+        bool host = inCompetition && CompetitionFlow.IsHostRunner(runner) && !MondayRelay.InSession(runner);
 
         endButton.gameObject.SetActive(host);
         // Lobby settings only in a multiplayer game (2026-11-19, Anders). The 3D settings are always under Settings

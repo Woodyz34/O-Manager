@@ -84,20 +84,40 @@ public class ReadyUIHandler : NetworkBehaviour
 
     public void StartGame()
     {
+        // The Monday relay starts on the clock (MondayRelayLobby), never from the button
+        if (MondayRelay.Active) return;
+        TryStartGame(false);
+    }
+
+    // The Monday relay (MondayRelayLobby): the relay that won the vote, raced with Any runner and no extra game modes.
+    // ignoreMaps: start even if someone still lacks the map (they have had MondayRelay.MapWaitSeconds to get it).
+    // Returns true when the race was started.
+    public bool StartMondayRelay(CourseData course, bool ignoreMaps)
+    {
+        if (!IsHost() || course == null) return false;
+        if (mapHandler != null) mapHandler.Select(course);
+        if (gameModeHandler != null) gameModeHandler.gameMode = GameModes.ChooseAny;
+        LobbySettingsUI lobbySettings = FindObjectOfType<LobbySettingsUI>();
+        if (lobbySettings != null) lobbySettings.modes = ExtraMode.None;
+        return TryStartGame(ignoreMaps);
+    }
+
+    bool TryStartGame(bool ignoreMaps)
+    {
         // Bara värden (master client i Shared Mode) får starta spelet
-        if (!IsHost()) return;
-        if (remaking) return;
+        if (!IsHost()) return false;
+        if (remaking) return false;
         // No course chosen: tell the host instead of starting a race that can't be set up
         string courseProblem = CourseLibrary.StartProblem(CourseLibrary.Current);
         if (courseProblem != null)
         {
             UIToast.Show(courseProblem);
-            return;
+            return false;
         }
         if (AICoursePanel.ShouldRemake(CourseLibrary.Current))
         {
             RemakeAICourseThenStart();
-            return;
+            return false;
         }
 
         // "Your runners": every player needs a runner of their own for every leg of a relay
@@ -115,13 +135,13 @@ public class ReadyUIHandler : NetworkBehaviour
         if (tooFew != null)
         {
             UIToast.Show(tooFew);
-            return;
+            return false;
         }
         string modeProblem = ExtraModes.CourseProblem(extraModes, CourseLibrary.Current);
         if (modeProblem != null)
         {
             UIToast.Show(modeProblem);
-            return;
+            return false;
         }
         // The imposter modes (Imposter, Secret task) need at least 3 players
         if ((extraModes & ExtraModes.ImposterKinds) != 0 || CompetitionFlow.IsImposterMode(chosenMode))
@@ -130,7 +150,7 @@ public class ReadyUIHandler : NetworkBehaviour
             if (fewPlayers != null)
             {
                 UIToast.Show("Imposter and Secret task need at least " + ExtraModes.MinImposterPlayers + " players. Wait for more players or choose another game mode.");
-                return;
+                return false;
             }
         }
         if ((extraModes & ExtraMode.SecretTask) != 0)
@@ -139,15 +159,15 @@ public class ReadyUIHandler : NetworkBehaviour
             if (noTask != null)
             {
                 UIToast.Show(noTask);
-                return;
+                return false;
             }
         }
         // A course on the host's private map: everyone needs their copy of the map before the race can start
-        string mapProblem = PrivateMaps.StartProblem(CourseLibrary.Current);
+        string mapProblem = ignoreMaps ? null : PrivateMaps.StartProblem(CourseLibrary.Current);
         if (mapProblem != null)
         {
             UIToast.Show(mapProblem);
-            return;
+            return false;
         }
 
         // The lobby stays open while it races: a player who joins now watches the race (SessionRacing, Spectator)
@@ -200,7 +220,7 @@ public class ReadyUIHandler : NetworkBehaviour
 
         // Every course is run in the same scene; CourseLoader sets it up for the course picked in the lobby
         Runner.LoadScene(CourseScenes.Competition);
-
+        return true;
     }
 
     // Update is called once per frame
@@ -208,7 +228,8 @@ public class ReadyUIHandler : NetworkBehaviour
     {
         // I Shared Mode har varje spelare state authority över sin egen spelare, så det går inte att använda
         // för att avgöra vem som är värd. Kollas varje bildruta så att knappen även följer med om värden byts.
-        bool show = IsHost();
+        // The Monday relay: no Start button and no host buttons, the lobby runs on the clock
+        bool show = IsHost() && !MondayRelay.Active;
         if (buttonReady.activeSelf != show)
         {
             buttonReady.SetActive(show);

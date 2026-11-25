@@ -142,6 +142,16 @@ public static class SharedMaps
     // ---- Listing (called by CloudCourses with every player the course query returns) ----
 
     // Called with the "sharedMaps" value of each player. Afterwards Sync downloads what is missing.
+    // A map that some player shares (seen in the last course query): everyone can get it
+    public static bool IsListed(string mapId) => !string.IsNullOrEmpty(mapId) && others.Exists(m => m.id == mapId);
+
+    // The name of a shared map, or null
+    public static string ListedName(string mapId)
+    {
+        SharedMap map = string.IsNullOrEmpty(mapId) ? null : others.Find(m => m.id == mapId);
+        return map != null ? map.name : null;
+    }
+
     public static void BeginListing()
     {
         others.Clear();

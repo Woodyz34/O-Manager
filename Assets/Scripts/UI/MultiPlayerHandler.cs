@@ -41,6 +41,30 @@ public class MultiPlayerHandler : MonoBehaviour
         // Only a name the player writes is saved for next time (2026-11-19: another player's lobby name turned up)
         if (sessionNameinputField != null) sessionNameinputField.onValueChanged.AddListener(_ => { if (sessionNameinputField.isFocused) lobbyNameTyped = true; });
         MakeBackButton();
+        // The main menu's Monday relay card: straight into this week's relay lobby
+        if (MondayRelay.AutoJoin)
+        {
+            MondayRelay.AutoJoin = false;
+            StartCoroutine(JoinMondayRelay());
+        }
+    }
+
+    IEnumerator JoinMondayRelay()
+    {
+        HideAllPanels();
+        MondayRelay.Event e = MondayRelay.Current(MondayRelay.NowUtc);
+        ShowLoading("Joining " + e.FunName);
+        yield return null;   // the network runner is made in NetworkRunnerHandler.Start
+        string nickName = CourseData.SafeText(playerNameinputField != null ? playerNameinputField.text : "", 16);
+        if (nickName.Length == 0) nickName = "Player";
+        GameManager.Instance.playerNickName = nickName;
+        NetworkRunnerHandler handler = FindObjectOfType<NetworkRunnerHandler>();
+        if (handler == null)
+        {
+            UIToast.Show("Could not join the Monday relay. Try again from the main menu.");
+            yield break;
+        }
+        handler.JoinMondayRelay(e.SessionName);
     }
 
     // "Back" in the top left corner on every step of this page: leaves the lobby list and goes back to

@@ -140,6 +140,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // The player is drawing its route right now (the leaderboard shows the ones who are not done yet)
     [Networked] public NetworkBool drawingNow { get; set; }
 
+    // The Monday relay (MondayRelayLobby). On the host's player: the three relays to vote on (MondayRelayLobby.Encode),
+    // how far the lobby has come (MondayRelay.StateVoting ...) and the relay that won (1-3). On every player: its vote (1-3, 0 = none).
+    [Networked] public NetworkString<_512> mondayChoices { get; set; }
+    [Networked] public int mondayState { get; set; }
+    [Networked] public int mondayPick { get; set; }
+    [Networked] public int mondayVote { get; set; }
+
     // A lobby chat message (LobbyChat), sent from the writer's own player to everyone
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     public void RPC_Chat(string text)
@@ -153,6 +160,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     public void RPC_Kick(PlayerRef who)
     {
         if (Runner == null || who != Runner.LocalPlayer) return;
+        // The Monday relay has no real host: nobody can be taken out
+        if (MondayRelay.InSession(Runner)) return;
         UIToast.Show("The host took you out of the game.", 5f);
         SceneLoader.LeaveSession(Runner, "MainMenu");
     }

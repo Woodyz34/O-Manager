@@ -94,7 +94,7 @@ public class EndScreenUI : MonoBehaviour
         revealNowButton.gameObject.SetActive(false);
         waitingText.text = "";
 
-        lobbyButton.onClick.AddListener(CompetitionFlow.HostReturnToLobby);
+        lobbyButton.onClick.AddListener(OnLobbyButton);
         revealNowButton.onClick.AddListener(ConfirmRevealNow);
     }
 
@@ -167,9 +167,38 @@ public class EndScreenUI : MonoBehaviour
         }
     }
 
+    // The Monday relay (MondayRelay) has no host to take everyone back: everyone leaves for the main menu when they like
+    bool monday;
+    bool mondayChecked;
+
+    bool Monday
+    {
+        get
+        {
+            if (!mondayChecked)
+            {
+                mondayChecked = true;
+                monday = MondayRelay.Active;
+                if (monday) CourseUI.SetButtonText(lobbyButton, "Main menu");
+            }
+            return monday;
+        }
+    }
+
+    void OnLobbyButton()
+    {
+        if (Monday)
+        {
+            NetworkPlayer local = NetworkPlayer.Local;
+            SceneLoader.LeaveSession(local != null ? local.Runner : null, "MainMenu");
+            return;
+        }
+        CompetitionFlow.HostReturnToLobby();
+    }
+
     void Update()
     {
-        bool host = CompetitionFlow.LocalIsHost();
+        bool host = CompetitionFlow.LocalIsHost() || Monday;
 
         if (lobbyButton.gameObject.activeSelf != (host && rewardsGiven))
         {

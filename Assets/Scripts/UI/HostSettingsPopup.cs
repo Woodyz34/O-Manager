@@ -25,7 +25,7 @@ public class HostSettingsPopup : MonoBehaviour
         canvas.sortingOrder = 260;   // above the Esc menu it can be opened from
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
         open = go.AddComponent<HostSettingsPopup>();
-        open.canChange = NetworkPlayer.Local == null || CompetitionFlow.LocalIsHost();
+        open.canChange = NetworkPlayer.Local == null || (CompetitionFlow.LocalIsHost() && !MondayRelay.Active);
         open.values = open.canChange ? HostSettings.Mine : HostSettings.Current;
         open.Build();
     }

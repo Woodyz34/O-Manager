@@ -60,6 +60,7 @@ public class MainMenuUI : MonoBehaviour
         PrivateMaps.ForgetBorrowed();   // copies of other players' private maps are only for the lobby they were in
         SharedMaps.CheckOnce();   // maps other players have shared, downloaded in the background
         AddContestsButton();
+        MondayRelayCard.Add(homePanel != null ? homePanel.transform : null);   // the Monday relay, top left
         ContestsPage.ClaimInBackground();   // prize money from weekly and daily contests that are over
         // Back from a contest race (or left it from the Esc menu): straight to the contests page again
         if (ContestRun.Active != null) ContestRun.Leave();

@@ -140,6 +140,7 @@ public class LeaderboardRow : MonoBehaviour, IPointerClickHandler
         }
         if (eventData.button != PointerEventData.InputButton.Right) return;
         if (local == null || !CompetitionFlow.LocalIsHost() || player.Object.HasStateAuthority) return;
+        if (MondayRelay.Active) return;   // the Monday relay's host is just whoever came first: no kicking
         NetworkPlayer target = player;
         string name = BearMode.Name(target);
         ChoicePopup.Open("Kick " + name + "?", new[]

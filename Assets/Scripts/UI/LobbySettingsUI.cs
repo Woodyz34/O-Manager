@@ -116,6 +116,8 @@ public class LobbySettingsUI : MonoBehaviour
     {
         NetworkPlayer local = NetworkPlayer.Local;
         bool host = local != null && local.Object != null && local.Object.IsValid && local.Runner != null && local.Runner.IsSharedModeMasterClient;
+        // The Monday relay's game modes are set: everyone can only look
+        if (MondayRelay.Active) host = false;
         if (!host)
         {
             // The other players can look at what the host has picked, including which secret tasks are in

@@ -236,6 +236,19 @@ public class NetworkRunnerHandler : MonoBehaviour
         var clientTask = InitializeNetworkRunner(networkRunner, GameMode.Shared, GameManager.Instance.GetConnectionsToken(), sessionName, NetAddress.Any(), SceneRef.FromIndex(SceneUtility.GetBuildIndexByScenePath($"scenes/{sceneName}")), null, SessionRacing.NewLobbyProperties());
     }
 
+    // The Monday relay (MondayRelay): everyone joins the lobby with this week's name. The first one in makes it (on the
+    // lobby scene), everyone after joins it, and someone who comes while it races watches (SessionRacing, Spectator).
+    public void JoinMondayRelay(string sessionName)
+    {
+        if (networkRunner == null)
+        {
+            networkRunner = Instantiate(networkRunnerPrefab);
+            networkRunner.name = "Network runner";
+        }
+        Debug.Log($"Join the Monday relay {sessionName}");
+        var clientTask = InitializeNetworkRunner(networkRunner, GameMode.Shared, GameManager.Instance.GetConnectionsToken(), sessionName, NetAddress.Any(), SceneRef.FromIndex(SceneUtility.GetBuildIndexByScenePath("scenes/Lobby")), null, SessionRacing.NewLobbyProperties());
+    }
+
     public void JoinGame(SessionInfo sessionInfo)
     {
         Debug.Log($"Join session {sessionInfo.Name}");

@@ -236,6 +236,34 @@ public class ManualPathDrawer : MonoBehaviour
         timeToDraw = true;
     }
 
+    // The Monday relay (MondayRelay): the time to draw is up. Every stretch not drawn yet is "drawn" as a straight line
+    // from control to control (run on the compass, round what can't be crossed), and the leg is handed in as if drawn.
+    public void DrawRestStraight()
+    {
+        if (!relayMode || manager == null) return;
+        for (int guard = 0; guard < 200 && relayMode && timeToDraw && ThisControll != null && targetControl != null; guard++)
+        {
+            isDrawing = false;
+            ClearLine();
+            Vector2Int from = WorldToGrid(ThisControll.position);
+            Vector2Int to = WorldToGrid(targetControl.position);
+            int steps = Mathf.Max(1, Mathf.Max(Mathf.Abs(to.x - from.x), Mathf.Abs(to.y - from.y)));
+            for (int i = 0; i <= steps; i++)
+            {
+                Vector2Int cell = new Vector2Int(Mathf.RoundToInt(Mathf.Lerp(from.x, to.x, i / (float)steps)), Mathf.RoundToInt(Mathf.Lerp(from.y, to.y, i / (float)steps)));
+                if (gridPath.Count > 0 && gridPath[gridPath.Count - 1] == cell) continue;
+                gridPath.Add(cell);
+                smoothPath.Add(manager.GridToWorldPosition(cell.y, cell.x));
+            }
+            if (smoothPath.Count < 2) smoothPath.Add(targetControl.position);
+            int stretchBefore = relayStretch;
+            timeToDraw = false;
+            OnPathFinished();
+            ClearLine();
+            if (relayStretch == stretchBefore) break;   // nothing was handed in: don't loop for ever
+        }
+    }
+
     public void ClearKeptLines()
     {
         foreach (GameObject kept in keptLines)
@@ -317,6 +345,11 @@ public class ManualPathDrawer : MonoBehaviour
             if ((corridorPath == null || corridorPath.Count == 0) && RouteAnalysis.On)
             {
                 corridorPath = new List<Vector2Int>(gridPath);
+            }
+            // No route near the line at all (straight over a lake): the way round, so the runner never stands still
+            if (corridorPath == null || corridorPath.Count == 0)
+            {
+                corridorPath = WayRound(gridPath[0], gridPath[gridPath.Count - 1]);
             }
             agent.relaySegments.Add(corridorPath);
             // Route analysis: the stretches drawn before are not left on the map (they were in the way while drawing
