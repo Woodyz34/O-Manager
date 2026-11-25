@@ -17,6 +17,9 @@ using MapImport;
 //  - every piece is a handful of meshes, so the graphics card skips every piece outside the picture;
 //  - a piece close to the runner draws its full trees and its ground at 1 m; further away a cheaper copy of the same
 //    trees and the ground at 4 m (TvMesh.Near / Far);
+//  - the full trees are only made for the pieces near the runner (2026-11-25, Anders: big maps lagged): a piece
+//    further out is built with the far copy alone, built again for its full trees when the runner comes within
+//    reach, and they are thrown away when the runner has gone on;
 //  - the undergrowth and the young trees of thickets (by far the most triangles) are only made for the pieces right
 //    round the runner, and thrown away again when the runner moves on;
 //  - shadows only close by, and none on Low.
@@ -71,12 +74,17 @@ public class RunWorld : MonoBehaviour
         public bool nearOn;
         public readonly List<Renderer> lean = new List<Renderer>();   // a town's leaner houses, hidden under the full ones
         public bool leanHidden, peopleOn;
+        // The full trees: made with the piece when it was close, else by a build of their own when the runner comes near
+        public bool treesNear, treesBuilding, treesOwn;
+        public readonly List<Renderer> farTrees = new List<Renderer>();   // the far copy, drawn until the full trees are there
+        public readonly List<Renderer> treeRenderers = new List<Renderer>();
+        public readonly List<Mesh> treeMeshes = new List<Mesh>();
     }
 
     class Done
     {
         public Piece piece;
-        public bool detail;
+        public bool detail, trees;
         public TvWorld world;
         public List<TvWorldView.MeshArrays> arrays;
     }
@@ -550,7 +558,7 @@ public class RunWorld : MonoBehaviour
         }
 
         var drop = new List<long>();
-        Piece nextBase = null, nextDetail = null;
+        Piece nextBase = null, nextDetail = null, nextTrees = null;
         foreach (var pair in pieces)
         {
             Piece p = pair.Value;
@@ -563,15 +571,15 @@ public class RunWorld : MonoBehaviour
             if (!p.ready && !p.building && (nextBase == null || p.dist < nextBase.dist)) nextBase = p;
             if (p.ready && p.detail == null && !p.detailBuilding && p.dist <= look.detail && (nextDetail == null || p.dist < nextDetail.dist)) nextDetail = p;
             if (p.detail != null && p.dist > look.detail + 16f) DropDetail(p);
+            if (p.ready && !p.treesNear && !p.treesBuilding && p.dist <= TreesReach && (nextTrees == null || p.dist < nextTrees.dist)) nextTrees = p;
+            if (p.treesOwn && p.dist > TreesReach + 60f) DropTrees(p);
             if (p.ready)
             {
                 bool nearOn = p.dist < look.near;
                 if (nearOn != p.nearOn)
                 {
                     p.nearOn = nearOn;
-                    foreach (Renderer r in p.near) r.enabled = nearOn;
-                    foreach (Renderer r in p.far) r.enabled = !nearOn;
-                    if (p.leanHidden) foreach (Renderer r in p.lean) r.enabled = false;
+                    ShowTier(p);
                 }
                 // A town's people walk and watch only round the runner
                 if (people != null)
@@ -593,19 +601,39 @@ public class RunWorld : MonoBehaviour
         }
 
         // The nearest piece first; a piece right round the runner before any undergrowth
-        while (jobs < MaxJobs && (nextBase != null || nextDetail != null))
+        while (jobs < MaxJobs && (nextBase != null || nextDetail != null || nextTrees != null))
         {
-            if (nextBase != null && (nextDetail == null || nextBase.dist <= nextDetail.dist + 40f))
+            // The full trees close by come before the ground far away, then the undergrowth
+            if (nextTrees != null && (nextBase == null || nextTrees.dist <= nextBase.dist + 60f))
+            {
+                StartTrees(nextTrees);
+                nextTrees = null;
+            }
+            else if (nextBase != null && (nextDetail == null || nextBase.dist <= nextDetail.dist + 40f))
             {
                 StartBase(nextBase);
                 nextBase = NextUnbuilt();
             }
-            else
+            else if (nextDetail != null)
             {
                 StartDetail(nextDetail);
                 nextDetail = null;
             }
+            else break;
         }
+    }
+
+    // How close the runner comes before a piece gets its full trees (a little before they are drawn)
+    float TreesReach => look.near + 24f;
+
+    // Which of a piece's meshes are drawn: the full ones close by, the far copies further out (and the far trees as long
+    // as the full ones aren't made yet)
+    void ShowTier(Piece p)
+    {
+        bool nearOn = p.nearOn;
+        foreach (Renderer r in p.near) if (r != null) r.enabled = nearOn;
+        foreach (Renderer r in p.far) if (r != null) r.enabled = !nearOn || (!p.treesNear && p.farTrees.Contains(r));
+        if (p.leanHidden) foreach (Renderer r in p.lean) if (r != null) r.enabled = false;
     }
 
     Piece NextUnbuilt()
@@ -643,6 +671,7 @@ public class RunWorld : MonoBehaviour
     {
         p.building = true;
         TvWorldInput input = Input(p);
+        input.skipNearTrees = p.dist > TreesReach;
         // The flags that stand in this piece
         input.flags = new List<float>();
         p.flags = new List<int>();
@@ -698,6 +727,70 @@ public class RunWorld : MonoBehaviour
         });
     }
 
+    // The full trees of a piece that was built far away: the piece is built again (the same trees in the same places)
+    // and only its full trees are kept
+    void StartTrees(Piece p)
+    {
+        p.treesBuilding = true;
+        TvWorldInput input = Input(p);
+        input.flags = new List<float>();
+        for (int i = 0; i < flagPoints.Count; i++)
+        {
+            double x = flagPoints[i].e - p.ce, z = flagPoints[i].n - p.cn;
+            if (x < -Half || x >= Half || z < -Half || z >= Half) continue;
+            input.flags.Add((float)x);
+            input.flags.Add((float)z);
+        }
+        jobs++;
+        Task.Run(() =>
+        {
+            var done = new Done { piece = p, trees = true };
+            try
+            {
+                TvWorld w = TvWorldBuilder.Build(input);
+                done.arrays = new List<TvWorldView.MeshArrays>();
+                foreach (TvMesh m in w.meshes)
+                    if (IsFullTrees(m.name, m.group)) done.arrays.Add(new TvWorldView.MeshArrays(m));
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("RunWorld: could not build the trees at " + p.ce.ToString("0") + ", " + p.cn.ToString("0") + ": " + e);
+            }
+            finished.Enqueue(done);
+        });
+    }
+
+    static bool IsFullTrees(string name, int group) => group == TvMesh.Near && name == "Trees";
+
+    void MakeTrees(Piece p, List<TvWorldView.MeshArrays> arrays)
+    {
+        if (p.root == null || p.treesNear || p.dist > TreesReach + 60f) return;
+        foreach (TvWorldView.MeshArrays m in arrays)
+        {
+            Renderer r = AddMesh(p.root.transform, m, p.treeMeshes);
+            p.near.Add(r);
+            p.treeRenderers.Add(r);
+        }
+        p.treesNear = true;
+        p.treesOwn = true;
+        ShowTier(p);
+    }
+
+    void DropTrees(Piece p)
+    {
+        foreach (Renderer r in p.treeRenderers)
+        {
+            p.near.Remove(r);
+            if (r != null) Destroy(r.gameObject);
+        }
+        p.treeRenderers.Clear();
+        foreach (Mesh m in p.treeMeshes) if (m != null) Destroy(m);
+        p.treeMeshes.Clear();
+        p.treesNear = false;
+        p.treesOwn = false;
+        ShowTier(p);
+    }
+
     // Meshes go to the graphics card a few at a time: about 4 ms a frame while running, more while loading
     void HandOver()
     {
@@ -709,6 +802,7 @@ public class RunWorld : MonoBehaviour
             jobs--;
             Piece p = done.piece;
             if (done.detail) p.detailBuilding = false;
+            else if (done.trees) p.treesBuilding = false;
             else p.building = false;
             long key = Key(p.ix, p.iz);
             bool kept = pieces.TryGetValue(key, out Piece now) && now == p;
@@ -718,6 +812,7 @@ public class RunWorld : MonoBehaviour
                 continue;
             }
             if (done.detail) MakeDetail(p, done.arrays);
+            else if (done.trees) MakeTrees(p, done.arrays);
             else MakeBase(p, done);
         }
     }
@@ -759,10 +854,16 @@ public class RunWorld : MonoBehaviour
         foreach (TvWorldView.MeshArrays m in done.arrays)
         {
             Renderer r = AddMesh(p.root.transform, m, p.meshes);
-            if (m.group == TvMesh.Near) { p.near.Add(r); r.enabled = p.nearOn; }
+            if (m.group == TvMesh.Near) p.near.Add(r);
+            if (IsFullTrees(m.name, m.group)) p.treesNear = true;
             if (m.name == "Town houses") p.lean.Add(r);
-            else if (m.group == TvMesh.Far) { p.far.Add(r); r.enabled = !p.nearOn; }
+            else if (m.group == TvMesh.Far)
+            {
+                p.far.Add(r);
+                if (m.name == "Trees far") p.farTrees.Add(r);
+            }
         }
+        ShowTier(p);
         // The solids, in metres from Origin
         List<TvSolid> list = p.world.solids;
         float ox = (float)(p.ce - anchorE), oz = (float)(p.cn - anchorN);
@@ -828,6 +929,11 @@ public class RunWorld : MonoBehaviour
         if (p.peopleOn && people != null) people.Despawn(Key(p.ix, p.iz));
         p.peopleOn = false;
         DropDetail(p);
+        foreach (Mesh m in p.treeMeshes) if (m != null) Destroy(m);
+        p.treeMeshes.Clear();
+        p.treeRenderers.Clear();
+        p.treesNear = p.treesOwn = false;
+        p.farTrees.Clear();
         p.lean.Clear();
         foreach (Mesh m in p.meshes) if (m != null) Destroy(m);
         p.meshes.Clear();

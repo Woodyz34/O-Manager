@@ -198,8 +198,23 @@ public partial class RunSession : MonoBehaviour
         try { await Task.Run(() => TvEdges.Attach(plain.layer, linesJson)); }
         catch (Exception e) { Debug.LogWarning("RunSession: edges: " + e); }
         if (this == null) return;
-        try { detailed = await Task.Run(() => RunContours.Detailed(mapId, plain.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile)); }
-        catch (Exception e) { Debug.LogWarning("RunSession: contours: " + e); }
+        // Made once with the map (import, Edit map, a shared map's download, the built-in maps: runheights.bytes); worked
+        // out here only for a map built before 2026-11-25, and then kept on this computer
+        byte[] baked = TvWorldData.RunHeightsBytes(mapDef);
+        TvHeights fromPackage = null;
+        if (baked != null)
+        {
+            try { fromPackage = await Task.Run(() => RunContours.FromPackage(mapId, baked, linesJson, pointsJson)); }
+            catch (Exception e) { Debug.LogWarning("RunSession: baked ground: " + e); }
+            if (this == null) return;
+            if (fromPackage == null) Debug.Log("RunSession: the map's runheights.bytes is from another version; the ground is worked out again");
+        }
+        if (fromPackage != null) detailed = fromPackage;
+        else
+        {
+            try { detailed = await Task.Run(() => RunContours.Detailed(mapId, plain.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile)); }
+            catch (Exception e) { Debug.LogWarning("RunSession: contours: " + e); }
+        }
         if (this == null) return;
         data = new TvWorldData.Data { mapId = plain.mapId, layer = plain.layer, heights = detailed, look = plain.look, speeds = plain.speeds, town = plain.town };
         loadingCard.Set("Reading the terrain", 0.08f);
