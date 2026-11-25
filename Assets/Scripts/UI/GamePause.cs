@@ -72,6 +72,8 @@ public static class GamePause
         if (NetworkPlayer.Local == null || NetworkPlayer.Local.Runner == null) return false;
         NetworkRunner runner = NetworkPlayer.Local.Runner;
         if (!runner.IsRunning || runner.GameMode != GameMode.Single) return false;
+        // The route choice game never pauses: otherwise you could stop the clock and study the routes (2026-11-25)
+        if (RouteChoiceGame.On) return false;
         string scene = ActiveScene.Name;
         return scene != "MainMenu" && scene != "MultiPlayer" && scene != "SingelPlayer" && scene != "NewCompetition"
                && scene != "Lobby" && scene != CourseScenes.Builder;
