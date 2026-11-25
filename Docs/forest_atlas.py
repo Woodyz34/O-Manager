@@ -40,6 +40,21 @@ def fft_noise(size, beta, seed, aspect=(1.0, 1.0)):
     return n
 
 
+def band_noise(size, f0, seed, aspect=(1.0, 1.0), width=0.5):
+    """Periodic noise with features of one size: about f0 waves across the picture. Smooth, so its zero lines
+    are long unbroken curves (good for bark cracks). aspect stretches like fft_noise."""
+    g = np.random.default_rng(seed)
+    w = g.normal(size=(size, size)) + 1j * g.normal(size=(size, size))
+    fy = np.fft.fftfreq(size, 1.0 / size)[:, None] * aspect[1]
+    fx = np.fft.fftfreq(size, 1.0 / size)[None, :] * aspect[0]
+    f = np.sqrt(fx * fx + fy * fy)
+    amp = np.exp(-((np.log(np.maximum(f, 1e-6)) - np.log(f0)) / width) ** 2)
+    amp[0, 0] = 0
+    n = np.real(np.fft.ifft2(w * amp))
+    n = (n - n.min()) / (n.max() - n.min())
+    return n
+
+
 def voronoi(size, count, seed, stretch=(1.0, 1.0), warp=0.0):
     """Periodic Voronoi: distance to nearest (f1), second nearest (f2) in pixels of the stretched space, and cell id."""
     g = np.random.default_rng(seed)
@@ -95,30 +110,54 @@ def relief(h, strength):
 
 
 def bark_pine_low():
-    """Old Scots pine bark (about 0.6 m a picture): long grey-brown plates split by wide, deep fissures, the
-    red-brown under-bark showing low in them, rough crusty plate tops and a few lichen specks."""
+    """Old Scots pine bark after Anders' photo (about 0.55 m a picture). A height field: long rough ridges up the
+    trunk from stretched noise, broken across into plates now and then, with crusty fine roughness on top. Deep
+    places are warm dark brown, the plates warm pinkish grey-brown with rusty and greyer patches."""
     s = IN
-    f1, f2, cid = voronoi(s, 24, 1, (1.0, 0.32), warp=60)
-    edge = f2 - f1
-    plate_n = fft_noise(s, 1.6, 2, (1.0, 0.5))
-    fine = fft_noise(s, 0.9, 3)
-    rough = fft_noise(s, 0.6, 8)
+    from scipy.ndimage import gaussian_filter
+    fine = fft_noise(s, 0.55, 8)
+    wob = fft_noise(s, 1.3, 11)
+    Y, X = np.mgrid[0:s, 0:s] / s
+    # columns of plates up the trunk, wandering sideways, split across into plates of uneven height
+    n_cols, n_rows = 10, 4
+    warp = band_noise(s, 1.6, 1, (1.0, 0.6), 0.5) - 0.5
+    jit = fft_noise(s, 1.7, 21) - 0.5
+    widths = band_noise(s, 4.0, 41, (1.0, 8.0), 0.5) - 0.5
+    rough = fft_noise(s, 1.15, 42) - 0.5
+    u = X * n_cols + warp * 0.35 + widths * 0.6 + jit * 0.45 + rough * 0.16
+    column = np.floor(u)
+    fu = u - column
+    cid = np.mod(column, n_cols)
+    h1 = (np.sin(cid * 12.9898 + 1.3) * 43758.5453) % 1.0
+    v = Y * n_rows + h1 * 3.0 + (fu - 0.5) * (h1 - 0.5) * 0.8 + jit * 0.25 + rough * 0.12
+    row = np.floor(v)
+    fv = v - row
+    cid = cid * 31 + np.mod(row, n_rows)
+    side = np.minimum(fu, 1 - fu) * s / n_cols
+    across = np.minimum(fv, 1 - fv) * s / n_rows
+    width_v = 1.6 + 3.2 * wob
+    width_h = (1.0 + 2.0 * wob) * (((np.sin(cid * 7.13) * 9123.1) % 1.0) > 0.25)
+    side = side * (1.0 + 2.5 * smooth(0.62, 0.8, fft_noise(s, 1.4, 44, (0.6, 1.0))))
+    dist = np.minimum(side / width_v, np.where(width_h > 0, across / np.maximum(width_h, 0.1), 99))
+    crack = 1.0 - smooth(0.6, 1.4, dist)
+    # rounded plates with thin scaly layers on them
+    layer = 1.0 - smooth(0.0, 0.03, np.abs(band_noise(s, 7.0, 31, (0.25, 1.0), 0.5) - 0.5))
+    crust = fft_noise(s, 0.9, 43)
+    height = np.clip(smooth(0.6, 9.0, dist) * (0.8 + 0.2 * crust) - 0.06 * layer * smooth(1.2, 3, dist) + 0.14 * (fine - 0.5), 0, 1)
     ids = (np.sin(cid * 12.9898) * 43758.5453) % 1.0
-    base = lerp(col('#7a726a'), col('#9a9286'), ids[..., None])
-    base = lerp(base, col('#6e6054'), plate_n[..., None] * 0.5)
-    crust = smooth(0.55, 0.8, fft_noise(s, 1.7, 4))
-    base = lerp(base, col('#96908a'), crust[..., None] * 0.35)
-    # the plate: flat-topped, falling off into a wide fissure; flaky layers across it
-    ridge = smooth(1.0, 13.0 + 6.0 * fine, edge)
-    layers = (fft_noise(s, 1.2, 6, (1.0, 0.3)) * 5) % 1.0
-    height = ridge * 0.8 + 0.12 * smooth(0.35, 0.55, layers) * ridge + 0.1 * rough * ridge
-    rgb = base * (0.82 + 0.3 * rough)[..., None]
-    under = smooth(0.6, 0.2, ridge)
-    rgb = lerp(rgb, col('#5e4a3e'), under[..., None] * 0.55)
-    rgb = lerp(rgb, col('#3a302a'), smooth(0.3, 0.0, ridge)[..., None] * 0.7)
-    rgb *= np.clip(relief(height * 14, 0.5), 0.75, 1.25)[..., None]
-    lich = lichen_mask(s, 7, 0.04, 1.4)
-    rgb = lerp(rgb, col('#9ea290'), (lich * ridge)[..., None] * 0.45)
+    plate = lerp(col('#a09084'), col('#c8baae'), (ids * 0.45 + fft_noise(s, 1.5, 3) * 0.55)[..., None])
+    plate = lerp(plate, col('#9a7a64'), smooth(0.55, 0.8, fft_noise(s, 1.4, 2))[..., None] * 0.45)
+    plate = lerp(plate, col('#b8b4ae'), smooth(0.55, 0.8, fft_noise(s, 1.6, 4))[..., None] * 0.35)
+    deep = lerp(col('#5e4636'), col('#866650'), fft_noise(s, 1.3, 6)[..., None])
+    rgb = lerp(deep, plate, (1.0 - crack)[..., None]) * (0.8 + 0.2 * height)[..., None]
+    rgb *= (1.0 - 0.5 * (1.0 - smooth(0.15, 0.6, dist)))[..., None]
+    rgb *= (0.86 + 0.24 * fine)[..., None]
+    mott = fft_noise(s, 1.25, 45)
+    rgb = lerp(rgb, col('#c4c2bc'), (smooth(0.58, 0.85, mott) * 0.45 * (1.0 - crack))[..., None])
+    rgb *= (1.0 - 0.18 * smooth(0.62, 0.9, fft_noise(s, 1.1, 46)))[..., None]
+    rgb *= np.clip(relief(height * 9, 0.5), 0.72, 1.25)[..., None]
+    lich = lichen_mask(s, 7, 0.03, 1.4)
+    rgb = lerp(rgb, col('#a0a490'), (lich * smooth(0.4, 0.7, height))[..., None] * 0.4)
     return to_img(rgb)
 
 
@@ -166,39 +205,43 @@ def bark_spruce():
 
 
 def bark_birch():
+    """Silver birch (about 0.5 m a picture): chalk white with a faint warm tint, black horizontal lenticels of
+    many lengths, black rough diamonds and streaks here and there, thin grey lines of peeling paper."""
     s = IN
-    n = fft_noise(s, 1.5, 31, (0.4, 1.0))
-    rgb = lerp(col('#e9e6dc'), col('#f6f3ea'), n[..., None])
-    rgb = lerp(rgb, col('#cfc8b6'), smooth(0.55, 0.8, fft_noise(s, 1.6, 32))[..., None] * 0.5)
+    n = fft_noise(s, 1.5, 31, (1.0, 0.4))
+    rgb = lerp(col('#e4e1d8'), col('#f5f3ec'), n[..., None])
+    rgb = lerp(rgb, col('#d2cbbd'), smooth(0.6, 0.85, fft_noise(s, 1.6, 32))[..., None] * 0.4)
     img = to_img(rgb)
     d = ImageDraw.Draw(img)
     g = np.random.default_rng(33)
-    # lenticels: short dark horizontal dashes; drawn three times shifted so the tile repeats
-    for _ in range(170):
-        x, y = g.random() * s, g.random() * s
-        w, h = 6 + g.random() * 38, 1.2 + g.random() * 2.6
-        c = tuple(int(v) for v in lerp(col('#2a2622'), col('#6d655c'), g.random())) + (255,)
-        for ox in (-s, 0, s):
-            for oy in (-s, 0, s):
-                d.ellipse([x + ox - w / 2, y + oy - h / 2, x + ox + w / 2, y + oy + h / 2], fill=c)
-    # black rough patches (diamonds) here and there
-    for _ in range(5):
-        x, y = g.random() * s, g.random() * s
-        w, h = 18 + g.random() * 50, 8 + g.random() * 20
-        c = tuple(int(v) for v in lerp(col('#2a2622'), col('#4a423a'), g.random())) + (255,)
-        pts = [(x - w / 2 + g.random() * 6, y + g.random() * 3), (x - w * 0.15, y - h / 2), (x + w * 0.2, y - h * 0.35),
-               (x + w / 2, y), (x + w * 0.1, y + h / 2), (x - w * 0.25, y + h * 0.3)]
+
+    def wrap_poly(pts, c):
         for ox in (-s, 0, s):
             for oy in (-s, 0, s):
                 d.polygon([(px + ox, py + oy) for px, py in pts], fill=c)
-    # peeling paper edges: pale curls
-    for _ in range(40):
+
+    # lenticels: thin dark horizontal dashes, tapering at both ends
+    for _ in range(260):
+        x, y = g.random() * s, g.random() * s
+        w, h = 5 + g.random() ** 2 * 60, 0.8 + g.random() * 2.2
+        c = tuple(int(v) for v in lerp(col('#1e1b19'), col('#5a524a'), g.random())) + (255,)
+        wrap_poly([(x - w / 2, y), (x - w / 4, y - h / 2), (x + w / 4, y - h / 2 + g.random()), (x + w / 2, y), (x + w / 4, y + h / 2), (x - w / 4, y + h / 2)], c)
+    # rough black patches below old branches: ragged, wider than tall, from noise
+    arr = np.asarray(img).astype(np.float32)
+    blot = lichen_mask(s, 34, 0.045, 1.5)
+    blot = blot * smooth(0.3, 0.6, fft_noise(s, 1.1, 35, (1.0, 0.35)))
+    arr[..., :3] = lerp(arr[..., :3], col('#24201c'), blot[..., None] * 0.92)
+    img = Image.fromarray(arr.astype(np.uint8), 'RGBA')
+    d = ImageDraw.Draw(img)
+    # peeling paper: pale lines with a grey shadow under them
+    for _ in range(50):
         x, y = g.random() * s, g.random() * s
         w = 10 + g.random() * 40
         for ox in (-s, 0, s):
             for oy in (-s, 0, s):
-                d.line([(x + ox, y + oy), (x + ox + w, y + oy + g.random() * 2)], fill=(250, 246, 236, 255), width=2)
-    return img.filter(ImageFilter.GaussianBlur(0.6))
+                d.line([(x + ox, y + oy + 1.5), (x + ox + w, y + oy + 1.5)], fill=(170, 165, 155, 255), width=1)
+                d.line([(x + ox, y + oy), (x + ox + w, y + oy)], fill=(252, 250, 244, 255), width=2)
+    return img.filter(ImageFilter.GaussianBlur(0.5))
 
 
 def bark_beech():
