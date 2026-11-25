@@ -50,13 +50,27 @@ public static class MapPackages
         if (IsFile(path))
         {
             string file = path.Substring(FilePrefix.Length) + extension;
-            return File.Exists(file) ? File.ReadAllBytes(file) : null;
+            return File.Exists(file) ? Unpack(File.ReadAllBytes(file)) : null;
         }
         TextAsset asset = Resources.Load<TextAsset>(path);
         if (asset == null) return null;
         byte[] bytes = asset.bytes;
         Resources.UnloadAsset(asset);
-        return bytes;
+        return Unpack(bytes);
+    }
+
+    // Built-in package files over GitHub's 100 MB limit are kept gzipped (MapImportMenu, 2026-11-25):
+    // a big sprint grid such as Oslo's is 123 MB raw and about 50 MB packed. Plain files pass through.
+    public static byte[] Unpack(byte[] bytes)
+    {
+        if (bytes == null || bytes.Length < 2 || bytes[0] != 0x1f || bytes[1] != 0x8b) return bytes;
+        using (var input = new MemoryStream(bytes))
+        using (var gzip = new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress))
+        using (var output = new MemoryStream(bytes.Length * 3))
+        {
+            gzip.CopyTo(output);
+            return output.ToArray();
+        }
     }
 
     static readonly Dictionary<string, Sprite> spriteCache = new Dictionary<string, Sprite>();
