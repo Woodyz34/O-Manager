@@ -491,7 +491,8 @@ public partial class RunSession : MonoBehaviour
         return paceText + "   (real life)\n"
                + "Ground: " + player.ground.surface + ", speed " + player.ground.speed.ToString("0.00") + ", rough " + player.ground.rough.ToString("0.0") + "\n"
                + "Slope: " + (player.gradient * 100f).ToString("0") + " %, slope factor " + RunPlayer.SlopeFactor(player.gradient, player.ground.rough).ToString("0.00") + "\n"
-               + "Run so far: " + (player.distance / 1000f).ToString("0.00") + " km   Tired: " + (player.fatigue * 100f).ToString("0") + " %";
+               + "Run so far: " + (player.distance / 1000f).ToString("0.00") + " km   Tired: " + (player.fatigue * 100f).ToString("0") + " %\n"
+               + "Map position: " + player.e.ToString("0") + ", " + player.n.ToString("0");
     }
 
     void ClearBig()

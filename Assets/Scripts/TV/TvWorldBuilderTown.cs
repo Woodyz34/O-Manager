@@ -479,11 +479,23 @@ public partial class TvWorldBuilder
 
         // Its edges at s metres out, along the tunnel: a straight road (the 2 m cells' edges zigzag), out of the
         // tunnel's mouths at first, so the wing walls hold its sides there
+        public float[] sa, sb;          // its sides at each whole metre out, smoothed, following a bend (or null)
+
         public void Edges(float s, out float a, out float b)
         {
             float k = Math.Max(0f, Math.Min(1f, (s - half - 2f) / 10f));
-            a = -len / 2f + (a0 + a1 * s - 0.4f + len / 2f) * k;
-            b = len / 2f + (b0 + b1 * s + 0.4f - len / 2f) * k;
+            float ra = a0 + a1 * s, rb = b0 + b1 * s;
+            if (sa != null)
+            {
+                // The causeway bends with the road (2026-11-25, Anders: the bridge must be able to turn): its sides
+                // follow the fences and shores metre by metre, smoothed, instead of one straight line
+                int i = Math.Max(0, Math.Min(sa.Length - 2, (int)Math.Floor(s)));
+                float f = Math.Max(0f, Math.Min(1f, s - i));
+                ra = sa[i] + (sa[i + 1] - sa[i]) * f;
+                rb = sb[i] + (sb[i + 1] - sb[i]) * f;
+            }
+            a = -len / 2f + (ra - 0.4f + len / 2f) * k;
+            b = len / 2f + (rb + 0.4f - len / 2f) * k;
         }
     }
 
@@ -580,6 +592,32 @@ public partial class TvWorldBuilder
         }
         Fit(la, -p.len / 2f, out cw.a0, out cw.a1);
         Fit(lb, p.len / 2f, out cw.b0, out cw.b1);
+        cw.sa = Bend(la, cw.a0, cw.a1);
+        cw.sb = Bend(lb, cw.b0, cw.b1);
+        // Each side at every metre: the sides found near it, weighted by closeness (6 m), easing to the straight fit
+        // where none are found; at most a 1 in 2 turn per metre, so a stray fence does not kink it
+        float[] Bend(List<(float s, float v)> pts, float f0, float f1)
+        {
+            if (pts.Count < 3) return null;
+            int n = (int)Math.Ceiling(cw.ext) + 2;
+            var r = new float[n];
+            for (int i = 0; i < n; i++)
+            {
+                float sw = 0f, sv = 0f;
+                foreach (var q in pts)
+                {
+                    float d = Math.Abs(q.s - i);
+                    if (d >= 6f) continue;
+                    float w = 1f - d / 6f;
+                    sw += w; sv += w * q.v;
+                }
+                float line = f0 + f1 * i;
+                r[i] = sw > 0f ? line + (sv / sw - line) * Math.Min(1f, sw / 2f) : line;
+            }
+            for (int i = 1; i < n; i++) r[i] = Math.Max(r[i - 1] - 0.5f, Math.Min(r[i - 1] + 0.5f, r[i]));
+            for (int i = n - 2; i >= 0; i--) r[i] = Math.Max(r[i + 1] - 0.5f, Math.Min(r[i + 1] + 0.5f, r[i]));
+            return r;
+        }
         if (ss.Count >= 3)
         {
             // A straight middle line through the land's middles, and its usual width
