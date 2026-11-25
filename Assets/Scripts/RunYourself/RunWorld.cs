@@ -350,6 +350,8 @@ public class RunWorld : MonoBehaviour
 
     void OnDestroy()
     {
+        probe?.Dispose();
+        probe = null;
         QualitySettings.shadowDistance = savedShadowDistance;
         QualitySettings.shadows = savedShadows;
         QualitySettings.shadowCascades = savedCascades;
@@ -573,6 +575,7 @@ public class RunWorld : MonoBehaviour
     float nextPerfLog;
     double worstFrame, worstPlan, worstHand, worstTrees;
     int slowFrames;
+    RunPerf probe;   // the rest of the frame: Unity's own profiler markers (RunPerf.cs)
 
     void Watch(long plan, long hand, long tree)
     {
@@ -581,7 +584,10 @@ public class RunWorld : MonoBehaviour
         int gc = GC.CollectionCount(0);
         bool cleaned = lastGc >= 0 && gc != lastGc;
         lastGc = gc;
-        if (Loading || frame < 50.0) return;
+        bool slow = !Loading && frame >= 50.0;
+        if (probe == null) probe = new RunPerf();
+        probe.Frame(frame, slow);
+        if (!slow) return;
         slowFrames++;
         if (frame > worstFrame) { worstFrame = frame; worstPlan = plan * ms; worstHand = hand * ms; worstTrees = tree * ms; }
         if (Time.unscaledTime < nextPerfLog) return;
@@ -591,7 +597,8 @@ public class RunWorld : MonoBehaviour
         Debug.Log("RunPerf: " + slowFrames + " slow frames, worst " + worstFrame.ToString("0") + " ms (plan " + worstPlan.ToString("0.0")
                   + ", meshes to the graphics card " + worstHand.ToString("0.0") + ", trees " + worstTrees.ToString("0.0") + " ms)"
                   + (cleaned ? ", memory cleaned (GC) this frame" : "") + "; pieces " + ready + "/" + pieces.Count
-                  + ", waiting " + uploading.Count + ", jobs " + jobs + ", trees as " + (trees != null ? "copies" : "meshes"));
+                  + ", waiting " + uploading.Count + ", jobs " + jobs + ", trees as " + (trees != null ? "copies" : "meshes")
+                  + "\nRunPerf whole frame: " + probe.TakeWorst());
         slowFrames = 0;
         worstFrame = 0;
     }
