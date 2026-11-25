@@ -119,7 +119,7 @@ public class WaitingScreen : MonoBehaviour
         StringBuilder text = new StringBuilder();
         List<string> ready = new List<string>();
         List<string> choosing = new List<string>();
-        foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             if (!NetworkPlayer.Races(p)) continue;
             string name = p.nickName.ToString();

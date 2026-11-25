@@ -224,7 +224,7 @@ public static class RouteAnalysis
         int cols = manager.speedGrid2D.GetLength(1) * scale;
         int legs = manager.controlPoints.Count - 1;
         List<Color> used = new List<Color>();
-        foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player.Object == null || !player.Object.IsValid || !player.analysisDone) continue;
             RouteEntry entry = new RouteEntry
@@ -268,7 +268,7 @@ public static class RouteAnalysis
     public static List<string> StillDrawing()
     {
         List<string> names = new List<string>();
-        foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (!NetworkPlayer.Races(player) || player.analysisDone) continue;
             names.Add(player.Object.HasStateAuthority ? "you" : BearMode.Name(player));

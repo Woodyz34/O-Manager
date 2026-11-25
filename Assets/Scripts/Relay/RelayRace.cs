@@ -335,7 +335,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
         raceStarted = true;
         int ourTime = TeamSeconds(NetworkPlayer.Local);
         int firstTime = ourTime;
-        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (!NetworkPlayer.Races(player)) continue;
             firstTime = Mathf.Min(firstTime, TeamSeconds(player));
@@ -628,7 +628,7 @@ public class RelayRace : MonoBehaviour, IRaceStats
     static bool AllTeamsFinished(int legIndex)
     {
         int count = 0;
-        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (!NetworkPlayer.Races(player)) continue;
             count++;

@@ -65,7 +65,7 @@ public static class CourseLibrary
         {
             return;
         }
-        foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player != local && player.Object != null && player.Object.IsValid && !player.Object.HasStateAuthority && player.lobbyCourse.Length > 0)
             {

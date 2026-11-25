@@ -228,7 +228,7 @@ public static class LobbyVisit
             Hide(root);
         }
         // The players' runner dots and name tags live outside the lobby scene (they follow you into the race)
-        foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             foreach (Renderer r in player.GetComponentsInChildren<Renderer>())
             {

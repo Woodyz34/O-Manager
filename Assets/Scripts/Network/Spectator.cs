@@ -250,7 +250,7 @@ public class Spectator : MonoBehaviour
     {
         if (cardBody == null) return;
         List<NetworkPlayer> players = new List<NetworkPlayer>();
-        foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             if (NetworkPlayer.Races(p)) players.Add(p);
         }

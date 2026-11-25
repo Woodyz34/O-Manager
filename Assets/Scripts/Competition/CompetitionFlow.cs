@@ -413,7 +413,7 @@ public static class CompetitionFlow
     // The players in the race: a player who joined in the middle only watches (NetworkPlayer.spectator)
     static IEnumerable<NetworkPlayer> ValidPlayers()
     {
-        foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             if (NetworkPlayer.Races(p))
             {

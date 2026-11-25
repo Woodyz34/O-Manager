@@ -220,7 +220,7 @@ public class LobbySettingsUI : MonoBehaviour
             {
                 local.lobbyGameMode = "";
             }
-            foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+            foreach (NetworkPlayer player in NetworkPlayer.All())
             {
                 if (player == local || player.Object == null || !player.Object.IsValid || player.lobbyGameMode.Length == 0)
                 {
@@ -277,7 +277,7 @@ public class LobbySettingsUI : MonoBehaviour
     static System.Collections.Generic.List<string> GuestIds(NetworkPlayer local)
     {
         var ids = new System.Collections.Generic.List<string>();
-        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player == local || player.Object == null || !player.Object.IsValid) continue;
             string id = player.cloudId.ToString();

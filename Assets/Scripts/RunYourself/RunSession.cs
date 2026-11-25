@@ -778,7 +778,7 @@ public partial class RunSession : MonoBehaviour
             mainMask = ~0;
         }
         // The 2D runners and their route lines would show on the map in the hand
-        foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             foreach (Renderer r in p.GetComponentsInChildren<Renderer>(true))
             {

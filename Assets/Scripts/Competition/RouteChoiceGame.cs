@@ -931,7 +931,7 @@ public class RouteChoiceView : MonoBehaviour
     List<NetworkPlayer> ReadStandings()
     {
         List<NetworkPlayer> players = new List<NetworkPlayer>();
-        foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             if (NetworkPlayer.Races(p)) players.Add(p);
         }

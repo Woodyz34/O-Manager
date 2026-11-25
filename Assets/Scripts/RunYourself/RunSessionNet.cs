@@ -44,7 +44,7 @@ public partial class RunSession
     static List<NetworkPlayer> Players()
     {
         var list = new List<NetworkPlayer>();
-        foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             // A player who joined in the middle only watches: not one of the runners
             if (NetworkPlayer.Races(p)) list.Add(p);

@@ -54,7 +54,7 @@ public static class RelayClock
             now = seconds;
             return on;
         }
-        foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player == null || player.Object == null || !player.Object.IsValid) continue;
             float clock = player.relayRaceClock;

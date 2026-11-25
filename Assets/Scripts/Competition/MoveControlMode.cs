@@ -234,7 +234,7 @@ public static class MoveControlMode
 
         List<NetworkPlayer> movers = new List<NetworkPlayer>();
         Vector2 sum = Vector2.zero;
-        foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player.Object == null || !player.Object.IsValid || !MovedTo(player, index, out Vector2 target)) continue;
             movers.Add(player);
