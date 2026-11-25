@@ -42,6 +42,10 @@ public partial class TvShapeBuilder
     // ---- Bark: a round limb along a line of points (a trunk, a branch, a root) ----
     // pts: x, y, z for each point; radius at each point; the bark picture repeats `around` times round it and once
     // every `along` metres up it. shade: colour at each point (darker low down, lighter on top).
+    // Unevenness of the next limbs (0 = a clean round tube): each corner out or in by up to this share of the radius,
+    // the same round the seam, so a trunk's outline is not a perfect cylinder
+    public float LimbRough;
+
     public void Limb(float[] pts, float[] radius, int sides, int tile, float around, float along, TvColor[] shade, float twist = 0f)
     {
         int count = pts.Length / 3;
@@ -79,7 +83,8 @@ public partial class TvShapeBuilder
                 float ang = i / (float)sides * 6.2831853f + twist * dist;
                 float ca = (float)Math.Cos(ang), sa = (float)Math.Sin(ang);
                 float ox = ux * ca + vx * sa, oy = uy * ca + vy * sa, oz = uz * ca + vz * sa;
-                VT(px + ox * r, py + oy * r, pz + oz * r, ox, oy, oz, col, i / (float)sides * around, dist / along, tile);
+                float rr = LimbRough > 0f ? r * (1f + LimbRough * (TvRandom.Noise((i % sides) * 1.37f + 0.5f, dist * 1.3f + first * 0.11f) - 0.5f) * 2f) : r;
+                VT(px + ox * rr, py + oy * rr, pz + oz * rr, ox, oy, oz, col, i / (float)sides * around, dist / along, tile);
             }
         }
         int ring = sides + 1;

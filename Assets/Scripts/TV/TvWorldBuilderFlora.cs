@@ -119,7 +119,7 @@ public partial class TvWorldBuilder
                 pts[k * 3] = x; pts[k * 3 + 1] = y; pts[k * 3 + 2] = z;
                 float t = Math.Min(1f, (y - y0) / Math.Max(0.01f, trunk[trunk.Length - 2] - y0)) * (rad.Length - 1);
                 int i = Math.Min(rad.Length - 2, (int)t);
-                r[k] = (rad[i] + (rad[i + 1] - rad[i]) * (t - i)) * 1.035f + 0.006f;
+                r[k] = (rad[i] + (rad[i + 1] - rad[i]) * (t - i)) * 1.065f + 0.006f;
             }
             b.Limb(pts, r, sides, TvAtlas.MossSock, Around(r[0], 0.5f), (high - y0) * 1.03f, new[] { Grey(0.85f), White });
         }
@@ -188,12 +188,14 @@ public partial class TvWorldBuilder
             // (2026-11-25, Anders: the bark looked stretched and dark) grey-brown plates most of the way up, a picture
             // every 0.55 m both round and along the trunk, so the plates keep their shape
             int split = (int)(seg * Rr(0.58f, 0.72f));
-            b.Limb(Part(trunk, 0, split + 1), PartR(rad, 0, split + 1), sides, TvAtlas.PineBarkLow, Around(rad[0], 0.55f), 0.55f,
+            b.LimbRough = detail >= 2 ? 0.05f : 0f;
+            b.Limb(Part(trunk, 0, split + 1), PartR(rad, 0, split + 1), sides, TvAtlas.PineBarkLow, Around(rad[1], 0.4f), 0.4f,
                    Shades(split + 2, Tint(0.9f, 0.88f, 0.86f), White));
+            b.LimbRough = 0f;
             if (detail >= 1 && random.Value() < 0.35f) MossFoot(b, trunk, rad, sides, Rr(0.5f, 1.3f));
             var upper = PartR(rad, split, seg);
             for (int k = 0; k < upper.Length; k++) upper[k] *= 0.985f;
-            b.Limb(Part(trunk, split, seg), upper, Math.Max(4, sides - 2), TvAtlas.PineBarkHigh, 2f, 0.6f,
+            b.Limb(Part(trunk, split, seg), upper, Math.Max(4, sides - 2), TvAtlas.PineBarkHigh, Around(upper[0], 0.45f), 0.45f,
                    new[] { Tint(0.9f, 0.88f, 0.85f), White });
 
             float crown0 = h * crownStart, crownH = h - crown0;
@@ -269,7 +271,7 @@ public partial class TvWorldBuilder
             int seg = young ? 3 : detail >= 2 ? 8 : 5;
             float[] trunk = TrunkLine(h, young ? 0.03f : Rr(0.05f, 0.2f), seg, out float[] rad, young ? 0.04f : 0.23f, young ? 0.008f : 0.025f, young ? -0.05f : -0.35f);
             if (!young || detail >= 2)
-                b.Limb(trunk, rad, young ? 4 : detail >= 3 ? 9 : detail >= 2 ? 7 : 5, TvAtlas.SpruceBark, young ? 1f : Around(rad[0], 0.4f), 0.4f,
+                b.Limb(trunk, rad, young ? 4 : detail >= 3 ? 9 : detail >= 2 ? 7 : 5, TvAtlas.SpruceBark, young ? 1f : Around(rad[1], 0.4f), 0.4f,
                        Shades(seg + 1, Tint(0.72f, 0.7f, 0.68f), White));
             if (!young && detail >= 1 && random.Value() < 0.7f) MossFoot(b, trunk, rad, detail >= 3 ? 9 : detail >= 2 ? 7 : 5, Rr(0.8f, 2.2f));
             // Live branches from low down (forest spruces lose the lowest ones in the shade)
@@ -338,15 +340,9 @@ public partial class TvWorldBuilder
             float h = height * Rr(0.92f, 1.08f);
             int seg = young ? 3 : detail >= 2 ? 8 : 5, sides = young ? 4 : detail >= 3 ? 9 : detail >= 2 ? 7 : 5;
             float[] trunk = TrunkLine(h * 0.95f, young ? 0.08f : Rr(0.2f, 0.6f), seg, out float[] rad, young ? 0.035f : 0.15f, young ? 0.008f : 0.03f, young ? -0.05f : -0.3f);
-            b.Limb(trunk, rad, sides, TvAtlas.BirchBark, young ? 1f : 2f, 1.1f, Shades(seg + 1, Tint(0.8f, 0.8f, 0.78f), White));
-            // The rough dark foot of an old birch
-            if (!young && detail >= 1)
-            {
-                var foot = Part(trunk, 0, 2);
-                var footR = PartR(rad, 0, 2);
-                for (int k = 0; k < footR.Length; k++) footR[k] *= 1.03f;
-                b.Limb(foot, footR, sides, TvAtlas.SpruceBark, 3f, 0.4f, new[] { Tint(0.45f, 0.43f, 0.42f), Tint(0.6f, 0.58f, 0.56f) });
-            }
+            // White with black marks all the way (2026-11-25, Anders: not a black foot and a white top); a picture every
+            // 0.5 m round and along, so the marks are not stretched
+            b.Limb(trunk, rad, sides, TvAtlas.BirchBark, young ? 1f : Around(rad[1], 0.5f), 0.5f, Shades(seg + 1, Grey(0.9f), White));
             float crown0 = h * (young ? 0.25f : Rr(0.4f, 0.52f)), crownH = h - crown0;
             int branches = young ? (detail >= 2 ? 5 : 3) : detail >= 3 ? 18 : detail == 2 ? 13 : detail == 1 ? 9 : 6;
             int cardsPer = young ? 2 : detail >= 3 ? 6 : detail == 2 ? 4 : detail == 1 ? 3 : 2;
@@ -394,7 +390,7 @@ public partial class TvWorldBuilder
             float h = height * Rr(0.92f, 1.08f);
             int seg = detail >= 2 ? 6 : 4, sides = detail >= 3 ? 10 : detail >= 2 ? 8 : 5;
             float[] trunk = TrunkLine(h * 0.6f, Rr(0.2f, 0.5f), seg, out float[] rad, 0.32f, 0.16f);
-            b.Limb(trunk, rad, sides, barkTile, 3f, 0.9f, Shades(seg + 1, bark.Shade(0.65f), bark));
+            b.Limb(trunk, rad, sides, barkTile, Around(rad[1], 0.6f), 0.6f, Shades(seg + 1, bark.Shade(0.8f), bark));
             float cy = h * 0.62f, rx = width, ry = h * 0.33f;
             int branches = detail >= 3 ? 12 : detail == 2 ? 9 : detail == 1 ? 6 : 4;
             At(trunk, h * 0.6f, out float tx, out float tz);
