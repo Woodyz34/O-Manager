@@ -72,7 +72,8 @@ Shader "O-Manager/TvAtlasLit"
             UNITY_INITIALIZE_OUTPUT(Input, o);
             o.atlas = v.texcoord.xyz;
             // Leaves and needles stir a little in the wind: more at the tip of a card (v near 1) than at its base
-            if (_Wind > 0.001 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || (v.texcoord.z >= 32.5 && v.texcoord.z < 34.5) || (v.texcoord.z >= 36.5 && v.texcoord.z < 37.5)))
+            // (not the cards lying flat on the ground, litter and leaf tops: 2026-11-25, Anders: the litter moved)
+            if (_Wind > 0.001 && abs(v.normal.y) < 0.85 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || (v.texcoord.z >= 32.5 && v.texcoord.z < 34.5) || (v.texcoord.z >= 36.5 && v.texcoord.z < 37.5)))
             {
                 float3 w = mul(unity_ObjectToWorld, v.vertex).xyz;
                 float tip = saturate(v.texcoord.y + 0.25);

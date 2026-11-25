@@ -618,52 +618,85 @@ def fern():
                     c.poly(leaf_shape(qx, qy, ll, ll * 0.38, aa, tip=0.05, n=7), mix('#335f20', '#79a843', shade * 0.6 + 0.4 * lt))
     return c.done()
 
+def ragged(img, seed, cy=0.5, ry=0.5):
+    """Thin a cut-out out towards a ragged, roundish edge (the card's square outline must never show,
+    2026-11-25 Anders: the litter lay in rectangles). The part centred at cy with half-height ry."""
+    a = np.asarray(img).astype(np.float32).copy()
+    s = a.shape[0]
+    yy, xx = np.mgrid[0:s, 0:s].astype(np.float32) / s
+    d = np.sqrt(((xx - 0.5) / 0.5) ** 2 + (((1 - yy) - cy) / ry) ** 2)
+    n = fft_noise(s, 1.6, seed) * 0.6 + fft_noise(s, 0.6, seed + 1) * 0.4
+    keep = smooth(1.0, 0.55, d + (n - 0.5) * 0.7)
+    a[..., 3] *= keep
+    return Image.fromarray(a.astype(np.uint8), 'RGBA')
+
+
 def litter():
-    """The forest floor from above, cut out: pine needles, small twigs, cones, a few dead leaves."""
+    """The forest floor from above, cut out, in two halves (v 0.5-1: conifer litter of pine and spruce needles,
+    twigs and cones; v 0-0.5: fallen birch and aspen leaves with some needles), each thinning out to a ragged edge so
+    the cards melt into the ground and into each other."""
     c = Canvas()
     g = np.random.default_rng(131)
-    # needles
-    for k in range(1300):
-        x, y = g.random(), g.random()
-        a = g.random() * math.pi
-        ln = R(0.02, 0.04)
-        cc = mix('#6a4a2e', '#b08a58', g.random(), int(R(200, 255)))
-        c.line([(x, y), (x + math.cos(a) * ln, y + math.sin(a) * ln)], 1.4, cc)
-    # dead leaves
-    for k in range(18):
-        x, y = R(0.05, 0.95), R(0.05, 0.95)
-        a = g.random() * 6.28
-        ln = R(0.03, 0.05)
-        c.poly(leaf_shape(x, y, ln, ln * 0.4, a, tip=0.3, n=10, serr=0.06), mix('#8a6a32', '#c09a4a', g.random()))
-    # twigs
-    for k in range(14):
-        x, y = R(0.05, 0.95), R(0.05, 0.95)
-        a = g.random() * 6.28
-        ln = R(0.12, 0.3)
-        pts = []
-        for i in range(8):
-            a += R(-0.15, 0.15)
-            pts.append((x, y))
-            x += math.cos(a) * ln / 7
-            y += math.sin(a) * ln / 7
-        cc = mix('#4a3a2c', '#7a6650', g.random())
-        c.taper(pts, R(2.5, 4.0), 1.2, cc)
-        for i in range(2, 7):
-            if g.random() < 0.5:
-                bx, by = pts[i]
-                ba = a + (1 if g.random() < 0.5 else -1) * R(0.5, 1.0)
-                bl = ln * R(0.15, 0.3)
-                c.taper([(bx, by), (bx + math.cos(ba) * bl, by + math.sin(ba) * bl)], 1.6, 0.8, cc)
-    # cones
-    for k in range(4):
-        x, y = R(0.1, 0.9), R(0.1, 0.9)
-        a = g.random() * 6.28
-        for j in range(16):
-            t = j / 15
-            px, py = x + math.cos(a) * 0.05 * t, y + math.sin(a) * 0.05 * t
-            r = 0.016 * math.sin(math.pi * (0.15 + 0.8 * t)) + 0.004
-            c.ellipse(px, py, r, r, mix('#4a3222', '#8a6038', (j % 3) / 2))
-    return c.done()
+
+    def needles(y0, y1, count):
+        for k in range(count):
+            x, y = R(0.02, 0.98), R(y0, y1)
+            a = g.random() * math.pi
+            ln = R(0.012, 0.035)
+            cc = mix('#5a3e26', '#b48c5a', g.random(), int(R(200, 255))) if g.random() < 0.8 else mix('#6a6a3a', '#8a8a4a', g.random())
+            c.line([(x, y), (x + math.cos(a) * ln, y + math.sin(a) * ln)], R(1.0, 1.6), cc)
+
+    def twigs(y0, y1, count):
+        for k in range(count):
+            x, y = R(0.1, 0.9), R(y0 + 0.05, y1 - 0.05)
+            a = g.random() * 6.28
+            ln = R(0.08, 0.22)
+            pts = []
+            for i in range(8):
+                a += R(-0.15, 0.15)
+                pts.append((x, y))
+                x += math.cos(a) * ln / 7
+                y += math.sin(a) * ln / 7
+            cc = mix('#3e3026', '#7a6650', g.random())
+            c.taper(pts, R(2.0, 3.5), 1.0, cc)
+
+    def cones(y0, y1, count):
+        for k in range(count):
+            x, y = R(0.15, 0.85), R(y0 + 0.08, y1 - 0.08)
+            a = g.random() * 6.28
+            ln = R(0.035, 0.06)
+            for j in range(16):
+                t = j / 15
+                px, py = x + math.cos(a) * ln * t, y + math.sin(a) * ln * t
+                r = ln * 0.3 * math.sin(math.pi * (0.15 + 0.8 * t)) + 0.003
+                c.ellipse(px, py, r, r * 0.8, mix('#3e2a1c', '#7a5634', (j % 3) / 2))
+
+    def leaves(y0, y1, count):
+        for k in range(count):
+            x, y = R(0.05, 0.95), R(y0, y1)
+            a = g.random() * 6.28
+            ln = R(0.022, 0.04)
+            t = g.random()
+            cc = mix('#7a5a28', '#c8a04a', t) if g.random() < 0.7 else mix('#5a3a22', '#8a5a34', t)
+            c.poly(leaf_shape(x, y, ln, ln * 0.62, a, tip=0.1, n=10, serr=0.08), cc)
+
+    # conifer half (top)
+    needles(0.5, 1.0, 1500)
+    twigs(0.5, 1.0, 9)
+    cones(0.5, 1.0, 4)
+    leaves(0.5, 1.0, 6)
+    # leaf half (bottom)
+    needles(0.0, 0.5, 350)
+    leaves(0.0, 0.5, 260)
+    twigs(0.0, 0.5, 5)
+    img = c.done()
+    top = ragged(img, 137, 0.75, 0.25)
+    bot = ragged(img, 139, 0.25, 0.25)
+    a = np.asarray(top).astype(np.float32)
+    b = np.asarray(bot).astype(np.float32)
+    s_ = a.shape[0]
+    out = np.where((np.arange(s_)[:, None, None] < s_ // 2), a, b)
+    return Image.fromarray(out.astype(np.uint8), 'RGBA')
 
 
 def twig():
@@ -1342,6 +1375,39 @@ def soil():
     return to_img(rgb, alpha)
 
 
+def reindeer_lichen():
+    """Reindeer lichen cushions seen close (2026-11-25, Anders: the flat white rings looked sick): a mass of tiny
+    pale grey-green branching tips, dark gaps between them, a few yellower and greener spots (repeats; laid on low
+    lumpy mounds)."""
+    s = IN
+    base = fft_noise(s, 1.5, 351)
+    rgb = lerp(col('#5e6454'), col('#7c8270'), base[..., None])
+    img = to_img(rgb)
+    d = ImageDraw.Draw(img)
+    g = np.random.default_rng(352)
+    for _ in range(5200):
+        x, y = g.random() * s, g.random() * s
+        t = g.random()
+        cc = lerp(col('#a8ae9a'), col('#e8eadc'), t)
+        if g.random() < 0.12:
+            cc = lerp(col('#b8b48a'), col('#d8d4a8'), t)
+        c_ = tuple(int(v) for v in cc) + (255,)
+        a = g.random() * 6.28
+        ln = 3 + g.random() * 5
+        for ox in (-s, 0, s):
+            for oy in (-s, 0, s):
+                x0, y0 = x + ox, y + oy
+                for k in range(3):
+                    x1, y1 = x0 + math.cos(a) * ln, y0 + math.sin(a) * ln
+                    d.line([(x0, y0), (x1, y1)], fill=c_, width=2)
+                    x0, y0 = x1, y1
+                    a += (g.random() - 0.5) * 1.6
+                d.ellipse([x0 - 1.5, y0 - 1.5, x0 + 1.5, y0 + 1.5], fill=c_)
+    rgb = np.asarray(img).astype(np.float32)[..., :3]
+    rgb *= (0.85 + 0.25 * fft_noise(s, 1.2, 353))[..., None]
+    return to_img(rgb)
+
+
 def granite():
     """Granite (boulders, cliff tops), 2026-11-25 after Anders' wish for living stones: coarse grains of grey, white
     quartz, pink-red feldspar and black mica, cracks, and lichen of several kinds: pale grey-green rosettes,
@@ -1494,6 +1560,7 @@ TILES = [
     ('slash', slash, False),
     ('heather top', heather_top, False),
     ('soil', soil, True),
+    ('reindeer lichen', reindeer_lichen, True),
 ]
 
 if __name__ == '__main__':

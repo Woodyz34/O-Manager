@@ -17,7 +17,7 @@ public static class TvAtlas
         Plaster = 25, Brick = 26, WoodPanel = 27, RoofTiles = 28, MetalSheet = 29, Concrete = 30, Glass = 31,
         MossSock = 32, BilberryTop = 33, LichenTop = 34, PineBarkLow2 = 35,
         // 2026-11-25 (Anders' photos of clear-cuts and heather): logging slash, a heather bush from above, churned soil
-        Slash = 36, HeatherTop = 37, Soil = 38;
+        Slash = 36, HeatherTop = 37, Soil = 38, ReindeerLichen = 39;
 
     // Tiles from this one on are leaves and plants: lit softly through, as light comes through a leaf
     public const int FirstFoliage = 5;
@@ -194,7 +194,7 @@ public partial class TvShapeBuilder
     // A cushion of moss on the forest floor (2026-11-25, Anders' photos of spruce forest: the ground is soft green humps
     // over old stumps and stones): a low lumpy dome, wide radius rx by rz, h high, its edge sunk a little into the ground.
     // The moss picture lies flat over it from above (u, v from x, z), every `size` metres.
-    public void Mound(float rx, float rz, float h, int tile, TvColor low, TvColor high, float size)
+    public void Mound(float rx, float rz, float h, int tile, TvColor low, TvColor high, float size, float lumpy = 0f)
     {
         int rings = 5, around = 14;
         int first = p.Count / 3;
@@ -205,7 +205,8 @@ public partial class TvShapeBuilder
             for (int j = 0; j < (i == 0 ? 1 : around); j++)
             {
                 float a = j * 6.2832f / around;
-                float wob = 1f + 0.16f * (float)Math.Sin(a * 2f + ph1) + 0.1f * (float)Math.Sin(a * 3f + ph2);
+                float wob = 1f + 0.16f * (float)Math.Sin(a * 2f + ph1) + 0.1f * (float)Math.Sin(a * 3f + ph2)
+                          + lumpy * (0.14f * (float)Math.Sin(a * 5f + ph1 * 2f) + 0.09f * (float)Math.Sin(a * 7f + ph2 * 3f));
                 float r = t * wob;
                 float x = (float)Math.Cos(a) * rx * r, z = (float)Math.Sin(a) * rz * r;
                 float y = h * (1f - t * t) * (1f - t * t) * (0.85f + 0.15f * wob) - 0.05f * t * t;   // flat at the edge: no step
@@ -283,25 +284,35 @@ public partial class TvShapeBuilder
             }
     }
 
-    // A card lying on the ground (litter, a stick): corners at the ground's own heights, normals the ground's
+    // A card lying on the ground (litter, a stick, slash): a small grid that follows the ground's own heights every
+    // half metre or so (2026-11-25, Anders: the litter cards floated over the ground in places and sank into it in
+    // others), normals the ground's
     public void GroundCard(float x, float z, float halfLength, float halfWidth, float yaw, Func<float, float, float> height, int tile,
                            TvColor color, float v0 = 0f, float v1 = 1f, float lift = 0.012f)
     {
         float ca = (float)Math.Cos(yaw), sa = (float)Math.Sin(yaw);
-        float[] cx = { -halfLength, halfLength, halfLength, -halfLength }, cz = { -halfWidth, -halfWidth, halfWidth, halfWidth };
-        float[] u = { 0f, 1f, 1f, 0f }, v = { v0, v0, v1, v1 };
-        int[] k = new int[4];
-        for (int i = 0; i < 4; i++)
-        {
-            float px = x + cx[i] * ca - cz[i] * sa, pz = z + cx[i] * sa + cz[i] * ca;
-            float h = height(px, pz);
-            // The ground's slope here, for the light
-            float gx = height(px + 0.5f, pz) - height(px - 0.5f, pz), gz = height(px, pz + 0.5f) - height(px, pz - 0.5f);
-            float nx = -gx, ny = 1f, nz = -gz;
-            Norm(ref nx, ref ny, ref nz);
-            k[i] = VT(px, h + lift, pz, nx, ny, nz, color, u[i], v[i], tile);
-        }
-        t.Add(k[0]); t.Add(k[2]); t.Add(k[1]);
-        t.Add(k[0]); t.Add(k[3]); t.Add(k[2]);
+        int nu = Math.Max(1, Math.Min(4, (int)Math.Ceiling(halfLength / 0.3f))), nv = Math.Max(1, Math.Min(4, (int)Math.Ceiling(halfWidth / 0.3f)));
+        lift = Math.Max(lift, 0.02f);
+        int first = -1;
+        for (int j = 0; j <= nv; j++)
+            for (int i = 0; i <= nu; i++)
+            {
+                float fu = i / (float)nu, fv = j / (float)nv;
+                float lx = (fu * 2f - 1f) * halfLength, lz = (fv * 2f - 1f) * halfWidth;
+                float px = x + lx * ca - lz * sa, pz = z + lx * sa + lz * ca;
+                float h = height(px, pz);
+                float gx = height(px + 0.5f, pz) - height(px - 0.5f, pz), gz = height(px, pz + 0.5f) - height(px, pz - 0.5f);
+                float nx = -gx, ny = 1f, nz = -gz;
+                Norm(ref nx, ref ny, ref nz);
+                int k = VT(px, h + lift, pz, nx, ny, nz, color, fu, v0 + (v1 - v0) * fv, tile);
+                if (first < 0) first = k;
+            }
+        for (int j = 0; j < nv; j++)
+            for (int i = 0; i < nu; i++)
+            {
+                int a = first + j * (nu + 1) + i, b = a + 1, q = a + nu + 1, d = q + 1;
+                t.Add(a); t.Add(d); t.Add(b);
+                t.Add(a); t.Add(q); t.Add(d);
+            }
     }
 }
