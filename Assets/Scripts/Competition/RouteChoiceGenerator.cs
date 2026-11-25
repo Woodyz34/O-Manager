@@ -100,6 +100,14 @@ public class RouteChoiceGenerator
     // runner can change between the two there, so it is no way of its own. Choices that really go different ways
     // keep the wide MaxSlower limit. The route choice game and the AI course both use Variants.
     public const float Variants = 1.10f;
+    // Tunnels and bridges (TwoLevels, 2026-11-25): the searches know which level a runner is on, as AStarPathfinder
+    // does. Into a tunnel only at its ends, straight through it, and never down into it from the road above (or up
+    // out of it). Before, the route choice game ignored the levels and its routes turned out of a tunnel sideways.
+    // A search state is a cell (level 0) or cell + cellCount (level 1, on the way); null when the window has none.
+    TwoLevels levels;
+    Vector2Int levelOffset;     // where the window starts in the whole grid
+    bool[] wayCell;             // the window's cells that belong to a tunnel or a bridge
+    int[] viaState;             // Trees: the level each cell is best passed on (its search state), or null
     public float VariantSlower { get; set; } = Variants;
     const float VariantShare = 0.3f;
 
@@ -119,6 +127,8 @@ public class RouteChoiceGenerator
         cellMeters = cellSize / MapDefinition.WorldUnitsPerMeter;
         this.baseSpeed = baseSpeed;
         this.gameSecondsPerSecond = gameSecondsPerSecond;
+        TwoLevels twoLevels = TwoLevels.For(height, width);
+        levels = twoLevels != null && twoLevels.Any ? twoLevels : null;
     }
 
     // A copy of a part of the grid
@@ -145,9 +155,21 @@ public class RouteChoiceGenerator
             }
         }
         leastCost = 1f / fastest;
-        gScore = new float[w * h];
-        cameFrom = new int[w * h];
-        closed = new int[w * h];
+        if (full.levels != null)
+        {
+            levelOffset = full.levelOffset + new Vector2Int(x0, y0);
+            wayCell = new bool[w * h];
+            bool any = false;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    if (full.levels.IsWay(x + levelOffset.x, y + levelOffset.y)) { wayCell[y * w + x] = true; any = true; }
+            if (any) levels = full.levels;
+            else wayCell = null;
+        }
+        int states = levels != null ? 2 * w * h : w * h;
+        gScore = new float[states];
+        cameFrom = new int[states];
+        closed = new int[states];
         cellSize = full.cellSize;
         cellMeters = full.cellMeters;
         baseSpeed = full.baseSpeed;
@@ -306,10 +328,9 @@ public class RouteChoiceGenerator
         // route already taken adds nothing new, so each new one gives a route that is somewhere else. Together
         // that is every sensible way: left, right, straight on, along a road or across the open.
         int cellCount = width * height;
-        float[] fromStart = new float[cellCount], toGoal = new float[cellCount];
-        int[] backToStart = new int[cellCount], onToGoal = new int[cellCount];
-        Tree(from, false, fromStart, backToStart);
-        Tree(to, true, toGoal, onToGoal);
+        float[] fromStart, toGoal;
+        int[] backToStart, onToGoal;
+        Trees(from, to, out fromStart, out toGoal, out backToStart, out onToGoal);
         int goalIndex = to.y * width + to.x;
         float bestCost = fromStart[goalIndex];
         if (float.IsInfinity(bestCost))
@@ -674,6 +695,7 @@ public class RouteChoiceGenerator
                 next.AddRange(shortcut);
                 if (b + 1 < route.Count) next.AddRange(route.GetRange(b + 1, route.Count - b - 1));
                 next = RemoveLoops(next);
+                if (!ValidLevels(next)) continue;
                 bool own = true;
                 foreach (RouteChoice o in others)
                 {
@@ -994,12 +1016,18 @@ public class RouteChoiceGenerator
         return v.y * width + v.x;
     }
 
-    static List<Vector2Int> RemoveLoops(List<Vector2Int> route)
+    // (A tunnel's or bridge's cell may be passed twice, over and under: that is no loop.)
+    List<Vector2Int> RemoveLoops(List<Vector2Int> route)
     {
         List<Vector2Int> result = new List<Vector2Int>(route.Count);
         Dictionary<Vector2Int, int> seen = new Dictionary<Vector2Int, int>();
         foreach (Vector2Int c in route)
         {
+            if (wayCell != null && c.x >= 0 && c.y >= 0 && c.x < width && c.y < height && wayCell[c.y * width + c.x])
+            {
+                result.Add(c);
+                continue;
+            }
             if (seen.TryGetValue(c, out int at))
             {
                 for (int i = at + 1; i < result.Count; i++) seen.Remove(result[i]);
@@ -1111,6 +1139,158 @@ public class RouteChoiceGenerator
 
     // ---- Fastest times from the start and to the goal ----
 
+    // The fastest times from the start to every cell and from every cell to the goal, and the next cell (search state)
+    // on the way back to each. Without tunnels: one Dijkstra each way over the cells. With them: over the states (cell
+    // and level); a cell then gets the times of the level it is best passed on, and viaState says which.
+    void Trees(Vector2Int from, Vector2Int to, out float[] fromStart, out float[] toGoal, out int[] backToStart, out int[] onToGoal)
+    {
+        int cellCount = width * height;
+        if (levels == null)
+        {
+            viaState = null;
+            fromStart = new float[cellCount]; toGoal = new float[cellCount];
+            backToStart = new int[cellCount]; onToGoal = new int[cellCount];
+            Tree(from, false, fromStart, backToStart);
+            Tree(to, true, toGoal, onToGoal);
+            return;
+        }
+        float[] forward = new float[2 * cellCount], backward = new float[2 * cellCount];
+        backToStart = new int[2 * cellCount];
+        onToGoal = new int[2 * cellCount];
+        LevelTree(from, false, forward, backToStart);
+        LevelTree(to, true, backward, onToGoal);
+        fromStart = new float[cellCount];
+        toGoal = new float[cellCount];
+        viaState = new int[cellCount];
+        for (int i = 0; i < cellCount; i++)
+        {
+            // A cell that is not part of a tunnel or bridge has only the ground level
+            int best = i;
+            if (wayCell[i] && forward[i + cellCount] + backward[i + cellCount] < forward[i] + backward[i]) best = i + cellCount;
+            fromStart[i] = forward[best];
+            toGoal[i] = backward[best];
+            viaState[i] = float.IsInfinity(forward[best]) || float.IsInfinity(backward[best]) ? -1 : best;
+        }
+        // The goal itself: reached on either level
+        int goal = to.y * width + to.x;
+        int goalState = forward[goal + cellCount] < forward[goal] ? goal + cellCount : goal;
+        fromStart[goal] = forward[goalState];
+        toGoal[goal] = 0f;
+        viaState[goal] = float.IsInfinity(forward[goalState]) ? -1 : goalState;
+    }
+
+    // May a runner on (cx, cy) at 'level' step to (nx, ny) (as AStarPathfinder: through the tunnel, not out of its
+    // side, and at a diagonal step not slipping past a corner between the levels)? nextLevel: its level there.
+    bool LevelStep(int cx, int cy, int level, int nx, int ny, out int nextLevel)
+    {
+        nextLevel = 0;
+        bool diagonal = cx != nx && cy != ny;
+        if (!wayCell[cy * width + cx] && !wayCell[ny * width + nx]
+            && (!diagonal || (!wayCell[cy * width + nx] && !wayCell[ny * width + cx]))) return true;
+        int ox = levelOffset.x, oy = levelOffset.y;
+        if (!levels.Step(cx + ox, cy + oy, level, nx + ox, ny + oy, out nextLevel)) return false;
+        if (diagonal && (!levels.Step(cx + ox, cy + oy, level, nx + ox, cy + oy, out _) || !levels.Step(cx + ox, cy + oy, level, cx + ox, ny + oy, out _)))
+            return false;
+        return true;
+    }
+
+    // True when a runner can follow the route cell by cell keeping to the levels (always, without tunnels). A route
+    // put together from pieces (a shortcut, a new way into the control) can join a tunnel to the road above it.
+    bool ValidLevels(List<Vector2Int> route)
+    {
+        if (levels == null || route == null || route.Count == 0) return true;
+        Vector2Int first = route[0];
+        int start = wayCell[first.y * width + first.x] ? levels.StartLevel(first.x + levelOffset.x, first.y + levelOffset.y) : 0;
+        bool on0 = start == 0, on1 = start == 1;
+        for (int i = 1; i < route.Count; i++)
+        {
+            Vector2Int p = route[i - 1], q = route[i];
+            if (Mathf.Abs(p.x - q.x) > 1 || Mathf.Abs(p.y - q.y) > 1) return false;
+            bool next0 = false, next1 = false;
+            if (on0 && LevelStep(p.x, p.y, 0, q.x, q.y, out int a)) { if (a == 0) next0 = true; else next1 = true; }
+            if (on1 && LevelStep(p.x, p.y, 1, q.x, q.y, out int b)) { if (b == 0) next0 = true; else next1 = true; }
+            if (!next0 && !next1) return false;
+            on0 = next0;
+            on1 = next1;
+        }
+        return true;
+    }
+
+    // Tree over the states (cell, level). Forward from the start on the level it stands on; backward from the goal on
+    // either level, stepping back from a state to every state that steps into it.
+    void LevelTree(Vector2Int root, bool backwards, float[] cost, int[] next)
+    {
+        int cellCount = width * height;
+        for (int i = 0; i < cost.Length; i++) { cost[i] = float.PositiveInfinity; next[i] = -1; }
+        bool[] done = new bool[cost.Length];
+        int rootCell = root.y * width + root.x;
+        heapCount = 0;
+        if (!backwards)
+        {
+            int rootLevel = wayCell[rootCell] ? levels.StartLevel(root.x + levelOffset.x, root.y + levelOffset.y) : 0;
+            cost[rootCell + rootLevel * cellCount] = 0f;
+            Push(rootCell + rootLevel * cellCount, 0f);
+        }
+        else
+        {
+            cost[rootCell] = 0f;
+            Push(rootCell, 0f);
+            if (wayCell[rootCell]) { cost[rootCell + cellCount] = 0f; Push(rootCell + cellCount, 0f); }
+        }
+        while (heapCount > 0)
+        {
+            int current = Pop();
+            if (done[current]) continue;
+            done[current] = true;
+            int level = current >= cellCount ? 1 : 0;
+            int cell = current - level * cellCount;
+            int cx = cell % width, cy = cell / width;
+            for (int d = 0; d < 8; d++)
+            {
+                int nx = cx + DirX[d], ny = cy + DirY[d];
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                int otherCell = ny * width + nx;
+                if (speed[ny, nx] <= 0.01f) continue;
+                // No cutting a corner past a closed cell (a fence drawn diagonally across the grid), as AStarPathfinder
+                if (DirX[d] != 0 && DirY[d] != 0 && (speed[cy, nx] <= 0.01f || speed[ny, cx] <= 0.01f)) continue;
+                float step = (DirX[d] != 0 && DirY[d] != 0) ? 1.414f : 1f;
+                if (!backwards)
+                {
+                    // current -> other
+                    if (!LevelStep(cx, cy, level, nx, ny, out int nextLevel)) continue;
+                    float slope = slopes[d] != null ? slopes[d][cy, cx] : 1f;
+                    if (slope <= 0f) continue;
+                    int other = otherCell + nextLevel * cellCount;
+                    if (done[other]) continue;
+                    float total = cost[current] + step / speed[ny, nx] / slope;
+                    if (total >= cost[other]) continue;
+                    cost[other] = total;
+                    next[other] = current;
+                    Push(other, total);
+                }
+                else
+                {
+                    // other -> current, in the opposite direction, from either level there
+                    int back = (d + 4) % 8;
+                    float slope = slopes[back] != null ? slopes[back][ny, nx] : 1f;
+                    if (slope <= 0f) continue;
+                    float c = step / Mathf.Max(0.01f, speed[cy, cx]) / slope;
+                    for (int otherLevel = 0; otherLevel <= (wayCell[otherCell] ? 1 : 0); otherLevel++)
+                    {
+                        if (!LevelStep(nx, ny, otherLevel, cx, cy, out int arrives) || arrives != level) continue;
+                        int other = otherCell + otherLevel * cellCount;
+                        if (done[other]) continue;
+                        float total = cost[current] + c;
+                        if (total >= cost[other]) continue;
+                        cost[other] = total;
+                        next[other] = current;
+                        Push(other, total);
+                    }
+                }
+            }
+        }
+    }
+
     // Dijkstra over the whole window: the fastest time from the root to every cell (or, backwards, from every cell
     // to the root), and the next cell on the way back to the root
     void Tree(Vector2Int root, bool backwards, float[] cost, int[] next)
@@ -1195,12 +1375,16 @@ public class RouteChoiceGenerator
     }
 
     // The fastest route from the start through a cell to the goal, without loops
+    // (With levels the two trees hold search states: a cell on the ground or on a tunnel; viaState says which.)
     List<Vector2Int> Through(int via, int[] backToStart, int[] onToGoal)
     {
         List<Vector2Int> route = new List<Vector2Int>();
-        for (int c = via; c >= 0; c = backToStart[c]) route.Add(new Vector2Int(c % width, c / width));
+        int cellCount = width * height;
+        int first = viaState != null ? viaState[via] : via;
+        if (first < 0) return route;
+        for (int c = first; c >= 0; c = backToStart[c]) { int cell = c % cellCount; route.Add(new Vector2Int(cell % width, cell / width)); }
         route.Reverse();
-        for (int c = onToGoal[via]; c >= 0; c = onToGoal[c]) route.Add(new Vector2Int(c % width, c / width));
+        for (int c = onToGoal[first]; c >= 0; c = onToGoal[c]) { int cell = c % cellCount; route.Add(new Vector2Int(cell % width, cell / width)); }
         return RemoveLoops(route);
     }
 
@@ -1241,6 +1425,7 @@ public class RouteChoiceGenerator
         grid = grid ?? speed;
         if (start.x < 0 || start.y < 0 || start.x >= width || start.y >= height) return null;
         if (goal.x < 0 || goal.y < 0 || goal.x >= width || goal.y >= height) return null;
+        if (levels != null) return PathOnLevels(start, goal, grid);
         search++;
         int startIndex = start.y * width + start.x;
         int goalIndex = goal.y * width + goal.x;
@@ -1272,6 +1457,59 @@ public class RouteChoiceGenerator
                 // No cutting a corner past a closed cell (a fence drawn diagonally across the grid), as AStarPathfinder
                 if (DirX[d] != 0 && DirY[d] != 0 && (grid[cy, nx] <= 0.01f || grid[ny, cx] <= 0.01f)) continue;
                 int next = ny * width + nx;
+                if (closed[next] == search) continue;
+                float slope = slopes[d] != null ? slopes[d][cy, cx] : 1f;
+                if (slope <= 0f) continue;
+                float cost = g + ((DirX[d] != 0 && DirY[d] != 0) ? 1.414f : 1f) / cellSpeed / slope;
+                if (closed[next] == -search && cost >= gScore[next]) continue;
+                closed[next] = -search;
+                gScore[next] = cost;
+                cameFrom[next] = current;
+                Push(next, cost + Estimate(nx, ny, goal));
+            }
+        }
+        return null;
+    }
+
+    // Path with the level as part of the search state (TwoLevels), as AStarPathfinder does it
+    List<Vector2Int> PathOnLevels(Vector2Int start, Vector2Int goal, float[,] grid)
+    {
+        search++;
+        int cellCount = width * height;
+        int startCell = start.y * width + start.x;
+        int goalCell = goal.y * width + goal.x;
+        int startLevel = wayCell[startCell] ? levels.StartLevel(start.x + levelOffset.x, start.y + levelOffset.y) : 0;
+        int startState = startCell + startLevel * cellCount;
+        heapCount = 0;
+        gScore[startState] = 0f;
+        cameFrom[startState] = -1;
+        closed[startState] = -search;
+        Push(startState, Estimate(start.x, start.y, goal));
+        while (heapCount > 0)
+        {
+            int current = Pop();
+            if (closed[current] == search) continue;
+            closed[current] = search;
+            int level = current >= cellCount ? 1 : 0;
+            int cell = current - level * cellCount;
+            if (cell == goalCell)
+            {
+                List<Vector2Int> path = new List<Vector2Int>();
+                for (int c = current; c >= 0; c = cameFrom[c]) { int k = c % cellCount; path.Add(new Vector2Int(k % width, k / width)); }
+                path.Reverse();
+                return path;
+            }
+            int cx = cell % width, cy = cell / width;
+            float g = gScore[current];
+            for (int d = 0; d < 8; d++)
+            {
+                int nx = cx + DirX[d], ny = cy + DirY[d];
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                float cellSpeed = grid[ny, nx];
+                if (cellSpeed <= 0.01f) continue;
+                if (DirX[d] != 0 && DirY[d] != 0 && (grid[cy, nx] <= 0.01f || grid[ny, cx] <= 0.01f)) continue;
+                if (!LevelStep(cx, cy, level, nx, ny, out int nextLevel)) continue;
+                int next = ny * width + nx + nextLevel * cellCount;
                 if (closed[next] == search) continue;
                 float slope = slopes[d] != null ? slopes[d][cy, cx] : 1f;
                 if (slope <= 0f) continue;
@@ -1517,8 +1755,9 @@ public class RouteChoiceGenerator
             List<Vector2Int> end = Path(route[first], to);
             if (end != null)
             {
-                route = new List<Vector2Int>(route.GetRange(0, first));
-                route.AddRange(end);
+                List<Vector2Int> joined = new List<Vector2Int>(route.GetRange(0, first));
+                joined.AddRange(end);
+                if (ValidLevels(joined)) route = joined;
             }
         }
         int last = -1;
@@ -1533,7 +1772,7 @@ public class RouteChoiceGenerator
             {
                 start.RemoveAt(start.Count - 1);
                 start.AddRange(route.GetRange(last, route.Count - last));
-                route = start;
+                if (ValidLevels(start)) route = start;
             }
         }
         return RemoveLoops(route);
