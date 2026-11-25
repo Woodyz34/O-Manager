@@ -2,7 +2,8 @@
 // bark, needles, leaves, bilberry, grass, ferns, twigs (the forest atlas, TV/TvFlora.cs). Lit like TvVertexLit (its
 // own sun, sky and ground light, ACES tone mapping, fog), so it sits in the same picture.
 // Each corner carries u, v and the atlas tile in its first uv (x, y, z); tile -1 = no picture (the corner's colour only).
-// Tiles 0-4 are bark, 20-24 stone and wood, 25-31 walls, roofs and glass (lit as solid things); 5-19 are leaves and plants.
+// Tiles 0-4 are bark, 20-24 stone and wood, 25-31 walls, roofs and glass, 32 moss at a trunk's foot (lit as solid
+// things, with relief); 5-19 and 33-35 are leaves and plants.
 // u, v repeat inside the tile (bark round a trunk), so the picture is looked up with its own slopes (no seam lines).
 // The leaves and plants are cut out by the picture's alpha and drawn from both sides; they are lit softly through
 // (light wraps round a leaf), with the normal the builder gave them (out of the crown), so a crown is lit as a whole.
@@ -16,6 +17,7 @@ Shader "O-Manager/TvAtlasLit"
         _Cutoff ("Alpha cut", Range(0,1)) = 0.5
         _Surface ("Surface grain strength", Range(0,1)) = 0.25
         _Wind ("Leaves moving in the wind", Range(0,1)) = 1
+        _Bump ("Relief of bark, stone and walls (m)", Range(0,0.05)) = 0.012
         _FogStart ("Fog start (m)", Float) = 45
         _FogEnd ("Fog end (m)", Float) = 230
     }
@@ -39,6 +41,7 @@ Shader "O-Manager/TvAtlasLit"
         float _Pad;
         half _Surface;
         half _Wind;
+        float _Bump;
         float _FogStart;
         float _FogEnd;
 
@@ -60,6 +63,7 @@ Shader "O-Manager/TvAtlasLit"
             fixed Gloss;
             fixed Alpha;
             half Foliage;
+            half3 WNormal;     // the world normal with the picture's relief on it
         };
 
         void tvVert (inout appdata_full v, out Input o)
@@ -67,7 +71,7 @@ Shader "O-Manager/TvAtlasLit"
             UNITY_INITIALIZE_OUTPUT(Input, o);
             o.atlas = v.texcoord.xyz;
             // Leaves and needles stir a little in the wind: more at the tip of a card (v near 1) than at its base
-            if (_Wind > 0.001 && v.texcoord.z >= 4.5 && v.texcoord.z < 19.5)
+            if (_Wind > 0.001 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || v.texcoord.z >= 32.5))
             {
                 float3 w = mul(unity_ObjectToWorld, v.vertex).xyz;
                 float tip = saturate(v.texcoord.y + 0.25);
@@ -80,7 +84,7 @@ Shader "O-Manager/TvAtlasLit"
 
         half4 LightingTv (SurfaceOutputTv s, half3 lightDir, half atten)
         {
-            half d = dot(s.Normal, lightDir);
+            half d = dot(s.WNormal, lightDir);
             // Leaves: light wraps round them and comes through them
             half nl = s.Foliage > 0.5 ? saturate((d + 0.45) / 1.45) : saturate(d);
             half4 c;
@@ -135,8 +139,24 @@ Shader "O-Manager/TvAtlasLit"
                 c *= 1.0 + v * 0.75 * _Surface;
             }
             o.Albedo = c;
-            o.Foliage = tile >= 4.5 && tile < 19.5 ? 1.0 : 0.0;
-            half up = IN.worldNormal.y * 0.5 + 0.5;
+            o.Foliage = (tile >= 4.5 && tile < 19.5) || tile >= 32.5 ? 1.0 : 0.0;
+            // Relief (2026-11-25, Anders: the bark looked flat, like a picture): the picture's light and dark read
+            // as height, bent into the normal from the screen's own slopes (no tangents needed); fades out far away
+            float3 n = normalize(IN.worldNormal);
+            bool solid = tile > -0.5 && (tile < 4.5 || (tile > 19.5 && tile < 32.5));
+            float bump = solid ? _Bump * saturate(1.0 - IN.tvDepth / 30.0) : 0.0;
+            if (bump > 0.0)
+            {
+                float hgt = dot(tex.rgb, float3(0.3, 0.5, 0.2));
+                float3 dpx = ddx(IN.worldPos), dpy = ddy(IN.worldPos);
+                float dhx = ddx(hgt), dhy = ddy(hgt);
+                float3 r1 = cross(dpy, n), r2 = cross(n, dpx);
+                float det = dot(dpx, r1);
+                float3 grad = sign(det) * (dhx * r1 + dhy * r2);
+                n = normalize(abs(det) * n - grad * bump);
+            }
+            o.WNormal = n;
+            half up = n.y * 0.5 + 0.5;
             o.Emission = c * lerp(TV_GROUND_LIGHT, TV_SKY_LIGHT, up);
             o.Alpha = tex.a;
         }

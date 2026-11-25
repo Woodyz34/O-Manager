@@ -14,7 +14,8 @@ public static class TvAtlas
         PineNeedles = 5, SpruceSpray = 6, BirchLeaves = 7, BroadLeaves = 8, Bilberry = 9, Grass = 10, Fern = 11,
         Heather = 12, Litter = 13, Twig = 14, DeadTwigs = 15, Lingonberry = 16, Sedge = 17, Juniper = 18, Flowers = 19,
         Granite = 20, CliffRock = 21, DeadWood = 22, PathSoil = 23, Moss = 24,
-        Plaster = 25, Brick = 26, WoodPanel = 27, RoofTiles = 28, MetalSheet = 29, Concrete = 30, Glass = 31;
+        Plaster = 25, Brick = 26, WoodPanel = 27, RoofTiles = 28, MetalSheet = 29, Concrete = 30, Glass = 31,
+        MossSock = 32, BilberryTop = 33, LichenTop = 34;
 
     // Tiles from this one on are leaves and plants: lit softly through, as light comes through a leaf
     public const int FirstFoliage = 5;
