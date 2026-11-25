@@ -25,7 +25,7 @@ MonoBehaviour:
   cols: 3892
   pointsPath: MapPackages/oslo-stolpejakten/points
   linesPath: MapPackages/oslo-stolpejakten/lines
-  editedAt: 0
+  editedAt: 1795526952
   defaultBackground: map
   backgrounds:
   - id: map
