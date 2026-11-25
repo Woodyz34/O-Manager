@@ -1969,6 +1969,7 @@ public partial class TvWorldBuilder
                     for (int q = 0; q < count && peopleHere < 14; q++)
                     {
                         float px = x - ez * (q - (count - 1) / 2f) * 0.75f, pz = z + ex * (q - (count - 1) / 2f) * 0.75f;
+                        if (!StandClear(x, z, px, pz, y)) continue;
                         int kind = (look + q) % 5 == 2 ? 2 : 0;
                         world.people.Add(px); world.people.Add(pz); world.people.Add(faceOut); world.people.Add(kind); world.people.Add((look * 7 + q * 13) % 24); world.people.Add(0f);
                         peopleHere++;
@@ -1976,7 +1977,7 @@ public partial class TvWorldBuilder
                     Mark(x, z, 1.2f, 9);
                     continue;
                 }
-                if (peopleHere < 14 && across >= 3f && min >= 1f && h > 0.97f && Free(x, z, 1f))
+                if (peopleHere < 14 && across >= 3f && min >= 1f && h > 0.97f && Free(x, z, 1f) && StandClear(x, z, x, z, y))
                 {
                     // A walker going along the street, back and forth
                     float wa = (acrossDir == 0 ? 2 : 0) * 0.785398f, wx = (float)Math.Cos(wa), wz = (float)Math.Sin(wa);
@@ -2102,6 +2103,22 @@ public partial class TvWorldBuilder
     }
 
     // Nothing else stands within gap (plus the other thing's own size)
+    // A watcher stands on open, level paving: not inside a wall, fence or cliff and not on the edge of a step or
+    // a drop (2026-11-25, Anders: people cheering inside a wall edge).
+    bool StandClear(float x, float z, float px, float pz, float y)
+    {
+        if (Base(CellAt(px, pz)) != WorldCell.Paved || ShutAt(px, pz)) return false;
+        if ((px != x || pz != z) && AcrossWall(x, z, px, pz)) return false;
+        if (Math.Abs(H(px, pz) - y) > 0.25f) return false;
+        for (int k = 0; k < 8; k++)
+        {
+            float a = k * 0.785398f, sx = px + (float)Math.Cos(a) * 0.5f, sz = pz + (float)Math.Sin(a) * 0.5f;
+            if (ShutAt(sx, sz) || AcrossWall(px, pz, sx, sz)) return false;
+            if (Math.Abs(H(sx, sz) - y) > 0.3f) return false;
+        }
+        return true;
+    }
+
     bool Free(float x, float z, float gap)
     {
         foreach (var p in townPlaced)
