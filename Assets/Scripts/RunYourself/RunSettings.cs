@@ -144,6 +144,8 @@ public static class RunSettings
         public int shadows;           // 0 = none, 1 = hard, 2 = soft, 3 = soft and sharp (4 cascades)
         public float shadowDistance;
         public int msaa;
+        public float reliefFar;       // metres: bark and stone relief this far out (0 = none)
+        public AnisotropicFiltering aniso;   // sharp textures on slanted ground and trunks
     }
 
     public static Look Current => For(Level);
@@ -155,13 +157,13 @@ public static class RunSettings
             // The undergrowth is flat cards with pictures since 2026-11-25, about a tenth of the triangles of the old
             // lumpy tufts, so every level has more of it than before
             case Quality.Low:
-                return new Look { view = 150f, near = 50f, detail = 26f, undergrowth = 0.12f, shadows = 0, shadowDistance = 0f, msaa = 1 };
+                return new Look { view = 150f, near = 50f, detail = 26f, undergrowth = 0.12f, shadows = 0, shadowDistance = 0f, msaa = 1, reliefFar = 0f, aniso = AnisotropicFiltering.Disable };
             case Quality.High:
-                return new Look { view = 330f, near = 96f, detail = 56f, undergrowth = 0.6f, shadows = 2, shadowDistance = 60f, msaa = 4 };
+                return new Look { view = 330f, near = 96f, detail = 56f, undergrowth = 0.6f, shadows = 2, shadowDistance = 60f, msaa = 4, reliefFar = 30f, aniso = AnisotropicFiltering.ForceEnable };
             case Quality.Ultra:
-                return new Look { view = 420f, near = 130f, detail = 72f, undergrowth = 1f, shadows = 3, shadowDistance = 110f, msaa = 8 };
+                return new Look { view = 420f, near = 130f, detail = 72f, undergrowth = 1f, shadows = 3, shadowDistance = 110f, msaa = 8, reliefFar = 50f, aniso = AnisotropicFiltering.ForceEnable };
             default:
-                return new Look { view = 230f, near = 72f, detail = 40f, undergrowth = 0.3f, shadows = 1, shadowDistance = 32f, msaa = 2 };
+                return new Look { view = 230f, near = 72f, detail = 40f, undergrowth = 0.3f, shadows = 1, shadowDistance = 32f, msaa = 2, reliefFar = 15f, aniso = AnisotropicFiltering.Enable };
         }
     }
 
@@ -195,8 +197,9 @@ public static class RunSettings
 
         Transform left = card.transform;
         Chips(left, "Graphics", new[] { "Low", "Medium", "High", "Ultra" }, (int)Level, i => { Level = (Quality)i; changed?.Invoke(); },
-            "Low: shorter view, no shadows, little undergrowth. For weak computers. High: long view and soft shadows. "
-            + "Ultra: for strong computers: the most detailed trees, thick bilberry and litter everywhere, the longest view and the sharpest shadows.");
+            "Low: shorter view, no shadows, little undergrowth, flat bark. For weak computers. Medium: hard shadows, relief on bark and stones close by. "
+            + "High: long view, soft shadows and sharp bark pictures twice the size. "
+            + "Ultra: for strong computers: the most detailed trees, thick bilberry and litter everywhere, the longest view, the sharpest shadows and relief furthest out.");
         int speedIndex = 1;   // 4 x
         for (int i = 0; i < Speeds.Length; i++) if (Mathf.Approximately(Speeds[i], GameSpeed)) speedIndex = i;
         Chips(left, "Game speed", new[] { "3 x real life", "4 x real life", "5 x real life" }, speedIndex, i => { GameSpeed = Speeds[i]; changed?.Invoke(); },

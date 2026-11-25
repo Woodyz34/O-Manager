@@ -89,6 +89,18 @@ public class TvWorldView : MonoBehaviour
         return material;
     }
 
+    static Texture2D sharpBark;
+
+    // The bark pictures at twice the size (2026-11-25, Anders: up close the trees looked pixly; Docs/forest_atlas.py
+    // --hd), for High and Ultra; Low and Medium never load it, so it costs them no memory
+    public static void SharpBark(Material material, bool on)
+    {
+        if (on && sharpBark == null) sharpBark = Resources.Load<Texture2D>("Textures/TvBarkHD");
+        on = on && sharpBark != null;
+        if (on) material.SetTexture("_BarkHD", sharpBark);
+        material.SetFloat("_BarkHDOn", on ? 1f : 0f);
+    }
+
     // The forest floor's moss, needles and twigs, multiplied on the ground's colour (repeats every 2.5 m)
     public static Texture2D ForestFloor()
     {
