@@ -89,14 +89,14 @@ public class ReadyUIHandler : NetworkBehaviour
         TryStartGame(false);
     }
 
-    // The Monday relay (MondayRelayLobby): the relay that won the vote, raced with Any runner and no extra game modes.
+    // The Monday relay (MondayRelayLobby): the relay that won the vote, raced with Your runners and no extra game modes.
     // ignoreMaps: start even if someone still lacks the map (they have had MondayRelay.MapWaitSeconds to get it).
     // Returns true when the race was started.
     public bool StartMondayRelay(CourseData course, bool ignoreMaps)
     {
         if (!IsHost() || course == null) return false;
         if (mapHandler != null) mapHandler.Select(course);
-        if (gameModeHandler != null) gameModeHandler.gameMode = GameModes.ChooseAny;
+        if (gameModeHandler != null) gameModeHandler.gameMode = GameModes.YourRunners;
         LobbySettingsUI lobbySettings = FindObjectOfType<LobbySettingsUI>();
         if (lobbySettings != null) lobbySettings.modes = ExtraMode.None;
         return TryStartGame(ignoreMaps);

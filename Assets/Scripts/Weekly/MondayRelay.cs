@@ -11,8 +11,8 @@ using UnityEngine;
 //
 // The relay: three random relays made by the players (published in the course builder) that have at least 3 legs,
 // every leg longer than 3 km. Everyone in the lobby votes, and the one with the most votes is run. Every leg gets a
-// random class rule (D18, H18, D20, H20, D21, H21): only runners of that class may run it. The pool is Any runner,
-// so everyone has the same runners to pick from.
+// random class rule (D18, H18, D20, H20, D21, H21): only runners of that class may run it. The pool is Your runners
+// (Anders 2026-11-25): a player without a runner of a leg's class gets one on loan (RunnerRules.YourRunnersPool).
 //
 // Times are worked out from the computer's clock in UTC, turned into Swedish time here (no time zone database: the
 // game runs on Windows, Mac and Linux, and the names of the zones differ).
@@ -37,8 +37,8 @@ public static class MondayRelay
 
     // How long things may take when nobody is the host (seconds of real time)
     public const float PickSeconds = 120f;                    // picking the runners for every leg
-    public const float DrawSeconds = 210f;                    // drawing one whole leg
-    public const float StatsSeconds = 45f;                    // the statistics between the legs
+    public const float DrawSeconds = 300f;                    // drawing one whole leg (the leg starts as soon as everyone has drawn)
+    public const float StatsSeconds = 60f;                    // the statistics between the legs
     public const float FinalStatsSeconds = 30f;               // the statistics after the last leg, then the results
     public const float MapWaitSeconds = 180f;                 // waiting for everyone to have the map after 21:00
 

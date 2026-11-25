@@ -484,7 +484,7 @@ public class MondayRelayLobby : MonoBehaviour
             rows[i].interactable = state == MondayRelay.StateVoting && now < ev.VoteClosesUtc;
         }
 
-        footer.text = players + (players == 1 ? " player" : " players") + " in the lobby.  Any runner: everyone picks from all the runners, and every leg has a class (D18, H20 ...) that only runners of that class may run.";
+        footer.text = players + (players == 1 ? " player" : " players") + " in the lobby.  Your runners: every leg has a class (D18, H20 ...) that only runners of that class may run. Missing one? You get one on loan.";
     }
 
     // The bar at the top of the lobby says the same. After LobbySettingsUI.Update has written it, so it doesn't flicker.
@@ -494,7 +494,7 @@ public class MondayRelayLobby : MonoBehaviour
         LobbySettingsUI settings = FindObjectOfType<LobbySettingsUI>();
         if (settings != null)
         {
-            if (settings.modeText != null) settings.modeText.text = "Any runner";
+            if (settings.modeText != null) settings.modeText.text = "Your runners";
             if (settings.imposterText != null) settings.imposterText.text = "Monday relay";
             if (settings.mapText != null && state < MondayRelay.StateChosen) settings.mapText.text = "Vote below";
         }
