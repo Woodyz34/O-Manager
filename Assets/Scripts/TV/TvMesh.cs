@@ -47,7 +47,11 @@ public class TvMesh
         float cos = (float)Math.Cos(yaw), sin = (float)Math.Sin(yaw);
         float[] p = shape.positions, n = shape.normals;
         byte[] c = shape.colors;
+        float[] su = shape.uvs;
         bool tilt = tiltX != 0f || tiltZ != 0f;
+        // Every tree its own (2026-11-25, Anders: "no tree like another"): its bark a little warmer or colder,
+        // greyer or greener, its picture moved round and up, and moss and lichen of its own on it (TreeLife)
+        TreeLife life = su != null ? new TreeLife(x, z) : null;
         for (int i = 0; i < p.Length; i += 3)
         {
             float px = p[i] * sx, py = p[i + 1] * sy, pz = p[i + 2] * sz;
@@ -60,14 +64,30 @@ public class TvMesh
             normals.Add(nx * cos + nz * sin);
             normals.Add(ny);
             normals.Add(-nx * sin + nz * cos);
-            colors.Add(Tint(c[i], tint)); colors.Add(Tint(c[i + 1], tint)); colors.Add(Tint(c[i + 2], tint));
+            if (life != null && TreeLife.IsBark(su[i + 2]))
+            {
+                colors.Add(Tint(c[i], tint * life.r)); colors.Add(Tint(c[i + 1], tint * life.g)); colors.Add(Tint(c[i + 2], tint * life.b));
+            }
+            else
+            {
+                colors.Add(Tint(c[i], tint)); colors.Add(Tint(c[i + 1], tint)); colors.Add(Tint(c[i + 2], tint));
+            }
         }
         int[] t = shape.triangles;
         for (int i = 0; i < t.Length; i++) triangles.Add(first + t[i]);
-        if (shape.uvs != null)
+        if (su != null)
         {
             PadUvs(first);
-            uvs.AddRange(shape.uvs);
+            for (int i = 0; i < su.Length; i += 3)
+            {
+                float tile = su[i + 2];
+                if (TreeLife.IsBark(tile))
+                {
+                    // u goes round a whole number of times, so any shift round is seamless
+                    uvs.Add(su[i] + life.du); uvs.Add(su[i + 1] + life.dv); uvs.Add(life.Code(tile, p[i], p[i + 1], p[i + 2]));
+                }
+                else { uvs.Add(su[i]); uvs.Add(su[i + 1]); uvs.Add(tile); }
+            }
         }
         else if (uvs.Count > 0) PadUvs(VertexCount);
     }
@@ -561,5 +581,52 @@ public class TvRandom
         h = (h ^ (h >> 13)) * 1274126177u;
         h ^= h >> 16;
         return (h & 0xFFFFFF) / 16777216f;
+    }
+}
+
+// What makes one tree its own (from where it stands, so a tree is the same in every build): the shade of its bark,
+// where its bark picture starts, how much moss grows up its foot and on which side (the damp side), and how much crust
+// lichen it carries. The moss and lichen are drawn by the shader (TvAtlasLit) in patches from the tree's own place in
+// the world; the amounts ride in the spare fraction of the tile number (the tile is the nearest whole number):
+// fraction = 0.02 + 0.47 * (lichen / 4 + moss * 0.24), lichen 0..3, moss 0..1. A plain whole number = none.
+public class TreeLife
+{
+    public float r = 1f, g = 1f, b = 1f, du, dv;
+    readonly float mossTop, mossLevel, wetX, wetZ;
+    readonly int lichen;
+
+    public static bool IsBark(float tile) => (tile > -0.5f && tile < 4.5f) || (tile > 34.5f && tile < 35.5f);
+
+    public TreeLife(float x, float z)
+    {
+        uint h = (uint)((int)Math.Floor(x * 7.31f) * 73856093) ^ (uint)((int)Math.Floor(z * 5.17f) * 19349663);
+        float Next() { h ^= h << 13; h ^= h >> 17; h ^= h << 5; return (h & 0xffffff) / 16777216f; }
+        Next(); Next();
+        float lum = 0.86f + 0.24f * Next(), warm = -0.05f + 0.13f * Next(), green = 0.03f * Next() * Next();
+        r = lum * (1f + warm); g = lum * (1f + green); b = lum * (1f - warm - green * 0.5f);
+        du = Next(); dv = Next() * 3f;
+        // Most trees a little moss at the foot, some a lot and high up, a few none
+        float m = Next();
+        mossLevel = m < 0.12f ? 0f : 0.35f + 0.65f * Next();
+        mossTop = 0.25f + 2.2f * m * m;
+        float a = Next() * 6.2832f;
+        wetX = (float)Math.Sin(a); wetZ = (float)Math.Cos(a);
+        lichen = (int)(Next() * 3.999f);
+    }
+
+    // The tile number with this corner's moss and the tree's lichen in its fraction (shape coordinates, y up from the foot)
+    public float Code(float tile, float x, float y, float z)
+    {
+        float t = (float)Math.Round(tile);
+        float species = t == TvAtlas.SpruceBark ? 1f : t == TvAtlas.BirchBark ? 0.45f : t == TvAtlas.PineBarkHigh ? 0.3f : 0.7f;
+        float rr = (float)Math.Sqrt(x * x + z * z);
+        float side = rr > 1e-4f ? (x * wetX + z * wetZ) / rr : 0f;
+        float k = Math.Max(0f, Math.Min(1f, 1f - (y + 0.2f) / mossTop));
+        float moss = mossLevel * species * k * (0.45f + 0.55f * Math.Max(0f, side)) + mossLevel * species * 0.25f * Math.Max(0f, 1f - y / 0.6f);
+        // A birch: the "moss" is its black, cracked foot instead, up to 0.3-1.8 m (the shader paints it)
+        if (t == TvAtlas.BirchBark) moss = Math.Max(0f, Math.Min(1f, 1.2f - (y + 0.1f) / (0.35f + mossTop * 0.6f)));
+        moss = Math.Max(0f, Math.Min(0.999f, moss));
+        int li = t == TvAtlas.BirchBark ? Math.Min(lichen, 1) : lichen;
+        return t + 0.02f + 0.47f * (li / 4f + moss * 0.24f);
     }
 }
