@@ -34,6 +34,8 @@ Shader "O-Manager/TvAtlasLit"
         CGPROGRAM
         #pragma surface surf Tv vertex:tvVert finalcolor:tvFinal addshadow alphatest:_Cutoff noambient novertexlights noforwardadd nofog nolightmap
         #pragma target 3.0
+        // The run-yourself world draws its trees as many copies of a few (RunTrees, Graphics.RenderMeshInstanced)
+        #pragma multi_compile_instancing
 
         #define TV_SUN half3(1.75, 1.54, 1.18)
         #define TV_SKY_LIGHT half3(0.592, 0.708, 0.812)

@@ -102,6 +102,9 @@ public class TvWorldInput
     // piece in sight, though only drawn within a hundred metres; RunWorld builds the piece again for them when the
     // runner comes near. The trees stand in the same places either way (every square draws its own numbers).
     public bool skipNearTrees;
+    // The run-yourself world draws the trees as copies of a few ready-made ones (RunTrees, 2026-11-25): a piece then
+    // makes no tree meshes at all, only a list of where each tree stands (TvWorld.treeRecords)
+    public bool treeRecords;
     // How detailed the trees, the undergrowth and the forest floor are made (RunSettings.Quality): 0 Low, 1 Medium,
     // 2 High, 3 Ultra. The TV controls use High.
     public int quality = 2;
@@ -130,6 +133,11 @@ public class TvWorld
 
     // The outside walls of a town's houses (run yourself): ax, az, bx, bz for each; the runner keeps its reach from them
     public readonly List<float> walls = new List<float>();
+
+    // TvWorldInput.treeRecords: the trees, RecordSize numbers each: the full shape (TreeShapes(quality, true)), the far
+    // shape (TreeShapes(quality, false)), x, y, z, scale across, scale up, yaw, tint, tilt x, tilt z
+    public const int RecordSize = 11;
+    public readonly List<float> treeRecords = new List<float>();
 
     // A town's tunnels near the piece (run yourself: in the tunnel or up on its roof, two levels): ax, az, ux, uz,
     // length, half width, floor height at the start and at the end, for each
@@ -3389,9 +3397,20 @@ public partial class TvWorldBuilder
                     default: shape = (near ? beechNear : beechFar)[Pick(near ? beechNear : beechFar)]; far = beechFar?[Pick(beechFar)]; trunk = 0.42f; break;
                 }
                 float y = H(x, z) - 0.15f, sy = s * Rr(0.9f, 1.12f), yaw = Rr(0f, 6.283f), tint = Rr(0.82f, 1.12f), tx = Rr(-0.03f, 0.03f), tz = Rr(-0.03f, 0.03f);
-                if (!(chunk && input.skipNearTrees)) treeMeshes[Tile(x, z)].Add(shape, x, y, z, s, sy, s, yaw, tint, tx, tz);
-                // A piece of the run-yourself world: the same tree, cheaper, for when it is far from the runner
-                if (chunk) treeFarMesh.Add(far, x, y, z, s, sy, s, yaw, tint, tx, tz);
+                if (chunk && input.treeRecords)
+                {
+                    world.treeRecords.Add(TreeIndex(shape, true));
+                    world.treeRecords.Add(TreeIndex(far, false));
+                    world.treeRecords.Add(x); world.treeRecords.Add(y); world.treeRecords.Add(z);
+                    world.treeRecords.Add(s); world.treeRecords.Add(sy); world.treeRecords.Add(yaw); world.treeRecords.Add(tint);
+                    world.treeRecords.Add(tx); world.treeRecords.Add(tz);
+                }
+                else
+                {
+                    if (!(chunk && input.skipNearTrees)) treeMeshes[Tile(x, z)].Add(shape, x, y, z, s, sy, s, yaw, tint, tx, tz);
+                    // A piece of the run-yourself world: the same tree, cheaper, for when it is far from the runner
+                    if (chunk) treeFarMesh.Add(far, x, y, z, s, sy, s, yaw, tint, tx, tz);
+                }
                 world.trees++;
                 world.solids.Add(new TvSolid { x = x, z = z, r = Math.Max(0.18f, trunk * (0.5f + s * 0.5f)) });
             }
