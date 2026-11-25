@@ -2,7 +2,7 @@
 // bark, needles, leaves, bilberry, grass, ferns, twigs (the forest atlas, TV/TvFlora.cs). Lit like TvVertexLit (its
 // own sun, sky and ground light, ACES tone mapping, fog), so it sits in the same picture.
 // Each corner carries u, v and the atlas tile in its first uv (x, y, z); tile -1 = no picture (the corner's colour only).
-// Tiles 0-4 are bark, 20-24 stone and wood, 25-31 walls, roofs and glass, 32 moss at a trunk's foot (lit as solid
+// Tiles 0-4 (and 35) are bark (a fraction on a bark tile number carries the tree's moss and lichen, TreeLife), 20-24 stone and wood, 25-31 walls, roofs and glass, 32 moss at a trunk's foot (lit as solid
 // things, with relief); 5-19 and 33-35 are leaves and plants.
 // u, v repeat inside the tile (bark round a trunk), so the picture is looked up with its own slopes (no seam lines).
 // The leaves and plants are cut out by the picture's alpha and drawn from both sides; they are lit softly through
@@ -133,6 +133,41 @@ Shader "O-Manager/TvAtlasLit"
             half4 tex = tex2Dgrad(_MainTex, float2(fromTop.x, 1.0 - fromTop.y), slopeX, slopeY);
             if (tile < -0.5) tex = half4(1, 1, 1, 1);
             c *= tex.rgb;
+            // A tree's own life on its bark (TreeLife in TV/TvMesh.cs): damp streaks, moss up the foot on its damp
+            // side, pale crust lichen in patches, all from the tree's own place in the world so no two look alike
+            float code = IN.atlas.z - tile;
+            bool bark = (tile < 4.5 && tile > -0.5) || (tile > 34.5 && tile < 35.5);
+            if (bark)
+            {
+                float3 wp = IN.worldPos;
+                c *= 0.84 + 0.32 * TvNoise(float3(wp.x * 5.0, wp.y * 0.45, wp.z * 5.0));
+                if (code > 0.01)
+                {
+                    float a = (code - 0.02) / 0.47;
+                    float li = floor(a * 4.0 + 0.02);
+                    float moss = saturate((a - li * 0.25) / 0.24);
+                    float n = TvNoise(wp * 2.3) * 0.5 + TvNoise(wp * 7.1 + 3.1) * 0.33 + TvNoise(wp * 21.0 + 9.7) * 0.17;
+                    float th = 1.02 - moss * 0.75;
+                    float mm = moss > 0.02 ? smoothstep(th - 0.05, th + 0.05, n) : 0.0;
+                    float3 mc = lerp(float3(0.40, 0.52, 0.14), float3(0.64, 0.74, 0.26), TvNoise(wp * 37.0));
+                    mc *= 0.7 + 0.45 * TvNoise(wp * 90.0);
+                    mc = mc * mc;
+                    float ln = TvNoise(wp * 9.0 + 11.0) * 0.6 + TvNoise(wp * 26.0 + 5.0) * 0.4;
+                    float lm = li > 1.5 ? smoothstep(0.68 - li * 0.03, 0.72 - li * 0.03, ln) * (0.12 + 0.08 * li) : 0.0;
+                    float3 lc = float3(0.6, 0.62, 0.56) * (0.8 + 0.3 * TvNoise(wp * 50.0));
+                    lc = lc * lc;
+                    c = lerp(c, lc, lm * 0.85);
+                    // A birch's foot: black, cracked up and down
+                    if (tile > 2.5 && tile < 3.5)
+                    {
+                        float cr = TvNoise(float3(wp.x * 14.0, wp.y * 1.6, wp.z * 14.0)) * 0.7 + TvNoise(wp * 40.0) * 0.3;
+                        float bm = smoothstep(1.0 - moss * 0.9, 1.12 - moss * 0.9, n * 0.6 + cr * 0.4 + 0.05);
+                        float3 bc = float3(0.05, 0.045, 0.04) * (0.5 + 1.5 * cr);
+                        c = lerp(c, bc, bm);
+                    }
+                    else c = lerp(c, mc, mm);
+                }
+            }
             if (_Surface > 0.001)
             {
                 half v = TvSurfaceGrain(IN.worldPos, IN.tvDepth);

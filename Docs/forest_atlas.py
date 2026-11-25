@@ -193,21 +193,45 @@ def bark_pine_high():
 
 
 def bark_spruce():
-    """Norway spruce bark: fine round grey-brown scales, pale grey-green crust lichen in patches."""
+    """Norway spruce bark (2026-11-25, Anders' photos): small thin rounded scales, 1-3 cm, grey-brown with a few
+    lighter grey and reddish ones, dark gaps between, the lower edge of each scale lifting off (a shadow under it),
+    pale grey-green crust lichen in patches. About 0.4 m round by 0.4 m up a picture."""
     s = IN
-    f1, f2, cid = voronoi(s, 260, 21, (1.0, 0.8), warp=45)
-    edge = f2 - f1 + fft_noise(s, 0.9, 25) * 2.0
-    ids = (np.sin(cid * 39.346) * 43758.5453) % 1.0
-    base = lerp(col('#6e6258'), col('#8c8076'), ids[..., None])
-    base = lerp(base, col('#9a948a'), smooth(0.5, 0.85, fft_noise(s, 1.7, 22))[..., None] * 0.5)
-    scale = smooth(0.0, 2.2, edge)
-    rgb = lerp(col('#4a3c32'), base, scale[..., None])
-    rgb *= np.clip(relief(smooth(0.0, 6.0, edge) * 6, 0.4), 0.75, 1.25)[..., None]
-    rgb *= (0.9 + 0.18 * fft_noise(s, 1.0, 23))[..., None]
-    lich = lichen_mask(s, 24, 0.22, 1.5)
-    rgb = lerp(rgb, col('#a7ad9a'), lich[..., None] * 0.65)
-    lich2 = lichen_mask(s, 26, 0.08, 1.2)
-    rgb = lerp(rgb, col('#c4c8b4'), lich2[..., None] * 0.5)
+    K = 2                                        # painted at twice the size, then made smaller (smooth edges)
+    S2 = s * K
+    g = np.random.default_rng(31)
+    img = Image.new('RGB', (S2 * 3, S2 * 3), tuple(int(v) for v in col('#4f4740')))
+    d = ImageDraw.Draw(img)
+    tone = fft_noise(s, 1.6, 32)
+    shapes = []
+    for k in range(5600):
+        x, y = g.random() * S2, g.random() * S2
+        w = (8 + g.random() * 15) * K
+        h = w * (0.5 + g.random() * 0.3)
+        t = tone[int(y / K) % s, int(x / K) % s]
+        base = lerp(col('#6a625a'), col('#8e877e'), 0.4 * g.random() + 0.6 * t)
+        if g.random() < 0.06:
+            base = lerp(base, col('#86604c'), 0.4)          # a fresh reddish scale where an old one fell off
+        if g.random() < 0.2:
+            base = lerp(base, col('#9c978c'), 0.4)          # a weathered pale one
+        n = 9
+        ang0 = g.random() * 6.283
+        rad = [0.75 + 0.25 * g.random() for _ in range(n)]
+        pts = [(math.cos(ang0 + i * 6.283 / n) * w / 2 * rad[i], math.sin(ang0 + i * 6.283 / n) * h / 2 * rad[i]) for i in range(n)]
+        for ox in (0, S2, 2 * S2):
+            for oy in (0, S2, 2 * S2):
+                shapes.append((y + oy, x + ox, pts, base, h))
+    # from the top down over the whole painting: each scale lies over the one above it, and the order repeats
+    shapes.sort(key=lambda q: q[0])
+    for (cy, cx, pts, base, h) in shapes:
+        d.polygon([(cx + px, cy + py + 2.0 * K) for px, py in pts], fill=tuple(int(v) for v in base * 0.62))
+        d.polygon([(cx + px, cy + py) for px, py in pts], fill=tuple(int(v) for v in base))
+        d.polygon([(cx + px * 0.75, cy + py * 0.75 + h * 0.12) for px, py in pts], fill=tuple(int(v) for v in np.minimum(base * 1.08, 255)))
+    img = img.crop((S2, S2, 2 * S2, 2 * S2)).filter(ImageFilter.GaussianBlur(0.8 * K)).resize((s, s), Image.LANCZOS)
+    rgb = np.asarray(img).astype(np.float32)
+    rgb *= (0.86 + 0.24 * fft_noise(s, 1.2, 33))[..., None]
+    lich = lichen_mask(s, 34, 0.1, 1.3)
+    rgb = lerp(rgb, col('#9a9c90'), lich[..., None] * 0.45)
     return to_img(rgb)
 
 
@@ -228,18 +252,35 @@ def bark_birch():
                 d.polygon([(px + ox, py + oy) for px, py in pts], fill=c)
 
     # lenticels: thin dark horizontal dashes, tapering at both ends
-    for _ in range(260):
+    for _ in range(700):
         x, y = g.random() * s, g.random() * s
-        w, h = 5 + g.random() ** 2 * 60, 0.8 + g.random() * 2.2
+        w, h = 5 + g.random() ** 2 * 60, 0.5 + g.random() * 1.1
         c = tuple(int(v) for v in lerp(col('#1e1b19'), col('#5a524a'), g.random())) + (255,)
         wrap_poly([(x - w / 2, y), (x - w / 4, y - h / 2), (x + w / 4, y - h / 2 + g.random()), (x + w / 2, y), (x + w / 4, y + h / 2), (x - w / 4, y + h / 2)], c)
     # rough black patches below old branches: ragged, wider than tall, from noise
     arr = np.asarray(img).astype(np.float32)
-    blot = lichen_mask(s, 34, 0.045, 1.5)
+    blot = lichen_mask(s, 34, 0.07, 1.5)
     blot = blot * smooth(0.3, 0.6, fft_noise(s, 1.1, 35, (1.0, 0.35)))
     arr[..., :3] = lerp(arr[..., :3], col('#24201c'), blot[..., None] * 0.92)
     img = Image.fromarray(arr.astype(np.uint8), 'RGBA')
     d = ImageDraw.Draw(img)
+    # (2026-11-25, Anders' birch photos) black chevrons where old branches were: an upside-down V, thick in the
+    # middle, ragged, with a dark knot under its point
+    # (the picture is 0.5 m round by 1 m up: everything drawn half as tall as it looks)
+    for _ in range(2):
+        x, y = g.random() * s, g.random() * s
+        w, hh = 80 + g.random() * 70, 15 + g.random() * 15
+        th = 6 + g.random() * 5
+        top, bot = [], []
+        for k in range(13):
+            t = k / 12.0
+            px = x - w / 2 + w * t
+            py = y - hh / 2 + hh * abs(t - 0.5) * 2
+            th_k = th * (1 - 0.75 * abs(t - 0.5) * 2) * (0.7 + 0.6 * g.random())
+            top.append((px, py - th_k * 0.5))
+            bot.append((px, py + th_k * 0.5))
+        wrap_poly(top + bot[::-1], (30, 27, 24, 255))
+        wrap_poly([(x - 8, y - hh / 2 + 5), (x + 8, y - hh / 2 + 5), (x + 5, y - hh / 2 + 13), (x - 5, y - hh / 2 + 13)], (34, 30, 26, 255))
     # peeling paper: pale lines with a grey shadow under them
     for _ in range(50):
         x, y = g.random() * s, g.random() * s
@@ -409,8 +450,8 @@ def spruce_spray():
             a = ang + side * R(0.5, 1.3)
             nl = R(0.016, 0.026)
             tipness = smooth(0.7, 1.0, np.float32(t))
-            c0 = mix('#1e361f', '#2e4b29', g.random())
-            c1 = mix('#3d5f33', '#6b8f45', float(tipness) * 0.8 + g.random() * 0.2)
+            c0 = mix('#233f27', '#34532e', g.random())
+            c1 = mix('#486a38', '#80a04e', float(tipness) * 0.8 + g.random() * 0.2)
             c.taper([(px, py), (px + math.cos(a) * nl, py + math.sin(a) * nl)], 1.8, 1.0, c0, c1)
         if depth == 0:
             for k in range(3):
@@ -528,7 +569,7 @@ def bilberry():
     for (px, py, a, ln, sh, _) in leaves:
         # leaves higher up catch more light: lighter and yellower
         t = min(1.0, sh * 0.5 + py * 0.7)
-        fill = mix('#386020', '#7cab36', t)
+        fill = mix('#435a2c', '#82984c', t)
         c.poly(leaf_shape(px, py, ln, ln * 0.45, a, tip=0.15, n=10, serr=0.03), fill)
     for pts in stems:
         if g.random() < 0.05:
@@ -550,7 +591,7 @@ def bilberry_top():
         px, py = 0.5 + math.cos(a) * r, 0.5 + math.sin(a) * r
         ln = R(0.035, 0.06)
         t = g.random() * 0.6 + 0.4 * (1 - r / 0.47)
-        c.poly(leaf_shape(px, py, ln, ln * 0.45, g.random() * 6.283, tip=0.15, n=8), mix('#345e1e', '#80ae38', t))
+        c.poly(leaf_shape(px, py, ln, ln * 0.45, g.random() * 6.283, tip=0.15, n=8), mix('#40562a', '#7f964a', t))
     for k in range(3):
         px, py = R(0.25, 0.75), R(0.25, 0.75)
         c.ellipse(px, py, 0.012, 0.012, rgba('#1e2748'))
@@ -603,11 +644,11 @@ def grass():
         lean = (x - 0.5) * 1.2 + R(-0.25, 0.25)
         tip = (x + lean * h * 0.6, h)
         mid = (x + lean * h * 0.15, h * 0.55)
-        dry = g.random() < 0.22
-        c0 = mix('#3e5a24', '#5c7a30', g.random()) if not dry else mix('#7a7040', '#9a8a52', g.random())
-        c1 = mix('#8aa848', '#b8c070', g.random()) if not dry else mix('#c8b878', '#e0d098', g.random())
+        dry = g.random() < 0.07
+        c0 = mix('#3e5a24', '#5a7c2e', g.random()) if not dry else mix('#7a7040', '#9a8a52', g.random())
+        c1 = mix('#6c9636', '#8eb04a', g.random()) if not dry else mix('#c8b878', '#e0d098', g.random())
         c.taper(bezier((x, 0.0), mid, tip, 8), R(4, 6.5), 0.8, c0, c1)
-    for k in range(6):
+    for k in range(3):
         x = R(0.3, 0.7)
         h = R(0.85, 1.0)
         tip = (x + R(-0.12, 0.12), h)
@@ -1020,19 +1061,40 @@ def path_soil():
 
 
 def moss_tex():
-    """Thick green moss (repeats): soft rounded cushions, each lit from above and dark where they meet, a fine
-    soft weave of tips on top. No hard specks."""
+    """Moss carpet (repeats, about 0.7 m a picture; 2026-11-25, Anders' photos of mossy spruce forest): a dense
+    pile of tiny feathery sprigs, yellow-green on top, dark between, in small soft cushions. No big shapes."""
     s = IN
-    f1, f2, cid = voronoi(s, 26, 341, warp=40)
-    dome = np.sqrt(np.clip(1.0 - (f1 / (f1 + f2 + 1e-3) * 2.0) ** 2, 0, 1))
+    K = 2
+    S2 = s * K
+    g = np.random.default_rng(345)
     from scipy.ndimage import gaussian_filter
-    weave = gaussian_filter(np.random.default_rng(343).random((s, s)), 1.2, mode='wrap')
-    weave = (weave - weave.min()) / (weave.max() - weave.min())
+    f1, f2, cid = voronoi(s, 70, 341, warp=25)
+    dome = np.sqrt(np.clip(1.0 - (f1 / (f1 + f2 + 1e-3) * 2.0) ** 2, 0, 1))
     big = fft_noise(s, 1.8, 342)
-    lum = 0.55 + 0.35 * dome + 0.25 * (weave - 0.5)
-    rgb = lerp(col('#2e4416'), col('#7c9c34'), np.clip(lum * 0.9 + big * 0.15 - 0.1, 0, 1)[..., None])
-    rgb = lerp(rgb, col('#9ab048'), smooth(0.7, 0.9, big)[..., None] * 0.25)
-    rgb *= np.clip(relief(dome * 30, 0.4), 0.8, 1.2)[..., None]
+    img = Image.new('RGB', (S2 * 3, S2 * 3), tuple(int(v) for v in col('#26340f')))
+    d = ImageDraw.Draw(img)
+    for k in range(9000):
+        x, y = g.random() * S2, g.random() * S2
+        lit = dome[int(y / K) % s, int(x / K) % s] * 0.6 + big[int(y / K) % s, int(x / K) % s] * 0.4
+        t = min(1.0, max(0.0, lit * 0.8 + g.random() * 0.4))
+        c = tuple(int(v) for v in lerp(col('#40581a'), col('#9cb446'), t))
+        a = g.random() * 6.283
+        ln = (5 + g.random() * 7) * K
+        ex, ey = math.cos(a) * ln, math.sin(a) * ln
+        for ox in (0, S2, 2 * S2):
+            for oy in (0, S2, 2 * S2):
+                cx, cy = x + ox, y + oy
+                d.line([(cx, cy), (cx + ex, cy + ey)], fill=c, width=K)
+                # little side shoots: a feathery sprig
+                for j in (0.35, 0.6, 0.85):
+                    bx, by = cx + ex * j, cy + ey * j
+                    for sd in (-1, 1):
+                        sa = a + sd * 0.9
+                        d.line([(bx, by), (bx + math.cos(sa) * ln * 0.3, by + math.sin(sa) * ln * 0.3)], fill=c, width=1)
+    img = img.crop((S2, S2, 2 * S2, 2 * S2)).resize((s, s), Image.LANCZOS)
+    rgb = np.asarray(img).astype(np.float32)
+    rgb *= (0.8 + 0.35 * dome)[..., None]
+    rgb = lerp(rgb, col('#a8b850'), smooth(0.75, 0.95, big)[..., None] * 0.2)
     return to_img(rgb)
 
 

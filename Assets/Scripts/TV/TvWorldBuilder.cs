@@ -3204,6 +3204,19 @@ public partial class TvWorldBuilder
                     case WorldCell.BareRock: p = 0.012f; tree = Tree.Pine2; s = Rr(0.3f, 0.5f); break;
                     default: continue;
                 }
+                // Young spruces and pines coming up between the old trees (Anders' photos of pine forest)
+                if (kind == WorldCell.Forest && !marsh && input.town == null && youngSpruce != null && random.Value() < 0.05f)
+                {
+                    float yx = x + Rr(-0.8f, 0.8f), yz = z + Rr(-0.8f, 0.8f);
+                    if (!Blocked(yx, yz, 0.6f) && (townLines == null || townLines.Count == 0 || !BridgeWater(yx, yz)))
+                    {
+                        float yh = Rr(0.6f, 2.8f) / 2.5f;
+                        (chunk ? thicketMesh : treeMeshes[Tile(yx, yz)]).Add(youngSpruce[(int)(random.Value() * youngSpruce.Length) % youngSpruce.Length],
+                            yx, H(yx, yz) - 0.05f, yz, yh * Rr(0.85f, 1.2f), yh, yh * Rr(0.85f, 1.2f), Rr(0f, 6.283f), Rr(0.8f, 1.1f),
+                            Rr(-0.04f, 0.04f), Rr(-0.04f, 0.04f));
+                        world.trees++;
+                    }
+                }
                 if (random.Value() > p || Blocked(x, z, 1.3f)) continue;
                 // A town: no crown in a house, a canopy, a bridge or a street thing (the crown reaches about 2 m)
                 if (input.town != null && (TownKeepOut(x, z, 1.2f + 1.6f * s) || !Free(x, z, 1.2f + 1.4f * s))) continue;
@@ -3211,16 +3224,17 @@ public partial class TvWorldBuilder
                 if (townLines != null && townLines.Count > 0 && (BridgeWater(x, z) || (input.town == null && TownLineDist(x, z, 1) < 2.5f))) continue;
 
                 bool near = chunk || x * x + z * z < 70f * 70f;
-                int pick = random.Value() < 0.5f ? 0 : 1;
+                float pickAt = random.Value();
+                int Pick(TvShape[] set) => set == null ? 0 : Math.Min(set.Length - 1, (int)(pickAt * set.Length));
                 TvShape shape, far;
                 float trunk;
                 switch (tree)
                 {
-                    case Tree.Pine: shape = (near ? pineNear : pineFar)[pick]; far = pineFar[pick]; trunk = 0.3f; break;
-                    case Tree.Pine2: shape = (near ? pine2Near : pine2Far)[pick]; far = pine2Far[pick]; trunk = 0.28f; break;
-                    case Tree.Spruce: shape = spruceShape[pick]; far = spruceFar; trunk = 0.45f; break;   // the low branches are in the way too
-                    case Tree.Birch: shape = (near ? birchNear : birchFar)[pick]; far = birchFar[pick]; trunk = 0.22f; break;
-                    default: shape = (near ? beechNear : beechFar)[pick]; far = beechFar[pick]; trunk = 0.42f; break;
+                    case Tree.Pine: shape = (near ? pineNear : pineFar)[Pick(near ? pineNear : pineFar)]; far = pineFar?[Pick(pineFar)]; trunk = 0.3f; break;
+                    case Tree.Pine2: shape = (near ? pine2Near : pine2Far)[Pick(near ? pine2Near : pine2Far)]; far = pine2Far?[Pick(pine2Far)]; trunk = 0.28f; break;
+                    case Tree.Spruce: shape = spruceShape[Pick(spruceShape)]; far = spruceFar; trunk = 0.45f; break;   // the low branches are in the way too
+                    case Tree.Birch: shape = (near ? birchNear : birchFar)[Pick(near ? birchNear : birchFar)]; far = birchFar?[Pick(birchFar)]; trunk = 0.22f; break;
+                    default: shape = (near ? beechNear : beechFar)[Pick(near ? beechNear : beechFar)]; far = beechFar?[Pick(beechFar)]; trunk = 0.42f; break;
                 }
                 float y = H(x, z) - 0.15f, sy = s * Rr(0.9f, 1.12f), yaw = Rr(0f, 6.283f), tint = Rr(0.82f, 1.12f), tx = Rr(-0.03f, 0.03f), tz = Rr(-0.03f, 0.03f);
                 treeMeshes[Tile(x, z)].Add(shape, x, y, z, s, sy, s, yaw, tint, tx, tz);
@@ -3344,7 +3358,19 @@ public partial class TvWorldBuilder
             }
             else
             {
+                // Moss cushions over old stumps and stones, most in spruce forest (2026-11-25, Anders' photos)
+                bool spruceWood = look.forest == TerrainLook.Spruce;
+                if (look.ground == TerrainLook.Moss && moundShapes != null && random.Value() < (spruceWood ? 0.085f : 0.015f))
+                {
+                    float ms = Rr(0.7f, 1.5f);
+                    tuftMeshes[Tile(x, z)].Add(moundShapes[(int)(random.Value() * moundShapes.Length) % moundShapes.Length], x, H(x, z) - 0.03f, z,
+                        ms, ms * Rr(0.7f, 1.3f), ms, Rr(0f, 6.283f), Rr(0.78f, 1.08f));
+                    world.tufts++;
+                    continue;
+                }
                 if (rough <= 0.42f || random.Value() > Sm(0.42f, 0.62f, rough)) continue;
+                // A spruce forest's floor is mostly bare moss: few plants, more thin grass than bilberry
+                if (spruceWood && random.Value() < 0.8f) continue;
                 float r = random.Value();
                 // Wide, low clumps that grow together into a carpet. Plants grow in patches (2026-11-25, Anders: the
                 // mix of everything everywhere looked chaotic): a slow noise says which plant a place has, and the
@@ -3352,7 +3378,7 @@ public partial class TvWorldBuilder
                 float patch = TvRandom.Patches((x + ox) * 0.05f + 40f, (z + oz) * 0.05f + 13f);
                 float light = TvRandom.Patches((x + ox) * 0.15f + 5f, (z + oz) * 0.15f + 9f);
                 s = Rr(0.85f, 1.25f);
-                tint = 0.72f + 0.36f * light;
+                tint = 0.8f + 0.36f * light;
                 switch (look.ground)
                 {
                     case TerrainLook.Heather: shape = patch < 0.6f ? (r < 0.9f ? tuftHeath : tuftLingon) : (r < 0.85f ? tuftBerry : tuftHeath); s *= 1.15f; break;
@@ -3370,6 +3396,8 @@ public partial class TvWorldBuilder
                               : (r < 0.55f ? tuftFern : r < 0.85f ? tuftBerry : tuftGrass);
                         break;
                 }
+                if (spruceWood && look.ground == TerrainLook.Moss && r < 0.65f) { shape = r < 0.1f ? tuftFern : tuftGrass; tint = Rr(0.7f, 0.95f); s = Rr(0.6f, 1.1f); }
+                else if (spruceWood) tint *= 0.85f;   // the bilberry in a spruce forest's shade
                 // Under broad-leaved trees: ferns and grass more than blueberry
                 if ((look.forest == TerrainLook.Beech || look.forest == TerrainLook.Birch) && look.ground == TerrainLook.Moss && r < 0.5f)
                 {

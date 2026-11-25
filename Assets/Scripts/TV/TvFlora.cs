@@ -189,6 +189,40 @@ public partial class TvShapeBuilder
         t.Add(a1); t.Add(b1); t.Add(b2); t.Add(a1); t.Add(b2); t.Add(a2);
     }
 
+    // A cushion of moss on the forest floor (2026-11-25, Anders' photos of spruce forest: the ground is soft green humps
+    // over old stumps and stones): a low lumpy dome, wide radius rx by rz, h high, its edge sunk a little into the ground.
+    // The moss picture lies flat over it from above (u, v from x, z), every `size` metres.
+    public void Mound(float rx, float rz, float h, int tile, TvColor low, TvColor high, float size)
+    {
+        int rings = 5, around = 14;
+        int first = p.Count / 3;
+        float ph1 = (float)(random.Value() * 6.283), ph2 = (float)(random.Value() * 6.283);
+        for (int i = 0; i <= rings; i++)
+        {
+            float t = i / (float)rings;                 // 0 at the top, 1 at the edge
+            for (int j = 0; j < (i == 0 ? 1 : around); j++)
+            {
+                float a = j * 6.2832f / around;
+                float wob = 1f + 0.16f * (float)Math.Sin(a * 2f + ph1) + 0.1f * (float)Math.Sin(a * 3f + ph2);
+                float r = t * wob;
+                float x = (float)Math.Cos(a) * rx * r, z = (float)Math.Sin(a) * rz * r;
+                float y = h * (1f - t * t) * (1f - t * t) * (0.85f + 0.15f * wob) - 0.05f * t * t;   // flat at the edge: no step
+                float nx = (float)Math.Cos(a) * t * 0.9f, nz = (float)Math.Sin(a) * t * 0.9f, ny = 1f;
+                Norm(ref nx, ref ny, ref nz);
+                VT(x, y, z, nx, ny, nz, high.Lerp(low, t * t), x / size, z / size, tile);
+            }
+        }
+        for (int i = 0; i < rings; i++)
+            for (int j = 0; j < around; j++)
+            {
+                int j1 = (j + 1) % around;
+                int b0 = first + 1 + i * around + j, b1 = first + 1 + i * around + j1;
+                if (i == 0) { t.Add(first); t.Add(b1); t.Add(b0); continue; }
+                int a0 = first + 1 + (i - 1) * around + j, a1 = first + 1 + (i - 1) * around + j1;
+                t.Add(a0); t.Add(a1); t.Add(b1); t.Add(a0); t.Add(b1); t.Add(b0);
+            }
+    }
+
     // A plant on the ground as a star of cards leaning out from its middle (a bilberry clump, a tussock, heather):
     // reads as a plant from the side and as a round clump from above. Its light is the ground's (normals up, leaning
     // a little out), so it sits in the ground's colour.
