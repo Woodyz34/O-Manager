@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Unity.Profiling;
+using Unity.Profiling.LowLevel.Unsafe;
 using UnityEngine;
 
 // What the whole of a slow frame went to, for the "RunPerf:" lines in the log (2026-11-25, Anders: Fossum still lagged
@@ -18,6 +19,19 @@ public class RunPerf : IDisposable
     }
 
     readonly List<Probe> times = new List<Probe>();
+    // Every script's own Update / LateUpdate / FixedUpdate (Unity names them "Class.Update() [Invoke]"), found once the
+    // race has run a while; the worst ones are listed by name
+    readonly List<Probe> scripts = new List<Probe>();
+    readonly HashSet<string> scriptNames = new HashSet<string>();
+    int lookedForScripts;
+    float nextLook;
+
+    // Parts of the run-yourself session's own frame (RunSession), measured by hand
+    static readonly string[] partNames = { "runner", "hand map", "online", "window search", "menu check", "punch", "world" };
+    static readonly long[] partTicks = new long[partNames.Length];
+    static readonly long[] lastPartTicks = new long[partNames.Length];
+    public enum Part { Runner, HandMap, Online, WindowSearch, MenuCheck, Punch, World }
+    public static void Add(Part part, long ticks) => partTicks[(int)part] += ticks;
     readonly List<Probe> counts = new List<Probe>();
     readonly FrameTiming[] timing = new FrameTiming[1];
 
@@ -69,6 +83,16 @@ public class RunPerf : IDisposable
     public void Frame(double frameMs, bool slow)
     {
         FrameTimingManager.CaptureFrameTimings();
+        // The hand-measured parts of the frame before (RunSession's Update ran before RunWorld's, or after: either way
+        // one frame's worth)
+        Array.Copy(partTicks, lastPartTicks, partTicks.Length);
+        Array.Clear(partTicks, 0, partTicks.Length);
+        if (lookedForScripts < 3 && UnityEngine.Time.unscaledTime >= nextLook)
+        {
+            lookedForScripts++;
+            nextLook = UnityEngine.Time.unscaledTime + 5f;
+            LookForScripts();
+        }
         if (!slow || frameMs <= worstFrame) return;
         worstFrame = frameMs;
         worstText = Describe();
@@ -81,6 +105,29 @@ public class RunPerf : IDisposable
         worstText = null;
         worstFrame = 0;
         return text;
+    }
+
+    void LookForScripts()
+    {
+        try
+        {
+            var all = new List<ProfilerRecorderHandle>();
+            ProfilerRecorderHandle.GetAvailable(all);
+            foreach (ProfilerRecorderHandle h in all)
+            {
+                string name = ProfilerRecorderHandle.GetDescription(h).Name;
+                if (name == null || scriptNames.Contains(name)) continue;
+                if (!(name.EndsWith(".Update() [Invoke]", StringComparison.Ordinal) || name.EndsWith(".LateUpdate() [Invoke]", StringComparison.Ordinal)
+                      || name.EndsWith(".FixedUpdate() [Invoke]", StringComparison.Ordinal) || name.EndsWith(".Update()", StringComparison.Ordinal)
+                      || name.EndsWith(".LateUpdate()", StringComparison.Ordinal) || name.StartsWith("Fusion", StringComparison.Ordinal)
+                      || name.StartsWith("NetworkRunner", StringComparison.Ordinal) || name.StartsWith("Coroutine", StringComparison.Ordinal))) continue;
+                scriptNames.Add(name);
+                var rec = new ProfilerRecorder(h, 1);
+                rec.Start();
+                scripts.Add(new Probe { label = name.Replace(" [Invoke]", ""), rec = rec });
+            }
+        }
+        catch (Exception) { }
     }
 
     string Describe()
@@ -110,6 +157,30 @@ public class RunPerf : IDisposable
             }
         }
         else if (sb.Length == 0) sb.Append("no marker times (not a development build)");
+        // The scripts that took the longest, by name
+        var worst = new List<(double ms, string label)>();
+        foreach (Probe p in scripts)
+        {
+            if (!p.rec.Valid) continue;
+            double ms = p.rec.LastValue / 1e6;
+            if (ms >= 1.0) worst.Add((ms, p.label));
+        }
+        worst.Sort((a, b) => b.ms.CompareTo(a.ms));
+        if (worst.Count > 0)
+        {
+            sb.Append("; slowest scripts: ");
+            for (int i = 0; i < worst.Count && i < 8; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.Append(worst[i].label).Append(' ').Append(worst[i].ms.ToString("0.0")).Append(" ms");
+            }
+        }
+        else sb.Append("; slowest scripts: none named (" + scripts.Count + " watched)");
+        // The run-yourself session's own parts
+        double tick = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        sb.Append("; 3D session:");
+        for (int i = 0; i < partNames.Length; i++) sb.Append(' ').Append(partNames[i]).Append(' ').Append((lastPartTicks[i] * tick).ToString("0.0"));
+        sb.Append(" ms");
         foreach (Probe p in counts)
         {
             if (!p.rec.Valid) continue;
@@ -122,6 +193,9 @@ public class RunPerf : IDisposable
     {
         foreach (Probe p in times) p.rec.Dispose();
         foreach (Probe p in counts) p.rec.Dispose();
+        foreach (Probe p in scripts) p.rec.Dispose();
+        scripts.Clear();
+        scriptNames.Clear();
         times.Clear();
         counts.Clear();
     }

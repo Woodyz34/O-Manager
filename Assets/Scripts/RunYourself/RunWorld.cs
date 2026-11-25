@@ -562,6 +562,7 @@ public class RunWorld : MonoBehaviour
         long t2 = perf.ElapsedTicks;
         DrawTrees();
         long t3 = perf.ElapsedTicks;
+        RunPerf.Add(RunPerf.Part.World, t3 - t0);
         Watch(t1 - t0, t2 - t1, t3 - t2);
     }
 
