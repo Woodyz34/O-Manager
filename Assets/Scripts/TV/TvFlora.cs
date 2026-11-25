@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 
 // The pictures of the forest's texture atlas (Resources/Textures/TvForestAtlas.png, painted by Docs/forest_atlas.py):
-// 6 x 6 tiles of 512 px, each with 16 px padding round its picture. A textured corner carries u, v (0..1 over the
+// 7 x 7 tiles of 512 px, each with 16 px padding round its picture. A textured corner carries u, v (0..1 over the
 // tile's picture; bark and stone repeat past 1) and the tile's number. The shader (TvAtlasLit) cuts the leaves, needles
 // and stems out of their tile by its alpha. Tiles 0-4 are bark, 20-24 stone and wood, 25-31 the town's walls, roofs and windows; 5-19 are leaves and plants.
 public static class TvAtlas
 {
-    public const int PerSide = 6;
+    public const int PerSide = 7;
     public const float Padding = 16f / 512f;
 
     public const int PineBarkLow = 0, PineBarkHigh = 1, SpruceBark = 2, BirchBark = 3, BeechBark = 4,
@@ -15,7 +15,9 @@ public static class TvAtlas
         Heather = 12, Litter = 13, Twig = 14, DeadTwigs = 15, Lingonberry = 16, Sedge = 17, Juniper = 18, Flowers = 19,
         Granite = 20, CliffRock = 21, DeadWood = 22, PathSoil = 23, Moss = 24,
         Plaster = 25, Brick = 26, WoodPanel = 27, RoofTiles = 28, MetalSheet = 29, Concrete = 30, Glass = 31,
-        MossSock = 32, BilberryTop = 33, LichenTop = 34, PineBarkLow2 = 35;
+        MossSock = 32, BilberryTop = 33, LichenTop = 34, PineBarkLow2 = 35,
+        // 2026-11-25 (Anders' photos of clear-cuts and heather): logging slash, a heather bush from above, churned soil
+        Slash = 36, HeatherTop = 37, Soil = 38;
 
     // Tiles from this one on are leaves and plants: lit softly through, as light comes through a leaf
     public const int FirstFoliage = 5;
@@ -28,7 +30,7 @@ public partial class TvShapeBuilder
     public bool Empty => p.Count == 0;
 
     // A textured corner: its own u, v and tile
-    int VT(float x, float y, float z, float nx, float ny, float nz, TvColor col, float u, float v, int tile)
+    int VT(float x, float y, float z, float nx, float ny, float nz, TvColor col, float u, float v, float tile)
     {
         int index = p.Count / 3;
         while (uv.Count < index * 3) { uv.Add(0f); uv.Add(0f); uv.Add(-1f); }
@@ -110,7 +112,7 @@ public partial class TvShapeBuilder
     // A flat triangle with a repeating picture laid on it from the side it faces most (a stone's face): `scale` metres
     // per repeat. Faces away from (cx, cy, cz).
     public void FlatTriTex(float ax, float ay, float az, float bx, float by, float bz, float qx, float qy, float qz,
-                           float cx, float cy, float cz, TvColor col, int tile, float scale, float shift = 0f)
+                           float cx, float cy, float cz, TvColor col, float tile, float scale, float shift = 0f)
     {
         float ux = bx - ax, uy = by - ay, uz = bz - az, vx = qx - ax, vy = qy - ay, vz = qz - az;
         float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;

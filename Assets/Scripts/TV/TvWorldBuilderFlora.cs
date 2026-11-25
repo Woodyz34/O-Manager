@@ -21,7 +21,7 @@ public partial class TvWorldBuilder
         public TvShape[] pineNear, pineFar, pine2Near, pine2Far, spruceNear, birchNear, birchFar, beechNear, beechFar;
         public TvShape spruceFar, bigTree, deadPine;
         public TvShape[] youngSpruce, youngLeafy, bushes;
-        public TvShape[] mounds;
+        public TvShape[] mounds, berrySet, heathSet;
         public TvShape berry, berryNear, heath, heathNear, grass, dry, shortGrass, fern, lingon, sedge, flowers, juniper;
     }
 
@@ -58,6 +58,8 @@ public partial class TvWorldBuilder
         bushShapes = f.bushes;
         bigTree = f.bigTree;
         moundShapes = f.mounds;
+        berrySet = f.berrySet;
+        heathSet = f.heathSet;
         tuftBerry = f.berry;
         tuftBerryNear = f.berryNear;
         tuftHeath = f.heath;
@@ -73,7 +75,7 @@ public partial class TvWorldBuilder
     }
 
     TvShape tuftLingon, tuftSedge, tuftFlowers, tuftJuniper;
-    TvShape[] moundShapes;
+    TvShape[] moundShapes, berrySet, heathSet;
 
     // ---- Colours (multiplied with the pictures; white = the picture as painted) ----
     static readonly TvColor White = new TvColor(255, 255, 255);
@@ -518,6 +520,33 @@ public partial class TvWorldBuilder
             return b.Done();
         }
 
+        // One bush you can tell apart (2026-11-25, Anders: every single bilberry bush clear, leaves and not a sea of
+        // green; the same for heather): a ring of upright cards with the bush from the side, leaning out a little,
+        // darker low down and at the back, and a few tilted cards on top with the bush from above. Small, so the
+        // bushes stand one by one with moss or grass showing between them.
+        TvShape OneBush(int sides, int tops, float r, float h, int sideTile, int topTile, float dark)
+        {
+            var b = new TvShapeBuilder(random);
+            float turn = Rr(0f, 6.283f);
+            for (int i = 0; i < sides; i++)
+            {
+                float a = turn + i * 6.283f / sides + Rr(-0.3f, 0.3f), ca = (float)Math.Cos(a), sa = (float)Math.Sin(a);
+                float d = r * Rr(0.15f, 0.45f), w = r * Rr(0.75f, 1.05f), hh = h * Rr(0.8f, 1.15f), lean = Rr(0.1f, 0.3f) * hh;
+                // the card faces out from the middle (its normal along ca, sa), its width runs round
+                b.Card(ca * d, -0.03f, sa * d, -sa * w, 0f, ca * w, ca * lean, hh, sa * lean, ca, 0.6f, sa, sideTile,
+                       Grey(dark), Grey(Math.Min(1f, dark + 0.5f)), 0f);
+            }
+            for (int i = 0; i < tops; i++)
+            {
+                float size = r * Rr(0.95f, 1.35f), y = h * Rr(0.68f, 0.95f), a = Rr(0f, 6.283f);
+                float ox = Rr(-0.25f, 0.25f) * r, oz = Rr(-0.25f, 0.25f) * r;
+                float ca = (float)Math.Cos(a), sa = (float)Math.Sin(a), tilt = Rr(-0.35f, 0.35f) * size;
+                b.Card(ox - sa * size * 0.5f, y - tilt * 0.5f, oz + ca * size * 0.5f, ca * size * 0.5f, 0f, sa * size * 0.5f,
+                       sa * size, tilt, -ca * size, 0f, 1f, 0f, topTile, Grey(0.62f + 0.08f * i), Grey(0.9f));
+            }
+            return b.Done();
+        }
+
         TvShape FernShape(int fronds)
         {
             var b = new TvShapeBuilder(random);
@@ -563,10 +592,17 @@ public partial class TvWorldBuilder
         // Bilberry a deep, slightly yellow green (2026-11-25: the first try was too bright, like a lawn)
         // Bilberry (2026-11-25, Anders' photos): one calm bright green, a rounded clump with a top of leaves seen
         // from above, so the clumps grow together into a carpet instead of a jumble of stars
-        f.berry = Berry(few, 0.8f, 0.32f, q >= 1 ? 3 : 2);
-        f.berryNear = Berry(many, 0.85f, 0.34f, 4);
-        f.heath = Star(few, 0.45f, 0.32f, 0.3f, TvAtlas.Heather, Grey(0.5f), Tint(0.78f, 0.76f, 0.74f));
-        f.heathNear = Star(many, 0.5f, 0.34f, 0.35f, TvAtlas.Heather, Grey(0.5f), Tint(0.78f, 0.76f, 0.74f));
+        // Single bushes now (2026-11-25), a few of each so neighbours differ
+        f.berrySet = new[] { OneBush(q >= 1 ? 4 : 3, 2, 0.3f, 0.3f, TvAtlas.Bilberry, TvAtlas.BilberryTop, 0.45f),
+                             OneBush(q >= 1 ? 5 : 3, 2, 0.36f, 0.34f, TvAtlas.Bilberry, TvAtlas.BilberryTop, 0.42f),
+                             OneBush(q >= 1 ? 4 : 3, 1, 0.26f, 0.26f, TvAtlas.Bilberry, TvAtlas.BilberryTop, 0.5f) };
+        f.berry = f.berrySet[0];
+        f.berryNear = OneBush(many - 1, 3, 0.34f, 0.32f, TvAtlas.Bilberry, TvAtlas.BilberryTop, 0.42f);
+        f.heathSet = new[] { OneBush(q >= 1 ? 4 : 3, 1, 0.3f, 0.3f, TvAtlas.Heather, TvAtlas.HeatherTop, 0.4f),
+                             OneBush(q >= 1 ? 5 : 3, 2, 0.38f, 0.36f, TvAtlas.Heather, TvAtlas.HeatherTop, 0.38f),
+                             OneBush(q >= 1 ? 4 : 3, 1, 0.24f, 0.24f, TvAtlas.Heather, TvAtlas.HeatherTop, 0.45f) };
+        f.heath = f.heathSet[0];
+        f.heathNear = OneBush(many - 1, 2, 0.36f, 0.34f, TvAtlas.Heather, TvAtlas.HeatherTop, 0.38f);
         // Lingonberry: low, dark and glossy, on drier ground; sedge in the marsh; flowers in meadows; juniper in
         // open pine forest and pasture (a narrow upright bush, its picture on tall cards)
         f.lingon = Star(few, 0.55f, 0.2f, 0.35f, TvAtlas.Lingonberry, Grey(0.45f), Grey(0.85f));
@@ -773,6 +809,145 @@ public partial class TvWorldBuilder
                     world.trees++;
                 }
             }
+    }
+
+    // ---- A clear-cut (hygge), 2026-11-25 after Anders' photos: the ground worked by the big machines ----
+    // Stumps (some fresh and pale on top, some old and grey), logging slash lying everywhere and in low heaps, thin
+    // branches, stones turned up, a tall dead snag now and then, young birches and spruces coming up, rows of
+    // scarified soil (markberedning) and the wheel ruts of the forwarder. The rows and ruts follow one direction per
+    // stretch of map, from the map's own position, so they run on from piece to piece.
+    static bool CutKind(int kind) => kind == WorldCell.RoughOpen || kind == WorldCell.RoughOpenTrees;
+
+    void ClearCut()
+    {
+        if (input.town != null) return;
+        const float Step = 2.5f;
+        float first = -R + 2f, last = R - 2f, firstX = first, firstZ = first;
+        if (chunk)
+        {
+            firstX = (float)Math.Ceiling((-R + ox) / Step) * Step - ox;
+            firstZ = (float)Math.Ceiling((-R + oz) / Step) * Step - oz;
+            last = R;
+        }
+        var g = new TvShapeBuilder(random);
+        float Height(float x, float z) => H(x, z);
+        int found = 0;
+        for (float gz = firstZ; gz < last; gz += Step)
+            for (float gx = firstX; gx < last; gx += Step)
+            {
+                if (chunk) Reseed(gx + Step * 0.5f, gz + Step * 0.5f, 31);
+                float x = gx + Rr(0f, Step), z = gz + Rr(0f, Step);
+                if (!Inside(x, z, 2f)) continue;
+                byte cell = CellAt(x, z);
+                if (!CutKind(Base(cell)) || (cell & WorldCell.Marsh) != 0) continue;
+                found++;
+                if (ClearAt(x, z) < 0.8f || Blocked(x, z, 0.5f)) continue;
+                float y = H(x, z), roll = random.Value();
+                if (roll < 0.2f)
+                {
+                    // A stump: low, sawn flat; fresh ones pale yellow on top, old ones grey and cracked
+                    bool fresh = random.Value() < 0.55f;
+                    float r = Rr(0.13f, 0.32f), h = Rr(0.1f, 0.42f);
+                    var b = new TvShapeBuilder(random);
+                    int bark = random.Value() < 0.5f ? TvAtlas.PineBarkLow : TvAtlas.SpruceBark;
+                    b.Limb(new[] { 0f, -0.15f, 0f, 0f, h * 0.5f, 0f, 0f, h, 0f }, new[] { r * 1.4f, r * 1.05f, r }, Q >= 2 ? 9 : 6,
+                           bark, Math.Max(2f, (float)Math.Round(6.2832f * r / 0.4f)), 0.8f, new[] { Grey(0.65f), Grey(0.82f), Grey(0.9f) });
+                    b.Disk(0f, h, 0f, r, Q >= 2 ? 9 : 6, TvAtlas.DeadWood, fresh ? Tint(1.25f, 1.1f, 0.8f) : Grey(0.85f), 0.8f);
+                    woodMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, Rr(0f, 6.283f), 1f, Rr(-0.06f, 0.06f), Rr(-0.06f, 0.06f));
+                    world.solids.Add(new TvSolid { x = x, z = z, r = r });
+                }
+                else if (roll < 0.55f)
+                {
+                    // Slash lying on the ground, a branch or two over it
+                    int n = 2 + (int)(random.Value() * 3.5f);
+                    for (int k = 0; k < n; k++)
+                    {
+                        float sx = x + Rr(-1f, 1f), sz = z + Rr(-1f, 1f), size = Rr(0.55f, 1.3f);
+                        g.GroundCard(sx, sz, size, size * Rr(0.7f, 1f), Rr(0f, 6.283f), Height, TvAtlas.Slash, Grey(Rr(0.72f, 1f)), 0f, 1f, Rr(0.04f, 0.12f));
+                    }
+                    if (random.Value() < 0.35f)
+                    {
+                        float a = Rr(0f, 6.283f), l = Rr(1f, 3f), r0 = Rr(0.025f, 0.06f);
+                        float bx = x + (float)Math.Cos(a) * l, bz = z + (float)Math.Sin(a) * l;
+                        if (!Blocked(bx, bz, 0.4f))
+                            Log(x, y + r0 + 0.05f, z, bx, H(bx, bz) + r0 * 0.5f, bz, r0, r0 * 0.5f, random.Value() < 0.5f ? TvAtlas.SpruceBark : TvAtlas.DeadWood);
+                    }
+                }
+                else if (roll < 0.585f)
+                {
+                    // A low heap of slash: branches leaning together
+                    var b = new TvShapeBuilder(random);
+                    float hr = Rr(0.7f, 1.4f), hh = Rr(0.4f, 0.85f);
+                    int n = 6 + (int)(random.Value() * 4f);
+                    for (int k = 0; k < n; k++)
+                    {
+                        float a = k * 6.283f / n + Rr(-0.3f, 0.3f), ca = (float)Math.Cos(a), sa = (float)Math.Sin(a), w = hr * Rr(0.6f, 0.9f);
+                        b.Card(ca * hr * 0.55f, -0.05f, sa * hr * 0.55f, -sa * w * 0.5f, 0f, ca * w * 0.5f, -ca * hr * 0.6f, hh, -sa * hr * 0.6f,
+                               ca, 0.7f, sa, TvAtlas.Slash, Grey(0.5f), Grey(Rr(0.8f, 1f)));
+                    }
+                    b.Card(-hr * 0.5f, hh * 0.8f, 0f, 0f, 0f, hr * 0.5f, hr, 0f, 0f, 0f, 1f, 0f, TvAtlas.Slash, Grey(0.9f), Grey(0.9f));
+                    woodMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, Rr(0f, 6.283f));
+                }
+                else if (roll < 0.66f)
+                {
+                    // Stones the machines turned up, half in the ground
+                    AddRock(x, z, Rr(0.15f, 0.6f), 0.28f, false);
+                }
+                else if (roll < 0.7f && Q >= 1)
+                {
+                    // Young trees coming up
+                    bool leafy = random.Value() < 0.55f;
+                    TvShape[] set = leafy ? youngLeafy : youngSpruce;
+                    if (set == null) continue;
+                    float sc = Rr(0.25f, 0.8f);
+                    (chunk ? thicketMesh : treeMeshes[Tile(x, z)]).Add(set[(int)(random.Value() * set.Length) % set.Length], x, y - 0.05f, z,
+                        sc * Rr(0.85f, 1.2f), sc, sc * Rr(0.85f, 1.2f), Rr(0f, 6.283f), Rr(0.8f, 1.1f), Rr(-0.05f, 0.05f), Rr(-0.05f, 0.05f));
+                    world.trees++;
+                }
+                else if (roll < 0.705f)
+                {
+                    // A tall snag: a dead trunk left standing, its top broken off
+                    var b = new TvShapeBuilder(random);
+                    float h = Rr(2.2f, 6f), r = Rr(0.13f, 0.22f);
+                    float[] pts = { 0f, -0.3f, 0f, Rr(-0.06f, 0.06f), h * 0.5f, Rr(-0.06f, 0.06f), Rr(-0.15f, 0.15f), h, Rr(-0.15f, 0.15f) };
+                    b.Limb(pts, new[] { r, r * 0.85f, r * 0.6f }, Q >= 2 ? 8 : 5, TvAtlas.DeadWood, 2f, 1.4f, new[] { Grey(0.7f), Grey(0.85f), Grey(0.95f) });
+                    woodMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, Rr(0f, 6.283f));
+                    world.solids.Add(new TvSolid { x = x, z = z, r = r });
+                }
+            }
+        if (found == 0) return;
+
+        // Rows of scarified soil and the forwarder's wheel ruts, in global rows over the whole clear-cut
+        double bx0 = Math.Floor((ox) / 300f), bz0 = Math.Floor((oz) / 300f);
+        float dirA = TvRandom.Patches((float)bx0 * 0.73f + 11f, (float)bz0 * 0.71f + 5f) * 6.283f;
+        float dx = (float)Math.Cos(dirA), dz = (float)Math.Sin(dirA);   // along the rows
+        float nx = -dz, nz = dx;                                        // across
+        float corner = R * 1.42f;
+        float uC = ox * nx + oz * nz, vC = ox * dx + oz * dz;           // the piece's centre in row coordinates
+        void Strip(float u, float vFrom, float vTo, float step, float chance, float halfW, float len, int salt, TvColor col, float wobble)
+        {
+            for (float v = (float)Math.Floor((vC + vFrom) / step) * step; v < vC + vTo; v += step)
+            {
+                float uu = u + wobble * (float)Math.Sin(v * 0.045f + u * 0.37f);
+                float gxw = uu * nx + v * dx, gzw = uu * nz + v * dz;    // global (from the anchor)
+                float lx = gxw - ox, lz = gzw - oz;
+                if (!Inside(lx, lz, 1f)) continue;
+                random.Reseed((int)Math.Floor(gxw * 3f), (int)Math.Floor(gzw * 3f), salt);
+                if (random.Value() > chance) continue;
+                byte cell = CellAt(lx, lz);
+                if (!CutKind(Base(cell)) || ClearAt(lx, lz) < 0.6f || Blocked(lx, lz, 0.3f)) continue;
+                float yaw = (float)Math.Atan2(dz, dx) + Rr(-0.12f, 0.12f);
+                g.GroundCard(lx, lz, len * Rr(0.8f, 1.1f), halfW * Rr(0.8f, 1.2f), yaw, Height, TvAtlas.Soil, col, 0f, 1f, 0.025f);
+            }
+        }
+        // Scarified rows every 2.4 m, broken
+        for (float u = (float)Math.Floor((uC - corner) / 2.4f) * 2.4f; u < uC + corner; u += 2.4f)
+            Strip(u, -corner, corner, 1.5f, 0.72f, 0.36f, 0.8f, 41, Grey(0.92f), 0.25f);
+        // Wheel ruts: a pair every 24 m, darker and wetter, unbroken
+        for (float u = (float)Math.Floor((uC - corner) / 24f) * 24f + 7f; u < uC + corner; u += 24f)
+            for (int side = -1; side <= 1; side += 2)
+                Strip(u + side * 0.95f, -corner, corner, 1.2f, 0.95f, 0.26f, 0.7f, 43 + side, Tint(0.62f, 0.58f, 0.55f), 1.4f);
+        if (!g.Empty) woodMesh.Add(g.Done(), 0f, 0f, 0f, 1f, 1f, 1f, 0f);
     }
 
     // ---- The forest floor's litter: needles, twigs, cones and leaves lying on the ground, and dead sticks ----
