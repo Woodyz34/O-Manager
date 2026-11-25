@@ -807,11 +807,11 @@ public static partial class TvCityShapes
     {
         switch (pose)
         {
-            case Pose.Cheer: return Figure(random, look, false, Animate(Act.Cheer, 1, look));
-            case Pose.Sit: return Figure(random, look, false, Animate(Act.Sit, 0, look));
-            case Pose.Walk: return Figure(random, look, false, Animate(Act.Walk, 2, look));
-            case Pose.Child: return Figure(random, look, true, Animate(Act.Idle, 0, look));
-            default: return Figure(random, look, false, Animate(Act.Idle, 0, look));
+            case Pose.Cheer: return Figure(random, look, false, Animate(Act.Cheer, 1, look), 0);
+            case Pose.Sit: return Figure(random, look, false, Animate(Act.Sit, 0, look), 0);
+            case Pose.Walk: return Figure(random, look, false, Animate(Act.Walk, 2, look), 0);
+            case Pose.Child: return Figure(random, look, true, Animate(Act.Idle, 0, look), 0);
+            default: return Figure(random, look, false, Animate(Act.Idle, 0, look), 0);
         }
     }
 
