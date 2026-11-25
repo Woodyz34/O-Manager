@@ -144,6 +144,9 @@ namespace MapImport
             bool area = s.kind == SymbolKind.Area;
             bool line = s.kind == SymbolKind.Line;
             bool point = s.kind == SymbolKind.Point;
+            // A multi-level map's tag line (the edge of a lower level, triangles pointing out of it) is no bridge: as
+            // one it opened a way through every wall under it. Tunnels closes it when the grid is loaded.
+            if (line && MultiLevelTag(name)) return TerrainRule.None;
 
             if (area)
             {
@@ -278,6 +281,15 @@ namespace MapImport
             }
             return TerrainRule.None;
         }
+
+        // Multi-level tags (2026-11-25): ISSprOM 2019-2 has no symbol for the entrance to a lower level, so maps that
+        // show several levels draw their own line of small triangles: "Ingresso multilivello", "Multi-level entrance" ...
+        public static bool MultiLevelTag(string lowerName) =>
+            lowerName != null && (lowerName.Contains("multiliv") || lowerName.Contains("multi-liv") || lowerName.Contains("multi liv")
+            || lowerName.Contains("multi-level") || lowerName.Contains("multilevel") || lowerName.Contains("multi level")
+            || lowerName.Contains("flernivå") || lowerName.Contains("fleirnivå") || lowerName.Contains("flere nivå")
+            || lowerName.Contains("level entrance") || lowerName.Contains("ingresso") || lowerName.Contains("nivåinngang")
+            || lowerName.Contains("nivåingång"));
 
         // "Impassable stone wall", "Oöverstigligt staket", "Opasserbar mur", "Ogenomtränglig vegetation" ...
         static bool ImpassableName(string name) =>
