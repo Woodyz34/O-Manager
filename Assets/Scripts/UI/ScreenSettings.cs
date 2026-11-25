@@ -158,7 +158,9 @@ public class ScreenSettings : MonoBehaviour
         if (Time.unscaledTime >= nextCanvasCheck)
         {
             nextCanvasCheck = Time.unscaledTime + 0.2f;
-            int count = FindObjectsByType<CanvasScaler>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Length;
+            // Counted by Canvas, not CanvasScaler: a search for a script type looks through every script in the scene
+            // (a big map has 68 000 map objects with scripts), a Canvas search only through the canvases (2026-11-25)
+            int count = FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Length;
             if (count != lastCanvasCount)
             {
                 lastCanvasCount = count;

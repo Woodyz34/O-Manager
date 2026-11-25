@@ -44,7 +44,7 @@ public static class RunnerVisibility
         var gone = new List<NetworkPlayer>();
         foreach (NetworkPlayer key in offFromStart.Keys) if (key == null) gone.Add(key);
         foreach (NetworkPlayer key in gone) offFromStart.Remove(key);
-        foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player == null || !offFromStart.TryGetValue(player, out HashSet<Component> keepOff)) continue;
             // Only the dots and the name tags: the drawn line (LineRenderer) is only on for your own runner

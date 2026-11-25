@@ -159,7 +159,7 @@ public static class SecretTasks
     // at the reveal if the host has left.
     public static bool TryGet(out int code)
     {
-        foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             if (p.Object == null || !p.Object.IsValid) continue;
             if (p.secretTask != 0)

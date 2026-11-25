@@ -170,7 +170,7 @@ public class IndividualRace : MonoBehaviour, IRaceStats
     static bool AllFinished()
     {
         int count = 0;
-        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (!NetworkPlayer.Races(player)) continue;
             count++;

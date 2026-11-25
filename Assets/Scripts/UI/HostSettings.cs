@@ -86,7 +86,7 @@ public static class HostSettings
             cached = Mine;
             NetworkPlayer local = NetworkPlayer.Local;
             if (local == null || CompetitionFlow.LocalIsHost()) return cached;
-            foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+            foreach (NetworkPlayer player in NetworkPlayer.All())
             {
                 if (player == null || player.Object == null || !player.Object.IsValid) continue;
                 string text = player.hostOptions.ToString();

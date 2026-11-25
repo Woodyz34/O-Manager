@@ -453,7 +453,7 @@ public class BearWatcher : MonoBehaviour
     // Relays: a bear taken away at a new leg is hidden, and a bear hidden somewhere new is unfound and can scare again.
     void SyncViews()
     {
-        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player.Object == null || !player.Object.IsValid) continue;
             PlayerRef owner = player.Object.StateAuthority;
@@ -600,7 +600,7 @@ public class BearWatcher : MonoBehaviour
         }
         Vector3 me = agent.transform.position;
         float cooldown = BearMode.CooldownGameSeconds / PackRunning.GameSecondsPerSecond;
-        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player.Object == null || !player.Object.IsValid) continue;
             PlayerRef owner = player.Object.StateAuthority;
