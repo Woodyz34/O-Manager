@@ -109,56 +109,63 @@ def relief(h, strength):
     return 1.0 + strength * (-gx * 0.7 - gy * 0.7)
 
 
-def bark_pine_low():
-    """Old Scots pine bark after Anders' photo (about 0.55 m a picture). A height field: long rough ridges up the
-    trunk from stretched noise, broken across into plates now and then, with crusty fine roughness on top. Deep
-    places are warm dark brown, the plates warm pinkish grey-brown with rusty and greyer patches."""
+def bark_pine_low(seed=0):
+    """Old Scots pine bark after Anders' photo (2026-11-25, round 6): a mosaic of uneven, scaly plates (about 4-12 cm,
+    taller than wide) with short cracks round each one, running every way, not long lines up the trunk. Some plates
+    are grey and weathered, some show the warmer red-brown under-bark, some carry pale lichen. A picture is 0.4 m round
+    and 0.8 m up the trunk (fewer repeats); two versions (seed) so the trees differ."""
     s = IN
     from scipy.ndimage import gaussian_filter
-    fine = fft_noise(s, 0.55, 8)
-    wob = fft_noise(s, 1.3, 11)
-    Y, X = np.mgrid[0:s, 0:s] / s
-    # columns of plates up the trunk, wandering sideways, split across into plates of uneven height
-    n_cols, n_rows = 10, 4
-    warp = band_noise(s, 1.6, 1, (1.0, 0.6), 0.5) - 0.5
-    jit = fft_noise(s, 1.7, 21) - 0.5
-    widths = band_noise(s, 4.0, 41, (1.0, 8.0), 0.5) - 0.5
-    rough = fft_noise(s, 1.15, 42) - 0.5
-    u = X * n_cols + warp * 0.35 + widths * 0.6 + jit * 0.45 + rough * 0.16
-    column = np.floor(u)
-    fu = u - column
-    cid = np.mod(column, n_cols)
-    h1 = (np.sin(cid * 12.9898 + 1.3) * 43758.5453) % 1.0
-    v = Y * n_rows + h1 * 3.0 + (fu - 0.5) * (h1 - 0.5) * 0.8 + jit * 0.25 + rough * 0.12
-    row = np.floor(v)
-    fv = v - row
-    cid = cid * 31 + np.mod(row, n_rows)
-    side = np.minimum(fu, 1 - fu) * s / n_cols
-    across = np.minimum(fv, 1 - fv) * s / n_rows
-    width_v = 1.6 + 3.2 * wob
-    width_h = (1.0 + 2.0 * wob) * (((np.sin(cid * 7.13) * 9123.1) % 1.0) > 0.25)
-    side = side * (1.0 + 2.5 * smooth(0.62, 0.8, fft_noise(s, 1.4, 44, (0.6, 1.0))))
-    dist = np.minimum(side / width_v, np.where(width_h > 0, across / np.maximum(width_h, 0.1), 99))
-    crack = 1.0 - smooth(0.6, 1.4, dist)
-    # rounded plates with thin scaly layers on them
-    layer = 1.0 - smooth(0.0, 0.03, np.abs(band_noise(s, 7.0, 31, (0.25, 1.0), 0.5) - 0.5))
-    crust = fft_noise(s, 0.9, 43)
-    height = np.clip(smooth(0.6, 9.0, dist) * (0.8 + 0.2 * crust) - 0.06 * layer * smooth(1.2, 3, dist) + 0.14 * (fine - 0.5), 0, 1)
-    ids = (np.sin(cid * 12.9898) * 43758.5453) % 1.0
-    plate = lerp(col('#a09084'), col('#c8baae'), (ids * 0.45 + fft_noise(s, 1.5, 3) * 0.55)[..., None])
-    plate = lerp(plate, col('#9a7a64'), smooth(0.55, 0.8, fft_noise(s, 1.4, 2))[..., None] * 0.45)
-    plate = lerp(plate, col('#b8b4ae'), smooth(0.55, 0.8, fft_noise(s, 1.6, 4))[..., None] * 0.35)
-    deep = lerp(col('#5e4636'), col('#866650'), fft_noise(s, 1.3, 6)[..., None])
-    rgb = lerp(deep, plate, (1.0 - crack)[..., None]) * (0.8 + 0.2 * height)[..., None]
-    rgb *= (1.0 - 0.5 * (1.0 - smooth(0.15, 0.6, dist)))[..., None]
-    rgb *= (0.86 + 0.24 * fine)[..., None]
-    mott = fft_noise(s, 1.25, 45)
-    rgb = lerp(rgb, col('#c4c2bc'), (smooth(0.58, 0.85, mott) * 0.45 * (1.0 - crack))[..., None])
-    rgb *= (1.0 - 0.18 * smooth(0.62, 0.9, fft_noise(s, 1.1, 46)))[..., None]
+    k = seed * 100
+    fine = fft_noise(s, 0.6, 8 + k)
+    wob = fft_noise(s, 1.3, 11 + k)
+    # big plates: stretched, warped cells; small plates inside some of them, only partly cut
+    f1, f2, cid = voronoi(s, 220, 9 + k, (1.0, 0.72), warp=30)
+    g1, g2, gid = voronoi(s, 420, 19 + k, (1.0, 1.2), warp=12)
+    jag = (fft_noise(s, 0.9, 25 + k) - 0.5) * 2.2
+    width = 0.7 + 2.6 * wob ** 1.5
+    edge_big = (f2 - f1 + jag) / width
+    keep = smooth(0.55, 0.7, fft_noise(s, 1.2, 13 + k))
+    edge_small = (g2 - g1 + jag * 0.6) / (0.5 + 0.8 * wob) + (1.0 - keep) * 6.0
+    # cracks across a plate are fainter than the ones beside it; some edges hardly show (plates grown together)
+    soft = smooth(0.5, 0.75, fft_noise(s, 1.3, 26 + k))
+    edge_big = edge_big + soft * 2.5 + 1.2 * ((np.sin(cid * 3.71 + 0.2) * 5419.3) % 1.0 > 0.6)
+    # cracks up the trunk (edges standing upright) are wider and deeper than the ones across
+    gy, gx = np.gradient(gaussian_filter(f2 - f1, 2.0, mode='wrap'))
+    upright = np.abs(gx) / (np.sqrt(gx * gx + gy * gy) + 1e-6)
+    edge_big = edge_big / (0.45 + 1.4 * upright ** 2)
+    dist = np.minimum(edge_big, edge_small * 1.3)
+    crack = np.maximum(1.0 - smooth(0.4, 1.4, edge_big), (1.0 - smooth(0.4, 1.2, edge_small)) * 0.55)
+    # each plate is a slightly bulging, crusty scale
+    crust = fft_noise(s, 0.9, 43 + k)
+    height = np.clip(smooth(0.4, 7.0, dist) * (0.75 + 0.25 * crust) + 0.16 * (fine - 0.5), 0, 1)
+    height = gaussian_filter(height, 0.6, mode='wrap')
+    ids = (np.sin(cid * 12.9898 + 0.7 * seed) * 43758.5453) % 1.0
+    sid = (np.sin(gid * 78.233 + 0.3 * seed) * 12543.531) % 1.0
+    tone = ids * 0.5 + sid * 0.3 + fft_noise(s, 1.5, 3 + k) * 0.2
+    plate = lerp(col('#8c7c6e'), col('#bcae9e'), tone[..., None])
+    # red-brown under-bark where a scale has fallen off, grey weathered plates, pale lichen
+    red = smooth(0.66, 0.88, sid * 0.7 + fft_noise(s, 1.0, 2 + k) * 0.3)
+    plate = lerp(plate, col('#a8765a'), red[..., None] * 0.55)
+    grey = smooth(0.55, 0.8, fft_noise(s, 1.6, 4 + k))
+    plate = lerp(plate, col('#aeaaa4'), grey[..., None] * 0.5)
+    deep = lerp(col('#46322a'), col('#6a4e3e'), fft_noise(s, 1.3, 6 + k)[..., None])
+    rgb = lerp(deep, plate, (1.0 - crack)[..., None]) * (0.82 + 0.18 * height)[..., None]
+    rgb *= (0.85 + 0.26 * fine)[..., None]
+    # small dark pits and crumbs on the plates
+    rgb *= (1.0 - 0.35 * smooth(0.72, 0.9, fft_noise(s, 0.4, 28 + k)))[..., None]
+    # bigger patches across the trunk: some greyer and lighter, some darker brown
+    patch = fft_noise(s, 2.0, 27 + k)
+    rgb = lerp(rgb, rgb * np.array([1.08, 1.08, 1.1]), smooth(0.55, 0.75, patch)[..., None])
+    rgb *= (1.0 - 0.18 * smooth(0.55, 0.25, patch))[..., None]
     rgb *= np.clip(relief(height * 9, 0.5), 0.72, 1.25)[..., None]
-    lich = lichen_mask(s, 7, 0.03, 1.4)
-    rgb = lerp(rgb, col('#a0a490'), (lich * smooth(0.4, 0.7, height))[..., None] * 0.4)
+    lich = lichen_mask(s, 7 + k, 0.035, 1.4)
+    rgb = lerp(rgb, col('#a8ac98'), (lich * smooth(0.3, 0.6, height))[..., None] * 0.45)
     return to_img(rgb)
+
+
+def bark_pine_low2():
+    return bark_pine_low(1)
 
 
 def bark_pine_high():
@@ -1247,6 +1254,7 @@ TILES = [
     ('moss sock', moss_sock, True),
     ('bilberry top', bilberry_top, False),
     ('lichen top', lichen_top, False),
+    ('pine bark low 2', bark_pine_low2, True),
 ]
 
 if __name__ == '__main__':
