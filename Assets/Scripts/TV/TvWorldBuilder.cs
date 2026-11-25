@@ -3346,19 +3346,29 @@ public partial class TvWorldBuilder
             {
                 if (rough <= 0.42f || random.Value() > Sm(0.42f, 0.62f, rough)) continue;
                 float r = random.Value();
-                // Wide, low clumps that grow together into a carpet (2026-11-25)
-                s = Rr(0.65f, 1.3f);
-                tint = Rr(0.55f, 0.85f);
+                // Wide, low clumps that grow together into a carpet. Plants grow in patches (2026-11-25, Anders: the
+                // mix of everything everywhere looked chaotic): a slow noise says which plant a place has, and the
+                // light a slower one, so a carpet of bilberry is one calm colour that only shifts from place to place
+                float patch = TvRandom.Patches((x + ox) * 0.05f + 40f, (z + oz) * 0.05f + 13f);
+                float light = TvRandom.Patches((x + ox) * 0.15f + 5f, (z + oz) * 0.15f + 9f);
+                s = Rr(0.85f, 1.25f);
+                tint = 0.72f + 0.36f * light;
                 switch (look.ground)
                 {
-                    case TerrainLook.Heather: shape = r < 0.8f ? tuftHeath : tuftBerry; s *= 1.15f; tint = Rr(0.7f, 1f); break;
-                    case TerrainLook.Grass: shape = r < 0.85f ? tuftGrass : tuftFern; s = Rr(0.9f, 1.8f); tint = Rr(0.8f, 1.1f); break;
-                    case TerrainLook.Hard: shape = r < 0.45f ? tuftBerry : r < 0.75f ? tuftLingon : tuftDry; break;
+                    case TerrainLook.Heather: shape = patch < 0.6f ? (r < 0.9f ? tuftHeath : tuftLingon) : (r < 0.85f ? tuftBerry : tuftHeath); s *= 1.15f; break;
+                    case TerrainLook.Grass: shape = patch < 0.7f ? tuftGrass : (r < 0.6f ? tuftFern : tuftGrass); s = Rr(0.9f, 1.8f); tint = Rr(0.85f, 1.05f); break;
+                    case TerrainLook.Hard: shape = patch < 0.6f ? (r < 0.92f ? tuftBerry : tuftLingon) : (r < 0.6f ? tuftLingon : tuftDry); break;
                     case TerrainLook.Sand: shape = r < 0.6f ? tuftDry : tuftHeath; tint = Rr(0.8f, 1.05f); break;
                     case TerrainLook.Stone: shape = r < 0.8f ? tuftShort : tuftDry; tint = Rr(0.8f, 1.05f); break;
-                    case TerrainLook.Lichen: shape = r < 0.5f ? tuftHeath : r < 0.8f ? tuftLingon : tuftBerry; s *= 0.8f; tint = Rr(0.7f, 0.95f); break;
-                    // Moss forest: mostly bilberry, lingonberry where it is a little drier, some heather and ferns
-                    default: shape = r < 0.66f ? tuftBerry : r < 0.8f ? tuftLingon : r < 0.88f ? tuftHeath : r < 0.96f ? tuftFern : tuftGrass; break;
+                    case TerrainLook.Lichen: shape = patch < 0.5f ? (r < 0.8f ? tuftHeath : tuftLingon) : (r < 0.7f ? tuftLingon : tuftBerry); s *= 0.8f; break;
+                    // Moss forest: mostly bilberry carpets; drier patches of lingonberry, a few of heather, ferns where
+                    // it is moist
+                    default:
+                        shape = patch < 0.56f ? (r < 0.96f ? tuftBerry : tuftLingon)
+                              : patch < 0.66f ? (r < 0.65f ? tuftLingon : tuftBerry)
+                              : patch < 0.69f ? (r < 0.6f ? tuftHeath : tuftLingon)
+                              : (r < 0.55f ? tuftFern : r < 0.85f ? tuftBerry : tuftGrass);
+                        break;
                 }
                 // Under broad-leaved trees: ferns and grass more than blueberry
                 if ((look.forest == TerrainLook.Beech || look.forest == TerrainLook.Birch) && look.ground == TerrainLook.Moss && r < 0.5f)

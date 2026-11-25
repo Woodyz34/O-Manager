@@ -95,27 +95,30 @@ def relief(h, strength):
 
 
 def bark_pine_low():
+    """Old Scots pine bark (about 0.6 m a picture): long grey-brown plates split by wide, deep fissures, the
+    red-brown under-bark showing low in them, rough crusty plate tops and a few lichen specks."""
     s = IN
-    f1, f2, cid = voronoi(s, 26, 1, (1.0, 0.33), warp=70)
+    f1, f2, cid = voronoi(s, 24, 1, (1.0, 0.32), warp=60)
     edge = f2 - f1
     plate_n = fft_noise(s, 1.6, 2, (1.0, 0.5))
-    fine = fft_noise(s, 1.0, 3)
+    fine = fft_noise(s, 0.9, 3)
+    rough = fft_noise(s, 0.6, 8)
     ids = (np.sin(cid * 12.9898) * 43758.5453) % 1.0
-    base = lerp(col('#6b5a4c'), col('#8a6a52'), ids[..., None])
-    base = lerp(base, col('#a07a5a'), (plate_n[..., None] * 0.6))
-    # plates: lighter flat tops, crusty grey patches
-    grey = smooth(0.55, 0.8, fft_noise(s, 1.8, 4))
-    base = lerp(base, col('#8d8780'), grey[..., None] * 0.45)
-    shade = 0.82 + 0.3 * fine
-    crack = smooth(1.0, 12.0 + 8.0 * fine, edge)          # 0 in the fissure
-    height = crack * (0.8 + 0.2 * plate_n) + 0.15 * fft_noise(s, 1.2, 5, (1.0, 0.4))
-    deep = col('#2e2018')
-    base = base * 1.12
-    rgb = lerp(deep, base * shade[..., None], smooth(0.0, 0.45, crack)[..., None])
-    rgb *= np.clip(relief(height * 18, 0.5), 0.55, 1.5)[..., None]
-    # flakes peeling in layers on the plates
-    layers = smooth(0.45, 0.5, (fft_noise(s, 1.3, 6, (1.0, 0.25)) * 7) % 1.0) * crack
-    rgb = lerp(rgb, rgb * 1.12 + 8, layers[..., None] * 0.5)
+    base = lerp(col('#7a726a'), col('#9a9286'), ids[..., None])
+    base = lerp(base, col('#6e6054'), plate_n[..., None] * 0.5)
+    crust = smooth(0.55, 0.8, fft_noise(s, 1.7, 4))
+    base = lerp(base, col('#96908a'), crust[..., None] * 0.35)
+    # the plate: flat-topped, falling off into a wide fissure; flaky layers across it
+    ridge = smooth(1.0, 13.0 + 6.0 * fine, edge)
+    layers = (fft_noise(s, 1.2, 6, (1.0, 0.3)) * 5) % 1.0
+    height = ridge * 0.8 + 0.12 * smooth(0.35, 0.55, layers) * ridge + 0.1 * rough * ridge
+    rgb = base * (0.82 + 0.3 * rough)[..., None]
+    under = smooth(0.6, 0.2, ridge)
+    rgb = lerp(rgb, col('#5e4a3e'), under[..., None] * 0.55)
+    rgb = lerp(rgb, col('#3a302a'), smooth(0.3, 0.0, ridge)[..., None] * 0.7)
+    rgb *= np.clip(relief(height * 14, 0.5), 0.75, 1.25)[..., None]
+    lich = lichen_mask(s, 7, 0.04, 1.4)
+    rgb = lerp(rgb, col('#9ea290'), (lich * ridge)[..., None] * 0.45)
     return to_img(rgb)
 
 
@@ -144,20 +147,21 @@ def bark_pine_high():
 
 
 def bark_spruce():
+    """Norway spruce bark: fine round grey-brown scales, pale grey-green crust lichen in patches."""
     s = IN
-    f1, f2, cid = voronoi(s, 160, 21, (1.0, 0.8), warp=25)
-    edge = f2 - f1
+    f1, f2, cid = voronoi(s, 260, 21, (1.0, 0.8), warp=45)
+    edge = f2 - f1 + fft_noise(s, 0.9, 25) * 2.0
     ids = (np.sin(cid * 39.346) * 43758.5453) % 1.0
-    base = lerp(col('#6c5c50'), col('#857266'), ids[..., None])
-    base = lerp(base, col('#9a8f84'), smooth(0.5, 0.85, fft_noise(s, 1.7, 22))[..., None] * 0.6)
-    scale = smooth(0.0, 2.5, edge)
-    # each scale a little lighter at its lower edge
-    rgb = lerp(col('#4a3a30'), base, scale[..., None])
-    rgb *= np.clip(relief(smooth(0.0, 6.0, edge) * 6, 0.4), 0.7, 1.3)[..., None]
-    rgb *= (0.86 + 0.24 * fft_noise(s, 1.0, 23))[..., None]
-    # resin and lichen specks
-    lich = smooth(0.78, 0.86, fft_noise(s, 1.3, 24))
-    rgb = lerp(rgb, col('#9aa48a'), lich[..., None] * 0.6)
+    base = lerp(col('#6e6258'), col('#8c8076'), ids[..., None])
+    base = lerp(base, col('#9a948a'), smooth(0.5, 0.85, fft_noise(s, 1.7, 22))[..., None] * 0.5)
+    scale = smooth(0.0, 2.2, edge)
+    rgb = lerp(col('#4a3c32'), base, scale[..., None])
+    rgb *= np.clip(relief(smooth(0.0, 6.0, edge) * 6, 0.4), 0.75, 1.25)[..., None]
+    rgb *= (0.9 + 0.18 * fft_noise(s, 1.0, 23))[..., None]
+    lich = lichen_mask(s, 24, 0.22, 1.5)
+    rgb = lerp(rgb, col('#a7ad9a'), lich[..., None] * 0.65)
+    lich2 = lichen_mask(s, 26, 0.08, 1.2)
+    rgb = lerp(rgb, col('#c4c8b4'), lich2[..., None] * 0.5)
     return to_img(rgb)
 
 
@@ -435,7 +439,8 @@ def broad_leaves():
 
 
 def bilberry():
-    """A bilberry plant from the side: green angular stems branching upwards, small oval leaves, blue berries."""
+    """Bilberry from the side: a dense mass of thin green angular stems with many small bright leaves, the top
+    of the clump rounded, a few blue berries hidden inside. One even colour family, so a carpet of it looks calm."""
     c = Canvas()
     g = np.random.default_rng(91)
     stems = []
@@ -443,51 +448,99 @@ def bilberry():
     def stem(x, y, ang, ln, w, depth):
         pts = [(x, y)]
         for i in range(6):
-            ang += R(-0.18, 0.18)
+            ang += R(-0.22, 0.22)
             x += math.cos(ang) * ln / 6
             y += math.sin(ang) * ln / 6
             pts.append((x, y))
-        c.taper(pts, w, w * 0.6, mix('#3e6a26', '#4f7a2c', g.random()), rgba('#6a9a38'))
+        c.taper(pts, w, w * 0.6, mix('#46702a', '#557e2e', g.random()), rgba('#6c9a36'))
         stems.append(pts)
         if depth < 2:
-            for k in range(2 if depth == 0 else 1):
+            for k in range(2):
                 i = int(R(2, 5))
                 side = 1 if g.random() < 0.5 else -1
-                stem(pts[i][0], pts[i][1], ang + side * R(0.4, 0.8), ln * R(0.45, 0.65), w * 0.7, depth + 1)
+                stem(pts[i][0], pts[i][1], ang + side * R(0.4, 0.9), ln * R(0.4, 0.6), w * 0.7, depth + 1)
 
-    for k in range(9):
-        x = 0.12 + 0.76 * k / 8 + R(-0.04, 0.04)
-        stem(x, 0.0, math.pi / 2 + (x - 0.5) * 0.6 + R(-0.25, 0.25), R(0.7, 0.95), 5, 0)
+    for k in range(14):
+        x = 0.06 + 0.88 * k / 13 + R(-0.03, 0.03)
+        top = 0.62 + 0.3 * math.sin(math.pi * x)       # a rounded clump
+        stem(x, 0.0, math.pi / 2 + (x - 0.5) * 0.7 + R(-0.2, 0.2), top * R(0.85, 1.05), 4, 0)
     leaves = []
     for pts in stems:
         for i in range(1, len(pts)):
-            if g.random() < 0.15:
-                continue
             px, py = pts[i]
-            side = 1 if i % 2 else -1
-            a = math.pi / 2 + side * R(0.6, 1.4)
-            ln = R(0.05, 0.08)
-            leaves.append((px, py, a, ln, g.random()))
-    # berries hang under the leaves, a few per plant
-    berries = []
+            for side in (-1, 1):
+                if g.random() < 0.2:
+                    continue
+                a = math.pi / 2 + side * R(0.5, 1.3)
+                ln = R(0.045, 0.07)
+                leaves.append((px, py, a, ln, g.random(), py))
+    leaves.sort(key=lambda l: l[5])
+    for (px, py, a, ln, sh, _) in leaves:
+        # leaves higher up catch more light: lighter and yellower
+        t = min(1.0, sh * 0.5 + py * 0.7)
+        fill = mix('#386020', '#7cab36', t)
+        c.poly(leaf_shape(px, py, ln, ln * 0.45, a, tip=0.15, n=10, serr=0.03), fill)
     for pts in stems:
-        if g.random() < 0.55:
-            i = int(R(1, len(pts) - 1))
-            px, py = pts[i]
-            berries.append((px + R(-0.015, 0.015), py - R(0.02, 0.035), R(0.017, 0.023)))
-    for (px, py, a, ln, sh) in leaves:
-        fill = mix('#3c6a24', '#7aa63e', sh)
-        if g.random() < 0.06:
-            fill = mix('#8a4a2a', '#b0602e', g.random())   # an autumn red leaf
-        c.poly(leaf_shape(px, py, ln, ln * 0.42, a, tip=0.15, n=12, serr=0.04), fill)
-        c.line([(px, py), (px + math.cos(a) * ln * 0.8, py + math.sin(a) * ln * 0.8)], 1, mix('#3a5a20', '#a4c06a', sh, 170))
-    for (px, py, r) in berries:
-        c.line([(px, py + r), (px, py + r + 0.02)], 1.5, rgba('#4a5a2a'))
-        c.ellipse(px, py, r, r, rgba('#1c2340'))
-        c.ellipse(px - r * 0.15, py + r * 0.1, r * 0.8, r * 0.8, rgba('#2f3e6a'))
-        c.ellipse(px - r * 0.3, py + r * 0.3, r * 0.35, r * 0.3, rgba('#8a9cc4', 200))     # bloom
-        c.ellipse(px + r * 0.05, py - r * 0.55, r * 0.3, r * 0.22, rgba('#14121e'))        # the crown at the bottom
+        if g.random() < 0.05:
+            px, py = pts[int(R(1, 4))]
+            r = R(0.014, 0.018)
+            c.ellipse(px, py - 0.02, r, r, rgba('#1e2748'))
+            c.ellipse(px - r * 0.3, py - 0.02 + r * 0.3, r * 0.35, r * 0.3, rgba('#7a8cb4', 200))
     return c.done()
+
+
+def bilberry_top():
+    """A bilberry carpet seen from above, for the flat cards on top of a clump: small bright leaves packed
+    together, darker gaps between, a ragged round edge (alpha)."""
+    c = Canvas()
+    g = np.random.default_rng(95)
+    for k in range(1400):
+        r = math.sqrt(g.random()) * 0.47
+        a = g.random() * 6.283
+        px, py = 0.5 + math.cos(a) * r, 0.5 + math.sin(a) * r
+        ln = R(0.035, 0.06)
+        t = g.random() * 0.6 + 0.4 * (1 - r / 0.47)
+        c.poly(leaf_shape(px, py, ln, ln * 0.45, g.random() * 6.283, tip=0.15, n=8), mix('#345e1e', '#80ae38', t))
+    for k in range(3):
+        px, py = R(0.25, 0.75), R(0.25, 0.75)
+        c.ellipse(px, py, 0.012, 0.012, rgba('#1e2748'))
+    return c.done()
+
+
+def lichen_top():
+    """Reindeer lichen seen from above: pale grey-white cushions of fine branches, ragged edge (alpha)."""
+    c = Canvas()
+    g = np.random.default_rng(97)
+    for k in range(3000):
+        r = math.sqrt(g.random()) * 0.46
+        a = g.random() * 6.283
+        px, py = 0.5 + math.cos(a) * r, 0.5 + math.sin(a) * r
+        rr = R(0.006, 0.016)
+        t = g.random()
+        c.ellipse(px, py, rr, rr, mix('#8c9282', '#cdd1c0', t))
+        c.ellipse(px - rr * 0.2, py + rr * 0.2, rr * 0.5, rr * 0.5, mix('#b4b8a6', '#dfe2d4', t))
+    return c.done()
+
+
+def moss_sock():
+    """The foot of an old trunk: moss and crust lichen growing up the bark, thick at the bottom, in ragged tongues
+    higher up (alpha above them). u goes round the trunk and repeats; v is 0 at the ground and 1 at the top."""
+    s = IN
+    ys, xs = np.mgrid[0:s, 0:s].astype(np.float32)
+    up = 1.0 - ys / s                                  # 0 at the bottom row, 1 at the top
+    tongues = fft_noise(s, 1.4, 501, (0.2, 1.0)) * 0.7 + fft_noise(s, 0.8, 502) * 0.3
+    reach = 0.25 + 0.6 * tongues
+    alpha = smooth(reach + 0.02, reach - 0.02, up) * 255
+    alpha[:, :] = np.where(up < 0.03, 0, alpha)        # a clear row at the very top and bottom
+    alpha = np.where(up > 0.97, 0, alpha)
+    n = fft_noise(s, 1.5, 504) * 0.5 + fft_noise(s, 0.7, 506) * 0.5
+    speck = np.random.default_rng(507).random((s, s))
+    rgb = lerp(col('#3e5a1c'), col('#86a43a'), n[..., None])
+    rgb = lerp(rgb, col('#a6c050'), (speck > 0.85)[..., None] * 0.35)
+    rgb = lerp(rgb, col('#26341a'), (speck < 0.1)[..., None] * 0.4)
+    lich = smooth(0.55, 0.0, reach - up) * smooth(0.5, 0.7, fft_noise(s, 1.3, 505))
+    rgb = lerp(rgb, col('#a8b08e'), lich[..., None] * 0.6)
+    return to_img(rgb, alpha)
 
 
 def grass():
@@ -695,34 +748,36 @@ def dead_twigs():
 
 
 def lingonberry():
-    """Lingonberry from the side: short upright stems with small glossy dark oval leaves and a few red berries."""
+    """Lingonberry: a low bushy mat of short upright shoots with small dark glossy oval leaves, a few red berries."""
     c = Canvas()
     g = np.random.default_rng(161)
-    for k in range(14):
-        x = R(0.08, 0.92)
-        h = R(0.35, 0.75)
-        lean = (x - 0.5) * 0.5 + R(-0.15, 0.15)
-        pts = bezier((x, 0.0), (x + lean * 0.1, h * 0.5), (x + lean * h * 0.3, h), 8)
-        c.taper(pts, 3.2, 1.6, rgba('#5a4a30'), rgba('#6a7a3a'))
-        for j in range(2, len(pts)):
-            px, py = pts[j]
+    shoots = []
+    for k in range(40):
+        x = R(0.04, 0.96)
+        top = (0.45 + 0.35 * math.sin(math.pi * x)) * R(0.7, 1.05)
+        pts = bezier((x, 0.0), (x + R(-0.06, 0.06), top * 0.5), (x + R(-0.12, 0.12), top), 8)
+        c.taper(pts, 2.5, 1.2, rgba('#5a4a2e'))
+        shoots.append(pts)
+    leaves = []
+    for pts in shoots:
+        for i, (px, py) in enumerate(pts[1:]):
             for side in (-1, 1):
-                if g.random() < 0.2:
-                    continue
                 a = math.pi / 2 + side * R(0.5, 1.2)
-                ln = R(0.05, 0.075)
-                sh = g.random()
-                c.poly(leaf_shape(px, py, ln, ln * 0.48, a, tip=0.05, n=10), mix('#1f4018', '#3a6428', sh))
-                # the glossy light edge
-                c.line([(px, py), (px + math.cos(a) * ln * 0.8, py + math.sin(a) * ln * 0.8)], 1.3, mix('#4a7a3a', '#8aac6a', sh, 160))
-        if g.random() < 0.45:
+                ln = R(0.04, 0.06)
+                leaves.append((py, px, a, ln, g.random()))
+    leaves.sort()
+    for (py, px, a, ln, sh) in leaves:
+        t = min(1.0, sh * 0.5 + py)
+        c.poly(leaf_shape(px, py, ln, ln * 0.55, a, tip=0.05, n=10), mix('#1e3a18', '#4a7a2a', t))
+        c.line([(px + math.cos(a) * ln * 0.2, py + math.sin(a) * ln * 0.2), (px + math.cos(a) * ln * 0.6, py + math.sin(a) * ln * 0.6)], 1, mix('#6a9a4a', '#a8d080', t, 150))
+    for pts in shoots:
+        if g.random() < 0.15:
             px, py = pts[-1]
-            for b in range(int(R(2, 5))):
-                bx, by = px + R(-0.03, 0.03), py + R(0.0, 0.04)
-                r = R(0.016, 0.022)
-                c.ellipse(bx, by, r, r, rgba('#8a1a1a'))
-                c.ellipse(bx - r * 0.2, by + r * 0.2, r * 0.75, r * 0.75, rgba('#c42a26'))
-                c.ellipse(bx - r * 0.35, by + r * 0.4, r * 0.25, r * 0.2, rgba('#f0a8a0', 220))
+            for j in range(3):
+                r = R(0.012, 0.016)
+                bx, by = px + R(-0.02, 0.02), py - R(0.0, 0.03)
+                c.ellipse(bx, by, r, r, rgba('#a01c1c'))
+                c.ellipse(bx - r * 0.3, by + r * 0.3, r * 0.3, r * 0.3, rgba('#f08080', 200))
     return c.done()
 
 
@@ -915,15 +970,19 @@ def path_soil():
 
 
 def moss_tex():
-    """Thick green moss (repeats): cushions with light tips, for the tops of stones and logs."""
+    """Thick green moss (repeats): soft rounded cushions, each lit from above and dark where they meet, a fine
+    soft weave of tips on top. No hard specks."""
     s = IN
-    f1, f2, cid = voronoi(s, 120, 341, warp=20)
-    cush = smooth(0.0, 18.0, f1)
-    n = fft_noise(s, 1.5, 342)
-    rgb = lerp(col('#4a6a26'), col('#7a9a3a'), (n * 0.6 + (1 - cush) * 0.4)[..., None])
-    speck = np.random.default_rng(343).random((s, s))
-    rgb = lerp(rgb, col('#a8c060'), (speck > 0.9)[..., None] * 0.6)
-    rgb = lerp(rgb, col('#2a3a18'), smooth(0.7, 1.0, cush)[..., None] * 0.5)
+    f1, f2, cid = voronoi(s, 26, 341, warp=40)
+    dome = np.sqrt(np.clip(1.0 - (f1 / (f1 + f2 + 1e-3) * 2.0) ** 2, 0, 1))
+    from scipy.ndimage import gaussian_filter
+    weave = gaussian_filter(np.random.default_rng(343).random((s, s)), 1.2, mode='wrap')
+    weave = (weave - weave.min()) / (weave.max() - weave.min())
+    big = fft_noise(s, 1.8, 342)
+    lum = 0.55 + 0.35 * dome + 0.25 * (weave - 0.5)
+    rgb = lerp(col('#2e4416'), col('#7c9c34'), np.clip(lum * 0.9 + big * 0.15 - 0.1, 0, 1)[..., None])
+    rgb = lerp(rgb, col('#9ab048'), smooth(0.7, 0.9, big)[..., None] * 0.25)
+    rgb *= np.clip(relief(dome * 30, 0.4), 0.8, 1.2)[..., None]
     return to_img(rgb)
 
 
@@ -1142,6 +1201,9 @@ TILES = [
     ('metal sheet', metal_sheet, True),
     ('concrete', concrete, True),
     ('glass', glass, True),
+    ('moss sock', moss_sock, True),
+    ('bilberry top', bilberry_top, False),
+    ('lichen top', lichen_top, False),
 ]
 
 if __name__ == '__main__':
