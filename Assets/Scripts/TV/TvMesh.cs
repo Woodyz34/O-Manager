@@ -41,7 +41,10 @@ public class TvMesh
 
     // A copy of a shape, scaled (sx, sy, sz), turned round the y axis, tilted a little and moved to (x, y, z).
     // tint multiplies the colours (1 = as they are).
-    public void Add(TvShape shape, float x, float y, float z, float sx, float sy, float sz, float yaw, float tint = 1f, float tiltX = 0f, float tiltZ = 0f)
+    // lifeX, lifeZ: where the tree's own life (TreeLife) is drawn from, when not where it stands (the run-yourself
+    // world's ready-made tree variants, RunTrees)
+    public void Add(TvShape shape, float x, float y, float z, float sx, float sy, float sz, float yaw, float tint = 1f, float tiltX = 0f, float tiltZ = 0f,
+                    float lifeX = float.NaN, float lifeZ = float.NaN)
     {
         int first = VertexCount;
         float cos = (float)Math.Cos(yaw), sin = (float)Math.Sin(yaw);
@@ -51,7 +54,7 @@ public class TvMesh
         bool tilt = tiltX != 0f || tiltZ != 0f;
         // Every tree its own (2026-11-25, Anders: "no tree like another"): its bark a little warmer or colder,
         // greyer or greener, its picture moved round and up, and moss and lichen of its own on it (TreeLife)
-        TreeLife life = su != null ? new TreeLife(x, z) : null;
+        TreeLife life = su != null ? new TreeLife(float.IsNaN(lifeX) ? x : lifeX, float.IsNaN(lifeZ) ? z : lifeZ) : null;
         for (int i = 0; i < p.Length; i += 3)
         {
             float px = p[i] * sx, py = p[i + 1] * sy, pz = p[i + 2] * sz;

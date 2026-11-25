@@ -1075,3 +1075,71 @@ public partial class TvWorldBuilder
         litterMesh.Add(b.Done(), 0f, 0f, 0f, 1f, 1f, 1f, 0f);
     }
 }
+
+// The run-yourself world's trees as copies of ready-made ones (RunTrees, 2026-11-25): the shapes in a fixed order, so a
+// piece can say which shape each tree is by a number
+public partial class TvWorldBuilder
+{
+    static readonly Dictionary<TvShape, int> treeIndex = new Dictionary<TvShape, int>();
+
+    // The full trees (near) or their far copies for a 3D quality, always in the same order: pines, young pines,
+    // spruces, birches, broad-leaved. Far index i is the far copy of the full shapes FarOf(i).
+    public static TvShape[] TreeShapes(int quality, bool near)
+    {
+        int q = Math.Max(0, Math.Min(3, quality));
+        Flora f;
+        lock (floraLock)
+        {
+            if (!floraCache.TryGetValue(q, out f))
+            {
+                f = BuildFlora(q);
+                floraCache[q] = f;
+            }
+        }
+        var list = new List<TvShape>();
+        if (near)
+        {
+            list.AddRange(f.pineNear); list.AddRange(f.pine2Near); list.AddRange(f.spruceNear); list.AddRange(f.birchNear); list.AddRange(f.beechNear);
+        }
+        else
+        {
+            list.AddRange(f.pineFar); list.AddRange(f.pine2Far); list.Add(f.spruceFar); list.AddRange(f.birchFar); list.AddRange(f.beechFar);
+        }
+        TvShape[] shapes = list.ToArray();
+        lock (treeIndex)
+            for (int i = 0; i < shapes.Length; i++) treeIndex[shapes[i]] = i;
+        return shapes;
+    }
+
+    // A full shape that looks like far shape i (for the pictures of far trees: they are taken of the full trees)
+    public static int NearOf(int quality, int far)
+    {
+        int q = Math.Max(0, Math.Min(3, quality));
+        Flora f;
+        lock (floraLock) floraCache.TryGetValue(q, out f);
+        if (f == null) return 0;
+        int pines = f.pineFar.Length, pines2 = f.pine2Far.Length, birches = f.birchFar.Length;
+        int nPines = f.pineNear.Length, nPines2 = f.pine2Near.Length, nSpruces = f.spruceNear.Length, nBirches = f.birchNear.Length;
+        if (far < pines) return Math.Min(far, nPines - 1);
+        far -= pines;
+        if (far < pines2) return nPines + Math.Min(far, nPines2 - 1);
+        far -= pines2;
+        if (far < 1) return nPines + nPines2;
+        far -= 1;
+        if (far < birches) return nPines + nPines2 + nSpruces + Math.Min(far, nBirches - 1);
+        far -= birches;
+        return nPines + nPines2 + nSpruces + nBirches + far;
+    }
+
+    float TreeIndex(TvShape shape, bool near)
+    {
+        if (shape == null) return -1f;
+        int i;
+        lock (treeIndex)
+        {
+            if (treeIndex.TryGetValue(shape, out i)) return i;
+        }
+        TreeShapes(input.quality, near);
+        lock (treeIndex) return treeIndex.TryGetValue(shape, out i) ? i : -1f;
+    }
+}
