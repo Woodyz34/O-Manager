@@ -59,11 +59,13 @@ public class TwoLevels
         return null;
     }
 
-    public void Add(Vector2 from, Vector2 to, List<Vector2Int> ownCells, List<Vector2Int> sharedCells)
+    // strict (a tunnel closed at its ends by multi-level tags, 2026-11-25): in and out only from beyond the tags,
+    // half a cell clear of them, never from beside the mouth (a corner cut from the road above into the tunnel)
+    public void Add(Vector2 from, Vector2 to, List<Vector2Int> ownCells, List<Vector2Int> sharedCells, bool strict = false)
     {
         Way way = new Way { from = from, dir = to - from };
         way.lengthSq = Mathf.Max(0.01f, way.dir.sqrMagnitude);
-        way.margin = 0.35f / Mathf.Sqrt(way.lengthSq);
+        way.margin = (strict ? -0.5f : 0.35f) / Mathf.Sqrt(way.lengthSq);
         int number = ways.Count;
         foreach (Vector2Int c in ownCells)
         {
@@ -87,6 +89,9 @@ public class TwoLevels
             wayOf[key] = number;
         }
     }
+
+    // A cell of a tunnel or a bridge (its own cells or the ones it shares with the ground above or below)
+    public bool IsWay(int x, int y) => x >= 0 && y >= 0 && x < cols && y < rows && wayOf.ContainsKey(y * cols + x);
 
     // The level a runner standing on this cell is on, when nothing else is known
     public int StartLevel(int x, int y) => own.Contains(y * cols + x) ? 1 : 0;

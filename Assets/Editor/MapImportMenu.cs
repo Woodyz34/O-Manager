@@ -200,9 +200,41 @@ public static class MapImportMenu
             "\n\nThe copies on this computer are still there; remove them from " + MapPackages.LocalRoot + " if you like.", "OK");
     }
 
+    // GitHub refuses files over 100 MB (2026-11-25: Oslo's grid.bytes was 123 MB). Binary files over this size are
+    // gzipped in place; MapPackages.LoadBytes unpacks them. A picture that big can't be packed here: it gets a warning.
+    const long PackAbove = 50L * 1024 * 1024;
+    const long GitHubLimit = 100L * 1000 * 1000;
+
+    static string PackBigFiles(string folder)
+    {
+        var log = new System.Text.StringBuilder();
+        foreach (string name in new[] { "grid.bytes", "kinds.bytes", "world.bytes" })
+        {
+            string file = Path.Combine(folder, name);
+            if (!File.Exists(file) || new FileInfo(file).Length <= PackAbove) continue;
+            byte[] raw = File.ReadAllBytes(file);
+            if (raw.Length >= 2 && raw[0] == 0x1f && raw[1] == 0x8b) continue;   // already packed
+            using (var output = new FileStream(file + ".tmp", FileMode.Create))
+            using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.Optimal))
+                gzip.Write(raw, 0, raw.Length);
+            File.Copy(file + ".tmp", file, true);
+            File.Delete(file + ".tmp");
+            log.AppendLine($"Packed {name}: {raw.Length / 1048576} MB -> {new FileInfo(file).Length / 1048576} MB");
+        }
+        foreach (string name in new[] { "picture.png", "lines.json", "points.json" })
+        {
+            string file = Path.Combine(folder, name);
+            if (File.Exists(file) && new FileInfo(file).Length > GitHubLimit)
+                Debug.LogWarning($"{folder}/{name} is {new FileInfo(file).Length / 1000000} MB, over GitHub's 100 MB limit. " +
+                    "For a picture: shrink it to 256 colours without dithering (pngquant --quality=90-100 --nofs), which keeps the size and looks the same.");
+        }
+        return log.ToString();
+    }
+
     // Imports the files in a package folder under Assets/Resources and makes its MapDefinition
     static string Bake(string folder, MapPackageInfo info)
     {
+        string packed = PackBigFiles(folder);
         AssetDatabase.Refresh();
         string picture = folder + "/picture.png";
         var importer = (TextureImporter)AssetImporter.GetAtPath(picture);
@@ -250,6 +282,6 @@ public static class MapImportMenu
         EditorUtility.SetDirty(map);
         AssetDatabase.SaveAssets();
         MapDefinition.Refresh();
-        return $"Import map: {info.name} ({info.mapType}, {info.cols} x {info.rows} cells of {info.cellSize} m, picture {info.pictureWidth} x {info.pictureHeight}) -> {folder}, {assetPath}";
+        return packed + $"Import map: {info.name} ({info.mapType}, {info.cols} x {info.rows} cells of {info.cellSize} m, picture {info.pictureWidth} x {info.pictureHeight}) -> {folder}, {assetPath}";
     }
 }
