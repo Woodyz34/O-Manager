@@ -1080,7 +1080,9 @@ public partial class TvWorldBuilder
 
     // A bridge's deck across, from the metres between its side lines (0: drawn as one line)
     static float BridgeWidth(float w) => w > 0.5f ? Math.Max(1.2f, Math.Min(10f, w)) : 2.6f;
-    static float TunnelWidth(float w) => w > 0.5f ? Math.Max(2.4f, Math.Min(10f, w - 0.4f)) : 3.2f;
+    // (Up to 40 m: on a multi-level map the road under a deck is a tunnel as wide as the deck, 2026-11-25; the map's
+    // own tunnels are at most 12 m between their side lines, TvTown.PairSides)
+    static float TunnelWidth(float w) => w > 0.5f ? Math.Max(2.4f, Math.Min(40f, w - 0.4f)) : 3.2f;
 
     // The height of a bridge's deck at a point on it
     // (over a tunnel: on its roof)
@@ -1876,6 +1878,17 @@ public partial class TvWorldBuilder
                         // The road's own asphalt on top (2026-11-24, Anders: the tunnel's top was another surface)
                         b.Box(-pl / 2f, Top + 0.6f, -W / 2f - 1.8f, pl / 2f, Top + 0.64f, W / 2f + 1.8f, TownPaved(x + ox, z + oz));
                         b.Box(-pl / 2f, Top - 0.05f, -W / 2f, pl / 2f, Top, W / 2f, dark);
+                        // A wide one (the road under a deck) stands on rows of square pillars, about 7 m apart each way
+                        if (W > 9f && p % 5 == 2)
+                        {
+                            int across = (int)Math.Floor(W / 7f);
+                            for (int k = 1; k <= across; k++)
+                            {
+                                float o = -W / 2f + W * k / (across + 1f);
+                                b.Box(-0.3f, -0.4f, o - 0.3f, 0.3f, Top, o + 0.3f, concrete);
+                                world.solids.Add(new TvSolid { x = x + dz * o, z = z - dx * o, r = 0.35f });
+                            }
+                        }
                         townBuiltMesh.Add(b.Done(), x, y, z, 1f, 1f, 1f, yaw);
                     }
                     if (q == 0) TunnelPortals(c, W, concrete);

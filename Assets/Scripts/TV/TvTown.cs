@@ -23,6 +23,8 @@ public class TvTown
     public readonly List<float> bridgeWidths = new List<float>(), tunnelWidths = new List<float>();
     // Per bridge: TvBridges.Wood, Fenced, OverWater (0 for the map's own bridges: concrete with railings)
     public readonly List<int> bridgeFlags = new List<int>();
+    // Multi-level tag lines ("Ingresso multilivello", 2026-11-25): the edges of a lower level, triangles on the left
+    public readonly List<float[]> tags = new List<float[]>();
     // Outlines of canopies (roofs on posts, and passages under houses), closed
     public readonly List<float[]> canopies = new List<float[]>();
     // The gardens and out-of-bounds areas as the map draws them (null on maps built before 2026-11-23: then the
@@ -50,6 +52,8 @@ public class TvTown
             PairSides(town.bridges, town.bridgeWidths);
             PairSides(town.tunnels, town.tunnelWidths);
         }
+        catch (Exception) { }
+        try { town.MultiLevel(layer); }
         catch (Exception) { }
         while (town.bridgeFlags.Count < town.bridges.Count) town.bridgeFlags.Add(0);
         try { town.PathsOverWater(layer); }
@@ -99,6 +103,7 @@ public class TvTown
                     case 5: paths.Add(Path(xy, name)); break;
                     case 6: pavedEdges.Add(xy); break;
                     case 7: houseEdges.Add(xy); break;
+                    case 8: tags.Add(xy); break;
                     case 4:
                         if (xy.Length >= 8 && Math.Abs(xy[0] - xy[xy.Length - 2]) < 0.6f && Math.Abs(xy[1] - xy[xy.Length - 1]) < 0.6f) canopies.Add(xy);
                         else canopyPieces.Add(xy);
@@ -192,6 +197,121 @@ public class TvTown
         }
     }
 
+    // ---- Multi-level maps (2026-11-25, Anders: the tunnels and the floors of the ML test map, Genoa, in 3D) ----
+    // The same reading as the 2D grid (Tunnels.cs): a tag line is the edge of a lower level, nobody steps off it; tags
+    // at the ends of a tunnel are its mouths, and two tag lines facing each other across a covered passage are the
+    // mouths of a tunnel of their own (the road under a deck). In the world layer the tags were bridges (512): a way
+    // over everything. Now the edges are high walls (the wall steps make the drop where the ground does) and the mouths
+    // are gone (the tunnel's portal stands there).
+    void MultiLevel(WorldLayer layer)
+    {
+        if (tags.Count == 0) return;
+        var mouth = new bool[tags.Count];
+        // Lone dashed lines longer than 12 m are the edges of roofs and decks overhead here, not tunnels
+        for (int i = tunnels.Count - 1; i >= 0; i--)
+        {
+            float[] c = tunnels[i];
+            if (tunnelWidths[i] <= 0.5f && Dist(c[0], c[1], c[c.Length - 2], c[c.Length - 1]) > 12f)
+            {
+                tunnels.RemoveAt(i);
+                tunnelWidths.RemoveAt(i);
+            }
+        }
+        // Mouths of the map's tunnels: the tunnel reaches through them
+        for (int i = 0; i < tunnels.Count; i++)
+        {
+            float[] c = tunnels[i];
+            float ax = c[0], az = c[1], bx = c[c.Length - 2], bz = c[c.Length - 1];
+            float len = Dist(ax, az, bx, bz);
+            if (len < 1f) continue;
+            float ux = (bx - ax) / len, uz = (bz - az) / len, w = Math.Max(3f, tunnelWidths[i]);
+            float pastA = MouthPast(ax, az, -ux, -uz, w, mouth), pastB = MouthPast(bx, bz, ux, uz, w, mouth);
+            if (pastA < 0f && pastB < 0f) continue;
+            float ea = pastA < 0f ? 0f : pastA + 1.5f, eb = pastB < 0f ? 0f : pastB + 1.5f;
+            tunnels[i] = new[] { ax - ux * ea, az - uz * ea, bx + ux * eb, bz + uz * eb };
+        }
+        // Two tag lines facing each other: each with its triangles (on its left) pointing away from the other
+        for (int i = 0; i < tags.Count; i++)
+        {
+            if (mouth[i]) continue;
+            float[] a = tags[i];
+            float a1x = a[0], a1z = a[1], a2x = a[a.Length - 2], a2z = a[a.Length - 1];
+            float la = Dist(a1x, a1z, a2x, a2z);
+            if (la < 1.5f || la > 40f) continue;
+            float ux = (a2x - a1x) / la, uz = (a2z - a1z) / la;
+            float amx = (a1x + a2x) / 2f, amz = (a1z + a2z) / 2f;
+            int best = -1;
+            float bestApart = 60f;
+            for (int j = 0; j < tags.Count; j++)
+            {
+                if (j == i || mouth[j]) continue;
+                float[] b = tags[j];
+                float b1x = b[0], b1z = b[1], b2x = b[b.Length - 2], b2z = b[b.Length - 1];
+                float lb = Dist(b1x, b1z, b2x, b2z);
+                if (lb < 1.5f || lb > 40f || Math.Min(la, lb) < 0.5f * Math.Max(la, lb)) continue;
+                float vx = (b2x - b1x) / lb, vz = (b2z - b1z) / lb;
+                if (Math.Abs(ux * vx + uz * vz) < 0.85f) continue;
+                float bmx = (b1x + b2x) / 2f, bmz = (b1z + b2z) / 2f;
+                float dx = bmx - amx, dz = bmz - amz;
+                float apart = Math.Abs(-uz * dx + ux * dz), along = Math.Abs(ux * dx + uz * dz);
+                if (apart < 2f || apart >= bestApart || along > 0.5f * Math.Min(la, lb)) continue;
+                // b behind a (a's triangles point the other way), a behind b
+                if (-uz * dx + ux * dz > -1f) continue;
+                if (-vz * -dx + vx * -dz > -1f) continue;
+                best = j;
+                bestApart = apart;
+            }
+            if (best < 0) continue;
+            float[] o = tags[best];
+            float omx = (o[0] + o[o.Length - 2]) / 2f, omz = (o[1] + o[o.Length - 1]) / 2f;
+            float ox = omx - amx, oz = omz - amz, ol = Math.Max(0.1f, (float)Math.Sqrt(ox * ox + oz * oz));
+            ox /= ol; oz /= ol;
+            tunnels.Add(new[] { amx - ox * 1.5f, amz - oz * 1.5f, omx + ox * 1.5f, omz + oz * 1.5f });
+            tunnelWidths.Add(la);
+            mouth[i] = mouth[best] = true;
+        }
+        // The world layer: the tag lines' own lines (512, a bridge there) become walls, or go at a mouth
+        if (layer?.lines == null) return;
+        foreach (WorldLine line in layer.lines)
+        {
+            if ((line.kind != WorldLineKind.Bridge && line.kind != WorldLineKind.HighWall) || line.xy == null || line.xy.Length < 4) continue;
+            for (int i = 0; i < tags.Count; i++)
+            {
+                float[] t = tags[i];
+                if (t.Length != line.xy.Length || Dist(t[0], t[1], line.xy[0], line.xy[1]) > 0.3f
+                    || Dist(t[t.Length - 2], t[t.Length - 1], line.xy[line.xy.Length - 2], line.xy[line.xy.Length - 1]) > 0.3f) continue;
+                line.kind = mouth[i] ? WorldLineKind.None : WorldLineKind.HighWall;
+                break;
+            }
+        }
+    }
+
+    // A tag line across the end of a tunnel at (x, z), the tunnel going on away from (ox, oz) (outward): how far out
+    // the tag lies (-1: none)
+    float MouthPast(float x, float z, float ox, float oz, float width, bool[] mouth)
+    {
+        for (int i = 0; i < tags.Count; i++)
+        {
+            float[] t = tags[i];
+            float t1x = t[0], t1z = t[1], t2x = t[t.Length - 2], t2z = t[t.Length - 1];
+            float len = Dist(t1x, t1z, t2x, t2z);
+            if (len < 0.5f || len > Math.Max(8f, width * 3f)) continue;
+            float vx = (t2x - t1x) / len, vz = (t2z - t1z) / len;
+            if (Math.Abs(vx * ox + vz * oz) > 0.7f) continue;            // across the tunnel, not along it
+            // Its nearest point to the tunnel's end
+            float k = Math.Max(0f, Math.Min(len, (x - t1x) * vx + (z - t1z) * vz));
+            float nx = t1x + vx * k, nz = t1z + vz * k;
+            if (Dist(nx, nz, x, z) > Math.Max(3f, width * 0.6f)) continue;
+            float outward = ((t1x + t2x) / 2f - x) * ox + ((t1z + t2z) / 2f - z) * oz;
+            if (outward < -3f) continue;
+            mouth[i] = true;
+            return Math.Max(0f, outward);
+        }
+        return -1f;
+    }
+
+    static float Dist(float ax, float az, float bx, float bz) => (float)Math.Sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
+
     // A bridge or a tunnel is drawn as its two side lines (ISSprOM 512.1/512.2). Each pair becomes one line down the
     // middle, with the metres between the sides as its width (2026-11-20, Anders: a bridge was two narrow decks with
     // water between them, and nobody got over it).
@@ -244,12 +364,14 @@ public class TvTown
         }
     }
 
-    // 1 bridge, 2 tunnel or underpass, 3 stairs, 4 canopy outline, 5 path, 6 paved edge, 7 building outline, 0 anything else
+    // 1 bridge, 2 tunnel or underpass, 3 stairs, 4 canopy outline, 5 path, 6 paved edge, 7 building outline,
+    // 8 multi-level tag line, 0 anything else
     static int Kind(string name)
     {
         string n = name.ToLowerInvariant();
         int code = 0;
         if (n.Length >= 3) int.TryParse(n.Substring(0, 3), NumberStyles.Integer, CultureInfo.InvariantCulture, out code);
+        if (SymbolRules.MultiLevelTag(n)) return 8;
         if (n.Contains("tunnel") || n.Contains("underpass") || n.Contains("genomgång")) return 2;
         if (code == 512 || n.Contains("bridge") || n.Contains("spång") || n.StartsWith("bro ") || n.Contains(" bro ") || n.Contains(" bro/")) return 1;
         if (n.Contains("skärmtak") || n.Contains("canopy")) return 4;
