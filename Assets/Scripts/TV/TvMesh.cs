@@ -68,6 +68,10 @@ public class TvMesh
             {
                 colors.Add(Tint(c[i], tint * life.r)); colors.Add(Tint(c[i + 1], tint * life.g)); colors.Add(Tint(c[i + 2], tint * life.b));
             }
+            else if (life != null && TreeLife.IsStone(su[i + 2]))
+            {
+                colors.Add(Tint(c[i], tint * life.sr)); colors.Add(Tint(c[i + 1], tint * life.sg)); colors.Add(Tint(c[i + 2], tint * life.sb));
+            }
             else
             {
                 colors.Add(Tint(c[i], tint)); colors.Add(Tint(c[i + 1], tint)); colors.Add(Tint(c[i + 2], tint));
@@ -85,6 +89,10 @@ public class TvMesh
                 {
                     // u goes round a whole number of times, so any shift round is seamless
                     uvs.Add(su[i] + life.du); uvs.Add(su[i + 1] + life.dv); uvs.Add(life.Code(tile, p[i], p[i + 1], p[i + 2]));
+                }
+                else if (TreeLife.IsStone(tile))
+                {
+                    uvs.Add(su[i] + life.du); uvs.Add(su[i + 1] + life.dv); uvs.Add(life.StoneCode(tile));
                 }
                 else { uvs.Add(su[i]); uvs.Add(su[i + 1]); uvs.Add(tile); }
             }
@@ -405,12 +413,13 @@ public partial class TvShapeBuilder
             float up = Smooth(0.45f, 0.9f, ny) * Smooth(0.42f, 0.6f, TvRandom.Noise(cx * 1.8f - seed, cz * 1.8f + 3f) + mossShare - 0.5f);
             if (textured)
             {
-                // The picture brings the grain, cracks and lichen; the colour only shades it (damp foot, faces)
+                // The picture brings the grain, cracks and lichen; the colour only shades it (damp foot, faces). The
+                // moss is painted by the shader where the stone faces up, in patches (2026-11-25: no more whole
+                // triangles of moss); how much rides in the tile's fraction (StoneLife, TvMesh.Add)
                 float shade = 0.82f + 0.3f * grain - 0.25f * Smooth(0.15f, -0.3f, cy / Math.Max(0.01f, sy));
-                bool mossy = up > 0.35f;
-                TvColor tint = mossy ? new TvColor(235, 240, 225).Shade(0.85f + 0.2f * grain) : new TvColor(255, 252, 246).Shade(shade);
+                TvColor tint = new TvColor(255, 252, 246).Shade(shade);
                 FlatTriTex(v[a], v[a + 1], v[a + 2], v[b], v[b + 1], v[b + 2], v[q], v[q + 1], v[q + 2], 0f, oy, 0f, tint,
-                           mossy ? TvAtlas.Moss : TvAtlas.Granite, 0.9f, seed);
+                           TvAtlas.Granite + 0.02f + 0.47f * Math.Min(0.999f, mossShare * 1.6f), 0.9f, seed);
                 continue;
             }
             if (up > 0.02f) col = col.Lerp(moss.Shade(0.9f + 0.2f * grain), Math.Min(1f, up * 1.15f));
@@ -596,6 +605,12 @@ public class TreeLife
     readonly int lichen;
 
     public static bool IsBark(float tile) => (tile > -0.5f && tile < 4.5f) || (tile > 34.5f && tile < 35.5f);
+    public static bool IsStone(float tile) => tile > 19.5f && tile < 20.5f;
+
+    // A stone's own (2026-11-25, Anders: every stone personal): grey, warm pink-red, dark, pale or brownish granite,
+    // and its own share of moss (some bare, some green all over their top)
+    public float sr = 1f, sg = 1f, sb = 1f;
+    readonly float stoneMoss;
 
     public TreeLife(float x, float z)
     {
@@ -612,6 +627,22 @@ public class TreeLife
         float a = Next() * 6.2832f;
         wetX = (float)Math.Sin(a); wetZ = (float)Math.Cos(a);
         lichen = (int)(Next() * 3.999f);
+        float k = Next(), sl = 0.88f + 0.24f * Next();
+        if (k < 0.35f) { sr = sl; sg = sl; sb = sl * 1.02f; }                          // grey
+        else if (k < 0.55f) { sr = sl * 1.12f; sg = sl * 0.97f; sb = sl * 0.9f; }      // pink-red granite
+        else if (k < 0.7f) { sr = sl * 0.74f; sg = sl * 0.75f; sb = sl * 0.78f; }      // dark
+        else if (k < 0.85f) { sr = sl * 1.14f; sg = sl * 1.12f; sb = sl * 1.06f; }     // pale
+        else { sr = sl * 1.04f; sg = sl * 0.96f; sb = sl * 0.84f; }                    // brownish
+        float m2 = Next();
+        stoneMoss = m2 < 0.2f ? 0f : 0.3f + 1.4f * m2;
+    }
+
+    // A stone's tile with its moss share in the fraction (the shape's share times the stone's own)
+    public float StoneCode(float tile)
+    {
+        float t = (float)Math.Round(tile), shapeMoss = Math.Max(0f, (tile - t - 0.02f) / 0.47f);
+        float moss = Math.Max(0f, Math.Min(0.999f, shapeMoss * stoneMoss));
+        return moss < 0.01f ? t : t + 0.02f + 0.47f * moss;
     }
 
     // The tile number with this corner's moss and the tree's lichen in its fraction (shape coordinates, y up from the foot)

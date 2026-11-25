@@ -840,6 +840,19 @@ public static class TvHuman
         return d;
     }
 
+    // How far a point of the head (local, metres) is inside the hair: 0 at the hairline and outside it, 1 from about
+    // 1.5 cm in (the forehead, above the ears, down the nape)
+    static float HairOn(int style, V3 p)
+    {
+        float front = style == 2 ? 0.072f : 0.066f;
+        float line = p.z > 0.04f ? front + (Math.Abs(p.x) > 0.04f ? -0.012f : 0f)
+                   : p.z > -0.02f ? (Math.Abs(p.x) > 0.06f ? 0.022f : 0.035f)
+                   : style == 4 || style == 7 ? -0.08f : -0.055f;
+        if ((style == 4 || style == 7) && p.z < 0.05f) line = Math.Abs(p.x) > 0.06f ? -0.06f : line;
+        if (p.z > 0.05f && style == 7 && Math.Abs(p.x) > 0.05f) line = -0.04f;
+        return Smooth(line, line + 0.015f, p.y);
+    }
+
     static void BuildHead(Mesher m, Look look, Rig rest, float kb, float hu, int det)
     {
         V3 hc = rest.neckTop + new V3(0f, 0.1f * hu, 0.012f * hu);     // the middle of the head
@@ -874,6 +887,8 @@ public static class TvHuman
                 if (local.z > 0.08f && Math.Abs(local.y + 0.054f) < 0.0075f && Math.Abs(local.x) < 0.021f) col = col.Lerp(TvColor.Hex("#a8545a"), 0.75f);
                 if (look.beard && local.y < -0.025f && local.z > -0.02f && !(local.z > 0.08f && Math.Abs(local.y + 0.054f) < 0.01f && Math.Abs(local.x) < 0.024f))
                     col = col.Lerp(look.hair, 0.82f);
+                // The scalp under the hair takes the hair's colour, so no skin shows at the hair's thin edge
+                if (HairOn(look.hairStyle, local) > 0.2f) col = col.Lerp(look.hair.Shade(0.8f), 0.9f);
                 int bone = local.y < -0.06f && local.z < 0.0f ? Neck : Head;
                 m.V(at, col, Head, bone, bone == Head ? 1f : 0.6f, hc);
             }
@@ -900,30 +915,26 @@ public static class TvHuman
             Ellipsoid(m, L(s * 0.077f, -0.002f, -0.006f), R, U, F, 0.011f * hu, 0.029f * hu, 0.019f * hu, Head, look.skin.Shade(0.95f), 5, 8);
         }
 
+        // A mouth (2026-11-25, Anders: the people had no mouth): upper and lower lip and the dark line between
+        Ellipsoid(m, L(0f, -0.0465f, 0.0935f), R, U, F, 0.0195f * hu, 0.0042f * hu, 0.0062f * hu, Head, TvColor.Hex("#b4646a").Lerp(look.skin, 0.3f), 4, 8);
+        Ellipsoid(m, L(0f, -0.0575f, 0.0925f), R, U, F, 0.017f * hu, 0.0052f * hu, 0.0065f * hu, Head, TvColor.Hex("#b05a62").Lerp(look.skin, 0.25f), 4, 8);
+        Ellipsoid(m, L(0f, -0.052f, 0.0972f), R, U, F, 0.0175f * hu, 0.0013f * hu, 0.0026f * hu, Head, TvColor.Hex("#3c1e1e"), 3, 8);
+
         // ---- Hair ----
         int style = look.hairStyle;
         float thick = style == 1 ? 0.004f : style == 3 ? 0.016f : style == 7 || style == 4 ? 0.011f : 0.008f;
-        // Where hair grows on the head (local, metres): the hairline at the forehead, above the ears, down the nape
-        bool Grows(V3 p)
-        {
-            float front = style == 2 ? 0.072f : 0.066f;
-            float line = p.z > 0.04f ? front + (Math.Abs(p.x) > 0.04f ? -0.012f : 0f)
-                       : p.z > -0.02f ? (Math.Abs(p.x) > 0.06f ? 0.022f : 0.035f)
-                       : style == 4 || style == 7 ? -0.08f : -0.055f;
-            if ((style == 4 || style == 7) && p.z < 0.05f) line = Math.Abs(p.x) > 0.06f ? -0.06f : line;
-            if (p.z > 0.05f && style == 7 && Math.Abs(p.x) > 0.05f) line = -0.04f;
-            return p.y > line;
-        }
         int hfirst = m.p.Count / 3;
         var index = new int[(rings + 1) * around];
         for (int v = 0; v < index.Length; v++)
         {
             index[v] = -1;
             V3 p = surf[v];
-            if (!Grows(p)) continue;
-            // Thicker on top, thin at the edges; curls make the top lumpy
+            float on = HairOn(style, p);
+            if (on <= 0f) continue;
+            // Thicker on top, thin at the edges; curls make the top lumpy. At the hairline the hair comes down onto
+            // the scalp (2026-11-25, Anders: the hair sat above the head like a cap that did not follow it)
             float edge = Smooth(-0.07f, 0.06f, p.y);
-            float h = thick * (0.45f + 0.55f * edge);
+            float h = thick * (0.45f + 0.55f * edge) * on - 0.0015f * (1f - on);
             if (style == 3) h += 0.006f * (float)Math.Abs(Math.Sin(p.x * 160f) * Math.Sin(p.z * 150f)) * edge;
             if (style == 2) h += 0.008f * Smooth(-0.01f, 0.04f, p.x) * Smooth(0.03f, 0.08f, p.y);
             V3 at = hc + (p + dirs[v] * h) * hu;
