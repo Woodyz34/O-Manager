@@ -840,6 +840,7 @@ public partial class TvWorldBuilder
         // is, so the shore where the ground meets the water follows the map's bank line
         TownLines();
         EdgeField();
+        LakeLevels();
         if (input.town != null) PoolGround();
         for (int j = 0; j < N; j++)
         {
@@ -848,13 +849,112 @@ public partial class TvWorldBuilder
                 int k = j * N + i;
                 byte cell = input.town != null ? SmoothCell(i - R, j - R) : CellAt(i - R, j - R);
                 float inside = Math.Max(0f, Math.Min(1f, (wLvl[k] + 0.5f) / 1f));
-                if (inside > 0f) F[k] -= 0.45f * inside + (quay != null ? 0.9f * quay[k] : 0f);
+                float lake = lakeLevel[k];
+                if (inside > 0f)
+                {
+                    F[k] -= 0.45f * inside + (quay != null ? 0.9f * quay[k] : 0f);
+                    // Under the lake's one flat surface everywhere inside its edge
+                    if (!float.IsNaN(lake)) F[k] = Math.Min(F[k], lake - 0.12f - 0.5f * inside);
+                }
+                // The bank just outside the edge stays above the surface (the lake never spills onto the land)
+                else if (!float.IsNaN(lake) && wLvl[k] > -2f && F[k] < lake + 0.12f && F[k] > lake - 1f) F[k] = lake + 0.12f;
                 // Pools in a marsh are hollows with water in them
                 else if (Base(cell) != WorldCell.Water && MarshPool(i - R - 0.5f, j - R - 0.5f, (cell & WorldCell.Marsh) != 0, bog[k])) F[k] -= 0.3f;
             }
         }
         // The town's bridges, tunnels and stairs; on a forest map its footbridges (TvBridges)
         TownHeights();
+    }
+
+    // One flat surface for a lake (2026-11-25, Anders: the water rose in an L-shaped bulge a metre or two out from a
+    // quay and a bridge, where the ground was dug deeper by the wall). The surface at a corner is the lowest of the
+    // map's own heights (no digging, no bridges) on the water cells within 12 m, a little lower: it changes only slowly along a river,
+    // and every piece gets the same, as it comes from the map alone. NaN: no water near.
+    float[] lakeLevel;
+    const float LakeDrop = 0.35f;       // the surface under the lowest map height of the water round about
+
+    void LakeLevels()
+    {
+        lakeLevel = new float[N * N];
+        for (int k = 0; k < lakeLevel.Length; k++) lakeLevel[k] = float.NaN;
+        const float Reach = 12f;
+        double c = layer.cell;
+        int i0 = (int)Math.Floor((input.centerE - R - Reach - layer.minE) / c), i1 = (int)Math.Floor((input.centerE + R + Reach - layer.minE) / c);
+        int j0 = (int)Math.Floor((input.centerN - R - Reach - layer.minN) / c), j1 = (int)Math.Floor((input.centerN + R + Reach - layer.minN) / c);
+        int ci = i1 - i0 + 1, cj = j1 - j0 + 1;
+        var cellH = new float[ci * cj];
+        bool any = false;
+        for (int j = 0; j < cj; j++)
+            for (int i = 0; i < ci; i++)
+            {
+                double e = layer.minE + (i0 + i + 0.5) * c, n = layer.minN + (j0 + j + 0.5) * c;
+                bool wet = Base(layer.At(e, n)) == WorldCell.Water;
+                cellH[j * ci + i] = wet ? (input.heights != null ? input.heights.At(e, n) : 0f) - baseHeight : float.NaN;
+                any |= wet;
+            }
+        if (!any) return;
+        // The lowest along each row first (within 12 m across), then down the columns, inside the circle's square
+        int r = (int)Math.Ceiling(Reach / c);
+        var rowMin = new float[ci * cj];
+        for (int j = 0; j < cj; j++)
+            for (int i = 0; i < ci; i++)
+            {
+                float m = float.NaN;
+                for (int d = -r; d <= r; d++)
+                {
+                    int ii = i + d;
+                    if (ii < 0 || ii >= ci) continue;
+                    float v = cellH[j * ci + ii];
+                    if (!float.IsNaN(v) && (float.IsNaN(m) || v < m)) m = v;
+                }
+                rowMin[j * ci + i] = m;
+            }
+        for (int k = 0; k < N * N; k++)
+        {
+            if (wLvl[k] < -3f) continue;
+            double e = input.centerE + (k % N - R), n = input.centerN + (k / N - R);
+            int i = (int)Math.Floor((e - layer.minE) / c) - i0, j = (int)Math.Floor((n - layer.minN) / c) - j0;
+            float m = float.NaN;
+            for (int d = -r; d <= r; d++)
+            {
+                int jj = j + d;
+                if (jj < 0 || jj >= cj || i < 0 || i >= ci) continue;
+                float v = rowMin[jj * ci + i];
+                if (!float.IsNaN(v) && (float.IsNaN(m) || v < m)) m = v;
+            }
+            if (!float.IsNaN(m)) lakeLevel[k] = m - LakeDrop;
+        }
+    }
+
+    // The lake's surface at a point from the map alone (as LakeLevels): the lowest map height of the water cells
+    // within reach metres, minus the same LakeDrop; NaN when no water is that near
+    float LakeLevelAt(float x, float z, float reach)
+    {
+        double c = layer.cell, e0 = input.centerE + x, n0 = input.centerN + z;
+        int r = (int)Math.Ceiling(reach / c);
+        int ic = (int)Math.Floor((e0 - layer.minE) / c), jc = (int)Math.Floor((n0 - layer.minN) / c);
+        float m = float.NaN;
+        for (int dj = -r; dj <= r; dj++)
+            for (int di = -r; di <= r; di++)
+            {
+                double e = layer.minE + (ic + di + 0.5) * c, n = layer.minN + (jc + dj + 0.5) * c;
+                if (Base(layer.At(e, n)) != WorldCell.Water) continue;
+                float h = (input.heights != null ? input.heights.At(e, n) : 0f) - baseHeight;
+                if (float.IsNaN(m) || h < m) m = h;
+            }
+        if (float.IsNaN(m)) return m;
+        // The lake's own level round about, as its surface is drawn
+        float wide = float.NaN;
+        int R2 = (int)Math.Ceiling(12f / c);
+        for (int dj = -R2; dj <= R2; dj++)
+            for (int di = -R2; di <= R2; di++)
+            {
+                double e = layer.minE + (ic + di + 0.5) * c, n = layer.minN + (jc + dj + 0.5) * c;
+                if (Base(layer.At(e, n)) != WorldCell.Water) continue;
+                float h = (input.heights != null ? input.heights.At(e, n) : 0f) - baseHeight;
+                if (float.IsNaN(wide) || h < wide) wide = h;
+            }
+        return wide - LakeDrop;
     }
 
     // The map's heights with a little roughness, before knolls, cliffs and ditches
@@ -1656,7 +1756,7 @@ public partial class TvWorldBuilder
                 // height): else the ground at the deck's height showed through the deck as a zigzag strip
                 // (2026-11-23, Anders on the Tranås bridge)
                 float gy = F[k];
-                if (UnderBridgeDeck(x, z)) gy -= 1.6f;
+                if (UnderBridgeDeck(x, z)) gy = float.IsNaN(lakeLevel[k]) ? gy - 1.6f : Math.Min(gy - 1.6f, lakeLevel[k] - 0.6f);
                 groundMesh.Vertex(x, gy, z, nx / nl, 1f / nl, nz / nl, c);
             }
         }
@@ -1735,6 +1835,7 @@ public partial class TvWorldBuilder
                 byte k = kind[a];
                 if (k == 0) continue;
                 float lift = k == 1 ? 0.3f : k == 2 ? 0.12f : 0.12f;
+                bool flat = k == 1;
                 int V(int ci, int cj)
                 {
                     int q = cj * N + ci;
@@ -1743,8 +1844,9 @@ public partial class TvWorldBuilder
                     // The sky shows in the water in broad streaks; marsh pools are dark and brown
                     float glint = TvRandom.Noise((x + ox) * 0.12f + 3f, (z + oz) * 0.05f);
                     TvColor c = k == 3 ? bogC.Shade(0.9f + 0.2f * glint) : deep.Lerp(sky, 0.15f + 0.45f * glint);
-                    corner[q] = waterMesh.Vertex(x, level[q] + lift, z, 0f, 1f, 0f, c);
-                    if (k == 1) waterTop[q] = level[q] + lift;
+                    float top = flat && !float.IsNaN(lakeLevel[q]) ? lakeLevel[q] : level[q] + lift;
+                    corner[q] = waterMesh.Vertex(x, top, z, 0f, 1f, 0f, c);
+                    if (k == 1) waterTop[q] = top;
                     return corner[q];
                 }
                 int v0 = V(i, j), v1 = V(i + 1, j), v2 = V(i, j + 1), v3 = V(i + 1, j + 1);
@@ -3272,7 +3374,7 @@ public partial class TvWorldBuilder
                     default: continue;
                 }
                 if (random.Value() > p || Blocked(x, z, 0.8f)) continue;
-                if (input.town != null && TownKeepOut(x, z, 0.9f)) continue;
+                if (input.town != null && (TownKeepOut(x, z, 0.9f) || TownBare(x, z))) continue;
                 if (townLines != null && townLines.Count > 0 && (BridgeWater(x, z) || (input.town == null && TownLineDist(x, z, 1) < 1.8f))) continue;
                 bool spruce = ThicketTree(kind != WorldCell.LightGreen) != Tree.Birch;
                 TvShape[] set = spruce ? youngSpruce : youngLeafy;
@@ -3327,6 +3429,7 @@ public partial class TvWorldBuilder
             if (kind == WorldCell.Water || kind == WorldCell.BareRock || kind == WorldCell.Paved || kind == WorldCell.Building
                 || kind == WorldCell.Sand || kind == WorldCell.Cultivated) continue;
             if (ClearAt(x, z) < 0.3f) continue;
+            if (input.town != null && TownBare(x, z)) continue;
             float cx = x - world.camX, cz = z - world.camZ;
             if (cx * cx + cz * cz < 6.25f) continue;   // nothing in front of the TV camera's lens
             int gi = (int)Math.Round(x) + R, gj = (int)Math.Round(z) + R;

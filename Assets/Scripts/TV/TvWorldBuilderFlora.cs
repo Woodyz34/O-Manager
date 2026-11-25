@@ -805,6 +805,7 @@ public partial class TvWorldBuilder
                           || kind == WorldCell.OpenTrees || kind == WorldCell.RoughOpenTrees;
             if (!forest || (cell & WorldCell.Marsh) != 0) continue;
             if (ClearAt(x, z) < 0.6f) continue;
+            if (input.town != null && TownBare(x, z)) continue;
             float tint = Rr(0.75f, 1.05f);
             TvColor c = Grey(tint);
             // Reindeer lichen in pale cushions where the ground is dry and poor (Anders' photo of a pine heath):
