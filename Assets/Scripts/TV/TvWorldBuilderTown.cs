@@ -787,7 +787,9 @@ public partial class TvWorldBuilder
                     // Only where water is beside it (on land the road ramps down, it has no wall)
                     bool wet = Base(CellAt(cx + p.ux * (edge + o * 1.5f), cz + p.uz * (edge + o * 1.5f))) == WorldCell.Water
                                || Base(CellAt(cx + p.ux * (edge + o * 3f), cz + p.uz * (edge + o * 3f))) == WorldCell.Water;
-                    if (wet && top - low >= 0.4f) { run.Add(new[] { x, z, top + 0.12f, low - 2.5f }); continue; }
+                    // On the land between the tunnel's mouth and the water too: the road stands at the roof there
+                    // and its side showed as slanted grey earth with holes (2026-11-25, Anders: "kaos" by the tunnel)
+                    if ((wet || s <= cw.ext) && top - low >= 0.4f) { run.Add(new[] { x, z, top + 0.12f, low - 2.5f }); continue; }
                     WallRun(townBuiltMesh, run, 0.3f, concrete);
                     run.Clear();
                 }
@@ -2040,14 +2042,14 @@ public partial class TvWorldBuilder
                 // At the street's edge: lamps, benches, bins, parked cars
                 if (min >= 0.6f && min < 1.6f && roomy)
                 {
-                    if (h < 0.4f && FarFrom(x, z, 12f, 0) && Free(x, z, 1f))
+                    if (h < 0.4f && FarFrom(x, z, 12f, 0) && Free(x, z, 1f) && LevelAt(x, z, y, 0.4f))
                     {
                         townThingMesh.Add(Shape(Thing.Lamp, look % 5, style), x, y, z, 1f, 1f, 1f, alongEdge);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.18f });
                         Mark(x, z, 0.5f, 0);
                         continue;
                     }
-                    if (!wall && h > 0.55f && h < 0.75f && FarFrom(x, z, 14f, 1) && Free(x, z, 1.4f))
+                    if (!wall && h > 0.55f && h < 0.75f && FarFrom(x, z, 14f, 1) && Free(x, z, 1.4f) && LevelAt(x, z, y, 1.1f))
                     {
                         townThingMesh.Add(Shape(Thing.Bench, 0, style), x, y, z, 1f, 1f, 1f, faceOut);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.55f });
@@ -2060,7 +2062,7 @@ public partial class TvWorldBuilder
                         Mark(x, z, 1.2f, 1);
                         continue;
                     }
-                    if (h > 0.75f && h < 0.82f && FarFrom(x, z, 15f, 2) && Free(x, z, 0.8f))
+                    if (h > 0.75f && h < 0.82f && FarFrom(x, z, 15f, 2) && Free(x, z, 0.8f) && LevelAt(x, z, y, 0.4f))
                     {
                         townThingMesh.Add(Shape(Thing.Bin, 0, style), x, y, z, 1f, 1f, 1f, faceOut);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.25f });
@@ -2070,7 +2072,7 @@ public partial class TvWorldBuilder
                     // A parked car only where the street is wide and open: at least 6 m free beside it, and nothing
                     // the runner can't pass (a wall, a fence, tape) under it (2026-11-22, Anders: a car blocked a
                     // narrow paved way between walls and tape, so nobody got past)
-                    if (!Old && !wall && across >= 10f && d[(minDir + 4) % 8] >= 6f && h > 0.82f && h < 0.95f && FarFrom(x, z, 7f, 3) && Free(x, z, 3f)
+                    if (!Old && !wall && across >= 10f && d[(minDir + 4) % 8] >= 6f && h > 0.82f && h < 0.95f && FarFrom(x, z, 7f, 3) && Free(x, z, 3f) && LevelAt(x, z, y, 2.4f)
                         && RoomForCar(x, z, ex, ez))
                     {
                         townThingMesh.Add(Shape(Thing.Car, look % 12, style), x, y, z, 1f, 1f, 1f, alongEdge + (h2 < 0.5f ? 0f : (float)Math.PI));
@@ -2148,6 +2150,18 @@ public partial class TvWorldBuilder
     // Nothing else stands within gap (plus the other thing's own size)
     // A watcher stands on open, level paving: not inside a wall, fence or cliff and not on the edge of a step or
     // a drop (2026-11-25, Anders: people cheering inside a wall edge).
+    // The street lies level all round a thing (a bench, a lamp, a car): it does not stand across a step, a quay's
+    // edge or the ramp down from a tunnel's roof (2026-11-25, Anders: a bench sank half into the ground by the underpass)
+    bool LevelAt(float x, float z, float y, float r)
+    {
+        for (int k = 0; k < 8; k++)
+        {
+            float a = k * 0.785398f, sx = x + (float)Math.Cos(a) * r, sz = z + (float)Math.Sin(a) * r;
+            if (Math.Abs(H(sx, sz) - y) > 0.15f + r * 0.05f) return false;
+        }
+        return true;
+    }
+
     bool StandClear(float x, float z, float px, float pz, float y)
     {
         if (Base(CellAt(px, pz)) != WorldCell.Paved || ShutAt(px, pz)) return false;
