@@ -95,7 +95,7 @@ public class RunTerrain
             for (int b = 0; b < town.tunnels.Count; b++)
             {
                 all.Add((TunnelKind, town.tunnels[b]));
-                if (b < town.tunnelWidths.Count && town.tunnelWidths[b] > 0.5f) wayHalf[town.tunnels[b]] = Math.Min(5f, town.tunnelWidths[b] / 2f);
+                if (b < town.tunnelWidths.Count && town.tunnelWidths[b] > 0.5f) wayHalf[town.tunnels[b]] = Math.Min(20f, town.tunnelWidths[b] / 2f);
             }
             foreach (float[] xy in town.stairs) all.Add((TownStairsKind, xy));
             foreach (TvBridges.PathLine path in town.paths)
