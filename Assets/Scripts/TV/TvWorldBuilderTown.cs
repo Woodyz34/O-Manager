@@ -79,6 +79,26 @@ public partial class TvWorldBuilder
         Take(t.bridges, 1, t.bridgeWidths, t.bridgeFlags);
         Take(t.tunnels, 2, t.tunnelWidths);
         Take(t.stairs, 3, t.stairWidths);
+        // A short stair line drawn along the top step rather than up the flight (2026-11-25, Anders: a stair in
+        // Bergen stood turned 90 degrees from the map): when the land falls across the line far more than along it,
+        // the flight runs across the line, as wide as the line is long. From the map's heights alone, so every piece
+        // turns it the same way.
+        for (int i = 0; i < townLines.Count; i++)
+        {
+            var l = townLines[i];
+            if (l.kind != 3 || l.xz.Length != 4) continue;
+            float[] c = l.xz;
+            float w = l.w > 0.5f ? l.w : 2f;
+            float dx = c[2] - c[0], dz = c[3] - c[1], len = (float)Math.Sqrt(dx * dx + dz * dz);
+            if (len < 0.5f || len > Math.Max(4f, w * 1.3f)) continue;
+            dx /= len; dz /= len;
+            float mx = (c[0] + c[2]) / 2f, mz = (c[1] + c[3]) / 2f, nx = -dz, nz = dx;
+            float o = len / 2f + 1.5f, a = w / 2f + 1.5f;
+            float along = Math.Abs(BaseHeight(mx + dx * o, mz + dz * o) - BaseHeight(mx - dx * o, mz - dz * o));
+            float across = Math.Abs(BaseHeight(mx + nx * a, mz + nz * a) - BaseHeight(mx - nx * a, mz - nz * a));
+            if (across < 0.5f || across < along * 2.5f) continue;
+            townLines[i] = (3, new[] { mx - nx * w / 2f, mz - nz * w / 2f, mx + nx * w / 2f, mz + nz * w / 2f }, Math.Max(1f, len), l.flags);
+        }
         Take(t.canopies, 4);
         foreach (TvBridges.PathLine path in t.paths)
         {
@@ -108,7 +128,10 @@ public partial class TvWorldBuilder
         foreach (var l in townLines)
         {
             if (l.kind != 1 || (l.flags & TvBridges.OverWater) == 0) continue;
-            if (TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, 3f)) return true;
+            // Under the deck; beside it only where the map has water round about (2026-11-25, Anders: the water
+            // ran in over the land and the paving beside a bridge, past its fences)
+            if (TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, 0.3f)) return true;
+            if (TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, 3f) && KindWeight(x, z, WorldCell.Water) > 0.3f) return true;
         }
         return false;
     }
@@ -124,6 +147,32 @@ public partial class TvWorldBuilder
                 best = Math.Min(best, DistSeg(x, z, l.xz[q], l.xz[q + 1], l.xz[q + 2], l.xz[q + 3], out _, out _));
         }
         return best;
+    }
+
+    // Metres from the edge of the nearest stairs (their width taken off; 99 when none is near)
+    float StairDist(float x, float z)
+    {
+        float best = 99f;
+        foreach (var l in townLines)
+        {
+            if (l.kind != 3) continue;
+            float half = (l.w > 0.5f ? l.w : 2f) / 2f + 0.25f;
+            for (int q = 0; q + 3 < l.xz.Length; q += 2)
+                best = Math.Min(best, DistSeg(x, z, l.xz[q], l.xz[q + 1], l.xz[q + 2], l.xz[q + 3], out _, out _) - half);
+        }
+        return best;
+    }
+
+    // Town ground where no plant, moss cushion or litter belongs (2026-11-25, Anders: bushes on the stairs and on the
+    // asphalt): stairs, bridge decks, tunnels, basins and paving
+    bool TownBare(float x, float z)
+    {
+        if (input.town == null) return false;
+        TownLines();
+        if (StairDist(x, z) < 0.6f) return true;
+        if (TownLineDist(x, z, 1) < 3f || TownLineDist(x, z, 2) < 3f) return true;
+        if (InPool(x, z, 1f) != null) return true;
+        return PavedWeight(x, z) > 0.3f;
     }
 
     // Inside the outline of a canopy (a roof on posts, or a passage under a house)
@@ -168,7 +217,7 @@ public partial class TvWorldBuilder
                 float a = k * 0.785398f;
                 if (CanopyCell(x + (float)Math.Cos(a) * gap, z + (float)Math.Sin(a) * gap)) return true;
             }
-        return TownLineDist(x, z, 1) < gap + 2.5f || TownLineDist(x, z, 2) < gap + 2.5f || TownLineDist(x, z, 3) < gap + 1f;
+        return TownLineDist(x, z, 1) < gap + 2.5f || TownLineDist(x, z, 2) < gap + 2.5f || StairDist(x, z) < gap + 0.6f;
     }
 
     // ---- Heights: bridge decks are level with their ends ----
@@ -198,21 +247,18 @@ public partial class TvWorldBuilder
             if (l.kind != 1) continue;
             float[] c = l.xz;
             float bh = BridgeWidth(l.w) / 2f;
-            int n = c.Length / 2;
-            var along = new float[n];
-            for (int i = 1; i < n; i++)
-                along[i] = along[i - 1] + (float)Math.Sqrt((c[i * 2] - c[i * 2 - 2]) * (c[i * 2] - c[i * 2 - 2]) + (c[i * 2 + 1] - c[i * 2 - 1]) * (c[i * 2 + 1] - c[i * 2 - 1]));
-            float total = Math.Max(0.1f, along[n - 1]);
-            float h0 = Plain(c[0], c[1]), h1 = Plain(c[c.Length - 2], c[c.Length - 1]);
+            BridgeProfile bp = ProfileOf(l.xz, l.flags);
             for (int q = 0; q + 3 < c.Length; q += 2)
             {
                 int seg = q / 2;
                 float ax = c[q], az = c[q + 1], bx = c[q + 2], bz = c[q + 3];
-                float segLen = along[seg + 1] - along[seg];
+                float segLen = bp.along[seg + 1] - bp.along[seg];
                 ForNear(ax, az, bx, bz, bh + 0.4f, (k, d, qx, qz) =>
                 {
                     float t = segLen > 0.01f ? (float)Math.Sqrt((qx - ax) * (qx - ax) + (qz - az) * (qz - az)) / segLen : 0f;
-                    float deck = Lerp(h0, h1, (along[seg] + t * segLen) / total) + 0.1f;
+                    // Beside the deck over the lake the lake's bed stays down (no spikes up to the deck's edge)
+                    if (d > bh - 0.05f && wLvl != null && wLvl[k] > 0f && !float.IsNaN(lakeLevel[k])) return;
+                    float deck = bp.At(bp.along[seg] + t * segLen);
                     F[k] = Lerp(deck, F[k], Sm(bh - 0.05f, bh + 0.4f, d));
                 });
             }
@@ -369,6 +415,7 @@ public partial class TvWorldBuilder
         public float ax, az, ux, uz, len, half, fa, fb;
         public bool underHouse;         // a passage through a house: the house stands over it, no road is raised
         public Causeway wayA, wayB;     // the road over it running on as a causeway over water, each side (or null)
+        public RoadRaise raise;         // the road raised along its paving on the sides without a causeway (or null)
         public float FloorAt(float t) => fa + (fb - fa) * Math.Max(0f, Math.Min(1f, t / Math.Max(0.1f, len)));
     }
     List<TunnelPlan> tunnelPlans;
@@ -742,8 +789,163 @@ public partial class TvWorldBuilder
     // The tunnel's floor, and the road over it raised to its roof. The floor reaches in under the walls and the raised
     // ground starts behind them, so the slope between lies hidden in the walls and under the slab (2026-11-24, Anders:
     // ground stuck out in spikes along a tunnel's walls and beside its mouths)
+    // The road over a tunnel raised to its roof follows the road (2026-11-25, Anders: the raised road ran on dead
+    // straight from the tunnel while the street turned, with a long straight wall of earth beside it). On a side
+    // with no causeway, the distance from the slab is measured along the paving (a curving street is followed round
+    // its bend), and the road comes down to the land over about 10 m for each metre it was raised. The ground beside
+    // the raised paving is a soft bank, never a wall. From the map alone, so every piece agrees.
+    class RoadRaise
+    {
+        public int x0, z0, w, h;
+        public float[] target;           // the raised height of each corner of the box (NaN: not raised)
+    }
+
+    RoadRaise MakeRoadRaise(TunnelPlan p)
+    {
+        const float Far = 45f;
+        float ex = p.ax + p.ux * p.len, ez = p.az + p.uz * p.len, pad = p.half + Far + 6f;
+        var rr = new RoadRaise
+        {
+            x0 = (int)Math.Floor(Math.Min(p.ax, ex) - pad), z0 = (int)Math.Floor(Math.Min(p.az, ez) - pad)
+        };
+        rr.w = (int)Math.Ceiling(Math.Max(p.ax, ex) + pad) - rr.x0 + 1;
+        rr.h = (int)Math.Ceiling(Math.Max(p.az, ez) + pad) - rr.z0 + 1;
+        int n = rr.w * rr.h;
+        var dist = new float[n];
+        var open = new bool[n];
+        rr.target = new float[n];
+        bool any = false;
+        for (int j = 0; j < rr.h; j++)
+            for (int i = 0; i < rr.w; i++)
+            {
+                int k = j * rr.w + i;
+                float x = rr.x0 + i, z = rr.z0 + j;
+                dist[k] = float.MaxValue;
+                rr.target[k] = float.NaN;
+                float dx = x - p.ax, dz = z - p.az, t = dx * p.ux + dz * p.uz, across = -dx * p.uz + dz * p.ux, a = Math.Abs(across);
+                Causeway cw = across < 0f ? p.wayA : p.wayB;
+                if (cw != null) continue;
+                bool band = t >= 0.6f && t <= p.len - 0.6f;
+                // The tunnel's own way in front of its mouths stays down
+                if (!band && a <= p.half + 1.5f) continue;
+                if (band && a < p.half + 1.6f) continue;
+                if (Base(CellAt(x, z)) == WorldCell.Building) continue;
+                bool paved = Base(SmoothCell(x, z)) == WorldCell.Paved;
+                if (band && a <= p.half + 2.6f) { dist[k] = 0f; open[k] = true; any = true; continue; }
+                open[k] = paved;
+            }
+        if (!any) return rr;
+        // Distances along the paving (chamfer sweeps until nothing changes)
+        const float D1 = 1f, D2 = 1.4142f;
+        for (int pass = 0; pass < 24; pass++)
+        {
+            bool changed = false;
+            for (int dir = 0; dir < 2; dir++)
+            {
+                int js = dir == 0 ? 0 : rr.h - 1, je = dir == 0 ? rr.h : -1, jd = dir == 0 ? 1 : -1;
+                int is0 = dir == 0 ? 0 : rr.w - 1, ie = dir == 0 ? rr.w : -1, id = dir == 0 ? 1 : -1;
+                for (int j = js; j != je; j += jd)
+                    for (int i = is0; i != ie; i += id)
+                    {
+                        int k = j * rr.w + i;
+                        if (!open[k]) continue;
+                        float best = dist[k];
+                        void Try(int ii, int jj, float c)
+                        {
+                            if (ii < 0 || jj < 0 || ii >= rr.w || jj >= rr.h) return;
+                            int q = jj * rr.w + ii;
+                            if (open[q] && dist[q] + c < best) best = dist[q] + c;
+                        }
+                        Try(i - id, j, D1); Try(i, j - jd, D1); Try(i - id, j - jd, D2); Try(i + id, j - jd, D2);
+                        if (best < dist[k] - 1e-4f) { dist[k] = best; changed = true; }
+                    }
+            }
+            if (!changed) break;
+        }
+        for (int j = 0; j < rr.h; j++)
+            for (int i = 0; i < rr.w; i++)
+            {
+                int k = j * rr.w + i;
+                if (dist[k] > Far) continue;
+                float x = rr.x0 + i, z = rr.z0 + j;
+                float t = (x - p.ax) * p.ux + (z - p.az) * p.uz;
+                float roof = p.FloorAt(t) + TunnelRoof, land = Plain(x, z), rise = roof - land;
+                if (rise <= 0f) continue;
+                float ramp = Math.Max(6f, Math.Min(40f, rise * 10f));
+                if (dist[k] >= ramp) continue;
+                rr.target[k] = Lerp(roof, land, Sm(0f, ramp, dist[k]));
+            }
+        // A soft bank down from the raised paving to the land beside it (about 1 in 1.2, 5 m at most)
+        var bank = (float[])rr.target.Clone();
+        const int Reach = 5;
+        for (int j = 0; j < rr.h; j++)
+            for (int i = 0; i < rr.w; i++)
+            {
+                int k = j * rr.w + i;
+                if (!float.IsNaN(rr.target[k])) continue;
+                float x = rr.x0 + i, z = rr.z0 + j;
+                float dx = x - p.ax, dz = z - p.az, t = dx * p.ux + dz * p.uz, a = Math.Abs(-dx * p.uz + dz * p.ux);
+                if ((t < 0.6f || t > p.len - 0.6f) && a <= p.half + 1.5f) continue;
+                if (Base(CellAt(x, z)) == WorldCell.Building) continue;
+                float best = float.NaN;
+                for (int dj = -Reach; dj <= Reach; dj++)
+                    for (int di = -Reach; di <= Reach; di++)
+                    {
+                        int ii = i + di, jj = j + dj;
+                        if (ii < 0 || jj < 0 || ii >= rr.w || jj >= rr.h) continue;
+                        float v = rr.target[jj * rr.w + ii];
+                        if (float.IsNaN(v)) continue;
+                        float d = (float)Math.Sqrt(di * di + dj * dj);
+                        if (d > Reach) continue;
+                        float h2 = v - d / 1.2f;
+                        if (float.IsNaN(best) || h2 > best) best = h2;
+                    }
+                if (!float.IsNaN(best) && best > Plain(x, z)) bank[k] = best;
+            }
+        rr.target = bank;
+        return rr;
+    }
+
+    // How far out from the tunnel's middle along its mouth (tEnd) on one side the raised road stands over the land
+    float WingReach(TunnelPlan p, float tEnd, float side)
+    {
+        if (p.raise == null) return p.half + 40f;
+        float out0 = tEnd < p.len / 2f ? -1f : 1f, mx = p.ax + p.ux * tEnd, mz = p.az + p.uz * tEnd, nx = -p.uz * side, nz = p.ux * side;
+        float last = p.half + 1f;
+        for (float a = p.half + 0.5f; a <= p.half + 45f; a += 1f)
+        {
+            float ix = mx + nx * a - p.ux * out0 * 0.8f, iz = mz + nz * a - p.uz * out0 * 0.8f;
+            float hi = RaisedAt(p, ix, iz);
+            if (!float.IsNaN(hi) && hi - Plain(mx + nx * a + p.ux * out0 * 0.8f, mz + nz * a + p.uz * out0 * 0.8f) >= 0.1f) last = a + 2f;
+            else if (a > p.half + 3f) break;
+        }
+        return last;
+    }
+
+    float RaisedAt(TunnelPlan p, float x, float z)
+    {
+        RoadRaise rr = p.raise;
+        if (rr == null) return float.NaN;
+        int i = (int)Math.Round(x) - rr.x0, j = (int)Math.Round(z) - rr.z0;
+        if (i < 0 || j < 0 || i >= rr.w || j >= rr.h) return float.NaN;
+        return rr.target[j * rr.w + i];
+    }
+
     void TunnelHeights()
     {
+        foreach (TunnelPlan p in tunnelPlans)
+        {
+            if (p.underHouse || (p.wayA != null && p.wayB != null)) continue;
+            p.raise = MakeRoadRaise(p);
+            RoadRaise rr = p.raise;
+            for (int k = 0; k < N * N; k++)
+            {
+                int i = k % N - R - rr.x0, j = k / N - R - rr.z0;
+                if (i < 0 || j < 0 || i >= rr.w || j >= rr.h) continue;
+                float v = rr.target[j * rr.w + i];
+                if (!float.IsNaN(v) && v > F[k]) F[k] = v;
+            }
+        }
         foreach (TunnelPlan p in tunnelPlans)
         {
             float ex = p.ax + p.ux * p.len, ez = p.az + p.uz * p.len;
@@ -797,6 +999,9 @@ public partial class TvWorldBuilder
                     if (Base(CellAt(x, z)) == WorldCell.Water) return;
                     if (wLvl != null && wLvl[k] > -0.6f) return;
                 }
+                // The land on a side with no causeway: the road is raised along its own paving (RoadRaise), not
+                // as a straight band
+                if (cw == null && a >= p.half + 1.6f && (overTunnel || onWay)) return;
                 if (input.town != null && (cw == null || a <= cw.ext + 30f))
                 {
                     // Paved right across, up to the walls and the mouths (2026-11-24, Anders: grass and zigzag on the tunnel)
@@ -933,6 +1138,7 @@ public partial class TvWorldBuilder
         public float hLow, hHigh;                       // the heights of the low and the high end
         public float dig;                               // a flat way in dug out this far in front of the low end (0: none)
         public bool door;                               // steps up to a door: nothing dug or raised
+        public float reach;                             // how far beyond the top the land reaches the top's height
     }
 
     StairPlan PlanStairs(float[] c, float width)
@@ -968,35 +1174,33 @@ public partial class TvWorldBuilder
         bool up = p.sign > 0;
         p.lx = up ? ax : bx; p.lz = up ? az : bz; p.lux = up ? adx : bdx; p.luz = up ? adz : bdz;
         p.tx = up ? bx : ax; p.tz = up ? bz : az; p.tux = up ? bdx : adx; p.tuz = up ? bdz : adz;
-        float hTop = Plain(p.tx + p.tux, p.tz + p.tuz);
-        // Out from the low end: the first place low enough for a real stair angle, else the lowest within 30 m
-        float lowest = float.MaxValue, lowestAt = 0f, dig = -1f;
-        for (float d = 0.5f; d <= 30f; d += 1f)
-        {
-            float h = Plain(p.lx + p.lux * d, p.lz + p.luz * d);
-            if (hTop - h >= need) { dig = d; lowest = h; break; }
-            if (h < lowest) { lowest = h; lowestAt = d; }
-        }
-        if (dig < 0f && hTop - lowest >= 0.3f) dig = lowestAt;
-        if (dig >= 0f)
-        {
-            p.hHigh = hTop;
-            p.hLow = lowest;
-            p.dig = dig > 1.6f ? dig : 0f;
-            return p;
-        }
         p.door = Base(CellAt(p.tx + p.tux * 1.2f, p.tz + p.tuz * 1.2f)) == WorldCell.Building;
+        // The street at the low end keeps its height (2026-11-25, Anders: the stairs dug big holes in a street that is
+        // level everywhere else). The flight starts on the ground there; when the land at the top is not high enough
+        // for a real stair, the top is raised and carried on level beyond the stairs (ShapeStairEnds), and the land
+        // round it is rounded off softly, rather than digging the street out below.
+        p.hLow = Plain(p.lx + p.lux * 1.5f, p.lz + p.luz * 1.5f);
+        p.dig = 0f;
+        float hTop = Plain(p.tx + p.tux, p.tz + p.tuz);
         if (p.door)
         {
-            p.hLow = Plain(p.lx, p.lz);
             p.hHigh = p.hLow + Math.Max(0.45f, Math.Min(total * 0.5f, 1.4f));
             return p;
         }
-        // Flat land: half steep, a little down at the low end and a little up at the top
-        float rise = Math.Max(0.45f, Math.Min(total * 0.3f, 2.4f));
-        float mid = (Plain(p.lx, p.lz) + Plain(p.tx, p.tz)) / 2f;
-        p.hLow = mid - rise / 2f;
-        p.hHigh = mid + rise / 2f;
+        // The land ahead of the top, up to 12 m on: the stairs climb to the height it reaches there (a real stair
+        // angle at most), and the ground between is carried level from the top (ShapeStairEnds). On flat land they
+        // climb a little, at most a metre, and the top is a gentle mound.
+        float ahead = hTop;
+        p.reach = 0f;
+        for (float d = 1f; d <= 12f; d += 1f)
+        {
+            float h = Plain(p.tx + p.tux * d, p.tz + p.tuz * d);
+            if (Base(CellAt(p.tx + p.tux * d, p.tz + p.tuz * d)) == WorldCell.Building) break;
+            if (h > ahead) { ahead = h; p.reach = d; }
+            if (ahead - p.hLow >= need) break;
+        }
+        float want = Math.Max(Math.Abs(dh) < 0.3f ? Math.Max(0.45f, Math.Min(total * 0.2f, 1f)) : 0.45f, Math.Min(need, ahead - p.hLow));
+        p.hHigh = Math.Max(hTop, p.hLow + want);
         return p;
     }
 
@@ -1028,12 +1232,43 @@ public partial class TvWorldBuilder
     void ShapeStairEnds(StairPlan p)
     {
         if (p.door) return;
-        // The low end: dug down to its height (a flat way in), or raised a little to it
-        float atLow = Plain(p.lx, p.lz), atTop = Plain(p.tx, p.tz);
-        float digLen = Math.Max(p.dig, Math.Max(2f, Math.Abs(atLow - p.hLow) * 1.5f));
-        Shape(p.lx, p.lz, p.lux, p.luz, p.half, digLen, p.hLow);
-        float raiseLen = Math.Max(2f, Math.Abs(p.hHigh - atTop) * 1.5f);
-        Shape(p.tx, p.tz, p.tux, p.tuz, p.half, raiseLen, p.hHigh);
+        // The low end: a short flat way in at the street's own height (only small corrections)
+        float atLow = Plain(p.lx, p.lz);
+        Shape(p.lx, p.lz, p.lux, p.luz, p.half, Math.Max(1.5f, Math.Min(3f, Math.Abs(atLow - p.hLow) * 1.5f)), p.hLow);
+        // The top: carried on level beyond the stairs, then rounded softly down into the land on every side
+        float atTop = Plain(p.tx + p.tux, p.tz + p.tuz), lift = p.hHigh - atTop;
+        if (lift > 0.05f) Raise(p, Math.Max(1.5f, p.reach), Math.Max(3f, Math.Min(8f, lift * 2.5f)));
+        else Shape(p.tx, p.tz, p.tux, p.tuz, p.half, 2f, p.hHigh);
+    }
+
+    // The ground beyond the top of stairs lifted to their top: level for len metres a little wider than the stairs,
+    // and then rounded down into the land over ease metres ahead and to the sides (a soft mound, never a pit). Not on
+    // houses, and not past a wall or fence.
+    void Raise(StairPlan p, float len, float ease)
+    {
+        float tx = p.tx, tz = p.tz, ux = p.tux, uz = p.tuz, level = p.hHigh;
+        float wide = p.half + 0.8f, reach = wide + ease;
+        ForNear(tx, tz, tx + ux * (len + ease), tz + uz * (len + ease), reach, (k, d, qx, qz) =>
+        {
+            float x = k % N - R, z = k / N - R;
+            float along = (x - tx) * ux + (z - tz) * uz;
+            if (along < -0.3f) return;
+            float side = Math.Abs(-(x - tx) * uz + (z - tz) * ux);
+            if (Base(CellAt(x, z)) == WorldCell.Building) return;
+            if (AcrossWall(tx + ux * 0.3f, tz + uz * 0.3f, x, z)) return;
+            // Never over another flight (its own ground is set by ApplyStairs)
+            foreach (var l in townLines)
+            {
+                if (l.kind != 3 || l.xz == p.c) continue;
+                float oh = (l.w > 0.5f ? l.w : 2f) / 2f + 1.5f;
+                for (int q = 0; q + 3 < l.xz.Length; q += 2)
+                    if (DistSeg(x, z, l.xz[q], l.xz[q + 1], l.xz[q + 2], l.xz[q + 3], out _, out _) < oh) return;
+            }
+            float da = Math.Max(0f, along - len), ds = Math.Max(0f, side - wide);
+            float w = 1f - Sm(0f, ease, (float)Math.Sqrt(da * da + ds * ds));
+            if (w <= 0f) return;
+            F[k] = Math.Max(F[k], Lerp(F[k], level, w));
+        });
     }
 
     void ApplyStairs(StairPlan p)
@@ -1084,12 +1319,92 @@ public partial class TvWorldBuilder
     // own tunnels are at most 12 m between their side lines, TvTown.PairSides)
     static float TunnelWidth(float w) => w > 0.5f ? Math.Max(2.4f, Math.Min(40f, w - 0.4f)) : 3.2f;
 
+    // A bridge's deck along it, from the map alone, so every piece draws the same deck (a piece draws a whole
+    // stretch of a bridge, out past its own edge where the ground is not its own)
+    class BridgeProfile
+    {
+        public float[] along;
+        public float total, h0, h1, top;    // top: the height over water it climbs to (NaN: none)
+        public float At(float s)
+        {
+            float deck = h0 + (h1 - h0) * Math.Max(0f, Math.Min(1f, s / total)) + 0.1f;
+            if (!float.IsNaN(top)) deck = Math.Max(deck, Math.Min(top, Math.Min(h0 + s / 6f, h1 + (total - s) / 6f) + 0.1f));
+            return deck;
+        }
+    }
+    Dictionary<float[], BridgeProfile> bridgeProfiles;
+
+    BridgeProfile ProfileOf(float[] c, int flags)
+    {
+        if (bridgeProfiles == null) bridgeProfiles = new Dictionary<float[], BridgeProfile>();
+        if (bridgeProfiles.TryGetValue(c, out BridgeProfile had)) return had;
+        int n = c.Length / 2;
+        var bp = new BridgeProfile { along = new float[n] };
+        for (int i = 1; i < n; i++)
+            bp.along[i] = bp.along[i - 1] + (float)Math.Sqrt((c[i * 2] - c[i * 2 - 2]) * (c[i * 2] - c[i * 2 - 2]) + (c[i * 2 + 1] - c[i * 2 - 1]) * (c[i * 2 + 1] - c[i * 2 - 1]));
+        bp.total = Math.Max(0.1f, bp.along[n - 1]);
+        bp.h0 = Plain(c[0], c[1]);
+        bp.h1 = Plain(c[c.Length - 2], c[c.Length - 1]);
+        // Over water the deck stands clear of it (2026-11-25, Anders: a bridge lay right on the water; a metre or a
+        // metre and a half up looks right): it climbs from its ends at about 1 in 6 to that height
+        float clear = (flags & TvBridges.Wood) != 0 ? 0.9f : 1.2f, top = float.NaN;
+        for (int q = 0; q + 3 < c.Length; q += 2)
+        {
+            float sl = Math.Max(0.01f, bp.along[q / 2 + 1] - bp.along[q / 2]);
+            for (float u = 0f; u <= sl; u += 1.5f)
+            {
+                float lv = LakeLevelAt(c[q] + (c[q + 2] - c[q]) * u / sl, c[q + 1] + (c[q + 3] - c[q + 1]) * u / sl, 1.5f);
+                if (!float.IsNaN(lv) && (float.IsNaN(top) || lv > top)) top = lv;
+            }
+        }
+        bp.top = float.IsNaN(top) ? top : top + clear;
+        bridgeProfiles[c] = bp;
+        return bp;
+    }
+
+    // The deck's height of the bridge over a point, or NaN
+    float BridgeDeckAt(float x, float z)
+    {
+        if (townLines == null) return float.NaN;
+        foreach (var l in townLines)
+        {
+            if (l.kind != 1 || !TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, 0.3f) && !OnBridgeEnd(l.xz, BridgeWidth(l.w), x, z)) continue;
+            BridgeProfile bp = ProfileOf(l.xz, l.flags);
+            float[] c = l.xz;
+            float best = float.MaxValue, sBest = 0f;
+            for (int q = 0; q + 3 < c.Length; q += 2)
+            {
+                float d = DistSeg(x, z, c[q], c[q + 1], c[q + 2], c[q + 3], out float qx, out float qz);
+                if (d < best) { best = d; sBest = bp.along[q / 2] + (float)Math.Sqrt((qx - c[q]) * (qx - c[q]) + (qz - c[q + 1]) * (qz - c[q + 1])); }
+            }
+            return bp.At(sBest);
+        }
+        return float.NaN;
+    }
+
+    // Within a bridge's width over its last metre and a half at either end (UnderDeck leaves those out)
+    static bool OnBridgeEnd(float[] c, float width, float x, float z)
+    {
+        float r = width / 2f + 0.3f;
+        for (int e = 0; e < 2; e++)
+        {
+            int a = e == 0 ? 0 : c.Length - 2, b = e == 0 ? 2 : c.Length - 4;
+            float ux = c[b] - c[a], uz = c[b + 1] - c[a + 1], l = (float)Math.Sqrt(ux * ux + uz * uz);
+            if (l < 0.01f) continue;
+            ux /= l; uz /= l;
+            float t = (x - c[a]) * ux + (z - c[a + 1]) * uz, o = Math.Abs(-(x - c[a]) * uz + (z - c[a + 1]) * ux);
+            if (t >= -0.2f && t <= 1.6f && o <= r) return true;
+        }
+        return false;
+    }
+
     // The height of a bridge's deck at a point on it
     // (over a tunnel: on its roof)
     float DeckAt(float x, float z)
     {
+        float bd = BridgeDeckAt(x, z);
         TunnelPlan p = InTunnel(x, z, 0f);
-        if (p == null) return H(x, z);
+        if (p == null) return float.IsNaN(bd) ? H(x, z) : bd;
         float t = (x - p.ax) * p.ux + (z - p.az) * p.uz;
         return Math.Max(H(x, z), p.FloorAt(t) + TunnelRoof);
     }
@@ -1654,6 +1969,7 @@ public partial class TvWorldBuilder
                     for (int q = 0; q < count && peopleHere < 14; q++)
                     {
                         float px = x - ez * (q - (count - 1) / 2f) * 0.75f, pz = z + ex * (q - (count - 1) / 2f) * 0.75f;
+                        if (!StandClear(x, z, px, pz, y)) continue;
                         int kind = (look + q) % 5 == 2 ? 2 : 0;
                         world.people.Add(px); world.people.Add(pz); world.people.Add(faceOut); world.people.Add(kind); world.people.Add((look * 7 + q * 13) % 24); world.people.Add(0f);
                         peopleHere++;
@@ -1661,7 +1977,7 @@ public partial class TvWorldBuilder
                     Mark(x, z, 1.2f, 9);
                     continue;
                 }
-                if (peopleHere < 14 && across >= 3f && min >= 1f && h > 0.97f && Free(x, z, 1f))
+                if (peopleHere < 14 && across >= 3f && min >= 1f && h > 0.97f && Free(x, z, 1f) && StandClear(x, z, x, z, y))
                 {
                     // A walker going along the street, back and forth
                     float wa = (acrossDir == 0 ? 2 : 0) * 0.785398f, wx = (float)Math.Cos(wa), wz = (float)Math.Sin(wa);
@@ -1787,6 +2103,22 @@ public partial class TvWorldBuilder
     }
 
     // Nothing else stands within gap (plus the other thing's own size)
+    // A watcher stands on open, level paving: not inside a wall, fence or cliff and not on the edge of a step or
+    // a drop (2026-11-25, Anders: people cheering inside a wall edge).
+    bool StandClear(float x, float z, float px, float pz, float y)
+    {
+        if (Base(CellAt(px, pz)) != WorldCell.Paved || ShutAt(px, pz)) return false;
+        if ((px != x || pz != z) && AcrossWall(x, z, px, pz)) return false;
+        if (Math.Abs(H(px, pz) - y) > 0.25f) return false;
+        for (int k = 0; k < 8; k++)
+        {
+            float a = k * 0.785398f, sx = px + (float)Math.Cos(a) * 0.5f, sz = pz + (float)Math.Sin(a) * 0.5f;
+            if (ShutAt(sx, sz) || AcrossWall(px, pz, sx, sz)) return false;
+            if (Math.Abs(H(sx, sz) - y) > 0.3f) return false;
+        }
+        return true;
+    }
+
     bool Free(float x, float z, float gap)
     {
         foreach (var p in townPlaced)

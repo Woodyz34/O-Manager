@@ -99,8 +99,11 @@ public partial class TvWorldBuilder
                         foreach (float tEnd in new[] { 0.6f, p.len - 0.6f })
                         {
                             id++;
-                            float mx = p.ax + p.ux * tEnd, mz = p.az + p.uz * tEnd, reach = p.half + 40f;
-                            AddStep(mx + p.uz * reach, mz - p.ux * reach, mx - p.uz * reach, mz + p.ux * reach, id, true, 0);
+                            // Only as far out as the raised road stands over the land (2026-11-25, Anders: a long
+                            // straight wall of earth across the land beside the tunnel)
+                            float mx = p.ax + p.ux * tEnd, mz = p.az + p.uz * tEnd;
+                            float ra = p.wayA != null ? p.half + 40f : WingReach(p, tEnd, -1f), rb = p.wayB != null ? p.half + 40f : WingReach(p, tEnd, 1f);
+                            AddStep(mx + p.uz * ra, mz - p.ux * ra, mx - p.uz * rb, mz + p.ux * rb, id, true, 0);
                         }
                     // The edges of its slab: the road beside it level right up to the slab, not sloping in under it
                     // (its face showed over the ground in a zigzag)
@@ -362,6 +365,10 @@ public partial class TvWorldBuilder
             int np = 0, nn = 0;
             for (int i = 0; i < n; i++) { if (d[i] >= 0f) { sp += piece[i].y; np++; } else { sn += piece[i].y; nn++; } }
             step = g.force || Math.Abs(sp / np - sn / nn) > 0.25f;
+            // Where the line ends inside the piece, the piece is not stepped: the triangles beyond the line's end are
+            // not cut, so a step here would leave a crack to see through (2026-11-25, Anders: a see-through triangle
+            // beside a tunnel's mouth). The ground slopes over that one triangle instead.
+            if (step && (Math.Min(c0, c1) < -0.05f || Math.Max(c0, c1) > g.len + 0.05f)) step = false;
         }
         var cuts = new PV[2, 2];        // [crossing, side]
         int found = 0;

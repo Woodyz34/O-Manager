@@ -387,11 +387,17 @@ public class TvTown
     }
 
     // "Stairway, footprint: 1.6 m" -> 1.6
+    // "Trapp, 3 m" -> 3 (2026-11-25: the Norwegian symbol set writes the width after a comma)
     static float Footprint(string name)
     {
         int colon = name.LastIndexOf(':');
-        if (colon < 0) return 0f;
-        string rest = name.Substring(colon + 1).Replace("m", "").Trim().Replace(',', '.');
+        if (colon < 0)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(name, @"[\s,]([0-9]+(?:[.,][0-9]+)?)\s*m\s*\)?\s*$");
+            if (!m.Success) return 0f;
+            colon = m.Groups[1].Index - 1;
+        }
+        string rest = name.Substring(colon + 1).Replace("m", "").Replace(")", "").Trim().Replace(',', '.');
         return float.TryParse(rest, NumberStyles.Float, CultureInfo.InvariantCulture, out float w) && w > 0.5f && w < 20f ? w : 0f;
     }
 
