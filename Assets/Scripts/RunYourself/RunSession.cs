@@ -262,6 +262,7 @@ public partial class RunSession : MonoBehaviour
         float yaw = Bearing(points[0], points[1]);
         sounds = RunSounds.Create(transform, RunSettings.Woman, UnityEngine.Random.Range(0, int.MaxValue));
         player = RunPlayer.Create(world, terrain, sounds, se, sn, yaw, UnityEngine.Random.Range(0, int.MaxValue));
+        world.viewCamera = player.cam;
         player.transform.SetParent(transform, true);
         player.Moved = CheckPunch;
         // Online everyone runs at the same speed, so the mass start is fair and the replays line up
@@ -364,10 +365,13 @@ public partial class RunSession : MonoBehaviour
 
     void Update()
     {
-        if (Time.unscaledTime >= nextHide && twoDHidden)
+        if (Time.unscaledTime >= nextHide)
         {
-            nextHide = Time.unscaledTime + 0.5f;
-            HideCanvases();
+            // Looking through the whole scene for windows is slow on a big map (Fossum has 68 000 map objects in the
+            // scene; 2026-11-25): done every 1.5 s, and the windows found are looked at in between
+            nextHide = Time.unscaledTime + 1.5f;
+            FindCanvases();
+            if (twoDHidden) HideCanvases();
         }
         if (watchOnly && !atResults && CompetitionFlow.ResultsShown)
         {
@@ -470,11 +474,11 @@ public partial class RunSession : MonoBehaviour
     bool MenuOpen()
     {
         if (EscMenu.IsOpen || HostSettingsPopup.IsOpen || RunSettings.IsOpen) return true;
-        foreach (GraphicRaycaster r in FindObjectsByType<GraphicRaycaster>(FindObjectsSortMode.None))
+        foreach (Canvas c in canvases)
         {
-            if (!r.enabled || !r.gameObject.activeInHierarchy) continue;
-            Canvas c = r.GetComponent<Canvas>();
-            if (c == null || !c.enabled || own.Contains(c) || c.renderMode == RenderMode.WorldSpace) continue;
+            if (c == null || !c.enabled || !c.gameObject.activeInHierarchy || own.Contains(c) || c.renderMode == RenderMode.WorldSpace) continue;
+            GraphicRaycaster r = c.GetComponent<GraphicRaycaster>();
+            if (r == null || !r.enabled) continue;
             if (c.name == "Toast") continue;   // a short message in the corner, not a window
             // The canvas of a closed window (the Esc menu keeps its canvas and hides only its card) does not count:
             // something must be shown on it
@@ -773,13 +777,29 @@ public partial class RunSession : MonoBehaviour
                 hiddenCanvases.Add(c);
             }
         }
+        FindCanvases();
         HideCanvases();
     }
 
     // The 2D race's own screens (clock, leaderboard, buttons). Messages, menus and pop-ups stay.
+    readonly List<Canvas> canvases = new List<Canvas>();
+    bool slowFindLogged;
+
+    void FindCanvases()
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        canvases.Clear();
+        canvases.AddRange(FindObjectsByType<Canvas>(FindObjectsSortMode.None));
+        if (!slowFindLogged && watch.ElapsedMilliseconds > 5)
+        {
+            slowFindLogged = true;
+            Debug.Log("RunPerf: looking through the scene for windows took " + watch.ElapsedMilliseconds + " ms");
+        }
+    }
+
     void HideCanvases()
     {
-        foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+        foreach (Canvas c in canvases)
         {
             if (c == null || !c.enabled || !c.isRootCanvas || own.Contains(c)) continue;
             if (c.sortingOrder >= 200 || c.gameObject.scene.name == "DontDestroyOnLoad") continue;
