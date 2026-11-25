@@ -71,7 +71,7 @@ Shader "O-Manager/TvAtlasLit"
             UNITY_INITIALIZE_OUTPUT(Input, o);
             o.atlas = v.texcoord.xyz;
             // Leaves and needles stir a little in the wind: more at the tip of a card (v near 1) than at its base
-            if (_Wind > 0.001 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || v.texcoord.z >= 32.5))
+            if (_Wind > 0.001 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || (v.texcoord.z >= 32.5 && v.texcoord.z < 34.5)))
             {
                 float3 w = mul(unity_ObjectToWorld, v.vertex).xyz;
                 float tip = saturate(v.texcoord.y + 0.25);
@@ -139,11 +139,11 @@ Shader "O-Manager/TvAtlasLit"
                 c *= 1.0 + v * 0.75 * _Surface;
             }
             o.Albedo = c;
-            o.Foliage = (tile >= 4.5 && tile < 19.5) || tile >= 32.5 ? 1.0 : 0.0;
+            o.Foliage = (tile >= 4.5 && tile < 19.5) || (tile >= 32.5 && tile < 34.5) ? 1.0 : 0.0;
             // Relief (2026-11-25, Anders: the bark looked flat, like a picture): the picture's light and dark read
             // as height, bent into the normal from the screen's own slopes (no tangents needed); fades out far away
             float3 n = normalize(IN.worldNormal);
-            bool solid = tile > -0.5 && (tile < 4.5 || (tile > 19.5 && tile < 32.5));
+            bool solid = tile > -0.5 && (tile < 4.5 || (tile > 19.5 && tile < 32.5) || tile > 34.5);
             float bump = solid ? _Bump * saturate(1.0 - IN.tvDepth / 30.0) : 0.0;
             if (bump > 0.0)
             {

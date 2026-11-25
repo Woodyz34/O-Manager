@@ -15,7 +15,7 @@ public static class TvAtlas
         Heather = 12, Litter = 13, Twig = 14, DeadTwigs = 15, Lingonberry = 16, Sedge = 17, Juniper = 18, Flowers = 19,
         Granite = 20, CliffRock = 21, DeadWood = 22, PathSoil = 23, Moss = 24,
         Plaster = 25, Brick = 26, WoodPanel = 27, RoofTiles = 28, MetalSheet = 29, Concrete = 30, Glass = 31,
-        MossSock = 32, BilberryTop = 33, LichenTop = 34;
+        MossSock = 32, BilberryTop = 33, LichenTop = 34, PineBarkLow2 = 35;
 
     // Tiles from this one on are leaves and plants: lit softly through, as light comes through a leaf
     public const int FirstFoliage = 5;
@@ -45,6 +45,8 @@ public partial class TvShapeBuilder
     // Unevenness of the next limbs (0 = a clean round tube): each corner out or in by up to this share of the radius,
     // the same round the seam, so a trunk's outline is not a perfect cylinder
     public float LimbRough;
+    // Moves the picture along a limb (metres), so trees made from the same picture do not line up
+    public float LimbShift;
 
     public void Limb(float[] pts, float[] radius, int sides, int tile, float around, float along, TvColor[] shade, float twist = 0f)
     {
@@ -84,7 +86,7 @@ public partial class TvShapeBuilder
                 float ca = (float)Math.Cos(ang), sa = (float)Math.Sin(ang);
                 float ox = ux * ca + vx * sa, oy = uy * ca + vy * sa, oz = uz * ca + vz * sa;
                 float rr = LimbRough > 0f ? r * (1f + LimbRough * (TvRandom.Noise((i % sides) * 1.37f + 0.5f, dist * 1.3f + first * 0.11f) - 0.5f) * 2f) : r;
-                VT(px + ox * rr, py + oy * rr, pz + oz * rr, ox, oy, oz, col, i / (float)sides * around, dist / along, tile);
+                VT(px + ox * rr, py + oy * rr, pz + oz * rr, ox, oy, oz, col, i / (float)sides * around, (dist + LimbShift) / along, tile);
             }
         }
         int ring = sides + 1;
