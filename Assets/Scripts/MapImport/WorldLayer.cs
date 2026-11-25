@@ -311,6 +311,9 @@ namespace MapImport
         {
             string name = (s.name ?? "").ToLowerInvariant();
             if (name.Contains("vindfäl") || name.Contains("windfall") || name.Contains("fallen tree")) return WorldLineKind.Log;
+            // A multi-level map's tag line (2026-11-25): the edge of a lower level, a wall nobody climbs (TvTown takes
+            // away the ones at a tunnel's mouth)
+            if (SymbolRules.MultiLevelTag(name)) return WorldLineKind.HighWall;
             TerrainRole role = SymbolRules.For(s, sprint).role;
             if (role == TerrainRole.Stairs) return WorldLineKind.Stairs;
             int major = SymbolRules.Isom2017Major(s);
