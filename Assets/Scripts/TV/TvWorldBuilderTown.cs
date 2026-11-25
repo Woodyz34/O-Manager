@@ -130,8 +130,13 @@ public partial class TvWorldBuilder
             if (l.kind != 1 || (l.flags & TvBridges.OverWater) == 0) continue;
             // Under the deck; beside it only where the map has water round about (2026-11-25, Anders: the water
             // ran in over the land and the paving beside a bridge, past its fences)
-            if (TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, 0.3f)) return true;
-            if (TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, 3f) && KindWeight(x, z, WorldCell.Water) > 0.3f) return true;
+            // (2026-11-25, round 2: blue squares of water lay on the land at a bridge's ends: under the deck only
+            // where the map has water near, never on the paving or land the bridge starts from)
+            if (!TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, 3f)) continue;
+            float wet = KindWeight(x, z, WorldCell.Water);
+            if (PavedWeight(x, z) > 0.3f && wet < 0.5f) continue;
+            if (TvBridges.UnderDeck(l.xz, BridgeWidth(l.w), x, z, 0.3f) && wet > 0.15f) return true;
+            if (wet > 0.5f && Base(CellAt(x, z)) == WorldCell.Water) return true;
         }
         return false;
     }

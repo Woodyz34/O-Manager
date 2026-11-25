@@ -855,16 +855,40 @@ public partial class TvWorldBuilder
             {
                 int k = j * N + i;
                 byte cell = input.town != null ? SmoothCell(i - R, j - R) : CellAt(i - R, j - R);
-                float inside = Math.Max(0f, Math.Min(1f, (wLvl[k] + 0.5f) / 1f));
                 float lake = lakeLevel[k];
+                // Only the water's side of the edge is lowered: the land keeps its height right up to the edge line,
+                // where the ground is cut (2026-11-25, Anders: the land dipped in jagged teeth at the water; the
+                // corners up to half a metre on the land side were lowered under the surface too). Without a lake
+                // level (a pond with no level found) the old half metre on the land side still slopes it in.
+                float inside = Math.Max(0f, Math.Min(1f, float.IsNaN(lake) ? wLvl[k] + 0.5f : wLvl[k] + 0.05f));
                 if (inside > 0f)
                 {
                     F[k] -= 0.45f * inside + (quay != null ? 0.9f * quay[k] : 0f);
                     // Under the lake's one flat surface everywhere inside its edge
-                    if (!float.IsNaN(lake)) F[k] = Math.Min(F[k], lake - 0.12f - 0.5f * inside);
+                    if (!float.IsNaN(lake))
+                    {
+                        F[k] = Math.Min(F[k], lake - 0.12f - 0.5f * inside);
+                        // A natural shore shelves gently under the surface, not a 1 m drop in jagged teeth at the
+                        // edge (2026-11-25, Anders); by a quay wall the water stays deep
+                        if (quay == null || quay[k] < 0.05f) F[k] = Math.Max(F[k], lake - 0.15f - 0.3f * Math.Max(0f, wLvl[k]));
+                    }
                 }
                 // The bank just outside the edge stays above the surface (the lake never spills onto the land)
-                else if (!float.IsNaN(lake) && wLvl[k] > -2f && F[k] < lake + 0.12f && F[k] > lake - 1f) F[k] = lake + 0.12f;
+                // (2026-11-25, Anders: the open land by the water dipped below the surface in jagged teeth and small
+                // lakes: the map's heights by the shore lie lower than the water's own, so all the land near a lake
+                // is kept above it, easing off only far from the edge)
+                else if (!float.IsNaN(lake))
+                {
+                    if (F[k] < lake + 0.15f) F[k] = lake + 0.15f;
+                    // A natural bank (not a street's quay) eases down to the water over its last 2.5 m, soft and
+                    // even, instead of a step (2026-11-25, Anders: "mjukt, härligt, gå ner till vattnet")
+                    if (wLvl[k] > -2.5f && (quay == null || quay[k] < 0.05f) && Base(cell) != WorldCell.Paved && Base(cell) != WorldCell.Building
+                        && (input.town == null || PavedWeight(i - R, j - R) < 0.02f))
+                    {
+                        float near = lake + 0.15f;
+                        F[k] = Math.Min(F[k], near + (F[k] - near) * Sm(0f, 2.5f, -wLvl[k]));
+                    }
+                }
                 // Pools in a marsh are hollows with water in them
                 else if (Base(cell) != WorldCell.Water && MarshPool(i - R - 0.5f, j - R - 0.5f, (cell & WorldCell.Marsh) != 0, bog[k])) F[k] -= 0.3f;
             }
@@ -1523,13 +1547,19 @@ public partial class TvWorldBuilder
                     bool wl = Base(SideCell(mx + nx * 1.6f, mz + nz * 1.6f)) == WorldCell.Water, wr = Base(SideCell(mx - nx * 1.6f, mz - nz * 1.6f)) == WorldCell.Water;
                     if (wl == wr) continue;
                     float wSide = wl ? 1f : -1f;
+                    // Deep water only by a street's quay wall; by a wall or barrier along grass the shore shelves
+                    // gently (2026-11-25, Anders: the grass by the water fell in 1 m jagged teeth)
+                    bool street = Base(SideCell(mx - nx * wSide * 1.6f, mz - nz * wSide * 1.6f)) == WorldCell.Paved;
                     ForNear(ax, az, bx, bz, 4f, (k, d, qx, qz) =>
                     {
                         float vx = k % N - R, vz = k / N - R;
                         float side = (vx - qx) * nx + (vz - qz) * nz >= 0f ? 1f : -1f;
-                        if (d < EdgeReach && d < wDist[k]) { wDist[k] = d; wLvl[k] = side * wSide * Math.Max(d, 0.02f); }
+                        // Its water side only where the map has water: a fence running on past the water's end (at a
+                        // bridge's ends) made blue sunken boxes on the land beside it (2026-11-25, Anders)
+                        bool dry = side * wSide > 0f && KindWeight(vx, vz, WorldCell.Water) < 0.25f;
+                        if (!dry && d < EdgeReach && d < wDist[k]) { wDist[k] = d; wLvl[k] = side * wSide * Math.Max(d, 0.02f); }
                         // The water by a quay wall is deep: its surface lies well below the street
-                        if (side * wSide > 0f) quay[k] = Math.Max(quay[k], 1f - Sm(2.5f, 4f, d));
+                        if (side * wSide > 0f && street) quay[k] = Math.Max(quay[k], 1f - Sm(2.5f, 4f, d));
                     });
                 }
             }
