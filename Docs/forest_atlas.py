@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 TILE, PAD = 512, 16
 IN = TILE - 2 * PAD          # 480
+U = 1                        # pixels per pixel of the normal atlas (2 for the sharp bark atlas, --hd)
 SS = 3                       # supersampling when painting
 N = 7
 
@@ -120,8 +121,9 @@ def bark_pine_low(seed=0):
     fine = fft_noise(s, 0.6, 8 + k)
     wob = fft_noise(s, 1.3, 11 + k)
     # big plates: stretched, warped cells; small plates inside some of them, only partly cut
-    f1, f2, cid = voronoi(s, 220, 9 + k, (1.0, 0.72), warp=30)
-    g1, g2, gid = voronoi(s, 420, 19 + k, (1.0, 1.2), warp=12)
+    f1, f2, cid = voronoi(s, 220, 9 + k, (1.0, 0.72), warp=30 * U)
+    g1, g2, gid = voronoi(s, 420, 19 + k, (1.0, 1.2), warp=12 * U)
+    f1, f2, g1, g2 = f1 / U, f2 / U, g1 / U, g2 / U
     jag = (fft_noise(s, 0.9, 25 + k) - 0.5) * 2.2
     width = 0.7 + 2.6 * wob ** 1.5
     edge_big = (f2 - f1 + jag) / width
@@ -131,7 +133,7 @@ def bark_pine_low(seed=0):
     soft = smooth(0.5, 0.75, fft_noise(s, 1.3, 26 + k))
     edge_big = edge_big + soft * 2.5 + 1.2 * ((np.sin(cid * 3.71 + 0.2) * 5419.3) % 1.0 > 0.6)
     # cracks up the trunk (edges standing upright) are wider and deeper than the ones across
-    gy, gx = np.gradient(gaussian_filter(f2 - f1, 2.0, mode='wrap'))
+    gy, gx = np.gradient(gaussian_filter(f2 - f1, 2.0 * U, mode='wrap'))
     upright = np.abs(gx) / (np.sqrt(gx * gx + gy * gy) + 1e-6)
     edge_big = edge_big / (0.45 + 1.4 * upright ** 2)
     dist = np.minimum(edge_big, edge_small * 1.3)
@@ -139,7 +141,7 @@ def bark_pine_low(seed=0):
     # each plate is a slightly bulging, crusty scale
     crust = fft_noise(s, 0.9, 43 + k)
     height = np.clip(smooth(0.4, 7.0, dist) * (0.75 + 0.25 * crust) + 0.16 * (fine - 0.5), 0, 1)
-    height = gaussian_filter(height, 0.6, mode='wrap')
+    height = gaussian_filter(height, 0.6 * U, mode='wrap')
     ids = (np.sin(cid * 12.9898 + 0.7 * seed) * 43758.5453) % 1.0
     sid = (np.sin(gid * 78.233 + 0.3 * seed) * 12543.531) % 1.0
     tone = ids * 0.5 + sid * 0.3 + fft_noise(s, 1.5, 3 + k) * 0.2
@@ -158,7 +160,7 @@ def bark_pine_low(seed=0):
     patch = fft_noise(s, 2.0, 27 + k)
     rgb = lerp(rgb, rgb * np.array([1.08, 1.08, 1.1]), smooth(0.55, 0.75, patch)[..., None])
     rgb *= (1.0 - 0.18 * smooth(0.55, 0.25, patch))[..., None]
-    rgb *= np.clip(relief(height * 9, 0.5), 0.72, 1.25)[..., None]
+    rgb *= np.clip(relief(height * 9 * U, 0.5), 0.72, 1.25)[..., None]
     lich = lichen_mask(s, 7 + k, 0.035, 1.4)
     rgb = lerp(rgb, col('#a8ac98'), (lich * smooth(0.3, 0.6, height))[..., None] * 0.45)
     return to_img(rgb)
@@ -178,15 +180,15 @@ def bark_pine_high():
     g = np.random.default_rng(15)
     for _ in range(900):
         x, y = g.random() * s, g.random() * s
-        w, h = 8 + g.random() * 40, 2 + g.random() * 6
+        w, h = (8 + g.random() * 40) * U, (2 + g.random() * 6) * U
         t = g.random()
         c = tuple(int(v) for v in lerp(col('#c87a46'), col('#f0c08a'), t)) + (255,)
         dark = tuple(int(v) for v in lerp(col('#7a3e20'), col('#9a5530'), t)) + (255,)
         for ox in (-s, 0, s):
             for oy in (-s, 0, s):
-                d.ellipse([x + ox - w / 2, y + oy - h / 2 + 1.5, x + ox + w / 2, y + oy + h / 2 + 1.5], fill=dark)
+                d.ellipse([x + ox - w / 2, y + oy - h / 2 + 1.5 * U, x + ox + w / 2, y + oy + h / 2 + 1.5 * U], fill=dark)
                 d.ellipse([x + ox - w / 2, y + oy - h / 2, x + ox + w / 2, y + oy + h / 2], fill=c)
-    img = img.filter(ImageFilter.GaussianBlur(0.7))
+    img = img.filter(ImageFilter.GaussianBlur(0.7 * U))
     rgb = np.asarray(img)[..., :3].astype(np.float32)
     rgb *= (0.85 + 0.25 * fft_noise(s, 1.1, 14, (0.5, 1.0)))[..., None]
     return to_img(rgb)
@@ -206,7 +208,7 @@ def bark_spruce():
     shapes = []
     for k in range(5600):
         x, y = g.random() * S2, g.random() * S2
-        w = (8 + g.random() * 15) * K
+        w = (8 + g.random() * 15) * K * U
         h = w * (0.5 + g.random() * 0.3)
         t = tone[int(y / K) % s, int(x / K) % s]
         base = lerp(col('#6a625a'), col('#8e877e'), 0.4 * g.random() + 0.6 * t)
@@ -224,10 +226,10 @@ def bark_spruce():
     # from the top down over the whole painting: each scale lies over the one above it, and the order repeats
     shapes.sort(key=lambda q: q[0])
     for (cy, cx, pts, base, h) in shapes:
-        d.polygon([(cx + px, cy + py + 2.0 * K) for px, py in pts], fill=tuple(int(v) for v in base * 0.62))
+        d.polygon([(cx + px, cy + py + 2.0 * K * U) for px, py in pts], fill=tuple(int(v) for v in base * 0.62))
         d.polygon([(cx + px, cy + py) for px, py in pts], fill=tuple(int(v) for v in base))
         d.polygon([(cx + px * 0.75, cy + py * 0.75 + h * 0.12) for px, py in pts], fill=tuple(int(v) for v in np.minimum(base * 1.08, 255)))
-    img = img.crop((S2, S2, 2 * S2, 2 * S2)).filter(ImageFilter.GaussianBlur(0.8 * K)).resize((s, s), Image.LANCZOS)
+    img = img.crop((S2, S2, 2 * S2, 2 * S2)).filter(ImageFilter.GaussianBlur(0.8 * K * U)).resize((s, s), Image.LANCZOS)
     rgb = np.asarray(img).astype(np.float32)
     rgb *= (0.86 + 0.24 * fft_noise(s, 1.2, 33))[..., None]
     lich = lichen_mask(s, 34, 0.1, 1.3)
@@ -254,7 +256,7 @@ def bark_birch():
     # lenticels: thin dark horizontal dashes, tapering at both ends
     for _ in range(700):
         x, y = g.random() * s, g.random() * s
-        w, h = 5 + g.random() ** 2 * 60, 0.5 + g.random() * 1.1
+        w, h = (5 + g.random() ** 2 * 60) * U, (0.5 + g.random() * 1.1) * U
         c = tuple(int(v) for v in lerp(col('#1e1b19'), col('#5a524a'), g.random())) + (255,)
         wrap_poly([(x - w / 2, y), (x - w / 4, y - h / 2), (x + w / 4, y - h / 2 + g.random()), (x + w / 2, y), (x + w / 4, y + h / 2), (x - w / 4, y + h / 2)], c)
     # rough black patches below old branches: ragged, wider than tall, from noise
@@ -269,8 +271,8 @@ def bark_birch():
     # (the picture is 0.5 m round by 1 m up: everything drawn half as tall as it looks)
     for _ in range(2):
         x, y = g.random() * s, g.random() * s
-        w, hh = 80 + g.random() * 70, 15 + g.random() * 15
-        th = 6 + g.random() * 5
+        w, hh = (80 + g.random() * 70) * U, (15 + g.random() * 15) * U
+        th = (6 + g.random() * 5) * U
         top, bot = [], []
         for k in range(13):
             t = k / 12.0
@@ -280,16 +282,16 @@ def bark_birch():
             top.append((px, py - th_k * 0.5))
             bot.append((px, py + th_k * 0.5))
         wrap_poly(top + bot[::-1], (30, 27, 24, 255))
-        wrap_poly([(x - 8, y - hh / 2 + 5), (x + 8, y - hh / 2 + 5), (x + 5, y - hh / 2 + 13), (x - 5, y - hh / 2 + 13)], (34, 30, 26, 255))
+        wrap_poly([(x - 8 * U, y - hh / 2 + 5 * U), (x + 8 * U, y - hh / 2 + 5 * U), (x + 5 * U, y - hh / 2 + 13 * U), (x - 5 * U, y - hh / 2 + 13 * U)], (34, 30, 26, 255))
     # peeling paper: pale lines with a grey shadow under them
     for _ in range(50):
         x, y = g.random() * s, g.random() * s
-        w = 10 + g.random() * 40
+        w = (10 + g.random() * 40) * U
         for ox in (-s, 0, s):
             for oy in (-s, 0, s):
-                d.line([(x + ox, y + oy + 1.5), (x + ox + w, y + oy + 1.5)], fill=(170, 165, 155, 255), width=1)
-                d.line([(x + ox, y + oy), (x + ox + w, y + oy)], fill=(252, 250, 244, 255), width=2)
-    return img.filter(ImageFilter.GaussianBlur(0.5))
+                d.line([(x + ox, y + oy + 1.5 * U), (x + ox + w, y + oy + 1.5 * U)], fill=(170, 165, 155, 255), width=U)
+                d.line([(x + ox, y + oy), (x + ox + w, y + oy)], fill=(252, 250, 244, 255), width=2 * U)
+    return img.filter(ImageFilter.GaussianBlur(0.5 * U))
 
 
 def bark_beech():
@@ -1563,7 +1565,30 @@ TILES = [
     ('reindeer lichen', reindeer_lichen, True),
 ]
 
-if __name__ == '__main__':
+# The sharp bark atlas (2026-11-25, Anders: up close the trees looked pixly): the bark pictures again at twice the
+# size, 3 x 2 tiles of 1024 px (32 px padding), in TvAtlas order pine low, pine high, spruce, birch, beech, pine
+# low 2. Loaded on High and Ultra only (TvAtlasLit _BarkHD); a far tree uses its smaller mip levels.
+HD_TILES = [0, 1, 2, 3, 4, 35]
+
+
+def hd_bark(out):
+    global TILE, PAD, IN, U
+    TILE, PAD, U = 1024, 32, 2
+    IN = TILE - 2 * PAD
+    global N
+    atlas = Image.new('RGBA', (TILE * 3, TILE * 2), (0, 0, 0, 0))
+    for j, i in enumerate(HD_TILES):
+        name, fn, rep = TILES[i]
+        img = fn()
+        N = 3
+        place(atlas, img, j, rep)
+        print(j, name, flush=True)
+    atlas.convert('RGB').save(out)
+
+
+if __name__ == '__main__' and sys.argv[1] == '--hd':
+    hd_bark(sys.argv[2])
+elif __name__ == '__main__':
     out = sys.argv[1]
     prev = sys.argv[2] if len(sys.argv) > 2 else None
     only = set(sys.argv[3].split(',')) if len(sys.argv) > 3 else None
