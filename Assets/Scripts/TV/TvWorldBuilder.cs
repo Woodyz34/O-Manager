@@ -506,6 +506,7 @@ public partial class TvWorldBuilder
         CameraSpot();
         Trees();
         Stumps();
+        ClearCut();
         PathStrips();
         Undergrowth();
         Litter();
@@ -629,6 +630,7 @@ public partial class TvWorldBuilder
         int treeSolids = world.solids.Count;
         Trees();
         Stumps();
+        ClearCut();
         PathStrips();
         OpenPassages(treeSolids, world.solids.Count);
         // The ground and the water cut exactly along the map's lines (TvWorldBuilderSteps)
@@ -1360,8 +1362,8 @@ public partial class TvWorldBuilder
         }
     }
 
-    static readonly TvColor Open = TvColor.Hex("#a39a58"), OpenGreen = TvColor.Hex("#8a9a4e"), Rough = TvColor.Hex("#8f8a55"),
-        RoughGreen = TvColor.Hex("#768548"), LightGreen = TvColor.Hex("#48642f"), MidGreen = TvColor.Hex("#3a5428"), DarkGreen = TvColor.Hex("#2f4722"),
+    static readonly TvColor Open = TvColor.Hex("#a39a58"), OpenGreen = TvColor.Hex("#8a9a4e"), Rough = TvColor.Hex("#4f4530"),
+        RoughGreen = TvColor.Hex("#4a5630"), LightGreen = TvColor.Hex("#48642f"), MidGreen = TvColor.Hex("#3a5428"), DarkGreen = TvColor.Hex("#2f4722"),
         Field = TvColor.Hex("#b8a85a"), Field2 = TvColor.Hex("#a39a50"), Water = TvColor.Hex("#4c6a7c"), WaterDeep = TvColor.Hex("#3c5566"),
         Rock = TvColor.Hex("#8c8a84"), RockDark = TvColor.Hex("#6d6c69"), LichenRock = TvColor.Hex("#b9bba6"), SandColor = TvColor.Hex("#c2ad7c"),
         Paved = TvColor.Hex("#8a8782"), Plot = TvColor.Hex("#8f9a4e"), MarshColor = TvColor.Hex("#6f7440"), Wet = TvColor.Hex("#4a4a2e"),
@@ -2037,10 +2039,14 @@ public partial class TvWorldBuilder
             b.Rock(sx, sy, sz, oy, detail, cuts, 0.3f, c, mossG, mossy, 0.12f, -0.35f, true);
             return b.Done();
         }
+        // Every stone its own (2026-11-25, Anders): rounded and angular, flat slabs and tall blocks, split ones; each
+        // gets its own colour and moss where it lies (StoneLife)
         rocks = new[]
         {
             RockShape(1f, 0.75f, 1f, 0.3f, 1, 7, granite), RockShape(1.15f, 0.6f, 0.85f, 0.24f, 1, 8, granite2),
-            RockShape(0.9f, 0.85f, 1f, 0.33f, 1, 6, granite2), RockShape(1.2f, 0.5f, 0.95f, 0.2f, 1, 8, granite)
+            RockShape(0.9f, 0.85f, 1f, 0.33f, 1, 6, granite2), RockShape(1.2f, 0.5f, 0.95f, 0.2f, 1, 8, granite),
+            RockShape(1.35f, 0.42f, 1.05f, 0.16f, 1, 5, granite), RockShape(0.8f, 1.05f, 0.85f, 0.42f, 1, 10, granite2),
+            RockShape(1.1f, 0.7f, 0.75f, 0.27f, 1, 12, granite), RockShape(1f, 0.62f, 1.1f, 0.25f, 1, 3, granite2)
         };
         rocksLow = new[] { RockShape(1f, 0.7f, 1f, 0.28f, 0, 3, granite), RockShape(1.1f, 0.55f, 0.9f, 0.22f, 0, 3, granite2), RockShape(0.95f, 0.8f, 1f, 0.3f, 0, 3, granite) };
         var s = new TvShapeBuilder(random);
@@ -3297,11 +3303,20 @@ public partial class TvWorldBuilder
                         s = Rr(0.4f, 0.75f);
                         break;
                     case WorldCell.Open:
-                    case WorldCell.RoughOpen:
-                        p = kind == WorldCell.RoughOpen ? 0.008f : 0.004f;
+                        p = 0.004f;
                         tree = random.Value() < 0.5f ? Tree.Birch : Tree.Pine2;
                         s = Rr(0.35f, 0.7f);
                         break;
+                    case WorldCell.RoughOpen:
+                    {
+                        // A clear-cut: a few full-grown trees left standing for the birds (2026-11-25, Anders' photos),
+                        // tall thin pines, spruces and birches, often two or three together
+                        p = 0.01f * (0.3f + 1.7f * clump);
+                        float r = random.Value();
+                        tree = r < 0.45f ? Tree.Pine : r < 0.7f ? Tree.Spruce : Tree.Birch;
+                        s = Rr(0.85f, 1.15f);
+                        break;
+                    }
                     case WorldCell.Plot: p = 0.012f; tree = Tree.Birch; s = Rr(0.5f, 0.9f); break;
                     case WorldCell.BareRock: p = 0.012f; tree = Tree.Pine2; s = Rr(0.3f, 0.5f); break;
                     default: continue;
@@ -3406,7 +3421,7 @@ public partial class TvWorldBuilder
         }
         if (look.forest == TerrainLook.Beech) amount -= 0.12f;
         // Thicker on the higher 3D qualities (the plants are cards now, cheap to draw; 2026-11-25)
-        int tries = (int)(26000f * (0.6f + look.undergrowth * 0.8f) * UndergrowthDensity[Q]);
+        int tries = (int)(36000f * (0.6f + look.undergrowth * 0.8f) * UndergrowthDensity[Q]);
         // A run-yourself piece: as many per square metre as round a TV control, times the player's 3D quality
         if (chunk) tries = (int)(tries * (2f * R) * (2f * R) / (Math.PI * Reach * Reach) * Math.Max(0f, input.undergrowthShare));
         for (int i = 0; i < tries; i++)
@@ -3442,7 +3457,7 @@ public partial class TvWorldBuilder
             float s, tint;
             if (open || marsh)
             {
-                if (random.Value() > 0.75f) continue;
+                if (random.Value() > 0.54f) continue;   // as many as before the tries grew (2026-11-25)
                 float r = random.Value();
                 // Sedge tussocks in the marsh; grass with flowers here and there and now and then a juniper in the open
                 shape = marsh ? (r < 0.7f ? tuftSedge : tuftGrass) : r < 0.12f ? tuftFlowers : r < 0.125f && kind != WorldCell.Plot ? tuftJuniper : r < 0.45f ? tuftShort : tuftGrass;
@@ -3453,11 +3468,14 @@ public partial class TvWorldBuilder
             }
             else if (roughOpen)
             {
-                if (random.Value() > 0.8f) continue;
+                // A clear-cut (2026-11-25, Anders' photos): grass, much of it dry, between the slash and stumps
+                // (ClearCut), some heather, bilberry and lingonberry left from the forest, now and then fireweed
+                if (random.Value() > 0.5f) continue;
                 float r = random.Value();
-                shape = r < 0.5f ? tuftGrass : r < 0.8f ? tuftHeath : r < 0.94f ? tuftLingon : tuftJuniper;
-                s = r < 0.94f ? Rr(0.8f, 1.6f) : Rr(0.6f, 1.3f);
-                tint = Rr(0.75f, 1.1f);
+                shape = r < 0.3f ? tuftGrass : r < 0.58f ? tuftDry : r < 0.68f ? tuftShort : r < 0.76f ? tuftHeath : r < 0.84f ? tuftBerry
+                      : r < 0.94f ? tuftLingon : tuftFlowers;
+                s = Rr(0.6f, 1.25f);
+                tint = Rr(0.6f, 0.9f);
             }
             else
             {
@@ -3472,6 +3490,10 @@ public partial class TvWorldBuilder
                     continue;
                 }
                 if (rough <= 0.42f || random.Value() > Sm(0.42f, 0.62f, rough)) continue;
+                // Inside a carpet: thick in some spots, thinner in others, moss showing between the bushes
+                // (2026-11-25, Anders' photos of bilberry)
+                float thick = TvRandom.Patches((x + ox) * 0.32f + 3f, (z + oz) * 0.32f + 8f);
+                if (random.Value() > 0.08f + Sm(0.3f, 0.72f, thick)) continue;
                 // A spruce forest's floor is mostly bare moss: few plants, more thin grass than bilberry
                 if (spruceWood && random.Value() < 0.8f) continue;
                 float r = random.Value();
@@ -3508,11 +3530,16 @@ public partial class TvWorldBuilder
                     tint = Rr(0.75f, 1f);
                 }
             }
+            bool bushy = shape == tuftBerry || shape == tuftHeath;
             if (!chunk && x * x + z * z < 18f * 18f)
             {
                 if (shape == tuftBerry) shape = tuftBerryNear;
                 else if (shape == tuftHeath) shape = tuftHeathNear;
             }
+            else if (shape == tuftBerry && berrySet != null) shape = berrySet[(int)(random.Value() * berrySet.Length) % berrySet.Length];
+            else if (shape == tuftHeath && heathSet != null) shape = heathSet[(int)(random.Value() * heathSet.Length) % heathSet.Length];
+            // Every bush its own shade and size (2026-11-25, Anders: each single bush clear)
+            if (bushy) { tint *= Rr(0.7f, 1f); s *= Rr(0.8f, 1.3f); }
             tuftMeshes[Tile(x, z)].Add(shape, x, H(x, z) - 0.02f, z, s, s, s, Rr(0f, 6.283f), tint);
             world.tufts++;
         }

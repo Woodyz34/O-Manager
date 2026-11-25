@@ -35,6 +35,8 @@ public class RunWorld : MonoBehaviour
     public double anchorE, anchorN;     // the map point at Origin
     public float baseHeight;            // the map height at Origin
     RunSettings.Look look;
+    AnisotropicFiltering savedAniso;
+    bool anisoSaved;
 
     Material plainMaterial, groundMaterial, pavedMaterial, atlasMaterial;
     int quality;                        // RunSettings.Level when the race started, 0..3
@@ -258,6 +260,11 @@ public class RunWorld : MonoBehaviour
         // Bark, needles, leaves, undergrowth and litter (TvAtlasLit); no wind on Low
         atlasMaterial = TvWorldView.NewAtlasMaterial();
         atlasMaterial.SetFloat("_Wind", quality == 0 ? 0f : 1f);
+        // How sharp the trees and stones are up close (2026-11-25, Anders: clear steps between the levels): Low has no
+        // relief and no grain, Medium relief out to 15 m, High the sharp bark and relief to 30 m, Ultra to 50 m
+        TvWorldView.SharpBark(atlasMaterial, quality >= 2);
+        atlasMaterial.SetFloat("_BumpFar", look.reliefFar);
+        if (quality == 0) atlasMaterial.SetFloat("_Surface", 0f);
         if (data.town != null)
         {
             // A town's streets and squares: asphalt, or cobbles in the old stone town
@@ -305,6 +312,9 @@ public class RunWorld : MonoBehaviour
         QualitySettings.shadowCascades = look.shadows >= 3 ? 4 : look.shadows == 2 ? 2 : 1;
         QualitySettings.shadowResolution = look.shadows >= 3 ? ShadowResolution.VeryHigh : look.shadows == 2 ? ShadowResolution.High : ShadowResolution.Medium;
         QualitySettings.shadowProjection = ShadowProjection.StableFit;
+        savedAniso = QualitySettings.anisotropicFiltering;
+        anisoSaved = true;
+        QualitySettings.anisotropicFiltering = look.aniso;
     }
 
     public static Color SkyColor => Sky;
@@ -318,6 +328,7 @@ public class RunWorld : MonoBehaviour
         QualitySettings.shadowCascades = savedCascades;
         QualitySettings.shadowResolution = savedResolution;
         QualitySettings.shadowProjection = savedProjection;
+        if (anisoSaved) QualitySettings.anisotropicFiltering = savedAniso;
         foreach (Piece p in pieces.Values) Drop(p);
         pieces.Clear();
         if (plainMaterial != null) Destroy(plainMaterial);

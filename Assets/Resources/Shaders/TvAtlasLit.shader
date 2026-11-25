@@ -2,7 +2,8 @@
 // bark, needles, leaves, bilberry, grass, ferns, twigs (the forest atlas, TV/TvFlora.cs). Lit like TvVertexLit (its
 // own sun, sky and ground light, ACES tone mapping, fog), so it sits in the same picture.
 // Each corner carries u, v and the atlas tile in its first uv (x, y, z); tile -1 = no picture (the corner's colour only).
-// Tiles 0-4 (and 35) are bark (a fraction on a bark tile number carries the tree's moss and lichen, TreeLife), 20-24 stone and wood, 25-31 walls, roofs and glass, 32 moss at a trunk's foot (lit as solid
+// Tiles 36-37 (slash, heather from above) are plants too, 38 churned soil is solid; 20-21 stone and cliff get their
+// own colours and moss (StoneLife). Tiles 0-4 (and 35) are bark (a fraction on a bark tile number carries the tree's moss and lichen, TreeLife), 20-24 stone and wood, 25-31 walls, roofs and glass, 32 moss at a trunk's foot (lit as solid
 // things, with relief); 5-19 and 33-35 are leaves and plants.
 // u, v repeat inside the tile (bark round a trunk), so the picture is looked up with its own slopes (no seam lines).
 // The leaves and plants are cut out by the picture's alpha and drawn from both sides; they are lit softly through
@@ -12,12 +13,15 @@ Shader "O-Manager/TvAtlasLit"
     Properties
     {
         _MainTex ("Atlas", 2D) = "white" {}
+        _BarkHD ("Sharp bark (3 x 2 tiles, High and Ultra)", 2D) = "white" {}
+        _BarkHDOn ("Use the sharp bark", Float) = 0
         _Tiles ("Tiles per side", Float) = 5
         _Pad ("Padding share of a tile", Float) = 0.03125
         _Cutoff ("Alpha cut", Range(0,1)) = 0.5
         _Surface ("Surface grain strength", Range(0,1)) = 0.25
         _Wind ("Leaves moving in the wind", Range(0,1)) = 1
         _Bump ("Relief of bark, stone and walls (m)", Range(0,0.05)) = 0.012
+        _BumpFar ("Relief out to (m); 0 = none (Low)", Float) = 30
         _FogStart ("Fog start (m)", Float) = 45
         _FogEnd ("Fog end (m)", Float) = 230
     }
@@ -37,11 +41,14 @@ Shader "O-Manager/TvAtlasLit"
         #define TV_FOG half3(0.571, 0.672, 0.701)
 
         sampler2D _MainTex;
+        sampler2D _BarkHD;
+        float _BarkHDOn;
         float _Tiles;
         float _Pad;
         half _Surface;
         half _Wind;
         float _Bump;
+        float _BumpFar;
         float _FogStart;
         float _FogEnd;
 
@@ -71,7 +78,8 @@ Shader "O-Manager/TvAtlasLit"
             UNITY_INITIALIZE_OUTPUT(Input, o);
             o.atlas = v.texcoord.xyz;
             // Leaves and needles stir a little in the wind: more at the tip of a card (v near 1) than at its base
-            if (_Wind > 0.001 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || (v.texcoord.z >= 32.5 && v.texcoord.z < 34.5)))
+            // (not the cards lying flat on the ground, litter and leaf tops: 2026-11-25, Anders: the litter moved)
+            if (_Wind > 0.001 && abs(v.normal.y) < 0.85 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || (v.texcoord.z >= 32.5 && v.texcoord.z < 34.5) || (v.texcoord.z >= 36.5 && v.texcoord.z < 37.5)))
             {
                 float3 w = mul(unity_ObjectToWorld, v.vertex).xyz;
                 float tip = saturate(v.texcoord.y + 0.25);
@@ -117,6 +125,27 @@ Shader "O-Manager/TvAtlasLit"
             return (big - 0.5) * 0.06 + small * 0.4 + 0.02;
         }
 
+        // A tile's picture at u, v (repeating inside the tile). Bark on High and Ultra comes from the sharp bark atlas
+        // (2026-11-25, Anders: the trees looked pixly up close): the same pictures at twice the size, 3 x 2 tiles in
+        // the order 0-4, 35, the same padding share.
+        half4 TvTile (float tile, float2 uv, float2 duvx, float2 duvy)
+        {
+            float inner = 1.0 - 2.0 * _Pad;
+            float2 f = frac(uv);
+            bool hd = _BarkHDOn > 0.5 && ((tile < 4.5 && tile > -0.5) || (tile > 34.5 && tile < 35.5));
+            if (hd)
+            {
+                float k = tile > 4.5 ? 5.0 : tile;
+                float2 cellH = float2(fmod(k, 3.0), floor(k / 3.0));
+                float2 per = float2(3.0, 2.0);
+                float2 topH = (cellH + _Pad + float2(f.x, 1.0 - f.y) * inner) / per;
+                return tex2Dgrad(_BarkHD, float2(topH.x, 1.0 - topH.y), duvx * inner / per, duvy * inner / per);
+            }
+            float2 cell = float2(fmod(max(tile, 0.0), _Tiles), floor(max(tile, 0.0) / _Tiles));
+            float2 fromTop = float2(cell.x + _Pad + f.x * inner, cell.y + _Pad + (1.0 - f.y) * inner) / _Tiles;
+            return tex2Dgrad(_MainTex, float2(fromTop.x, 1.0 - fromTop.y), duvx * inner / _Tiles, duvy * inner / _Tiles);
+        }
+
         void surf (Input IN, inout SurfaceOutputTv o)
         {
             float3 c = IN.color.rgb;
@@ -125,12 +154,8 @@ Shader "O-Manager/TvAtlasLit"
             #endif
             // The tile's picture: u, v repeat inside the tile's inner part (its padding keeps the neighbours out)
             float tile = floor(IN.atlas.z + 0.5);
-            float inner = 1.0 - 2.0 * _Pad;
-            float2 slopeX = ddx(IN.atlas.xy) * inner / _Tiles, slopeY = ddy(IN.atlas.xy) * inner / _Tiles;
-            float2 f = frac(IN.atlas.xy);
-            float2 cell = float2(fmod(max(tile, 0.0), _Tiles), floor(max(tile, 0.0) / _Tiles));
-            float2 fromTop = float2(cell.x + _Pad + f.x * inner, cell.y + _Pad + (1.0 - f.y) * inner) / _Tiles;
-            half4 tex = tex2Dgrad(_MainTex, float2(fromTop.x, 1.0 - fromTop.y), slopeX, slopeY);
+            float2 duvx = ddx(IN.atlas.xy), duvy = ddy(IN.atlas.xy);
+            half4 tex = TvTile(tile, IN.atlas.xy, duvx, duvy);
             if (tile < -0.5) tex = half4(1, 1, 1, 1);
             c *= tex.rgb;
             // A tree's own life on its bark (TreeLife in TV/TvMesh.cs): damp streaks, moss up the foot on its damp
@@ -168,23 +193,53 @@ Shader "O-Manager/TvAtlasLit"
                     else c = lerp(c, mc, mm);
                 }
             }
+            // Stones and cliffs alive (2026-11-25, Anders: layers, cracks, different colours, moss on the stones): big
+            // patches of warmer, colder and darker rock from the world position, dark streaks running down a cliff,
+            // and moss where the rock faces up (a stone's own amount rides in its tile fraction, StoneLife; a cliff
+            // has some everywhere)
+            if (tile > 19.5 && tile < 21.5)
+            {
+                float3 wp = IN.worldPos;
+                float3 wn = normalize(IN.worldNormal);
+                c *= 0.84 + 0.3 * TvNoise(wp * 0.35 + 5.0);
+                c = lerp(c, c * float3(1.14, 0.98, 0.88), smoothstep(0.55, 0.75, TvNoise(wp * 0.6 + 17.0)));
+                c = lerp(c, c * float3(0.78, 0.8, 0.85), smoothstep(0.6, 0.8, TvNoise(wp * 0.45 + 40.0)));
+                if (tile > 20.5)
+                {
+                    c *= 0.88 + 0.2 * smoothstep(0.25, 0.7, TvNoise(float3(wp.x * 2.2, wp.y * 0.22, wp.z * 2.2)));
+                    c = lerp(c, c * float3(1.2, 0.95, 0.75), smoothstep(0.74, 0.86, TvNoise(float3(wp.x * 1.3, wp.y * 0.3, wp.z * 1.3) + 9.0)) * 0.4);
+                }
+                float mossAmt = code > 0.01 ? saturate((code - 0.02) / 0.47) : (tile > 20.5 ? 0.45 : 0.0);
+                float n3 = TvNoise(wp * 2.1) * 0.55 + TvNoise(wp * 6.3 + 2.0) * 0.3 + TvNoise(wp * 19.0 + 7.0) * 0.15;
+                float upf = saturate((wn.y - 0.1) * 1.4);
+                float m = upf * (0.35 + mossAmt * 0.7) + (n3 - 0.5) * 0.8 + mossAmt * 0.25 - 0.32;
+                float mm = mossAmt > 0.01 ? smoothstep(0.0, 0.08, m) : 0.0;
+                float3 mc = lerp(float3(0.36, 0.48, 0.13), float3(0.62, 0.72, 0.24), TvNoise(wp * 31.0));
+                mc *= 0.7 + 0.45 * TvNoise(wp * 80.0);
+                mc = mc * mc;
+                c = lerp(c, mc, mm);
+            }
             if (_Surface > 0.001)
             {
                 half v = TvSurfaceGrain(IN.worldPos, IN.tvDepth);
                 c *= 1.0 + v * 0.75 * _Surface;
             }
             o.Albedo = c;
-            o.Foliage = (tile >= 4.5 && tile < 19.5) || (tile >= 32.5 && tile < 34.5) ? 1.0 : 0.0;
+            o.Foliage = (tile >= 4.5 && tile < 19.5) || (tile >= 32.5 && tile < 34.5) || (tile >= 35.5 && tile < 37.5) ? 1.0 : 0.0;
             // Relief (2026-11-25, Anders: the bark looked flat, like a picture): the picture's light and dark read
             // as height, bent into the normal from the screen's own slopes (no tangents needed); fades out far away
             float3 n = normalize(IN.worldNormal);
-            bool solid = tile > -0.5 && (tile < 4.5 || (tile > 19.5 && tile < 32.5) || tile > 34.5);
-            float bump = solid ? _Bump * saturate(1.0 - IN.tvDepth / 30.0) : 0.0;
+            bool solid = tile > -0.5 && (tile < 4.5 || (tile > 19.5 && tile < 32.5) || (tile > 34.5 && tile < 35.5) || tile > 37.5);
+            float bump = solid && _BumpFar > 0.5 ? _Bump * saturate(1.0 - IN.tvDepth / _BumpFar) : 0.0;
             if (bump > 0.0)
             {
                 float hgt = dot(tex.rgb, float3(0.3, 0.5, 0.2));
                 float3 dpx = ddx(IN.worldPos), dpy = ddy(IN.worldPos);
-                float dhx = ddx(hgt), dhy = ddy(hgt);
+                // the picture's slope from two more looks one pixel over, not ddx/ddy of the height (those are the
+                // same for 2 x 2 pixels, which showed as square specks up close)
+                float hx = dot(TvTile(tile, IN.atlas.xy + duvx, duvx, duvy).rgb, float3(0.3, 0.5, 0.2));
+                float hy = dot(TvTile(tile, IN.atlas.xy + duvy, duvx, duvy).rgb, float3(0.3, 0.5, 0.2));
+                float dhx = hx - hgt, dhy = hy - hgt;
                 float3 r1 = cross(dpy, n), r2 = cross(n, dpx);
                 float det = dot(dpx, r1);
                 float3 grad = sign(det) * (dhx * r1 + dhy * r2);
