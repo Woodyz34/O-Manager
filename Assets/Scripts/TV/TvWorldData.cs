@@ -48,6 +48,14 @@ public static class TvWorldData
         catch (Exception) { return 5f; }
     }
 
+    // The run-yourself 3D ground the import worked out from the contours (runheights.bytes in the package, unzipped), or
+    // null for a map built before 2026-11-25. Main thread.
+    public static byte[] RunHeightsBytes(MapDefinition map)
+    {
+        string root = Root(map);
+        return root == null ? null : MapPackages.LoadBytes(root + "runheights", ".bytes");
+    }
+
     // The map's lines with their symbol names (lines.json in the package), or null. Main thread.
     public static byte[] LinesJson(MapDefinition map)
     {

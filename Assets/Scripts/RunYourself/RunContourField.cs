@@ -652,7 +652,9 @@ public static class RunContourField
             int end = next >= 0 ? next : text.Length;
             // A tick's way downhill ("Down":[x, y], written by imports from 2026-11-23)
             double[] down = null;
-            int d = text.IndexOf("\"Down\":[", at, StringComparison.Ordinal);
+            // Only looked for up to this feature's coordinates: searching the rest of the file for a "Down" that
+            // isn't there took minutes on a big map (Fossum, 40 MB of lines: 2026-11-25)
+            int d = text.IndexOf("\"Down\":[", at, coords - at, StringComparison.Ordinal);
             if (d >= 0 && d < coords)
             {
                 int close = text.IndexOf(']', d);

@@ -97,6 +97,11 @@ public class TvWorldInput
     public TvTown town;                 // a sprint map in the run-yourself game mode: build it as a town (TvWorldBuilderTown.cs)
     public TvPassable passable;         // the town: the 2D race's grid; no house stands where it lets a runner through
     public bool townRich = true;        // chunkDetail in a town: the houses in full detail (not on the Low 3D quality)
+    // A piece far from the runner (2026-11-25): only the cheap far copy of its trees is made. The full trees are by far
+    // the most of a piece (about 250 000 corners on High) and were made, kept and handed to the graphics card for every
+    // piece in sight, though only drawn within a hundred metres; RunWorld builds the piece again for them when the
+    // runner comes near. The trees stand in the same places either way (every square draws its own numbers).
+    public bool skipNearTrees;
     // How detailed the trees, the undergrowth and the forest floor are made (RunSettings.Quality): 0 Low, 1 Medium,
     // 2 High, 3 Ultra. The TV controls use High.
     public int quality = 2;
@@ -3237,7 +3242,7 @@ public partial class TvWorldBuilder
                     default: shape = (near ? beechNear : beechFar)[Pick(near ? beechNear : beechFar)]; far = beechFar?[Pick(beechFar)]; trunk = 0.42f; break;
                 }
                 float y = H(x, z) - 0.15f, sy = s * Rr(0.9f, 1.12f), yaw = Rr(0f, 6.283f), tint = Rr(0.82f, 1.12f), tx = Rr(-0.03f, 0.03f), tz = Rr(-0.03f, 0.03f);
-                treeMeshes[Tile(x, z)].Add(shape, x, y, z, s, sy, s, yaw, tint, tx, tz);
+                if (!(chunk && input.skipNearTrees)) treeMeshes[Tile(x, z)].Add(shape, x, y, z, s, sy, s, yaw, tint, tx, tz);
                 // A piece of the run-yourself world: the same tree, cheaper, for when it is far from the runner
                 if (chunk) treeFarMesh.Add(far, x, y, z, s, sy, s, yaw, tint, tx, tz);
                 world.trees++;

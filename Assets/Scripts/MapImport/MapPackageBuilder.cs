@@ -75,6 +75,7 @@ namespace MapImport
         public string linesJson;
         public byte[] kinds;            // one GroundKind per grid cell, for the runners' map reading
         public byte[] world;            // what the terrain is made of, for the 3D view of a TV control (WorldLayer)
+        public byte[] runHeights;       // the run-yourself 3D ground worked out from the contours (RunContours.Bake), gzipped
         public byte[] pictureRgba;     // row 0 at the top
         // On the paper, in mm: the grid, and every object of the map (an exported PNG of the whole map covers that)
         public MapExtent gridExtent;
@@ -184,6 +185,27 @@ namespace MapImport
             progress?.Invoke("Picking out stones, paths and streams", 0.35f);
             WriteLayers(map, offE, offN, out pkg.pointsJson, out pkg.linesJson);
 
+            // The 3D ground from the contours, worked out once here and not by every player before their first race on
+            // the map (2026-11-25: Fossum took minutes on each computer). The map works without it.
+            if (grid.hasHeights)
+            {
+                progress?.Invoke("Shaping the 3D ground from the contours", 0.4f);
+                try
+                {
+                    var groundSw = System.Diagnostics.Stopwatch.StartNew();
+                    pkg.runHeights = global::RunContours.Bake(global::TvHeights.Read(pkg.grid), Encoding.UTF8.GetBytes(pkg.linesJson),
+                                                              Encoding.UTF8.GetBytes(pkg.pointsJson), info.contourInterval);
+                    Log(pkg.runHeights != null
+                        ? $"3D ground: {pkg.runHeights.Length / 1024} kB in {groundSw.ElapsedMilliseconds} ms"
+                        : "3D ground: the contours could not be solved; it is made in the race from the grid");
+                }
+                catch (Exception e)
+                {
+                    pkg.runHeights = null;
+                    Log("3D ground: could not be made (" + e.Message + "); it is made in the race");
+                }
+            }
+
             if (drawPicture)
             {
                 progress?.Invoke("Drawing the map picture", 0.45f);
@@ -241,7 +263,7 @@ namespace MapImport
 
         public const int ThumbnailSide = 768;
 
-        // Writes map.json, grid.bytes, kinds.bytes, world.bytes, points.json, lines.json, picture.png and (for a drawn picture) thumb.png.
+        // Writes map.json, grid.bytes, kinds.bytes, world.bytes, runheights.bytes, points.json, lines.json, picture.png and (for a drawn picture) thumb.png.
         // Safe on a background thread. ownPng: a picture the player gave (FitOwnPicture first); its thumbnail is made by the caller.
         public static void WriteFolder(string folder, MapPackage pkg, byte[] ownPng, Action<string, float> progress = null)
         {
@@ -251,6 +273,9 @@ namespace MapImport
             File.WriteAllText(Path.Combine(folder, "lines.json"), pkg.linesJson);
             if (pkg.kinds != null) File.WriteAllBytes(Path.Combine(folder, "kinds.bytes"), pkg.kinds);
             if (pkg.world != null) File.WriteAllBytes(Path.Combine(folder, "world.bytes"), pkg.world);
+            string runHeights = Path.Combine(folder, "runheights.bytes");
+            if (pkg.runHeights != null) File.WriteAllBytes(runHeights, pkg.runHeights);
+            else if (File.Exists(runHeights)) File.Delete(runHeights);   // one from an older build would not match
             if (ownPng != null)
             {
                 File.WriteAllBytes(Path.Combine(folder, "picture.png"), ownPng);

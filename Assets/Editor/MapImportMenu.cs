@@ -186,11 +186,12 @@ public static class MapImportMenu
                 }
                 string folder = PackagesFolder + "/" + info.id;
                 Directory.CreateDirectory(folder);
-                foreach (string name in new[] { "grid.bytes", "kinds.bytes", "world.bytes", "points.json", "lines.json", "picture.png", "thumb.png", "map.json" })
+                foreach (string name in new[] { "grid.bytes", "kinds.bytes", "world.bytes", "runheights.bytes", "points.json", "lines.json", "picture.png", "thumb.png", "map.json" })
                 {
                     string from = Path.Combine(source, name);
                     if (File.Exists(from)) File.Copy(from, Path.Combine(folder, name), true);
                 }
+                EnsureRunHeights(folder, info);
                 Debug.Log(Bake(folder, info));
                 done.Add(info.name);
             }
@@ -230,6 +231,28 @@ public static class MapImportMenu
         }
         return log.ToString();
     }
+
+    // The run-yourself 3D ground (runheights.bytes) for a package that has none or an old one (a map imported before
+    // 2026-11-25), so no player has to work it out before their first race on the map
+    static void EnsureRunHeights(string folder, MapPackageInfo info)
+    {
+        try
+        {
+            string file = Path.Combine(folder, "runheights.bytes");
+            byte[] lines = ReadPlain(Path.Combine(folder, "lines.json")), points = ReadPlain(Path.Combine(folder, "points.json"));
+            byte[] grid = ReadPlain(Path.Combine(folder, "grid.bytes"));
+            if (lines == null || grid == null) return;
+            if (File.Exists(file) && RunContours.FromPackage(null, MapPackages.Unpack(File.ReadAllBytes(file)), lines, points) != null) return;
+            EditorUtility.DisplayProgressBar("Build imported maps", "Shaping the 3D ground of " + info.name + " from the contours", 0.5f);
+            byte[] made = RunContours.Bake(TvHeights.Read(grid), lines, points, info.contourInterval > 0.5f ? info.contourInterval : 5f);
+            if (made != null) File.WriteAllBytes(file, made);
+            Debug.Log("Build imported maps: 3D ground of " + info.name + (made != null ? " made (" + made.Length / 1024 + " kB)" : " could not be made from the contours"));
+        }
+        catch (System.Exception e) { Debug.LogWarning("Build imported maps: 3D ground of " + info.name + ": " + e.Message); }
+        finally { EditorUtility.ClearProgressBar(); }
+    }
+
+    static byte[] ReadPlain(string file) => File.Exists(file) ? MapPackages.Unpack(File.ReadAllBytes(file)) : null;
 
     // Imports the files in a package folder under Assets/Resources and makes its MapDefinition
     static string Bake(string folder, MapPackageInfo info)
