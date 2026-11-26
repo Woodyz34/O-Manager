@@ -954,11 +954,19 @@ public class RunWorld : MonoBehaviour
 
     const float HideFrom = 64f;              // closer pieces are always drawn
     readonly List<Piece> hiddenPieces = new List<Piece>();
+    readonly List<Renderer> hideList = new List<Renderer>();
 
     void Hide(Piece p, bool hide)
     {
         p.hidden = hide;
-        if (p.root != null) p.root.SetActive(!hide);
+        // Only not drawn: switching the whole piece off and on (SetActive) took every renderer out of Unity's lists and
+        // put it back, the likely cause of a 36 ms frame on Fossum (2026-11-26)
+        if (p.root != null)
+        {
+            p.root.GetComponentsInChildren(true, hideList);
+            foreach (Renderer r in hideList) r.forceRenderingOff = hide;
+            hideList.Clear();
+        }
         if (hide) { if (!hiddenPieces.Contains(p)) hiddenPieces.Add(p); }
         else hiddenPieces.Remove(p);
     }

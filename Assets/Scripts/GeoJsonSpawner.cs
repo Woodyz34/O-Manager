@@ -242,6 +242,14 @@ public class GeoJsonSpawner : MonoBehaviour
             frameWatch.Restart();
             foreach (ParsedFeature feature in task.Result)
             {
+                // While the 3D race hides the 2D map, its objects wait: none are made until the map shows again
+                // (2026-11-26, Anders on Fossum: even 1 ms a frame now and then took 30-100 ms, a big line or the
+                // clean-up after it)
+                while (RunSession.TwoDAway)
+                {
+                    yield return null;
+                    frameWatch.Restart();
+                }
                 switch (feature.kind)
                 {
                     case FeatureKind.Point:
@@ -256,7 +264,7 @@ public class GeoJsonSpawner : MonoBehaviour
                 }
                 created++;
 
-                // In a 3D race ("Run it yourself") the 2D objects wait: 1 ms a frame, not the whole budget (2026-11-26,
+                // In a 3D race ("Run it yourself") with the 2D map showing: 1 ms a frame, not the whole budget (2026-11-26,
                 // Anders on Fossum: 68 000 objects took 6 ms of every frame for 50 s of the race)
                 if (frameWatch.Elapsed.TotalMilliseconds >= (RunSession.Active != null ? Mathf.Min(1f, spawnBudgetMs) : spawnBudgetMs))
                 {
