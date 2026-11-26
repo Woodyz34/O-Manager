@@ -203,7 +203,7 @@ public static class MapImportMenu
     }
 
     // GitHub refuses files over 100 MB (2026-11-25: Oslo's grid.bytes was 123 MB). Binary files over this size are
-    // gzipped in place; MapPackages.LoadBytes unpacks them. A picture that big can't be packed here: it gets a warning.
+    // gzipped in place; MapPackages.LoadBytes unpacks them. A picture that big is saved again with 256 colours.
     const long PackAbove = 50L * 1024 * 1024;
     const long GitHubLimit = 100L * 1000 * 1000;
 
@@ -223,14 +223,76 @@ public static class MapImportMenu
             File.Delete(file + ".tmp");
             log.AppendLine($"Packed {name}: {raw.Length / 1048576} MB -> {new FileInfo(file).Length / 1048576} MB");
         }
-        foreach (string name in new[] { "picture.png", "lines.json", "points.json" })
+        string picture = MapPictureFiles.SourcePng(Path.GetFileName(folder));
+        string shrunk = ShrinkPicture(picture);
+        if (shrunk != null) log.AppendLine(shrunk);
+        foreach (string name in new[] { "lines.json", "points.json" })
         {
-            string file = name == "picture.png" ? MapPictureFiles.SourcePng(Path.GetFileName(folder)) : Path.Combine(folder, name);
+            string file = Path.Combine(folder, name);
             if (File.Exists(file) && new FileInfo(file).Length > GitHubLimit)
-                Debug.LogWarning($"{file} is {new FileInfo(file).Length / 1000000} MB, over GitHub's 100 MB limit. " +
-                    "For a picture: shrink it to 256 colours without dithering (pngquant --quality=90-100 --nofs), which keeps the size and looks the same.");
+                Debug.LogWarning($"{file} is {new FileInfo(file).Length / 1000000} MB, over GitHub's 100 MB limit.");
         }
         return log.ToString();
+    }
+
+    // A map picture over ShrinkAbove (an RGBA PNG from before 2026-11-26, or one a player gave) saved again with
+    // 256 colours (PngPalette): same size in pixels, looks the same, a quarter of the bytes or less.
+    // Returns what was done, or null when the picture was already small enough.
+    const long ShrinkAbove = 90L * 1000 * 1000;
+
+    static string ShrinkPicture(string png)
+    {
+        if (!File.Exists(png) || new FileInfo(png).Length <= ShrinkAbove) return null;
+        long before = new FileInfo(png).Length;
+        var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        try
+        {
+            EditorUtility.DisplayProgressBar("Map picture", "Saving " + png + " with 256 colours (under GitHub's 100 MB limit)", 0.5f);
+            if (!texture.LoadImage(File.ReadAllBytes(png), false))
+            {
+                Debug.LogWarning(png + " could not be read, so it was not made smaller.");
+                return null;
+            }
+            int w = texture.width, h = texture.height;
+            Color32[] pixels = texture.GetPixels32();   // rows from the bottom
+            var rgba = new byte[(long)w * h * 4];
+            for (int y = 0; y < h; y++)
+            {
+                int from = (h - 1 - y) * w, to = y * w * 4;
+                for (int x = 0; x < w; x++, to += 4)
+                {
+                    Color32 c = pixels[from + x];
+                    rgba[to] = c.r; rgba[to + 1] = c.g; rgba[to + 2] = c.b; rgba[to + 3] = 255;
+                }
+            }
+            pixels = null;
+            PngPalette.Write(png + ".tmp", rgba, w, h);
+            File.Copy(png + ".tmp", png, true);
+            File.Delete(png + ".tmp");
+            string done = $"Map picture {png}: {before / 1000000} MB -> {new FileInfo(png).Length / 1000000} MB (256 colours)";
+            Debug.Log(done);
+            return done;
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(texture);
+            EditorUtility.ClearProgressBar();
+        }
+    }
+
+    [MenuItem("Tools/O-Manager/Developer (rarely needed)/Shrink map pictures over 90 MB", false, 124)]
+    static void ShrinkAllPictures()
+    {
+        var done = new List<string>();
+        if (Directory.Exists(MapPictureFiles.SourceFolder))
+            foreach (string folder in Directory.GetDirectories(MapPictureFiles.SourceFolder))
+            {
+                string result = ShrinkPicture(Path.Combine(folder, "picture.png"));
+                if (result != null) done.Add(result);
+            }
+        if (done.Count > 0) MapPictureCache.PrepareAll();   // the ready pictures follow the new PNGs
+        EditorUtility.DisplayDialog("Shrink map pictures",
+            done.Count == 0 ? "No map picture is over 90 MB." : string.Join("\n", done) + "\n\nCommit the new picture.png files in GitHub Desktop.", "OK");
     }
 
     // The run-yourself 3D ground (runheights.bytes) for a package that has none or an old one (a map imported before
