@@ -759,7 +759,8 @@ public partial class RunSession : MonoBehaviour
         {
             foreach (NetworkPlayer p in Players())
             {
-                if (p == NetworkPlayer.Local || p.raceFinished || !remotes.ContainsKey(p)) continue;
+                // Only a runner who is out in the forest (one still loading it has no place yet)
+                if (p == NetworkPlayer.Local || p.raceFinished || !remotes.ContainsKey(p) || (p.run3dFlags & FlagReady) == 0) continue;
                 autoPicked = true;
                 Watch(p);
                 break;

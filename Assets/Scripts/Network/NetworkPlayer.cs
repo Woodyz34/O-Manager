@@ -114,6 +114,54 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // True for the local player while it only watches the race
     public static bool LocalWatches => Local != null && Local.Object != null && Local.Object.IsValid && Local.spectator;
 
+    // The players in the race, set by the host on its own player at Start game (PlayerId + 1 each; count 0 = not
+    // known). A player who is not on it only watches (2026-11-26: two players who came in just as a 3D race started
+    // were taken in as runners, stood at the start and held up the results; the spectator saw nobody move).
+    [Networked, Capacity(100)] public NetworkArray<int> raceRoster => default;
+    [Networked] public int raceRosterCount { get; set; }
+
+    // The host's list: known, and whether this player is on it
+    public static bool OnRoster(PlayerRef player, out bool known)
+    {
+        known = false;
+        foreach (NetworkPlayer p in All())
+        {
+            if (p.Object == null || !p.Object.IsValid || p.raceRosterCount <= 0) continue;
+            known = true;
+            int count = Mathf.Min(p.raceRosterCount, p.raceRoster.Length);
+            for (int i = 0; i < count; i++) if (p.raceRoster[i] == player.PlayerId + 1) return true;
+            return false;
+        }
+        return false;
+    }
+
+    // The host, at Start game: everyone in the lobby now races
+    public void SetRaceRoster(NetworkRunner runner)
+    {
+        int n = 0;
+        foreach (PlayerRef player in runner.ActivePlayers)
+        {
+            if (n >= raceRoster.Length) break;
+            raceRoster.Set(n++, player.PlayerId + 1);
+        }
+        raceRosterCount = n;
+    }
+
+    // Not on the host's list but set up as a runner (the list arrived late): watch instead, once
+    bool switchedToWatching;
+    void WatchIfNotOnRoster()
+    {
+        if (switchedToWatching || spectator || Runner == null || Runner.GameMode == GameMode.Single) return;
+        if (ActiveScene.Name != CourseScenes.Competition || CompetitionFlow.ResultsShown) return;
+        if (OnRoster(Object.StateAuthority, out bool known) || !known) return;
+        switchedToWatching = true;
+        Debug.Log("NetworkPlayer: not one of the race's runners (came in as it started), watching it instead");
+        spectator = true;
+        if (RunSession.Active != null) Destroy(RunSession.Active.gameObject);
+        BeginSpectating(GetComponent<CameraController>());
+        ApplySpectatorLook();
+    }
+
     // This player's object has been in the lobby (a late joiner's has not: it arrives straight in the race)
     bool beenInLobby;
     public bool BeenInLobby => beenInLobby;
@@ -361,6 +409,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             string options = HostSettings.ToPublish;
             if (hostOptions.ToString() != options) hostOptions = options;
         }
+        if ((int)Runner.Tick % 30 == 15) WatchIfNotOnRoster();
         if (spectator)
         {
             // Watching: nothing to tell the others about a race of its own
@@ -639,8 +688,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                 beenInLobby = true;
                 if (spectator) spectator = false;
             }
-            else if (!beenInLobby && Runner.GameMode != GameMode.Single && ActiveScene.Name == CourseScenes.Competition
-                && SessionRacing.IsRacing(Runner.SessionInfo))
+            else if (Runner.GameMode != GameMode.Single && ActiveScene.Name == CourseScenes.Competition
+                && ((!beenInLobby && SessionRacing.IsRacing(Runner.SessionInfo))
+                    || (!OnRoster(Object.StateAuthority, out bool rosterKnown) && rosterKnown)))
             {
                 // Joined while the lobby was out racing: watch this race, race the next one. (Playing the competition
                 // scene straight from the editor makes a test lobby that is not marked as racing: that one is raced.)
@@ -1168,6 +1218,8 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                 raceDisqualified = false;
                 imposter = PlayerRef.None;
                 imposterTookOver = false;
+                raceRosterCount = 0;
+                switchedToWatching = false;
                 imposterGuess = PlayerRef.None;
                 hasGuessedImposter = false;
                 secretTask = 0;

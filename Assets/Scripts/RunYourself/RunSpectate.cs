@@ -160,13 +160,19 @@ public partial class RunSession
         }
         if (!Watching)
         {
-            if (watching != null) StopWatching();
+            if (watching != null)
+            {
+                StopWatching();
+                autoPicked = false;
+            }
             return;
         }
         Remote r = remotes[watching];
         if (watching.Object == null || !watching.Object.IsValid || !r.placed)
         {
             StopWatching();
+            // Only watching: on to someone else by itself (it used to stop there, at the start, with nobody moving)
+            autoPicked = false;
             return;
         }
         // A runner who is in: stay a moment, then on to someone still running
