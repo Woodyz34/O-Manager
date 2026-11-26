@@ -98,6 +98,22 @@ public partial class RunSession : MonoBehaviour
     CameraController cameraController;
     readonly List<Canvas> hiddenCanvases = new List<Canvas>();
     readonly List<Renderer> hiddenRenderers = new List<Renderer>();
+    // The 2D map's own objects (GeoJsonSpawner, 68 000 on Fossum) are not simulated while the 3D race is on
+    // (2026-11-26, Anders chose it for Ultra's lag): the 2D runner stands still, nothing there needs them
+    SimulationMode2D savedSim2D = SimulationMode2D.FixedUpdate;
+    bool sim2DPaused;
+
+    void PauseTwoDPhysics(bool pause)
+    {
+        if (pause == sim2DPaused) return;
+        if (pause)
+        {
+            savedSim2D = Physics2D.simulationMode;
+            Physics2D.simulationMode = SimulationMode2D.Script;
+        }
+        else Physics2D.simulationMode = savedSim2D;
+        sim2DPaused = pause;
+    }
     readonly HashSet<Canvas> own = new HashSet<Canvas>();
     float nextHide;
     bool twoDHidden;
@@ -757,6 +773,7 @@ public partial class RunSession : MonoBehaviour
         if (world != null) world.gameObject.SetActive(!show);
         if (mainCam != null) mainCam.cullingMask = show ? mainMask : 0;
         if (hud != null) hud.enabled = !show;
+        PauseTwoDPhysics(!show);
     }
 
     // ---- Hiding the 2D game underneath ----
@@ -777,6 +794,16 @@ public partial class RunSession : MonoBehaviour
         {
             mainMask = ~0;
         }
+        PauseTwoDPhysics(true);
+        // The map's own objects, when they are drawn (GeoJsonSpawner.objectsVisible): out of the 3D camera's culling
+        GameObject features = GameObject.Find("Objects");
+        if (features != null)
+            foreach (Renderer r in features.GetComponentsInChildren<Renderer>())
+            {
+                if (!r.enabled) continue;
+                r.enabled = false;
+                hiddenRenderers.Add(r);
+            }
         // The 2D runners and their route lines would show on the map in the hand
         foreach (NetworkPlayer p in NetworkPlayer.All())
         {
@@ -909,6 +936,7 @@ public partial class RunSession : MonoBehaviour
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
         if (Active == this) Active = null;
+        PauseTwoDPhysics(false);
         RouteAnalysis.RealTimer = null;
         if (loadingCard != null) loadingCard.Close();
         Cursor.lockState = CursorLockMode.None;
