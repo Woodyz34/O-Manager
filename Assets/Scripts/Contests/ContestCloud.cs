@@ -111,6 +111,15 @@ public class RankRow
     public int was;           // place at the update before, 0 = not in the list then
     public int ww;            // weekly contests won, all time
     public int wd;            // daily contests won, all time
+    public Dictionary<string, int[]> wk;   // wins per list: "rc", "rc-forest", ... -> [weekly, daily]
+
+    // Wins in one list; "overall" is every win
+    public int[] Wins(string key)
+    {
+        if (key == "overall" || string.IsNullOrEmpty(key)) return new[] { ww, wd };
+        if (wk != null && wk.TryGetValue(key, out int[] a) && a != null && a.Length >= 2) return a;
+        return new[] { 0, 0 };
+    }
 }
 
 // A player's contest wins of all time (counted when a contest with 2+ finishers comes into the ranking)
@@ -119,6 +128,14 @@ public class RankWins
     public int ww;            // weekly
     public int wd;            // daily
     public int rc, race, run; // by game
+    public Dictionary<string, int[]> wk;   // wins per list: "rc", "rc-forest", ... -> [weekly, daily]
+
+    public int[] Wins(string key)
+    {
+        if (key == "overall" || string.IsNullOrEmpty(key)) return new[] { ww, wd };
+        if (wk != null && wk.TryGetValue(key, out int[] a) && a != null && a.Length >= 2) return a;
+        return new[] { 0, 0 };
+    }
 
     public int Total => ww + wd;
 }

@@ -269,7 +269,7 @@ public class RankingPage : MonoBehaviour
     {
         if (data == null) return;
         RankWins my = data.myWins ?? new RankWins();
-        string wins = "\n<size=90%>Your contest wins: " + WinsText(my.ww, my.wd) + "</size>";
+        string wins = "\n<size=90%>Your contest wins: " + WinsText(my.Wins(ListKey)[0], my.Wins(ListKey)[1]) + "</size>";
         int count = data.counts.TryGetValue(ListKey, out int n) ? n : 0;
         if (data.mine.TryGetValue(ListKey, out RankRow mine) && mine != null)
         {
@@ -316,7 +316,7 @@ public class RankingPage : MonoBehaviour
         PlaceInRow(sub.rectTransform, ColName, ColNameWidth, 38, 4);
 
         // Weekly and daily contests won, all time (2026-11-24, the user: "mäktigt att kunna se hur många gånger man har vunnit")
-        TextMeshProUGUI winsText = CourseUI.Text("Wins", row.transform, WinsCell(r.ww, r.wd), 24, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.Center);
+        TextMeshProUGUI winsText = CourseUI.Text("Wins", row.transform, WinsCell(r.Wins(ListKey)[0], r.Wins(ListKey)[1]), 24, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.Center);
         winsText.richText = true;
         winsText.lineSpacing = -12;
         winsText.enableWordWrapping = false;
@@ -460,7 +460,7 @@ public class RankingPage : MonoBehaviour
         playerSummary.richText = true;
         CourseUI.Place(playerSummary.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40, -80), new Vector2(1100, 34));
 
-        playerWins = CourseUI.Text("Wins", card, "Contest wins: " + WinsText(r.ww, r.wd), 22, CourseUI.Ink);
+        playerWins = CourseUI.Text("Wins", card, "Wins in " + ListName + ": " + WinsText(r.Wins(ListKey)[0], r.Wins(ListKey)[1]), 22, CourseUI.Ink);
         playerWins.richText = true;
         CourseUI.Place(playerWins.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40, -114), new Vector2(1100, 34));
 
@@ -502,7 +502,7 @@ public class RankingPage : MonoBehaviour
         playerDays = history.days ?? new List<RankDay>();
         RankWins w = history.wins ?? new RankWins();
         if (w.Total > 0)
-            playerWins.text = "Contest wins: " + WinsText(w.ww, w.wd) + "   <color=#5B7563>·   Route choice " + w.rc + "  ·  Race " + w.race + "  ·  3D " + w.run + "</color>";
+            playerWins.text = "Wins in " + ListName + ": " + WinsText(w.Wins(playerList)[0], w.Wins(playerList)[1]) + "   <color=#5B7563>·   All: " + w.Total + "  ·  Route choice " + w.rc + "  ·  Race " + w.race + "  ·  3D " + w.run + "</color>";
         chart.EmptyMessage = "No history yet: the chart gets a new point every day the player is in the ranking.";
         ShowChart();
     }

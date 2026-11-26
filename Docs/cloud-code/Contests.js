@@ -656,6 +656,16 @@ const RANK_GAMES = ["rc", "race", "run"];
 const RANK_LISTS = ["overall", "rc", "race", "run", "rc-forest", "rc-sprint", "race-forest", "race-sprint", "run-forest", "run-sprint"];
 
 function gameOf(id) { return id.substring(id.indexOf("_") + 1).split("-")[0]; }
+// Wins by list (2026-11-26): x.k[list] = [weekly, daily] for "rc", "rc-forest", "rc-sprint", "race", ... "run-sprint"
+function addWin(x, type, game, sprint) {
+  if (!x.k) x.k = {};
+  const i = type === "w" ? 0 : 1;
+  for (const key of [game, game + "-" + (sprint ? "sprint" : "forest")]) {
+    const a = x.k[key] || (x.k[key] = [0, 0]);
+    a[i]++;
+  }
+}
+function winsOf(x) { return x && x.k ? x.k : {}; }
 function round1(x) { return Math.round(x * 10) / 10; }
 
 // The last day whose daily contest is final: { id: "2026-11-23", end: UTC ms of its end }
@@ -747,6 +757,18 @@ async function updateRanking(api, context, now, logger) {
   const winsItem = await loadRankItem(api, context, "contests_rank", "wins");
   const wins = winsItem.value && winsItem.value.players ? winsItem.value : { players: {} };
   let winsChanged = false;
+  // One-time fill of the wins per list from the contests already in the window (the window covers all of history so far)
+  if (wins.v !== 2) {
+    for (const c of win.contests) {
+      for (const r of c.rows) {
+        if (r[2] !== 1) continue;
+        const x = wins.players[r[0]] || (wins.players[r[0]] = { w: 0, d: 0 });
+        addWin(x, c.id[0], c.g, c.s);
+      }
+    }
+    wins.v = 2;
+    winsChanged = true;
+  }
   for (let i = 0; i < part.length; i += 20) {
     const ids = part.slice(i, i + 20);
     const loaded = await Promise.all(ids.map(async id => {
@@ -768,6 +790,7 @@ async function updateRanking(api, context, now, logger) {
         x[id[0]] = (x[id[0]] || 0) + 1;
         const g = gameOf(id);
         x[g] = (x[g] || 0) + 1;
+        addWin(x, id[0], g, isSprint(id));
         winsChanged = true;
       }
       for (const r of list) {
@@ -846,7 +869,7 @@ async function ranking(api, context, me, now, logger) {
   const withWins = r => {
     if (!r) return null;
     const x = wins[r.p] || {};
-    return Object.assign({}, r, { ww: x.w || 0, wd: x.d || 0 });
+    return Object.assign({}, r, { ww: x.w || 0, wd: x.d || 0, wk: winsOf(x) });
   };
   const lists = {}, mine = {}, counts = {};
   for (const key of RANK_LISTS) {
@@ -858,7 +881,7 @@ async function ranking(api, context, me, now, logger) {
   const myWins = wins[me] || {};
   return {
     day: stored.day, updatedAt: stored.updatedAt, me, lists, mine, counts,
-    myWins: { ww: myWins.w || 0, wd: myWins.d || 0, rc: myWins.rc || 0, race: myWins.race || 0, run: myWins.run || 0 },
+    myWins: { ww: myWins.w || 0, wd: myWins.d || 0, rc: myWins.rc || 0, race: myWins.race || 0, run: myWins.run || 0, wk: winsOf(myWins) },
     rules: { days: RANK_DAYS, weekly: RANK_WEIGHT.w, daily: RANK_WEIGHT.d, full: RANK_FULL, minFinishers: RANK_MIN_FINISHERS }
   };
 }
@@ -870,5 +893,5 @@ async function rankHistory(api, context, payload) {
   const list = item.value && item.value.players && item.value.players[pid] ? item.value.players[pid] : [];
   const winsItem = await loadRankItem(api, context, "contests_rank", "wins");
   const x = winsItem.value && winsItem.value.players && winsItem.value.players[pid] ? winsItem.value.players[pid] : {};
-  return { player: pid, days: list, wins: { ww: x.w || 0, wd: x.d || 0, rc: x.rc || 0, race: x.race || 0, run: x.run || 0 } };
+  return { player: pid, days: list, wins: { ww: x.w || 0, wd: x.d || 0, rc: x.rc || 0, race: x.race || 0, run: x.run || 0, wk: winsOf(x) } };
 }
