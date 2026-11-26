@@ -90,7 +90,9 @@ public class RunWorld : MonoBehaviour
         public int treeTier;
         public float minY, maxY;
         // A cross-fade between two levels of detail going on (FadeTime): what comes, what goes, what then to do
-        public bool hidden;                 // wholly behind a hill from the runner's eyes (Hidden): not drawn at all
+        public bool hidden;
+        public float cardFadeStart = -1f;   // the picture cards fading in (cardsComing) or out
+        public bool cardsComing;                 // wholly behind a hill from the runner's eyes (Hidden): not drawn at all
         public float fadeStart = -1f;
         public readonly List<Renderer> fadeIn = new List<Renderer>(), fadeOut = new List<Renderer>();
         public Action fadeDone;
@@ -336,6 +338,10 @@ public class RunWorld : MonoBehaviour
         QualitySettings.shadowCascades = look.shadows >= 3 ? 4 : look.shadows == 2 ? 2 : 1;
         QualitySettings.shadowResolution = look.shadows >= 3 ? ShadowResolution.VeryHigh : look.shadows == 2 ? ShadowResolution.High : ShadowResolution.Medium;
         QualitySettings.shadowProjection = ShadowProjection.StableFit;
+        // Low: the pictures (bark, needles, ground) at half size, which weak graphics chips read far quicker
+        // (2026-11-26, Anders: Low must run smoothly on a weak laptop, even if it looks plainer)
+        savedMipLimit = QualitySettings.globalTextureMipmapLimit;
+        if (quality <= (int)RunSettings.Quality.Low) QualitySettings.globalTextureMipmapLimit = Math.Max(1, savedMipLimit);
 
         // The trees as copies of a few (null: this computer can't, the pieces make tree meshes)
         trees = RunTrees.Create(quality, atlasMaterial, look.shadows > 0, sun);
@@ -365,6 +371,7 @@ public class RunWorld : MonoBehaviour
         probe?.Dispose();
         probe = null;
         QualitySettings.shadowDistance = savedShadowDistance;
+        if (savedMipLimit >= 0) QualitySettings.globalTextureMipmapLimit = savedMipLimit;
         QualitySettings.shadows = savedShadows;
         QualitySettings.shadowCascades = savedCascades;
         QualitySettings.shadowResolution = savedResolution;
@@ -590,6 +597,7 @@ public class RunWorld : MonoBehaviour
     float nextPerfLog;
     double worstFrame, worstPlan, worstHand, worstTrees;
     int slowFrames;
+    int savedMipLimit = -1;
     RunPerf probe;   // the rest of the frame: Unity's own profiler markers (RunPerf.cs)
 
     void Watch(long plan, long hand, long tree)
@@ -659,8 +667,10 @@ public class RunWorld : MonoBehaviour
                 int tier = p.dist < look.near ? 0 : p.dist < FarTreesReach || p.cardRenderer == null ? 1 : 2;
                 if (tier != p.treeTier)
                 {
+                    // The pictures cross-fade with the trees: coming, they fade in over the trees, which go on being
+                    // drawn until the pictures are whole; going, the trees are there at once and the pictures fade out
+                    if (p.cardRenderer != null && (tier == 2) != (p.treeTier == 2)) CardFade(p, tier == 2);
                     p.treeTier = tier;
-                    if (p.cardRenderer != null) p.cardRenderer.enabled = tier == 2;
                 }
             }
             if (p.ready && !p.hidden && p.root != null && Hidden(p)) Hide(p, true);
@@ -722,7 +732,9 @@ public class RunWorld : MonoBehaviour
     readonly Plane[] frustum = new Plane[6];
 
     // Out to here the far tree shapes; beyond, the pictures
-    float FarTreesReach => look.near + Mathf.Max(50f, look.view * 0.2f);
+    // (2026-11-26: the pictures, which have the leaves, from the near distance on; the bare far shapes are only used
+    // when the pictures could not be made)
+    float FarTreesReach => look.near;
 
     void DrawTrees()
     {
@@ -735,7 +747,9 @@ public class RunWorld : MonoBehaviour
         Vector3 me = ToScene(playerE, playerN, 0f);
         foreach (Piece p in pieces.Values)
         {
-            if (!p.ready || p.hidden || p.treeSet == null || p.treeTier == 2) continue;
+            if (!p.ready || p.hidden || p.treeSet == null) continue;
+            // As pictures: the trees only while the pictures fade in over them
+            if (p.treeTier == 2 && !(p.cardFadeStart >= 0f && p.cardsComing)) continue;
             // The full trees close by are always drawn (their shadows fall into the picture from behind too)
             // (and pieces whose trees are all beyond the shadows: nothing of them reaches the picture from outside it)
             if (cull && (p.treeTier == 1 || p.dist > trees.shadowReach))
@@ -744,7 +758,7 @@ public class RunWorld : MonoBehaviour
                 var b = new Bounds(c, new Vector3(PieceSize + 16f, p.maxY - p.minY + 50f, PieceSize + 16f));
                 if (!GeometryUtility.TestPlanesAABB(frustum, b)) continue;
             }
-            trees.Add(p.treeSet, p.treeTier != 0, me.x, me.z, toWorld, moved);
+            trees.Add(p.treeSet, p.treeTier == 1, me.x, me.z, toWorld, moved);
         }
         Vector3 at = transform.TransformPoint(ToScene(playerE, playerN, 0f));
         trees.Draw(new Bounds(at, new Vector3(look.view * 2f + 200f, 4000f, look.view * 2f + 200f)));
@@ -886,8 +900,43 @@ public class RunWorld : MonoBehaviour
         done?.Invoke();
     }
 
+    void CardFade(Piece p, bool coming)
+    {
+        p.cardsComing = coming;
+        p.cardFadeStart = Time.unscaledTime;
+        p.cardRenderer.enabled = true;
+        SetCardFade(p, 0f);
+        if (!cardFading.Contains(p)) cardFading.Add(p);
+    }
+
+    readonly List<Piece> cardFading = new List<Piece>();
+
+    void SetCardFade(Piece p, float t)
+    {
+        if (p.cardRenderer == null) return;
+        if (fadeBlock == null) fadeBlock = new MaterialPropertyBlock();
+        fadeBlock.SetFloat(FadeId, p.cardsComing ? t : -1f - t);
+        p.cardRenderer.SetPropertyBlock(fadeBlock);
+    }
+
     void Fades()
     {
+        for (int i = cardFading.Count - 1; i >= 0; i--)
+        {
+            Piece p = cardFading[i];
+            float t = (Time.unscaledTime - p.cardFadeStart) / FadeTime;
+            if (p.cardRenderer == null || p.gone || t >= 1f)
+            {
+                if (p.cardRenderer != null)
+                {
+                    p.cardRenderer.SetPropertyBlock(null);
+                    p.cardRenderer.enabled = p.cardsComing;
+                }
+                p.cardFadeStart = -1f;
+                cardFading.RemoveAt(i);
+            }
+            else SetCardFade(p, t);
+        }
         for (int i = fading.Count - 1; i >= 0; i--)
         {
             Piece p = fading[i];

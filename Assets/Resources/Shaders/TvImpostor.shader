@@ -15,6 +15,7 @@ Shader "O-Manager/TvImpostor"
         _Cutoff ("Alpha cut", Range(0,1)) = 0.5
         _FogStart ("Fog start (m)", Float) = 45
         _FogEnd ("Fog end (m)", Float) = 230
+        _Fade ("Cross-fade (1 = shown)", Float) = 1
     }
     SubShader
     {
@@ -31,7 +32,7 @@ Shader "O-Manager/TvImpostor"
             #define TV_FOG half3(0.571, 0.672, 0.701)
 
             sampler2D _MainTex;
-            float _Views, _Rows, _Cutoff, _FogStart, _FogEnd;
+            float _Views, _Rows, _Cutoff, _FogStart, _FogEnd, _Fade;
 
             struct appdata
             {
@@ -74,6 +75,13 @@ Shader "O-Manager/TvImpostor"
             {
                 half4 c = tex2D(_MainTex, i.uv);
                 clip(c.a - _Cutoff);
+                // Cross-fade with the real trees (RunWorld): the same dither as TvAtlasLit
+                if (_Fade < 0.999)
+                {
+                    float2 px = floor(i.pos.xy);
+                    float dither = frac(52.9829189 * frac(dot(px, float2(0.06711056, 0.00583715))));
+                    clip(_Fade >= 0 ? _Fade - dither : dither + _Fade + 1.0);
+                }
                 half3 col = saturate(c.rgb * i.tint);
                 float fog = smoothstep(_FogStart, _FogEnd, i.depth);
                 return half4(lerp(col, TV_FOG, fog), 1);
