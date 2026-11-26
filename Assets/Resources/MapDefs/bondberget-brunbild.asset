@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdf7c09cbde9a0e429736d1cbce57569, type: 3}
+  m_Name: bondberget-brunbild
+  m_EditorClassIdentifier: Assembly-CSharp::MapDefinition
+  id: bondberget-brunbild
+  displayName: Bondberget brunbild
+  mapType: forest
+  gridName: MapPackages/bondberget-brunbild/grid
+  minx: 1005.20593
+  miny: 1005.8
+  maxx: 4855.206
+  maxy: 4525.8
+  gridSize: 10
+  rows: 353
+  cols: 386
+  pointsPath: MapPackages/bondberget-brunbild/points
+  linesPath: MapPackages/bondberget-brunbild/lines
+  editedAt: 1795687116
+  defaultBackground: map
+  backgrounds:
+  - id: map
+    spritePath: MapPackages/bondberget-brunbild/picture
+    thumbnailPath: MapPackages/bondberget-brunbild/thumb
+    position: {x: 0, y: 0, z: 0}
+    rotation: 0
+    scale: 1
+    courseInPicture: 0
+    pixelSize: {x: 3088, y: 2824}
+    pivotPixels: {x: 1544, y: 1412}
+    pixelsPerUnit: 80

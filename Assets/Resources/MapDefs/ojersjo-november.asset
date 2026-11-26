@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdf7c09cbde9a0e429736d1cbce57569, type: 3}
+  m_Name: ojersjo-november
+  m_EditorClassIdentifier: Assembly-CSharp::MapDefinition
+  id: ojersjo-november
+  displayName: "\xD6jersj\xF6 November ( )"
+  mapType: sprint
+  gridName: MapPackages/ojersjo-november/grid
+  minx: 1128.52
+  miny: 1127.8264
+  maxx: 2778.52
+  maxy: 3357.8264
+  gridSize: 2
+  rows: 1116
+  cols: 826
+  pointsPath: MapPackages/ojersjo-november/points
+  linesPath: MapPackages/ojersjo-november/lines
+  editedAt: 1795622088
+  defaultBackground: map
+  backgrounds:
+  - id: map
+    spritePath: MapPackages/ojersjo-november/picture
+    thumbnailPath: MapPackages/ojersjo-november/thumb
+    position: {x: 0, y: 0, z: 0}
+    rotation: 0
+    scale: 1
+    courseInPicture: 0
+    pixelSize: {x: 4956, y: 6696}
+    pivotPixels: {x: 2478, y: 3348}
+    pixelsPerUnit: 300

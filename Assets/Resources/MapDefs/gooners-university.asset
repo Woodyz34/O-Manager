@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdf7c09cbde9a0e429736d1cbce57569, type: 3}
+  m_Name: gooners-university
+  m_EditorClassIdentifier: Assembly-CSharp::MapDefinition
+  id: gooners-university
+  displayName: Gooners University
+  mapType: sprint
+  gridName: MapPackages/gooners-university/grid
+  minx: 1008.448
+  miny: 1007.20905
+  maxx: 2302.448
+  maxy: 2661.209
+  gridSize: 2
+  rows: 828
+  cols: 648
+  pointsPath: MapPackages/gooners-university/points
+  linesPath: MapPackages/gooners-university/lines
+  editedAt: 1795622864
+  defaultBackground: map
+  backgrounds:
+  - id: map
+    spritePath: MapPackages/gooners-university/picture
+    thumbnailPath: MapPackages/gooners-university/thumb
+    position: {x: 0, y: 0, z: 0}
+    rotation: 0
+    scale: 1
+    courseInPicture: 0
+    pixelSize: {x: 3888, y: 4968}
+    pivotPixels: {x: 1944, y: 2484}
+    pixelsPerUnit: 300
