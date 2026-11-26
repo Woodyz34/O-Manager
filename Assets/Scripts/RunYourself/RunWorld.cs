@@ -479,7 +479,10 @@ public class RunWorld : MonoBehaviour
         int ix = (int)Math.Floor((e - anchorE) / PieceSize), iz = (int)Math.Floor((n - anchorN) / PieceSize);
         if (pieces.TryGetValue(Key(ix, iz), out Piece p) && p.world != null)
         {
-            float g = p.world.HeightAt((float)(e - p.ce), (float)(n - p.cn));
+            float x = (float)(e - p.ce), z = (float)(n - p.cn);
+            float g = p.world.HeightAt(x, z);
+            // On a cliff's rock top: its top is the ground, not the step hidden under it (2026-11-26, Anders on Fossum)
+            if (p.world.caps.Count > 0 && p.world.CapAt(x, z, out float cap) && cap > g) g = cap;
             // Beside a tunnel, over its walls: the top of its slab (the ground under it rises behind the walls)
             if (p.world.tunnels.Count > 0)
             {
@@ -1104,8 +1107,7 @@ public class RunWorld : MonoBehaviour
             {
                 done.world = TvWorldBuilder.Build(input);
                 if (copies != null) done.treeSet = copies.Prepare(done.world.treeRecords, offset);
-                done.arrays = new List<TvWorldView.MeshArrays>(done.world.meshes.Count);
-                foreach (TvMesh m in done.world.meshes) done.arrays.Add(new TvWorldView.MeshArrays(m));
+                done.arrays = Parts(done.world.meshes, false);
                 done.world.meshes.Clear();
             }
             catch (Exception e)
@@ -1130,8 +1132,7 @@ public class RunWorld : MonoBehaviour
             try
             {
                 TvWorld w = TvWorldBuilder.Build(input);
-                done.arrays = new List<TvWorldView.MeshArrays>(w.meshes.Count);
-                foreach (TvMesh m in w.meshes) done.arrays.Add(new TvWorldView.MeshArrays(m));
+                done.arrays = Parts(w.meshes, true);
             }
             catch (Exception e)
             {
@@ -1162,9 +1163,8 @@ public class RunWorld : MonoBehaviour
             try
             {
                 TvWorld w = TvWorldBuilder.Build(input);
-                done.arrays = new List<TvWorldView.MeshArrays>();
-                foreach (TvMesh m in w.meshes)
-                    if (IsFullTrees(m.name, m.group)) done.arrays.Add(new TvWorldView.MeshArrays(m));
+                w.meshes.RemoveAll(m => !IsFullTrees(m.name, m.group));
+                done.arrays = Parts(w.meshes, false);
             }
             catch (Exception e)
             {
@@ -1172,6 +1172,23 @@ public class RunWorld : MonoBehaviour
             }
             finished.Enqueue(done);
         });
+    }
+
+    // A piece's meshes as the graphics card gets them, in parts of at most MaxCorners corners so none stops the game
+    // when it is handed over (2026-11-26, Anders on Fossum Ultra: a piece's undergrowth of 1-1.5 million corners cost
+    // 100-200 ms). The undergrowth, thickets and litter are also cut into 16 m squares, so the graphics card skips the
+    // squares behind the runner and beside the picture.
+    const int MaxCorners = 48000;
+
+    static List<TvWorldView.MeshArrays> Parts(List<TvMesh> meshes, bool detail)
+    {
+        var list = new List<TvWorldView.MeshArrays>(meshes.Count);
+        foreach (TvMesh m in meshes)
+        {
+            bool cut = detail && m.name != "Town houses full";
+            list.AddRange(TvWorldView.MeshArrays.Split(m, Half, cut ? 4 : 1, MaxCorners));
+        }
+        return list;
     }
 
     static bool IsFullTrees(string name, int group) => group == TvMesh.Near && name == "Trees";
@@ -1265,7 +1282,7 @@ public class RunWorld : MonoBehaviour
         double ms = ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
         if (ms <= slowMeshMs) return;
         slowMeshMs = ms;
-        slowMesh = a.name + " " + a.vertices.Length.ToString("N0") + " corners " + ms.ToString("0.0") + " ms";
+        slowMesh = a.name + " " + a.count.ToString("N0") + " corners " + ms.ToString("0.0") + " ms";
     }
 
     Renderer AddMesh(Transform parent, TvWorldView.MeshArrays source, List<Mesh> keep)
@@ -1284,7 +1301,7 @@ public class RunWorld : MonoBehaviour
         go.transform.SetParent(parent, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         var r = go.AddComponent<MeshRenderer>();
-        r.sharedMaterial = source.uvs != null ? atlasMaterial
+        r.sharedMaterial = source.HasUvs ? atlasMaterial
             : source.name == "Ground paved" && pavedMaterial != null ? pavedMaterial
             : source.name.StartsWith("Ground", StringComparison.Ordinal) ? groundMaterial : plainMaterial;
         r.shadowCastingMode = source.castShadows && look.shadows > 0 ? ShadowCastingMode.On : ShadowCastingMode.Off;

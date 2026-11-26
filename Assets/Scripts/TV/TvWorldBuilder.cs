@@ -143,6 +143,33 @@ public class TvWorld
     // length, half width, floor height at the start and at the end, for each
     public readonly List<float> tunnels = new List<float>();
 
+    // The tops of the rock cliffs as triangles (x, y, z three times each): the ground a runner stands on there, over
+    // the ground's own step hidden under the rock (run yourself, 2026-11-26)
+    public readonly List<float> caps = new List<float>();
+
+    // The height of a cliff's rock top here, if there is one
+    public bool CapAt(float x, float z, out float y)
+    {
+        y = float.MinValue;
+        bool found = false;
+        List<float> t = caps;
+        for (int i = 0; i + 8 < t.Count; i += 9)
+        {
+            float ax = t[i], az = t[i + 2], bx = t[i + 3], bz = t[i + 5], cx = t[i + 6], cz = t[i + 8];
+            if ((x < ax && x < bx && x < cx) || (x > ax && x > bx && x > cx) || (z < az && z < bz && z < cz) || (z > az && z > bz && z > cz)) continue;
+            float d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+            if (Math.Abs(d) < 1e-8f) continue;
+            float u = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+            float v = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+            float w = 1f - u - v;
+            if (u < -1e-4f || v < -1e-4f || w < -1e-4f) continue;
+            float h = u * t[i + 1] + v * t[i + 4] + w * t[i + 7];
+            if (h > y) y = h;
+            found = true;
+        }
+        return found;
+    }
+
     public void AddWall(float ax, float az, float bx, float bz)
     {
         walls.Add(ax); walls.Add(az); walls.Add(bx); walls.Add(bz);
@@ -513,6 +540,7 @@ public partial class TvWorldBuilder
         Waters();
         Stones();
         Structures();
+        ForestHouses();
         if (input.town != null) TownStreets();
         else ForestBridges();
         ControlFlag();
@@ -637,6 +665,7 @@ public partial class TvWorldBuilder
         int lineSolids = world.solids.Count;
         Structures();
         OpenPassages(lineSolids, world.solids.Count);
+        ForestHouses();
         if (input.town != null) TownStreets();
         else ForestBridges();
         Flags();
@@ -2352,28 +2381,65 @@ public partial class TvWorldBuilder
                 lastFace = faceB;
                 lastTop = topB;
             }
+            // The rock top as solid ground for the runner (2026-11-26, Anders on Fossum: from above you could walk
+            // onto the top of a cliff and sink through it into the ground's step behind the face). A little past the
+            // piece too, so the top is solid right up to the piece's edge.
+            for (int i = 0; i < count; i++)
+            {
+                PointOn(c, along, (i + 0.5f) * gap, out float mx0, out float mz0);
+                if (mx0 < -R - 2f || mx0 > R + 2f || mz0 < -R - 2f || mz0 > R + 2f) continue;
+                CapColumn(c, along, length, i * gap, cliff.side, more, out float[] a);
+                CapColumn(c, along, length, (i + 1) * gap, cliff.side, more, out float[] b);
+                CapTriangle(a, 0, b, 0, a, 1);
+                CapTriangle(b, 0, b, 1, a, 1);
+                CapTriangle(a, 1, b, 1, a, 2);
+                CapTriangle(b, 1, b, 2, a, 2);
+            }
+        }
+
+        void CapTriangle(float[] p, int i, float[] q, int j, float[] r, int k)
+        {
+            List<float> caps = world.caps;
+            caps.Add(p[i * 3]); caps.Add(p[i * 3 + 1]); caps.Add(p[i * 3 + 2]);
+            caps.Add(q[j * 3]); caps.Add(q[j * 3 + 1]); caps.Add(q[j * 3 + 2]);
+            caps.Add(r[k * 3]); caps.Add(r[k * 3 + 1]); caps.Add(r[k * 3 + 2]);
+        }
+
+        // The front, middle and back of the rock top at the distance s along the line (x, y, z each), as Column
+        // builds it
+        void CapColumn(float[] c, float[] along, float length, float s, float side, (float before, float after) more, out float[] points)
+        {
+            ColumnBase(c, along, length, s, side, more, out float px, out float pz, out float nx, out float nz, out float fx, out float fz, out float top);
+            float mx = px - nx * 0.75f, mz = pz - nz * 0.75f, kx = px - nx * Back, kz = pz - nz * Back;
+            points = new[] { fx, top, fz, mx, Math.Max(top, H(mx, mz) + 0.06f), mz, kx, H(kx, kz) - 0.04f, kz };
+        }
+
+        void ColumnBase(float[] c, float[] along, float length, float s, float side, (float before, float after) more,
+                        out float px, out float pz, out float nx, out float nz, out float fx, out float fz, out float top)
+        {
+            PointOn(c, along, s, out px, out pz);
+            PointOn(c, along, Math.Max(0f, s - 0.75f), out float bx, out float bz);
+            PointOn(c, along, Math.Min(length, s + 0.75f), out float fx0, out float fz0);
+            float sx = fx0 - bx, sz = fz0 - bz, l = (float)Math.Sqrt(sx * sx + sz * sz);
+            if (l < 1e-5f) { sx = c[2] - c[0]; sz = c[3] - c[1]; l = Math.Max(1e-5f, (float)Math.Sqrt(sx * sx + sz * sz)); }
+            // The low side, as the drop was made
+            nx = side * sz / l; nz = -side * sx / l;
+            float jag = (TvRandom.Noise((px + ox) * 1.7f, (pz + oz) * 1.7f) - 0.5f) * 0.16f;
+            fx = px + nx * (Out + jag); fz = pz + nz * (Out + jag);
+            // The top: level with the ground above the step (a little over it, so the ground does not show through)
+            top = Math.Max(H(px - nx * 1.1f, pz - nz * 1.1f), H(px - nx * 1.45f, pz - nz * 1.45f)) + 0.1f;
+            // At the cliff's own ends the face sinks into the ground where it stands
+            float toEnd = Math.Min(more.before > 0f ? 9f : s, more.after > 0f ? 9f : length - s);
+            top = Lerp(H(fx, fz) - 0.05f, top, Sm(0f, 1.2f, toEnd));
         }
 
         // One column of the face (Rows + 1 corners from the top down) and of the top (3 corners from the front back),
         // the distance s along the line
         void Column(float[] c, float[] along, float length, float s, float side, (float before, float after) more, out int face, out int topFirst)
         {
-            PointOn(c, along, s, out float px, out float pz);
-            PointOn(c, along, Math.Max(0f, s - 0.75f), out float bx, out float bz);
-            PointOn(c, along, Math.Min(length, s + 0.75f), out float fx0, out float fz0);
-            float sx = fx0 - bx, sz = fz0 - bz, l = (float)Math.Sqrt(sx * sx + sz * sz);
-            if (l < 1e-5f) { sx = c[2] - c[0]; sz = c[3] - c[1]; l = Math.Max(1e-5f, (float)Math.Sqrt(sx * sx + sz * sz)); }
-            // The low side, as the drop was made
-            float nx = side * sz / l, nz = -side * sx / l;
-            float jag = (TvRandom.Noise((px + ox) * 1.7f, (pz + oz) * 1.7f) - 0.5f) * 0.16f;
-            float fx = px + nx * (Out + jag), fz = pz + nz * (Out + jag);
-            // The top: level with the ground above the step (a little over it, so the ground does not show through);
-            // the foot: in the ground below
-            float top = Math.Max(H(px - nx * 1.1f, pz - nz * 1.1f), H(px - nx * 1.45f, pz - nz * 1.45f)) + 0.1f;
+            ColumnBase(c, along, length, s, side, more, out float px, out float pz, out float nx, out float nz, out float fx, out float fz, out float top);
+            // The foot: in the ground below
             float foot = H(px + nx * 0.8f, pz + nz * 0.8f) - 0.4f;
-            // At the cliff's own ends the face sinks into the ground where it stands
-            float toEnd = Math.Min(more.before > 0f ? 9f : s, more.after > 0f ? 9f : length - s);
-            top = Lerp(H(fx, fz) - 0.05f, top, Sm(0f, 1.2f, toEnd));
             // A low cliff: the face reaches further into the ground below, never up above the top
             if (top < foot + 0.5f) foot = top - 0.5f;
             float lean = (TvRandom.Noise((px + ox) * 0.9f + 7f, (pz + oz) * 0.9f) - 0.5f) * 0.3f;
@@ -2810,28 +2876,10 @@ public partial class TvWorldBuilder
                 }
                 case WorldPointKind.SmallBuilding:
                 {
-                    // A small building of the forest (a hut, a shed, a shelter): red plank walls, a door and a window,
-                    // a pitched roof (2026-11-26, Anders on Fossum: the map's small buildings were missing)
-                    var t = new TvShapeBuilder(random);
-                    float hl = Rr(1.8f, 2.4f), hw = Rr(1.4f, 1.8f), eaves = 2.2f, ridge = 2.2f + hw * 0.8f;
-                    t.Box(-hl, -0.4f, -hw, hl, eaves, hw, house);
-                    t.Box(-hl - 0.02f, -0.4f, -hw - 0.02f, hl + 0.02f, 0.05f, hw + 0.02f, stone);   // the plinth
-                    t.Box(-0.45f, 0.05f, -hw - 0.04f, 0.45f, 1.95f, -hw + 0.02f, house.Shade(0.6f));   // the door
-                    t.Box(hl * 0.45f, 0.95f, -hw - 0.04f, hl * 0.45f + 0.7f, 1.6f, -hw + 0.02f, TvColor.Hex("#2c3238"));   // a window
-                    // The white corners and the gable ends up to the ridge
-                    foreach (float sx in new[] { -1f, 1f })
-                        foreach (float sz in new[] { -1f, 1f })
-                            t.Box(sx * hl - 0.06f, -0.4f, sz * hw - 0.06f, sx * hl + 0.06f, eaves, sz * hw + 0.06f, TvColor.Hex("#e8e4da"));
-                    for (int k = 0; k < 6; k++)
-                    {
-                        float f0 = k / 6f, f1 = (k + 1) / 6f, yy0 = eaves + (ridge - eaves) * f0, yy1 = eaves + (ridge - eaves) * f1;
-                        float half = hw * (1f - f1 * 0.98f);
-                        foreach (float sx in new[] { -1f, 1f })
-                            t.Box(sx * hl - 0.05f, yy0, -half, sx * hl + 0.05f, yy1, half, house);
-                    }
-                    Roof(t, hl, hw, eaves, ridge, 0.3f, roof);
-                    thingMesh.Add(t.Done(), x, y, z, 1f, 1f, 1f, Rr(0f, 6.283f));
-                    world.solids.Add(new TvSolid { x = x, z = z, r = Math.Max(hl, hw) + 0.3f });
+                    // A small building of the forest (a hut, a shed, a shelter), turned as the map draws it
+                    // (2026-11-26, Anders on Fossum: the map's small buildings were missing)
+                    float hl = Rr(1.8f, 2.4f), hw = Rr(1.4f, 1.8f);
+                    Hut(x, z, hl, hw, -p.angle * 0.0174533f);
                     break;
                 }
                 case WorldPointKind.SmallRuin:
@@ -3042,6 +3090,102 @@ public partial class TvWorldBuilder
     }
 
     // A pitched roof along x: two thick slabs meeting at the ridge, reaching out over the walls by over
+    // A red forest house: plank walls on a stone plinth, a door and a window, white corners, a pitched roof. hl, hw: half
+    // its length and width; yaw: which way its length goes. Solid: the runner keeps off its walls.
+    void Hut(float x, float z, float hl, float hw, float yaw)
+    {
+        TvColor house = TvColor.Hex("#b4472f"), roof = TvColor.Hex("#3f3b38"), stone = TvColor.Hex("#7e7b74");
+        float cos = (float)Math.Cos(yaw), sin = (float)Math.Sin(yaw);
+        // The corners as the mesh puts them (TvMesh.Add: x' = x cos + z sin, z' = -x sin + z cos)
+        float CornerX(float lx, float lz) => x + lx * cos + lz * sin;
+        float CornerZ(float lx, float lz) => z - lx * sin + lz * cos;
+        // Standing level on the highest corner, the plinth down to the lowest
+        float hi = float.MinValue, lo = float.MaxValue;
+        foreach (float sx in new[] { -1f, 0f, 1f })
+            foreach (float sz in new[] { -1f, 0f, 1f })
+            {
+                float h = H(CornerX(sx * hl, sz * hw), CornerZ(sx * hl, sz * hw));
+                hi = Math.Max(hi, h);
+                lo = Math.Min(lo, h);
+            }
+        float y = hi + 0.05f, foot = lo - y - 0.3f;
+        // A bigger house stands taller
+        float eaves = hw > 3f ? 2.8f : 2.2f, ridge = eaves + Math.Min(hw * 0.8f, 3.2f);
+        var t = new TvShapeBuilder(random);
+        t.Box(-hl, foot, -hw, hl, eaves, hw, house);
+        t.Box(-hl - 0.02f, foot, -hw - 0.02f, hl + 0.02f, 0.05f, hw + 0.02f, stone);   // the plinth
+        t.Box(-0.45f, 0.05f, -hw - 0.04f, 0.45f, 1.95f, -hw + 0.02f, house.Shade(0.6f));   // the door
+        t.Box(hl * 0.45f, 0.95f, -hw - 0.04f, hl * 0.45f + 0.7f, 1.6f, -hw + 0.02f, TvColor.Hex("#2c3238"));   // a window
+        if (hl > 3f) t.Box(-hl * 0.45f - 0.7f, 0.95f, -hw - 0.04f, -hl * 0.45f, 1.6f, -hw + 0.02f, TvColor.Hex("#2c3238"));
+        // The white corners and the gable ends up to the ridge
+        foreach (float sx in new[] { -1f, 1f })
+            foreach (float sz in new[] { -1f, 1f })
+                t.Box(sx * hl - 0.06f, foot, sz * hw - 0.06f, sx * hl + 0.06f, eaves, sz * hw + 0.06f, TvColor.Hex("#e8e4da"));
+        for (int k = 0; k < 6; k++)
+        {
+            float f0 = k / 6f, f1 = (k + 1) / 6f, yy0 = eaves + (ridge - eaves) * f0, yy1 = eaves + (ridge - eaves) * f1;
+            float half = hw * (1f - f1 * 0.98f);
+            foreach (float sx in new[] { -1f, 1f })
+                t.Box(sx * hl - 0.05f, yy0, -half, sx * hl + 0.05f, yy1, half, house);
+        }
+        Roof(t, hl, hw, eaves, ridge, 0.3f, roof);
+        thingMesh.Add(t.Done(), x, y, z, 1f, 1f, 1f, yaw);
+        // The walls (the runner keeps its reach from them), and a solid in the middle for the people and the trees
+        float ax = CornerX(-hl, -hw), az = CornerZ(-hl, -hw), bx = CornerX(hl, -hw), bz = CornerZ(hl, -hw);
+        float cx = CornerX(hl, hw), cz = CornerZ(hl, hw), dx = CornerX(-hl, hw), dz = CornerZ(-hl, hw);
+        world.AddWall(ax, az, bx, bz);
+        world.AddWall(bx, bz, cx, cz);
+        world.AddWall(cx, cz, dx, dz);
+        world.AddWall(dx, dz, ax, az);
+        world.solids.Add(new TvSolid { x = x, z = z, r = Math.Min(hl, hw) + 0.3f });
+    }
+
+    // The buildings a forest map draws as areas (2026-11-26, Anders on Fossum: of two buildings beside each other
+    // only the one drawn as a point stood in 3D): a house to the shape of each, the smallest rectangle round its
+    // outline. Built by the piece its middle is in.
+    void ForestHouses()
+    {
+        if (input.town != null || layer.areas == null) return;
+        foreach (WorldArea a in layer.areas)
+        {
+            if (a.kind != WorldAreaKind.House || a.hole || a.xy == null || a.xy.Length < 6) continue;
+            float cxE = (a.minE + a.maxE) * 0.5f, cxN = (a.minN + a.maxN) * 0.5f;
+            if (Math.Abs(cxE - input.centerE) > R + 60f || Math.Abs(cxN - input.centerN) > R + 60f) continue;
+            float[] xy = a.xy;
+            int n = xy.Length / 2;
+            // The smallest rectangle round the outline: one of its sides lies along a side of the outline
+            float best = float.MaxValue, ux = 1f, uz = 0f, u0 = 0f, u1 = 0f, v0 = 0f, v1 = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                int j = (i + 1) % n;
+                float ex = xy[j * 2] - xy[i * 2], ez = xy[j * 2 + 1] - xy[i * 2 + 1], l = (float)Math.Sqrt(ex * ex + ez * ez);
+                if (l < 0.2f) continue;
+                ex /= l; ez /= l;
+                float lu = float.MaxValue, hu = float.MinValue, lv = float.MaxValue, hv = float.MinValue;
+                for (int k = 0; k < n; k++)
+                {
+                    float px = xy[k * 2] - cxE, pz = xy[k * 2 + 1] - cxN;
+                    float pu = px * ex + pz * ez, pv = -px * ez + pz * ex;
+                    lu = Math.Min(lu, pu); hu = Math.Max(hu, pu);
+                    lv = Math.Min(lv, pv); hv = Math.Max(hv, pv);
+                }
+                float area = (hu - lu) * (hv - lv);
+                if (area < best - 1e-3f) { best = area; ux = ex; uz = ez; u0 = lu; u1 = hu; v0 = lv; v1 = hv; }
+            }
+            if (best == float.MaxValue) continue;
+            float mu = (u0 + u1) * 0.5f, mv = (v0 + v1) * 0.5f;
+            float x = (float)(cxE + mu * ux - mv * uz - input.centerE), z = (float)(cxN + mu * uz + mv * ux - input.centerN);
+            if (!Inside(x, z, 0f)) continue;
+            float hl = Math.Max(1f, (u1 - u0) * 0.5f), hw = Math.Max(1f, (v1 - v0) * 0.5f);
+            // The length along the longer side
+            if (hw > hl) { float s = hl; hl = hw; hw = s; float ox2 = ux; ux = -uz; uz = ox2; }
+            // Very big buildings stay as the map has them (blocked paving): a forest map's barns and halls are rare
+            if (hl > 25f) continue;
+            Reseed(x, z, 97);
+            Hut(x, z, hl, hw, (float)Math.Atan2(-uz, ux));
+        }
+    }
+
     static void Roof(TvShapeBuilder b, float hl, float hw, float eaves, float ridge, float over, TvColor color)
     {
         float pitch = (ridge - eaves) / Math.Max(0.01f, hw);
