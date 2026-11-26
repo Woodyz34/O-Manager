@@ -504,6 +504,14 @@ public class AICoursePanel : MonoBehaviour
         resultText.color = CourseUI.Ink;
         resultText.text = kind == CourseGenerator.Kind.Sprint ? (barriers ? "Laying the course and placing barriers to turn dull legs into good route choices..." : "Laying the course and looking for legs with good route choices...") : "Laying the course and checking every leg...";
 
+        // Show the loading bar at once and let two frames draw it before the heavy loading below starts
+        progressFill.anchorMax = new Vector2(0f, 1f);
+        progressText.text = "Starting...";
+        progressRow.gameObject.SetActive(true);
+        await Awaitable.NextFrameAsync();
+        await Awaitable.NextFrameAsync();
+        if (this == null) return;
+
         MapGrid grid = MapGrid.Load(map.gridName); // Resources has to be used on the main thread
         CourseGenerator.Settings settings = new CourseGenerator.Settings
         {
@@ -516,9 +524,6 @@ public class AICoursePanel : MonoBehaviour
             progress = new CourseGenerator.Progress()
         };
         progress = settings.progress;
-        progressFill.anchorMax = new Vector2(0f, 1f);
-        progressText.text = "Starting...";
-        progressRow.gameObject.SetActive(true);
         MapDefinition chosenMap = map;
         CourseGenerator.Result result = await Task.Run(() => CourseGenerator.Generate(chosenMap, grid, settings));
         if (this == null) return;
