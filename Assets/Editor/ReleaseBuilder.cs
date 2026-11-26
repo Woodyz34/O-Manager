@@ -20,7 +20,12 @@ using UnityEngine;
 //      Mac and Linux need "Mac Build Support (Mono)" and "Linux Build Support (Mono)" added to this Unity version
 //      in Unity Hub (Installs > the gear > Add modules). Without them those boxes are greyed out.
 //   3. opens that folder and the "new release" page on GitHub with the version and notes filled in.
-// Then drag the files onto the GitHub page and press Publish release. Every installed game updates itself the
+// Then drag the files onto the GitHub page and press Publish release.
+//
+// Speed (2026-11-26): the map pictures are not part of Unity's build any more. Before building, MapPictureCache makes
+// the compressed picture files in Assets/StreamingAssets/MapPictures, but only for maps whose PNG changed since last
+// time; Unity then just copies them into each game. The computer type the editor is on now is built last, so the
+// editor switches platform one time less, and the dialog at the end says how long each step took. Every installed game updates itself the
 // next time it starts, and the website's Download button gives the new version for the visitor's computer.
 public class ReleaseBuilder : EditorWindow
 {
@@ -185,6 +190,19 @@ public class ReleaseBuilder : EditorWindow
 
     static void BuildRelease(string version, string notes, bool openGitHub, bool windows, bool mac, bool linux)
     {
+        var clock = Stopwatch.StartNew();
+        var times = new List<string>();
+
+        // 0. Map pictures: only new or changed maps are compressed again
+        MapPictureCache.Result pictures = MapPictureCache.PrepareAll();
+        times.Add("Map pictures (" + pictures.reused.Count + " unchanged, " + pictures.made.Count + " made again): " + Took(clock));
+        if (pictures.failed.Count > 0)
+        {
+            EditorUtility.DisplayDialog("Build release", "Some map pictures could not be prepared, so those maps would have no picture " +
+                                        "in the game. Nothing was built.\n\n" + pictures.Summary(), "OK");
+            return;
+        }
+
         // 1. Version
         PlayerSettings.bundleVersion = version;
         AssetDatabase.SaveAssets();
@@ -195,10 +213,17 @@ public class ReleaseBuilder : EditorWindow
         var problems = new List<string>();
         try
         {
-            // 2. One computer type at a time. A failure on one does not stop the others.
-            if (windows) BuildWindows(version, made, problems);
-            if (mac) BuildMac(made, problems);
-            if (linux) BuildLinux(made, problems);
+            // 2. One computer type at a time. A failure on one does not stop the others. Switching the editor to
+            // another computer type costs a minute or two (scripts are compiled again), so the one it is on now
+            // goes last: then there is no switching back afterwards.
+            var steps = new List<KeyValuePair<BuildTarget, Action>>();
+            if (windows) steps.Add(new KeyValuePair<BuildTarget, Action>(BuildTarget.StandaloneWindows64, () => BuildWindows(version, made, problems, times, clock)));
+            if (mac) steps.Add(new KeyValuePair<BuildTarget, Action>(BuildTarget.StandaloneOSX, () => BuildMac(made, problems, times, clock)));
+            if (linux) steps.Add(new KeyValuePair<BuildTarget, Action>(BuildTarget.StandaloneLinux64, () => BuildLinux(made, problems, times, clock)));
+            foreach (var step in steps.Where(s => s.Key != activeBefore).Concat(steps.Where(s => s.Key == activeBefore)).ToList())
+            {
+                step.Value();
+            }
         }
         finally
         {
@@ -207,12 +232,14 @@ public class ReleaseBuilder : EditorWindow
             if (EditorUserBuildSettings.activeBuildTarget != activeBefore)
             {
                 EditorUserBuildSettings.SwitchActiveBuildTarget(BuildPipeline.GetBuildTargetGroup(activeBefore), activeBefore);
+                times.Add("Switching the editor back: " + Took(clock));
             }
         }
 
         if (made.Count == 0)
         {
-            EditorUtility.DisplayDialog("Build release", "Nothing was made.\n\n" + string.Join("\n", problems), "OK");
+            EditorUtility.DisplayDialog("Build release", "Nothing was made.\n\n" + string.Join("\n", problems) +
+                                        "\n\nTime taken:\n  " + string.Join("\n  ", times), "OK");
             return;
         }
 
@@ -235,6 +262,8 @@ public class ReleaseBuilder : EditorWindow
         {
             message += "\n\nNot made:\n" + string.Join("\n", problems);
         }
+        message += "\n\nTime taken:\n  " + string.Join("\n  ", times);
+        UnityEngine.Debug.Log("Release " + version + " time taken:\n" + string.Join("\n", times));
         EditorUtility.DisplayDialog("Build release", message, "OK");
     }
 
@@ -271,15 +300,34 @@ public class ReleaseBuilder : EditorWindow
             problems.Add(label + ": the Unity build failed (" + report.summary.result + "). See the Console.");
             return false;
         }
-        UnityEngine.Debug.Log("Release: " + label + " game built in " + folder);
+        // The map pictures come from Assets/StreamingAssets; without them every built-in map would be blank
+        int pictureFiles = Directory.GetFiles(folder, "*" + MapPictureFiles.Extension, SearchOption.AllDirectories).Length;
+        int expected = Directory.Exists(MapPictureFiles.ReadyFolder)
+            ? Directory.GetFiles(MapPictureFiles.ReadyFolder, "*" + MapPictureFiles.Extension).Length : 0;
+        if (pictureFiles < expected)
+        {
+            problems.Add(label + ": only " + pictureFiles + " of " + expected + " map pictures got into the game.");
+            return false;
+        }
+        UnityEngine.Debug.Log("Release: " + label + " game built in " + folder + " (" + pictureFiles + " map pictures)");
         return true;
     }
 
     static string SizeText(string path) => (new FileInfo(path).Length / 1048576) + " MB";
 
-    static void BuildWindows(string version, List<string> made, List<string> problems)
+    // How long since the last step, as m:ss, and starts timing the next one
+    static string Took(Stopwatch clock)
     {
-        if (!BuildGame(BuildTarget.StandaloneWindows64, BuildDir, PlayerSettings.productName + ".exe", "Windows", problems)) return;
+        TimeSpan t = clock.Elapsed;
+        clock.Restart();
+        return (int)t.TotalMinutes + ":" + t.Seconds.ToString("00");
+    }
+
+    static void BuildWindows(string version, List<string> made, List<string> problems, List<string> times, Stopwatch clock)
+    {
+        bool built = BuildGame(BuildTarget.StandaloneWindows64, BuildDir, PlayerSettings.productName + ".exe", "Windows", problems);
+        times.Add("Windows game: " + Took(clock));
+        if (!built) return;
 
         string iscc = FindIscc();
         if (iscc == null)
@@ -320,6 +368,7 @@ public class ReleaseBuilder : EditorWindow
         finally
         {
             EditorUtility.ClearProgressBar();
+            times.Add("Windows setup.exe (Inno Setup): " + Took(clock));
         }
 
         if (exitCode != 0 || !File.Exists(SetupPath))
@@ -332,11 +381,13 @@ public class ReleaseBuilder : EditorWindow
         UnityEngine.Debug.Log("Release: " + SetupPath + " (" + SizeText(SetupPath) + ")");
     }
 
-    static void BuildMac(List<string> made, List<string> problems)
+    static void BuildMac(List<string> made, List<string> problems, List<string> times, Stopwatch clock)
     {
         SetMacUniversal();
         string app = PlayerSettings.productName + ".app";
-        if (!BuildGame(BuildTarget.StandaloneOSX, MacBuildDir, app, "Mac", problems)) return;
+        bool built = BuildGame(BuildTarget.StandaloneOSX, MacBuildDir, app, "Mac", problems);
+        times.Add("Mac game (with switching the editor to Mac): " + Took(clock));
+        if (!built) return;
         try
         {
             EditorUtility.DisplayProgressBar("Build release", "Packing " + GameUpdater.MacAssetName + "…", 0.5f);
@@ -352,12 +403,15 @@ public class ReleaseBuilder : EditorWindow
         finally
         {
             EditorUtility.ClearProgressBar();
+            times.Add("Mac zip: " + Took(clock));
         }
     }
 
-    static void BuildLinux(List<string> made, List<string> problems)
+    static void BuildLinux(List<string> made, List<string> problems, List<string> times, Stopwatch clock)
     {
-        if (!BuildGame(BuildTarget.StandaloneLinux64, LinuxBuildDir, PlayerSettings.productName + ".x86_64", "Linux", problems)) return;
+        bool built = BuildGame(BuildTarget.StandaloneLinux64, LinuxBuildDir, PlayerSettings.productName + ".x86_64", "Linux", problems);
+        times.Add("Linux game (with switching the editor to Linux): " + Took(clock));
+        if (!built) return;
         try
         {
             EditorUtility.DisplayProgressBar("Build release", "Packing " + GameUpdater.LinuxAssetName + "…", 0.5f);
@@ -378,6 +432,7 @@ public class ReleaseBuilder : EditorWindow
         finally
         {
             EditorUtility.ClearProgressBar();
+            times.Add("Linux tar.gz: " + Took(clock));
         }
     }
 

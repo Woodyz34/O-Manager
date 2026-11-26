@@ -89,3 +89,21 @@ i en release får den datorn ingen uppdatering den gången (och hemsidan säger 
 | `Assets/Editor/ReleaseArchives.cs` | Packar Mac-zip och Linux-tar.gz med rätt "får köras"-flaggor |
 | `Assets/Scripts/UI/GameUpdater.cs` | Uppdateringskollen i spelet och versionsnumret nere till höger på huvudmenyn |
 | `website/config.js` | Vilket repo och vilka filnamn hemsidans *Ladda ner*-knapp använder |
+
+## Varför bygget går snabbare nu (kartbilderna)
+
+Kartbilderna ligger inte längre i `Assets/Resources`. Unity behövde annars importera dem (en minut för en stor
+karta) och skrev in dem **okomprimerade** i varje bygge: 4,2 GB av spelets 4,7 GB, och Inno Setup tog ungefär
+10 minuter på sig att packa dem. Nu:
+
+- PNG-bilderna ligger i `MapPictures/<karta>/picture.png` (i git, utanför Assets, så Unity rör dem inte).
+- **Build release** gör först färdiga, komprimerade bildfiler i `Assets/StreamingAssets/MapPictures/`, men bara
+  för kartor vars PNG har ändrats sedan förra gången. Oförändrade kartor tar en sekund eller två, en ny eller
+  ändrad stor karta ungefär en minut, en gång. Mappen ligger inte i git.
+- Unity kopierar sedan bara in de färdiga filerna i spelet, utan att bearbeta dem.
+- Dialogen när bygget är klart visar hur lång tid varje steg tog.
+
+Du behöver inte hålla reda på vad som har ändrats: verktyget jämför själv innehållet i varje PNG. Koden och
+resten byggs alltid om, det är den snabba delen. Vill du göra bildfilerna i förväg (t.ex. efter en ny karta)
+finns **Tools > O-Manager > Developer > Prepare map pictures for the build**. Import av en ny karta gör det
+också direkt.

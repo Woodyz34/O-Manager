@@ -56,6 +56,9 @@ UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
 Compression=lzma2/max
 SolidCompression=yes
+; Packs on several processor cores at once (2026-11-26): packing the 1 GB game on one core took about 10 minutes
+LZMAUseSeparateProcess=yes
+LZMANumBlockThreads=4
 WizardStyle=modern
 CloseApplications=force
 RestartApplications=no
