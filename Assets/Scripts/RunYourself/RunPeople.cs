@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -44,16 +46,57 @@ public class RunPeople : MonoBehaviour
         hasPlayer = true;
     }
 
-    // One mesh per person look, animation and frame, made when first needed
+    // One mesh per person look, animation and frame, made when first needed. The body (TvCityShapes.Figure) is put
+    // together on a background thread and only a few are handed to the graphics card a frame (2026-11-26: made on the
+    // main thread, a street full of new people cost 50-150 ms a frame on sprint maps); until a pose is ready the
+    // person keeps the one shown.
+    readonly ConcurrentDictionary<int, TvShape> made = new ConcurrentDictionary<int, TvShape>();
+    readonly HashSet<int> asked = new HashSet<int>();
+    int uploadsLeft;
+    const int UploadsPerFrame = 6;
+
     Mesh MeshFor(TvCityShapes.Act act, int frame, int look, bool child)
     {
         int key = (((int)act * TvCityShapes.Frames + frame) * 64 + look) * 2 + (child ? 1 : 0);
         if (meshes.TryGetValue(key, out Mesh mesh)) return mesh;
-        TvShape shape = TvCityShapes.Figure(new TvRandom(look * 13 + 5), look, child, TvCityShapes.Animate(act, frame, look));
-        mesh = TvWorldView.ToMesh(shape, "Person");
-        mesh.UploadMeshData(true);
-        meshes[key] = mesh;
-        return mesh;
+        if (made.TryGetValue(key, out TvShape shape))
+        {
+            if (uploadsLeft <= 0) return null;
+            uploadsLeft--;
+            made.TryRemove(key, out _);
+            mesh = TvWorldView.ToMesh(shape, "Person");
+            mesh.UploadMeshData(true);
+            meshes[key] = mesh;
+            return mesh;
+        }
+        Ask(act, frame, look, child, key);
+        return null;
+    }
+
+    void Ask(TvCityShapes.Act act, int frame, int look, bool child, int key)
+    {
+        if (!asked.Add(key)) return;
+        Task.Run(() =>
+        {
+            try { made[key] = TvCityShapes.Figure(new TvRandom(look * 13 + 5), look, child, TvCityShapes.Animate(act, frame, look)); }
+            catch (Exception e) { Debug.LogWarning("RunPeople: " + e.Message); }
+        });
+    }
+
+    // All the frames of the poses a person may take, asked for ahead (when the person is put out)
+    void AskAhead(Person p)
+    {
+        bool child = p.kind == 2;
+        var acts = p.kind == 1 ? new[] { TvCityShapes.Act.Walk }
+            : child ? new[] { TvCityShapes.Act.Idle, TvCityShapes.Act.Jump }
+            : new[] { TvCityShapes.Act.Idle, p.look % 4 == 3 ? TvCityShapes.Act.Phone : TvCityShapes.Act.Idle,
+                      p.look % 3 == 0 ? TvCityShapes.Act.Cheer : p.look % 3 == 1 ? TvCityShapes.Act.Clap : TvCityShapes.Act.Wave };
+        foreach (TvCityShapes.Act act in acts)
+            for (int f = 0; f < TvCityShapes.Frames; f++)
+            {
+                int key = (((int)act * TvCityShapes.Frames + f) * 64 + p.look) * 2 + (child ? 1 : 0);
+                if (!meshes.ContainsKey(key)) Ask(act, f, p.look, child, key);
+            }
     }
 
     public void Spawn(long key, Transform root, TvWorld world)
@@ -85,6 +128,7 @@ public class RunPeople : MonoBehaviour
             r.lightProbeUsage = LightProbeUsage.Off;
             r.reflectionProbeUsage = ReflectionProbeUsage.Off;
             r.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
+            AskAhead(person);
             Show(person, person.kind == 1 ? TvCityShapes.Act.Walk : TvCityShapes.Act.Idle, 0);
             Place(person, person.home, person.yaw, 0f);
             list.Add(person);
@@ -103,8 +147,10 @@ public class RunPeople : MonoBehaviour
     {
         int shown = (int)act * TvCityShapes.Frames + frame;
         if (p.shown == shown) return;
+        Mesh mesh = MeshFor(act, frame, p.look, p.kind == 2);
+        if (mesh == null) return;     // not made yet: the pose shown stays (none at first: not drawn)
         p.shown = shown;
-        p.filter.sharedMesh = MeshFor(act, frame, p.look, p.kind == 2);
+        p.filter.sharedMesh = mesh;
     }
 
     static int Frame(float cycles) => ((int)(cycles * TvCityShapes.Frames) % TvCityShapes.Frames + TvCityShapes.Frames) % TvCityShapes.Frames;
@@ -118,6 +164,7 @@ public class RunPeople : MonoBehaviour
 
     void Update()
     {
+        uploadsLeft = UploadsPerFrame;
         if (!hasPlayer) return;
         float time = Time.time, dt = Time.deltaTime;
         foreach (List<Person> list in byPiece.Values)
