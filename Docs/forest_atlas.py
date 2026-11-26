@@ -118,7 +118,7 @@ def bark_pine_low(seed=0):
     s = IN
     from scipy.ndimage import gaussian_filter
     k = seed * 100
-    fine = fft_noise(s, 0.6, 8 + k)
+    fine = fft_noise(s, 1.0, 8 + k)   # (2026-11-25: 0.6 was nearly white noise: specks up close)
     wob = fft_noise(s, 1.3, 11 + k)
     # big plates: stretched, warped cells; small plates inside some of them, only partly cut
     f1, f2, cid = voronoi(s, 220, 9 + k, (1.0, 0.72), warp=30 * U)
@@ -442,7 +442,7 @@ def spruce_spray():
             pts.append((x + math.cos(a) * ln * t, y + math.sin(a) * ln * t))
         c.taper(pts, 2.5, 1.2, twig)
         # needles all along, short, pointing forward and out
-        count = int(ln * 900)
+        count = int(ln * 1400)
         for k in range(count):
             t = g.random()
             i = min(6, int(t * 7))
@@ -450,23 +450,23 @@ def spruce_spray():
             py = lerp(pts[i][1], pts[i + 1][1], t * 7 - i)
             side = 1 if g.random() < 0.5 else -1
             a = ang + side * R(0.5, 1.3)
-            nl = R(0.016, 0.026)
+            nl = R(0.02, 0.032)
             tipness = smooth(0.7, 1.0, np.float32(t))
             c0 = mix('#233f27', '#34532e', g.random())
             c1 = mix('#486a38', '#80a04e', float(tipness) * 0.8 + g.random() * 0.2)
             c.taper([(px, py), (px + math.cos(a) * nl, py + math.sin(a) * nl)], 1.8, 1.0, c0, c1)
         if depth == 0:
-            for k in range(3):
-                t = 0.3 + 0.2 * k
+            for k in range(5):
+                t = 0.2 + 0.14 * k
                 i = int(t * 7)
                 side = 1 if k % 2 else -1
                 branchlet(pts[i], ang + side * R(0.6, 0.9), ln * R(0.35, 0.5), 1)
 
-    for k in range(14):
-        t = 0.06 + 0.86 * k / 13
+    for k in range(18):
+        t = 0.05 + 0.88 * k / 17
         i = int(t * (len(axis) - 1))
         side = 1 if k % 2 else -1
-        ln = 0.42 * math.sin(math.pi * (0.15 + 0.8 * t)) * R(0.8, 1.05)
+        ln = 0.47 * math.sin(math.pi * (0.15 + 0.8 * t)) * R(0.85, 1.05)
         ang = math.pi / 2 + side * R(0.75, 1.05)
         branchlet(axis[i], ang, ln, 0)
     # the leading tip
@@ -479,16 +479,18 @@ def birch_leaves():
     c = Canvas()
     g = np.random.default_rng(71)
     twig = rgba('#4a3628')
-    for s in range(5):
-        x0 = 0.15 + 0.17 * s + R(-0.04, 0.04)
-        pts = bezier((x0, 0.98), (x0 + R(-0.15, 0.15), 0.6), (x0 + R(-0.1, 0.1), R(0.05, 0.25)), 14)
-        c.taper(pts, 2.5, 1.0, twig)
+    # (2026-11-25, Anders: far too few leaves in the crowns, he wants about ten times as many): many hanging twigs
+    # side by side, each thick with small leaves, so a card is a curtain of leaves with only small gaps
+    for s in range(11):
+        x0 = 0.06 + 0.088 * s + R(-0.03, 0.03)
+        pts = bezier((x0, 0.98), (x0 + R(-0.12, 0.12), 0.6), (x0 + R(-0.08, 0.08), R(0.03, 0.15)), 22)
+        c.taper(pts, 2.2, 0.9, twig)
         for k, (px, py) in enumerate(pts[1:]):
-            for side in (-1, 1):
-                if g.random() < 0.25:
+            for side in (-1, 1, 0):
+                if side == 0 and g.random() < 0.5:
                     continue
-                a = -math.pi / 2 + side * R(0.5, 1.2) + R(-0.3, 0.3)
-                ln = R(0.06, 0.09)
+                a = -math.pi / 2 + side * R(0.4, 1.3) + R(-0.3, 0.3)
+                ln = R(0.045, 0.07)
                 stalk = 0.012
                 bx, by = px + math.cos(a) * stalk, py + math.sin(a) * stalk
                 shade = g.random()
@@ -506,8 +508,8 @@ def broad_leaves():
     c = Canvas()
     g = np.random.default_rng(81)
     twig = rgba('#4f3d30')
-    for s in range(4):
-        a0 = R(0, 2 * math.pi)
+    for s in range(8):
+        a0 = s * 0.785 + R(-0.3, 0.3)
         p0 = (0.5 + 0.12 * math.cos(a0), 0.5 + 0.12 * math.sin(a0))
         a = a0 + R(-0.4, 0.4)
         p1 = (0.5 + 0.45 * math.cos(a), 0.5 + 0.45 * math.sin(a))
@@ -516,10 +518,10 @@ def broad_leaves():
         for k, (px, py) in enumerate(pts[2:]):
             for side in (-1, 1):
                 aa = a + side * R(0.5, 1.1)
-                ln = R(0.09, 0.13)
+                ln = R(0.075, 0.11)
                 shade = g.random()
                 fill = mix('#3f6a28', '#78a03e', shade)
-                c.poly(leaf_shape(px, py, ln, ln * 0.33, aa, tip=0.2, n=16), fill)
+                c.poly(leaf_shape(px, py, ln, ln * 0.45, aa, tip=0.2, n=16), fill)
                 c.line([(px, py), (px + math.cos(aa) * ln * 0.9, py + math.sin(aa) * ln * 0.9)], 1.2, mix('#3a5a22', '#9ab85a', shade))
                 # side veins
                 for v in range(5):
@@ -1129,6 +1131,32 @@ def berry_leaf(c, g, px, py, ln, a, depth):
         c.line([(px, py), (px + ca * ln * 0.85, py + sa * ln * 0.85)], 1.1, tuple(int(v) for v in lerp(base, col('#c8dc8c'), 0.45)) + (255,))
 
 
+def bilberry_sprig():
+    """One bilberry sprig (2026-11-25, Anders: bilberry should be 3D, not pictures): a green zigzag twig up the
+    middle with 7-9 oval leaves one by one, filling the tile; the 3D bush sets many of these round its stems."""
+    c = Canvas()
+    g = np.random.default_rng(97)
+    pts = [(0.5, 0.0)]
+    x, y, ang = 0.5, 0.0, math.pi / 2
+    for i in range(8):
+        ang = math.pi / 2 + (0.22 if i % 2 else -0.22) + R(-0.08, 0.08)
+        x += math.cos(ang) * 0.115
+        y += math.sin(ang) * 0.115
+        pts.append((x, y))
+    c.taper(pts, 6, 3, rgba('#4a7026'), rgba('#78a33c'))
+    leaves = []
+    for i in range(1, len(pts)):
+        px, py = pts[i]
+        side = 1 if i % 2 else -1
+        a = math.pi / 2 + side * R(0.6, 1.2)
+        ln = R(0.2, 0.27) * (1.05 - 0.25 * py)
+        leaves.append((px, py, a, ln))
+    leaves.append((pts[-1][0], pts[-1][1], math.pi / 2 + R(-0.2, 0.2), 0.16))
+    for k, (px, py, a, ln) in enumerate(leaves):
+        berry_leaf(c, g, px, py, ln, a, 0.35 + 0.6 * k / len(leaves))
+    return c.done()
+
+
 def bilberry():
     """Bilberry from the side (2026-11-25, Anders: every bush clear, leaves and not a sea of green): green angular
     zigzag stems branching up from the moss, small oval leaves set one by one along them, the ones at the back and
@@ -1411,73 +1439,62 @@ def reindeer_lichen():
 
 
 def granite():
-    """Granite (boulders, cliff tops), 2026-11-25 after Anders' wish for living stones: coarse grains of grey, white
-    quartz, pink-red feldspar and black mica, cracks, and lichen of several kinds: pale grey-green rosettes,
-    yellow-green map lichen with dark rims, black dots (repeats; each stone gets its own colour cast and moss)."""
+    """Granite boulders (2026-11-25, second try after Anders' photos of real boulders: the first was far too dark and
+    cracked): light grey with a fine salt-and-pepper grain, white quartz specks and veins, a faint pink feldspar
+    cast, and big patches of pale grey-white crust lichen; hardly any cracks (repeats; each stone gets its own colour
+    cast and moss, the shader blends two scales so no pattern shows)."""
     s = IN
-    base = fft_noise(s, 1.7, 301)
-    g = np.random.default_rng(302)
-    grain = fft_noise(s, 0.25, 309)
-    rgb = lerp(col('#6a6762'), col('#958f86'), base[..., None])
+    base = fft_noise(s, 1.8, 301)
+    grain = fft_noise(s, 0.5, 309)
+    rgb = lerp(col('#8c8881'), col('#b8b4aa'), base[..., None])
     rgb *= (0.8 + 0.4 * grain)[..., None]
-    kind = fft_noise(s, 0.15, 312)
-    kind2 = fft_noise(s, 0.15, 314)
-    rgb = lerp(rgb, col('#c4bab0'), smooth(0.72, 0.8, kind)[..., None] * 0.4)            # quartz
-    rgb = lerp(rgb, col('#9a7466'), smooth(0.7, 0.78, kind2)[..., None] * 0.35)          # feldspar
-    rgb = lerp(rgb, col('#24221f'), smooth(0.25, 0.18, kind)[..., None] * 0.5)           # mica
-    f1, f2, _ = voronoi(s, 7, 305, warp=70)
-    crack = smooth(2.2, 0.0, f2 - f1)
-    rgb = lerp(rgb, col('#262422'), crack[..., None] * 0.65)
-    rgb = lerp(rgb, col('#b4b8a6'), lichen_mask(s, 306, 0.09)[..., None] * 0.55)
-    m2 = lichen_mask(s, 308, 0.05, 1.2)
-    rgb = lerp(rgb, col('#a4a85a'), m2[..., None] * 0.6)
-    rim = np.clip(lichen_mask(s, 308, 0.065, 1.2) - m2, 0, 1)
-    rgb = lerp(rgb, col('#1e1e1a'), rim[..., None] * 0.6)
-    rgb = lerp(rgb, col('#2a2b26'), lichen_mask(s, 310, 0.05, 1.0)[..., None] * 0.45)
+    kind = fft_noise(s, 0.35, 312)
+    kind2 = fft_noise(s, 1.2, 314)
+    rgb = lerp(rgb, col('#e6e2da'), smooth(0.66, 0.78, kind)[..., None] * 0.55)          # quartz, white
+    rgb = lerp(rgb, col('#b09486'), smooth(0.6, 0.8, kind2)[..., None] * 0.2)            # feldspar cast
+    rgb = lerp(rgb, col('#4a4844'), smooth(0.2, 0.12, kind)[..., None] * 0.35)           # mica, small dark
+    # one faint vein of quartz, no dark cracks
+    v = band_noise(s, 2.0, 305)
+    rgb = lerp(rgb, col('#ece8e0'), smooth(0.03, 0.0, np.abs(v - 0.5))[..., None] * 0.5)
+    # crust lichen: big pale grey-white and grey-green patches, a few yellow-green map lichen
+    rgb = lerp(rgb, col('#dcdcd0'), lichen_mask(s, 306, 0.22, 1.9)[..., None] * 0.6)
+    rgb = lerp(rgb, col('#b8c0a8'), lichen_mask(s, 307, 0.12, 1.7)[..., None] * 0.55)
+    rgb = lerp(rgb, col('#b4b46a'), lichen_mask(s, 308, 0.03, 1.2)[..., None] * 0.5)
+    rgb = lerp(rgb, col('#3a3a34'), lichen_mask(s, 310, 0.02, 1.0)[..., None] * 0.35)
     return to_img(rgb)
 
 
 def cliff_rock():
-    """A cliff face (2026-11-25, Anders: layers of rock, cracks, different colours): gneiss banded in wavy layers
-    of grey, pinkish and dark, broken into blocks by joints across and along the layers, rust stains and dark water
-    streaks running down, crust lichen, moss on the ledges (repeats; the shader adds larger colour changes)."""
+    """A cliff face (2026-11-25, second try after Anders' photos of real cliffs: lighter, far fewer cracks, no
+    pattern): light grey gneiss with faint long bands, smooth broad planes, soft darker water streaks running down,
+    a little rust, big patches of pale crust lichen. No joint lines; the shader blends two scales and the world's
+    own patches over it, so no two parts of a cliff look the same."""
     s = IN
     yy, xx = np.mgrid[0:s, 0:s].astype(np.float32) / s
     warp = fft_noise(s, 2.2, 321) * 0.12 + fft_noise(s, 1.4, 322) * 0.03
-    lay = (yy + warp) * 9.0
+    lay = (yy + warp) * 5.0
     band = np.sin(lay * 6.283) * 0.5 + 0.5
-    layer_id = np.floor(lay).astype(int) % 9
-    tone = np.random.default_rng(323).random(9)[layer_id]
-    rgb = lerp(col('#5a5a58'), col('#9c9a94'), (tone * 0.75 + band * 0.25)[..., None])
-    pinkish = (np.random.default_rng(324).random(9) > 0.6)[layer_id]
-    rgb = lerp(rgb, col('#94807a'), pinkish[..., None] * 0.3)
-    darkb = (np.random.default_rng(325).random(9) > 0.8)[layer_id]
-    rgb = lerp(rgb, col('#3e3c3a'), darkb[..., None] * 0.45)
-    rgb *= (0.86 + 0.22 * fft_noise(s, 0.35, 326))[..., None]
-    # fine streaks along the layers
-    st = fft_noise(s, 1.2, 327, (1.0, 0.06))
-    rgb *= (0.9 + 0.2 * st)[..., None]
-    # joints: blocks mostly upright, plus the layer partings
-    f1, f2, cid = voronoi(s, 8, 314, (1.0, 0.4), warp=30)
-    joint = smooth(2.4, 0.0, f2 - f1)
-    part = smooth(0.03, 0.0, np.abs(np.mod(lay, 1.0) - 0.02)) * smooth(0.45, 0.6, fft_noise(s, 1.6, 328))
-    shade = (np.random.default_rng(317).random(8)[cid] - 0.5) * 0.18
-    height = smooth(0.0, 22.0, f2 - f1) + fft_noise(s, 1.9, 318) * 0.35
-    lit = relief(height * 40.0, 0.03)
-    rgb *= (1.0 + shade)[..., None]
-    rgb *= np.clip(lit, 0.72, 1.22)[..., None]
-    # stains running down
-    stn = fft_noise(s, 1.5, 313, (0.06, 1.0))
-    rgb = lerp(rgb, col('#2a2926'), smooth(0.56, 0.8, stn)[..., None] * 0.5)
-    rust = smooth(0.7, 0.86, fft_noise(s, 1.4, 319, (0.12, 1.0)))
-    rgb = lerp(rgb, col('#7a5a40'), rust[..., None] * 0.4)
-    rgb = lerp(rgb, col('#1e1d1c'), np.maximum(joint, part * 0.8)[..., None] * 0.6)
-    below = np.roll(np.maximum(joint, part), -6, 0) * (1 - joint)
-    moss = smooth(0.42, 0.62, fft_noise(s, 1.5, 315))
-    rgb = lerp(rgb, col('#506a2c'), (below * moss)[..., None] * 0.75)
-    rgb = lerp(rgb, col('#b0b4a2'), lichen_mask(s, 316, 0.1)[..., None] * 0.45)
-    rgb = lerp(rgb, col('#9a9c56'), lichen_mask(s, 329, 0.03, 1.2)[..., None] * 0.4)
-    rgb = lerp(rgb, col('#262722'), lichen_mask(s, 320, 0.06, 1.3)[..., None] * 0.35)
+    big = fft_noise(s, 2.0, 323)
+    rgb = lerp(col('#8a8780'), col('#b8b5ac'), (big * 0.75 + band * 0.25)[..., None])
+    # a fine grain of light and dark minerals, as on the granite
+    rgb *= (0.82 + 0.36 * fft_noise(s, 0.45, 330))[..., None]
+    rgb = lerp(rgb, col('#b2a49c'), smooth(0.6, 0.85, fft_noise(s, 1.8, 324))[..., None] * 0.25)
+    rgb *= (0.92 + 0.14 * fft_noise(s, 0.6, 326))[..., None]
+    # gentle broad planes lit a little differently
+    plane = fft_noise(s, 2.4, 318)
+    rgb *= (0.9 + 0.2 * plane)[..., None]
+    # streaks running down: soft and few
+    stn = fft_noise(s, 1.5, 313, (0.05, 1.0))
+    rgb = lerp(rgb, col('#5e5c57'), smooth(0.62, 0.85, stn)[..., None] * 0.4)
+    rust = smooth(0.75, 0.9, fft_noise(s, 1.4, 319, (0.12, 1.0)))
+    rgb = lerp(rgb, col('#9a7a5e'), rust[..., None] * 0.12)
+    # one or two thin cracks, not a grid
+    v = band_noise(s, 1.5, 314, (0.25, 1.0))
+    crack = smooth(0.012, 0.0, np.abs(v - 0.5)) * smooth(0.45, 0.6, fft_noise(s, 1.8, 328))
+    rgb = lerp(rgb, col('#3c3a36'), crack[..., None] * 0.55)
+    rgb = lerp(rgb, col('#dedfd4'), lichen_mask(s, 316, 0.2, 1.9)[..., None] * 0.55)
+    rgb = lerp(rgb, col('#b4bca4'), lichen_mask(s, 317, 0.1, 1.6)[..., None] * 0.5)
+    rgb = lerp(rgb, col('#a8aa62'), lichen_mask(s, 329, 0.025, 1.2)[..., None] * 0.4)
     return to_img(rgb)
 
 
@@ -1563,6 +1580,7 @@ TILES = [
     ('heather top', heather_top, False),
     ('soil', soil, True),
     ('reindeer lichen', reindeer_lichen, True),
+    ('bilberry sprig', bilberry_sprig, False),
 ]
 
 # The sharp bark atlas (2026-11-25, Anders: up close the trees looked pixly): the bark pictures again at twice the
