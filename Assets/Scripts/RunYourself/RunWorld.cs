@@ -90,6 +90,7 @@ public class RunWorld : MonoBehaviour
         public int treeTier;
         public float minY, maxY;
         // A cross-fade between two levels of detail going on (FadeTime): what comes, what goes, what then to do
+        public bool hidden;                 // wholly behind a hill from the runner's eyes (Hidden): not drawn at all
         public float fadeStart = -1f;
         public readonly List<Renderer> fadeIn = new List<Renderer>(), fadeOut = new List<Renderer>();
         public Action fadeDone;
@@ -571,6 +572,7 @@ public class RunWorld : MonoBehaviour
         while (finished.TryDequeue(out Done done)) uploading.Enqueue(done);
         HandOver();
         long t2 = perf.ElapsedTicks;
+        Reveal();
         DrawTrees();
         Fades();
         long t3 = perf.ElapsedTicks;
@@ -661,6 +663,7 @@ public class RunWorld : MonoBehaviour
                     if (p.cardRenderer != null) p.cardRenderer.enabled = tier == 2;
                 }
             }
+            if (p.ready && !p.hidden && p.root != null && Hidden(p)) Hide(p, true);
             if (p.ready)
             {
                 bool nearOn = p.dist < look.near;
@@ -732,7 +735,7 @@ public class RunWorld : MonoBehaviour
         Vector3 me = ToScene(playerE, playerN, 0f);
         foreach (Piece p in pieces.Values)
         {
-            if (!p.ready || p.treeSet == null || p.treeTier == 2) continue;
+            if (!p.ready || p.hidden || p.treeSet == null || p.treeTier == 2) continue;
             // The full trees close by are always drawn (their shadows fall into the picture from behind too)
             // (and pieces whose trees are all beyond the shadows: nothing of them reaches the picture from outside it)
             if (cull && (p.treeTier == 1 || p.dist > trees.shadowReach))
@@ -767,6 +770,66 @@ public class RunWorld : MonoBehaviour
         if (!smooth) r.enabled = on;
         else if (on && !r.enabled) p.fadeIn.Add(r);
         else if (!on && r.enabled) p.fadeOut.Add(r);
+    }
+
+    // ---- Pieces behind hills (2026-11-26, Anders: "don't draw what can't be seen") ----
+    // A piece far enough out is not drawn at all when the hill tops between it and the runner's eyes hide even the
+    // tops of its tallest trees and houses at nine points over it. What is hidden in part (the foot of a slope behind
+    // a knoll, the tree trunks with their tops showing) is still drawn: the graphics card leaves out its hidden
+    // pixels itself (the depth test). A hidden piece is looked at again every frame, so it shows the moment its top
+    // comes into sight over the crest.
+
+    const float HideFrom = 64f;              // closer pieces are always drawn
+    readonly List<Piece> hiddenPieces = new List<Piece>();
+
+    void Hide(Piece p, bool hide)
+    {
+        p.hidden = hide;
+        if (p.root != null) p.root.SetActive(!hide);
+        if (hide) { if (!hiddenPieces.Contains(p)) hiddenPieces.Add(p); }
+        else hiddenPieces.Remove(p);
+    }
+
+    void Reveal()
+    {
+        for (int i = hiddenPieces.Count - 1; i >= 0; i--)
+        {
+            Piece p = hiddenPieces[i];
+            if (p.gone || p.root == null || !Hidden(p)) Hide(p, false);
+        }
+    }
+
+    bool Hidden(Piece p)
+    {
+        if (p.dist < HideFrom || p.world == null) return false;
+        // The eyes, a little high (the head bobs, the runner jumps)
+        float eye = GroundY(playerE, playerN) + 2.8f;
+        float top = p.maxY + (data.town != null ? 45f : 32f);
+        for (int a = -1; a <= 1; a++)
+        {
+            for (int b = -1; b <= 1; b++)
+            {
+                double te = p.ce + a * (Half - 1.0), tn = p.cn + b * (Half - 1.0);
+                if (!Blocked(eye, te, tn, top)) return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether the ground rises above the line from the eyes to (te, tn) at height top somewhere between them
+    bool Blocked(float eye, double te, double tn, float top)
+    {
+        double de = te - playerE, dn = tn - playerN;
+        double len = Math.Sqrt(de * de + dn * dn);
+        if (len < 20.0) return false;
+        int steps = Mathf.Clamp((int)(len / 6.0), 4, 60);
+        for (int i = 1; i < steps; i++)
+        {
+            double f = (double)i / steps;
+            float ground = GroundY(playerE + de * f, playerN + dn * f) - 0.5f;
+            if (ground > eye + (top - eye) * (float)f) return true;
+        }
+        return false;
     }
 
     // ---- Cross-fades between the levels of detail (2026-11-26, Anders: no sharp changes, no houses popping up) ----
@@ -1174,6 +1237,8 @@ public class RunWorld : MonoBehaviour
     {
         p.gone = true;
         EndFade(p);
+        hiddenPieces.Remove(p);
+        p.hidden = false;
         if (p.peopleOn && people != null) people.Despawn(Key(p.ix, p.iz));
         p.peopleOn = false;
         DropDetail(p);
