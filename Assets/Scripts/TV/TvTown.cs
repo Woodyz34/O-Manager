@@ -45,6 +45,24 @@ public class TvTown
         if (layer == null) return town;
         try { town.ReadLines(linesJson); }
         catch (Exception) { }
+        // The buildings' own area borders count as their outlines too (2026-11-26, Anders: some houses still had
+        // zigzag walls). Only maps whose buildings have separate 521 outline lines had straight walls; a map drawing its
+        // buildings as plain areas (Bergen, Oslo) had nothing for the walls to stand on. Kept by the world layer since
+        // RulesVersion 10: a sprint map built before needs one save in Edit map.
+        try
+        {
+            if (layer.areas != null)
+                foreach (WorldArea a in layer.areas)
+                    if (a.kind == WorldAreaKind.House && a.xy != null && a.xy.Length >= 6)
+                    {
+                        var xy = new float[a.xy.Length + 2];
+                        Array.Copy(a.xy, xy, a.xy.Length);
+                        xy[a.xy.Length] = a.xy[0];
+                        xy[a.xy.Length + 1] = a.xy[1];
+                        town.houseEdges.Add(xy);
+                    }
+        }
+        catch (Exception) { }
         try { town.StitchCanopies(); }
         catch (Exception) { }
         try

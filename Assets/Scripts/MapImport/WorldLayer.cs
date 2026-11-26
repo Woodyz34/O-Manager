@@ -151,7 +151,10 @@ namespace MapImport
                 if (o.kind != SymbolKind.Area || o.symbol == null) continue;
                 if (!AreaRule(o.symbol, sprint, out byte set, out byte flag, out bool clear)) continue;
                 areas.Add((GridBuilder.TopColor(o.symbol), order++, o, set, flag, clear));
-                if (set == WorldCell.Building && !sprint) w.KeepOutline(o, WorldAreaKind.House, mpm, offE, offN);
+                // Sprint maps too since RulesVersion 10 (2026-11-26, Anders: some town houses still had zigzag walls): a map
+                // that draws its buildings as areas without separate outline lines (Bergen, Oslo) gave the 3D town only
+                // the 2 m cells to go by, and a slanting wall became a staircase
+                if (set == WorldCell.Building) w.KeepOutline(o, WorldAreaKind.House, mpm, offE, offN);
                 if (set == WorldCell.Plot) w.KeepOutline(o, SymbolRules.Isom2017Major(o.symbol) == 520 ? WorldAreaKind.Garden : WorldAreaKind.OutOfBounds, mpm, offE, offN);
             }
             areas.Sort((a, b) => a.prio != b.prio ? b.prio.CompareTo(a.prio) : a.order.CompareTo(b.order));
