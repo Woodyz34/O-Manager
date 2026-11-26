@@ -609,6 +609,11 @@ public class GameUpdater : MonoBehaviour
 
         titleText = CourseUI.Text("Title", panel.transform, "New version", 42, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Size(titleText, 54);
+        // One line that shrinks to fit: "Updating to version 1.0.10" was wrapped and its last digit cut off (2026-11-26)
+        titleText.enableWordWrapping = false;
+        titleText.enableAutoSizing = true;
+        titleText.fontSizeMin = 24;
+        titleText.fontSizeMax = 42;
 
         notesText = CourseUI.Text("Notes", panel.transform, "", 22, CourseUI.Ink, FontStyles.Normal, TextAlignmentOptions.TopLeft);
         notesText.overflowMode = TextOverflowModes.Overflow; // the card's column layout sizes it to the text

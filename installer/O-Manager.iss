@@ -25,6 +25,9 @@
   #define OutputDir "..\Builds\Release"
 #endif
 
+#ifndef Threads
+  #define Threads "4"
+#endif
 #define AppName "O-Manager"
 #define AppExe "O-Manager.exe"
 
@@ -54,11 +57,12 @@ OutputBaseFilename=O-Manager-Setup
 SetupIconFile=O-Manager.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
-Compression=lzma2/max
+; lzma2/normal (2026-11-26): max took 5 min for 1.0.10 even on 4 cores; normal is about twice as fast and the
+; setup is only a few percent bigger. Threads comes from Build release (the computer's number of cores).
+Compression=lzma2/normal
 SolidCompression=yes
-; Packs on several processor cores at once (2026-11-26): packing the 1 GB game on one core took about 10 minutes
 LZMAUseSeparateProcess=yes
-LZMANumBlockThreads=4
+LZMANumBlockThreads={#Threads}
 WizardStyle=modern
 CloseApplications=force
 RestartApplications=no
