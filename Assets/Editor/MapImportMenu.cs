@@ -9,7 +9,8 @@ using UnityEngine;
 //    Assets/Resources/MapPackages/<id>/ with a MapDefinition in Resources/MapDefs.
 //  - Build imported maps into the game: does the same for the maps imported in the game on this computer
 //    (<persistent data>/Maps), for instance maps players have sent in.
-// The pictures are imported at full resolution (up to 16384 pixels, the most Unity allows).
+// The pictures are made at full resolution (up to 16384 pixels, the most Unity allows) and moved to
+// MapPictures/<id>/picture.png outside Assets, so Unity never imports them (MapPictureFiles, MapPictureCache).
 public static class MapImportMenu
 {
     const string PackagesFolder = "Assets/Resources/MapPackages";
@@ -224,9 +225,9 @@ public static class MapImportMenu
         }
         foreach (string name in new[] { "picture.png", "lines.json", "points.json" })
         {
-            string file = Path.Combine(folder, name);
+            string file = name == "picture.png" ? MapPictureFiles.SourcePng(Path.GetFileName(folder)) : Path.Combine(folder, name);
             if (File.Exists(file) && new FileInfo(file).Length > GitHubLimit)
-                Debug.LogWarning($"{folder}/{name} is {new FileInfo(file).Length / 1000000} MB, over GitHub's 100 MB limit. " +
+                Debug.LogWarning($"{file} is {new FileInfo(file).Length / 1000000} MB, over GitHub's 100 MB limit. " +
                     "For a picture: shrink it to 256 colours without dithering (pngquant --quality=90-100 --nofs), which keeps the size and looks the same.");
         }
         return log.ToString();
@@ -254,33 +255,31 @@ public static class MapImportMenu
 
     static byte[] ReadPlain(string file) => File.Exists(file) ? MapPackages.Unpack(File.ReadAllBytes(file)) : null;
 
+    // The map picture goes to MapPictures/<id>/picture.png, outside Assets: as a Unity texture in Resources it was
+    // imported (a minute for a big map), written into every build uncompressed and made Build release slow.
+    static string MovePictureOut(string folder, string id)
+    {
+        string from = Path.Combine(folder, "picture.png");
+        string to = MapPictureFiles.SourcePng(id);
+        if (!File.Exists(from)) return File.Exists(to) ? to : null;
+        Directory.CreateDirectory(Path.GetDirectoryName(to));
+        File.Copy(from, to, true);
+        File.Delete(from);
+        if (File.Exists(from + ".meta")) File.Delete(from + ".meta");
+        return to;
+    }
+
     // Imports the files in a package folder under Assets/Resources and makes its MapDefinition
     static string Bake(string folder, MapPackageInfo info)
     {
+        if (MovePictureOut(folder, info.id) == null) Debug.LogWarning("Import map: " + info.name + " has no picture.png.");
         string packed = PackBigFiles(folder);
         AssetDatabase.Refresh();
-        string picture = folder + "/picture.png";
-        var importer = (TextureImporter)AssetImporter.GetAtPath(picture);
-        if (importer != null)
-        {
-            importer.textureType = TextureImporterType.Sprite;
-            importer.spriteImportMode = SpriteImportMode.Single;
-            importer.spritePixelsPerUnit = info.pixelsPerMeter / MapDefinition.WorldUnitsPerMeter;
-            var settings = new TextureImporterSettings();
-            importer.ReadTextureSettings(settings);
-            settings.spriteAlignment = (int)SpriteAlignment.Custom;
-            settings.spriteMeshType = SpriteMeshType.FullRect;
-            importer.SetTextureSettings(settings);
-            importer.spritePivot = new Vector2(info.pivotX / info.pictureWidth, info.pivotY / info.pictureHeight);
-            importer.maxTextureSize = MaxPictureSide;
-            importer.npotScale = TextureImporterNPOTScale.None;
-            importer.mipmapEnabled = true;
-            importer.textureCompression = TextureImporterCompression.Compressed;
-            importer.wrapMode = TextureWrapMode.Clamp;
-            importer.filterMode = FilterMode.Trilinear;
-            importer.anisoLevel = 4;
-            importer.SaveAndReimport();
-        }
+        // The ready (compressed) picture for the game, made now so Play mode and the next build have it
+        string problem = MapPictureCache.Make(info.id);
+        if (problem != null) Debug.LogWarning("Import map: the ready picture of " + info.name + " could not be made now (" + problem +
+                                              "); Build release tries again.");
+        AssetDatabase.Refresh();
         string thumb = folder + "/thumb.png";
         var thumbImporter = (TextureImporter)AssetImporter.GetAtPath(thumb);
         if (thumbImporter != null)

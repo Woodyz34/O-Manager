@@ -15,8 +15,8 @@ using UnityEngine;
 //   thumb        a small copy of the picture for menus
 //
 // Built-in maps live in Resources/MapPackages/<id>/ (made in the editor with Tools > O-Manager > Import map file)
-// and have a MapDefinition asset in Resources/MapDefs. Maps a player imports in the game are saved in
-// <persistent data>/Maps/<id>/ and only exist on that computer until they are built into the game.
+// and have a MapDefinition asset in Resources/MapDefs. Their pictures are not in Resources: see MapPictureFiles.
+// Maps a player imports in the game are saved in <persistent data>/Maps/<id>/ and only exist on that computer until they are built into the game.
 // Paths that start with "file:" point at those files on disk; anything else is a Resources path.
 public static class MapPackages
 {
@@ -75,10 +75,13 @@ public static class MapPackages
 
     static readonly Dictionary<string, Sprite> spriteCache = new Dictionary<string, Sprite>();
 
-    // The map picture: from Resources, or from a PNG on disk
+    // The map picture: a built-in map's ready picture file (MapPictureFiles), an older picture in Resources,
+    // or a PNG on disk for a map imported in the game
     public static Sprite LoadSprite(MapBackground background)
     {
         if (background == null || string.IsNullOrEmpty(background.spritePath)) return null;
+        string builtInId = MapPictureFiles.BuiltInId(background.spritePath);
+        if (builtInId != null) return LoadBuiltInSprite(background, builtInId);
         if (!IsFile(background.spritePath))
         {
             return Resources.Load<Sprite>(background.spritePath);
@@ -86,11 +89,75 @@ public static class MapPackages
         if (spriteCache.TryGetValue(background.spritePath, out Sprite cached) && cached != null) return cached;
         Texture2D texture = LoadTexture(background.spritePath.Substring(FilePrefix.Length) + ".png", false);
         if (texture == null) return null;
-        Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
-            new Vector2(background.pivotPixels.x / texture.width, background.pivotPixels.y / texture.height),
-            background.pixelsPerUnit, 0, SpriteMeshType.FullRect);
-        sprite.name = Path.GetFileName(Path.GetDirectoryName(background.spritePath.Substring(FilePrefix.Length)));
+        Sprite sprite = MakeSprite(texture, texture.width, texture.height, background,
+            Path.GetFileName(Path.GetDirectoryName(background.spritePath.Substring(FilePrefix.Length))));
         spriteCache[background.spritePath] = sprite;
+        return sprite;
+    }
+
+    static Sprite MakeSprite(Texture2D texture, int width, int height, MapBackground background, string name)
+    {
+        Sprite sprite = Sprite.Create(texture, new Rect(0, 0, width, height),
+            new Vector2(background.pivotPixels.x / width, background.pivotPixels.y / height),
+            background.pixelsPerUnit, 0, SpriteMeshType.FullRect);
+        sprite.name = name;
+        return sprite;
+    }
+
+    // The built-in pictures loaded lately, newest last. Only the last two are kept: a Resources picture used to be
+    // let go when the scene changed, and these are hundreds of MB each on the graphics card.
+    static readonly List<string> builtInOrder = new List<string>();
+    const int BuiltInKept = 2;
+
+    static Sprite LoadBuiltInSprite(MapBackground background, string id)
+    {
+        string key = background.spritePath;
+        if (spriteCache.TryGetValue(key, out Sprite cached) && cached != null)
+        {
+            builtInOrder.Remove(key);
+            builtInOrder.Add(key);
+            return cached;
+        }
+
+        Texture2D texture = null;
+        int width = 0, height = 0;
+#if UNITY_EDITOR
+        // In the editor the ready file can be older than the PNG (a map imported again, not yet prepared):
+        // then the PNG itself is shown, which takes a little longer to load
+        if (MapPictureFiles.IsUpToDate(id))
+        {
+            texture = MapPictureFiles.Load(MapPictureFiles.ReadyFile(id), out MapPictureFiles.Header header);
+            width = header.pictureWidth;
+            height = header.pictureHeight;
+        }
+        if (texture == null)
+        {
+            texture = LoadTexture(MapPictureFiles.SourcePng(id), false);
+            if (texture != null) { width = texture.width; height = texture.height; }
+        }
+#else
+        texture = MapPictureFiles.Load(MapPictureFiles.ReadyFile(id), out MapPictureFiles.Header header);
+        width = header.pictureWidth;
+        height = header.pictureHeight;
+#endif
+        // A game built before the pictures moved out of Resources
+        if (texture == null) return Resources.Load<Sprite>(background.spritePath);
+
+        Sprite sprite = MakeSprite(texture, width, height, background, id);
+        spriteCache[key] = sprite;
+        builtInOrder.Remove(key);
+        builtInOrder.Add(key);
+        while (builtInOrder.Count > BuiltInKept)
+        {
+            string oldest = builtInOrder[0];
+            builtInOrder.RemoveAt(0);
+            if (spriteCache.TryGetValue(oldest, out Sprite old) && old != null)
+            {
+                MapPictureFiles.Free(old.texture);
+                MapPictureFiles.Free(old);
+            }
+            spriteCache.Remove(oldest);
+        }
         return sprite;
     }
 

@@ -53,3 +53,8 @@ __pycache__/
 
 # Maps downloaded by Tools > O-Manager > Download sent-in maps
 /SentInMaps/
+
+# Ready (compressed) map pictures, made from MapPictures/ by Build release (MapPictureCache); never in git
+/Assets/StreamingAssets/MapPictures/
+/Assets/StreamingAssets/MapPictures.meta
+/Assets/StreamingAssets.meta
