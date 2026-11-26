@@ -161,7 +161,7 @@ public class ReadyUIHandler : NetworkBehaviour
         }
 
         // Ensure the server/state-authority broadcasts the chosen mode to all peers
-        var allPlayers = FindObjectsOfType<NetworkPlayer>();
+        var allPlayers = NetworkPlayer.All();
         NetworkPlayer serverPlayer = null;
         foreach (var p in allPlayers)
         {

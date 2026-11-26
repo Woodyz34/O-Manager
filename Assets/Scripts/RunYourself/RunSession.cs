@@ -370,8 +370,10 @@ public partial class RunSession : MonoBehaviour
             // Looking through the whole scene for windows is slow on a big map (Fossum has 68 000 map objects in the
             // scene; 2026-11-25): done every 1.5 s, and the windows found are looked at in between
             nextHide = Time.unscaledTime + 1.5f;
+            long w0 = System.Diagnostics.Stopwatch.GetTimestamp();
             FindCanvases();
             if (twoDHidden) HideCanvases();
+            RunPerf.Add(RunPerf.Part.WindowSearch, System.Diagnostics.Stopwatch.GetTimestamp() - w0);
         }
         if (watchOnly && !atResults && CompetitionFlow.ResultsShown)
         {
@@ -382,14 +384,18 @@ public partial class RunSession : MonoBehaviour
         if (player == null || atResults) return;
         float dt = Time.deltaTime;
         bool playing = phase == Phase.Waiting || phase == Phase.Countdown || phase == Phase.Running;
+        long n0 = System.Diagnostics.Stopwatch.GetTimestamp();
         NetTick(dt);
+        RunPerf.Add(RunPerf.Part.Online, System.Diagnostics.Stopwatch.GetTimestamp() - n0);
 
         // The mouse turns the head while running; any menu or window (Esc menu, settings, a pop-up) frees it and the
         // runner stops taking keys until it is closed
         if (Time.unscaledTime >= nextMenuCheck)
         {
             nextMenuCheck = Time.unscaledTime + 0.15f;
+            long m0 = System.Diagnostics.Stopwatch.GetTimestamp();
             menuOpen = MenuOpen();
+            RunPerf.Add(RunPerf.Part.MenuCheck, System.Diagnostics.Stopwatch.GetTimestamp() - m0);
         }
         player.inputOff = menuOpen;
         bool locked = playing && !menuOpen;
@@ -455,8 +461,12 @@ public partial class RunSession : MonoBehaviour
             WatchTick(dt);
         }
 
+        long p0 = System.Diagnostics.Stopwatch.GetTimestamp();
         player.Tick(dt);
+        long p1 = System.Diagnostics.Stopwatch.GetTimestamp();
         handMap.Tick(dt, phase == Phase.Running && !menuOpen);
+        RunPerf.Add(RunPerf.Part.Runner, p1 - p0);
+        RunPerf.Add(RunPerf.Part.HandMap, System.Diagnostics.Stopwatch.GetTimestamp() - p1);
         clockText.text = phase == Phase.Countdown || phase == Phase.Waiting ? "0:00"
             : watchOnly && !(Watching && watching.raceFinished) ? "LIVE"
             : Watching ? (watching.raceFinished ? RaceTime(watching.relayTotals[0]) : RaceTime(gameSeconds * player.gameSpeed))
@@ -524,6 +534,13 @@ public partial class RunSession : MonoBehaviour
     void CheckPunch(double ae, double an, double be, double bn)
     {
         if (phase != Phase.Running) return;
+        long c0 = System.Diagnostics.Stopwatch.GetTimestamp();
+        try { Punch(ae, an, be, bn); }
+        finally { RunPerf.Add(RunPerf.Part.Punch, System.Diagnostics.Stopwatch.GetTimestamp() - c0); }
+    }
+
+    void Punch(double ae, double an, double be, double bn)
+    {
         for (int i = 0; i < world.FlagCount; i++)
         {
             world.Flag(i, out double fe, out double fn);
@@ -761,7 +778,7 @@ public partial class RunSession : MonoBehaviour
             mainMask = ~0;
         }
         // The 2D runners and their route lines would show on the map in the hand
-        foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             foreach (Renderer r in p.GetComponentsInChildren<Renderer>(true))
             {

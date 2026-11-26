@@ -101,7 +101,7 @@ public class LeaderboardManager : NetworkBehaviour
     {
         // A player who has just left is still found for a moment, but its networked values can not be read any more.
         // A player who only watches (joined in the middle of the race) has no row.
-        return FindObjectsOfType<NetworkPlayer>()
+        return NetworkPlayer.All()
             .Where(p => NetworkPlayer.Races(p))
             .OrderByDescending(p => Mathf.Max(0, p.relayLeg))
             .ThenByDescending(p => p.relayLeg < 0 ? 0f : p.relayProgress)
@@ -198,7 +198,7 @@ public class LeaderboardManager : NetworkBehaviour
             return;
         }
 
-        foreach (var p in FindObjectsOfType<NetworkPlayer>())
+        foreach (var p in NetworkPlayer.All())
         {
             if (p.Object == null || !p.Object.IsValid)
             {

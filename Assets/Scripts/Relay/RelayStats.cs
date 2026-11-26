@@ -49,7 +49,7 @@ public static class RelayStats
     {
         int points = race.Course.Route(leg, null).CommonCount;
         List<RelayTeamResult> teams = new List<RelayTeamResult>();
-        foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (!NetworkPlayer.Races(player)) continue;
             RelayTeamResult result = new RelayTeamResult
@@ -254,7 +254,7 @@ public class RelayHistory
     public void Capture(IRaceStats race, int leg)
     {
         Dictionary<NetworkPlayer, string> names = new Dictionary<NetworkPlayer, string>();
-        foreach (NetworkPlayer player in Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (!NetworkPlayer.Races(player)) continue;
             names[player] = player.relayRunnerName.ToString();

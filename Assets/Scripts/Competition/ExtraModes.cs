@@ -63,7 +63,7 @@ public static class ExtraModes
     public static int PlayersInLobby()
     {
         int n = 0;
-        foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             if (p.Object != null && p.Object.IsValid) n++;
         }
@@ -253,7 +253,7 @@ public static class ExtraModes
             if (CourseLoader.Loaded != null && CourseLoader.Loaded.IsSprint()) active &= ~ForestOnly;
             return;
         }
-        foreach (NetworkPlayer p in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             if (p.Object == null || !p.Object.IsValid) continue;
             int value = p.competitionModes;

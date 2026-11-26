@@ -105,7 +105,7 @@ public class EndScreenUI : MonoBehaviour
         if (CompetitionFlow.RevealStarted) return;
         int waiting = 0;
         CompetitionFlow.TryGetImposter(out PlayerRef imposter);
-        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (!NetworkPlayer.Races(player) || player.Object.StateAuthority == imposter) continue;
             if (!player.hasGuessedImposter) waiting++;

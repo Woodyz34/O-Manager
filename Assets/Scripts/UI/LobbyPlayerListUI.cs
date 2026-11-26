@@ -86,7 +86,7 @@ public class LobbyPlayerListUI : MonoBehaviour
     void Refresh()
     {
         List<NetworkPlayer> players = new List<NetworkPlayer>();
-        foreach (NetworkPlayer player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player.Object != null && player.Object.IsValid)
             {

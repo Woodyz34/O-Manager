@@ -13,6 +13,28 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     ChangeDetector changeDetector;
     public static NetworkPlayer Local { get; set; }
 
+    // Every player object that exists, kept by Awake / OnDestroy (2026-11-25): searching the scene for them
+    // (FindObjectsByType) looks through every script in it, and a big map has 68 000 map objects with scripts, so the
+    // searches done every frame (AllPlayers, CompetitionFlow ...) took 20-60 ms a frame on Fossum
+    static readonly List<NetworkPlayer> existing = new List<NetworkPlayer>();
+
+    // The players whose objects are active, as the scene search gave them
+    public static NetworkPlayer[] All()
+    {
+        int n = 0;
+        for (int i = existing.Count - 1; i >= 0; i--)
+        {
+            NetworkPlayer p = existing[i];
+            if (p == null) existing.RemoveAt(i);
+            else if (p.gameObject.activeInHierarchy) n++;
+        }
+        var all = new NetworkPlayer[n];
+        int k = 0;
+        foreach (NetworkPlayer p in existing)
+            if (p.gameObject.activeInHierarchy) all[k++] = p;
+        return all;
+    }
+
     [Networked]  public int token {  get; set; }
 
     public TextMeshProUGUI playerNickName;
@@ -89,6 +111,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     // This player's object has been in the lobby (a late joiner's has not: it arrives straight in the race)
     bool beenInLobby;
+    public bool BeenInLobby => beenInLobby;
 
     // Imposter mode. The host stores who the imposter is on its own player object when the game starts,
     // and every player stores their own guess at the end of the competition.
@@ -410,6 +433,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     void Awake()
     {
+        if (!existing.Contains(this)) existing.Add(this);
         agentMovement = GetComponent<AgentMovement>();
         clock = GetComponent<Clock>();
     }
@@ -505,7 +529,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     private static bool AllPlayers(Func<NetworkPlayer, bool> condition)
     {
-        foreach (var p in FindObjectsOfType<NetworkPlayer>())
+        foreach (var p in NetworkPlayer.All())
         {
             // Spectators are not waited for
             if (!Races(p))
@@ -757,6 +781,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             transform.position = at;
         }
         if (manager != null && manager.ChooseRunnerPanel != null) manager.ChooseRunnerPanel.SetActive(false);
+        // The waiting page (the dimmed map behind "Waiting for the others") is taken away when the race starts, which a
+        // spectator never sees: it stayed over the map and made the whole view dark (2026-11-26, Anders)
+        GameObject waitScreen = GameObject.FindGameObjectWithTag("WaitingForPlayersToConnect");
+        if (waitScreen != null) waitScreen.SetActive(false);
         if (localCamera != null && localCamera.cam != null) localCamera.cam.enabled = true;
         Debug.Log("NetworkPlayer: joined while the lobby is racing, watching this race");
         Spectator.Begin(this);
@@ -857,7 +885,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             return SinglePlayerMenu.ChosenGameMode;
         }
-        foreach (var p in FindObjectsOfType<NetworkPlayer>())
+        foreach (var p in NetworkPlayer.All())
         {
             if (p.Object == null || !p.Object.IsValid)
             {
@@ -1028,6 +1056,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     }
     void OnDestroy()
     {
+        existing.Remove(this);
         PackRegistry.Remove(this);
         CameraController localCamera = GetComponent<CameraController>();
         if (localCamera != null)
@@ -1312,7 +1341,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     private void CheckAllPlayersReady()
     {
-        var players = FindObjectsOfType<NetworkPlayer>();
+        var players = NetworkPlayer.All();
         bool allReady = true;
         foreach (var p in players)
         {
@@ -1366,7 +1395,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     private void CheckAllPlayersHasBet()
     {
-        var players = FindObjectsOfType<NetworkPlayer>();
+        var players = NetworkPlayer.All();
         bool allReady = true;
         Debug.Log("players  antal " + players.Length);
         foreach (var p in players)
@@ -1389,7 +1418,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     private void StartGameForAllPlayers()
     {
-        var players = FindObjectsOfType<NetworkPlayer>();
+        var players = NetworkPlayer.All();
         Debug.Log("players  antal " + players.Length);
         foreach (var p in players)
         {
@@ -1449,7 +1478,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         GameAnalytics.Record("race_started",
             "mode", RelayRace.Active != null ? "relay" : RouteAnalysis.On ? "route_analysis" : RouteChoiceGame.On ? "route_choice" : "normal",
             "terrain", raced != null && raced.IsSprint() ? "sprint" : "forest",
-            "players", FindObjectsOfType<NetworkPlayer>().Length);
+            "players", NetworkPlayer.All().Length);
 
     }
 

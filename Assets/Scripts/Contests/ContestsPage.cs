@@ -786,11 +786,13 @@ public class ContestsPage : MonoBehaviour
     }
 
     // The leaderboard: a summary (winner, your place, who beat you), every runner with their result and prize, and a
-    // GPS switch on each row to pick whose routes to watch, up to 10 at a time (2026-11-24, the user)
+    // GPS switch on each row to pick whose routes to watch (2026-11-24, the user). No limit on how many since
+    // 2026-11-26 (the user), with Show all / Hide all, and for races a button that shows the picked runners' routes
+    // straight away, without the replay.
     void ShowBoardSheet(ContestInfo c, ContestBoard board)
     {
         List<ContestRow> rows = board.rows;
-        float height = Mathf.Clamp(140 + 200 + rows.Count * 58f, 480f, 940f);
+        float height = Mathf.Clamp(140 + 250 + rows.Count * 58f, 530f, 960f);
         GameObject sheet = PopupFrame(ContestRun.SpanName(c) + ": " + ContestRun.Title(c), 1260, height);
         Transform body = sheet.transform.GetChild(0);
 
@@ -802,7 +804,7 @@ public class ContestsPage : MonoBehaviour
         RectTransform viewport = (RectTransform)scroll.transform;
         viewport.anchorMin = Vector2.zero;
         viewport.anchorMax = Vector2.one;
-        viewport.offsetMin = new Vector2(40, 120);
+        viewport.offsetMin = new Vector2(40, 166);
         viewport.offsetMax = new Vector2(-40, -176);
         CourseUI.Column(list.gameObject, 6, new RectOffset(0, 0, 0, 0));
         FastScroll.Add(scroll);
@@ -810,14 +812,15 @@ public class ContestsPage : MonoBehaviour
         // Picked for the map: the top three and you at first
         bool kept = board.ReplaysKept;
         List<ContestRow> picked = rows.FindAll(r => !r.dnf && (r.place <= 3 || r.me));
-        if (picked.Count > ContestCloud.MaxReplays) picked = picked.GetRange(0, ContestCloud.MaxReplays);
-        Button watch = null;
+        Button watch = null, routes = null;
+        List<(ContestRow row, Button toggle)> toggles = new List<(ContestRow, Button)>();
         void ShowWatch()
         {
             if (watch == null) return;
             string what = c.RouteChoice ? "See route choices" : "Watch GPS replay";
             CourseUI.SetButtonText(watch, !kept ? "GPS routes deleted" : what + " (" + picked.Count + ")");
             watch.interactable = kept && picked.Count > 0;
+            if (routes != null) routes.interactable = kept && picked.Count > 0;
         }
 
         foreach (ContestRow r in rows)
@@ -855,7 +858,6 @@ public class ContestsPage : MonoBehaviour
             toggle = CourseUI.Button("GPS", line.transform, "", CourseUI.ButtonKind.Light, () =>
             {
                 if (picked.Contains(row)) picked.Remove(row);
-                else if (picked.Count >= ContestCloud.MaxReplays) { UIToast.Show("At most " + ContestCloud.MaxReplays + " runners at a time."); return; }
                 else picked.Add(row);
                 ShowToggle(toggle, picked.Contains(row), c.RouteChoice);
                 ShowWatch();
@@ -863,16 +865,45 @@ public class ContestsPage : MonoBehaviour
             CourseUI.Place((RectTransform)toggle.transform, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-8, 0), new Vector2(124, 40));
             HoverTip.Add(toggle, c.RouteChoice ? "Show this runner's picks" : "Show this runner's GPS route on the map");
             ShowToggle(toggle, picked.Contains(row), c.RouteChoice);
+            toggles.Add((row, toggle));
         }
 
         string keptText = board.replaysUntil <= 0 ? "" : kept
             ? "GPS routes are kept until " + DateTimeOffset.FromUnixTimeMilliseconds(board.replaysUntil).LocalDateTime.ToString("d MMMM", System.Globalization.CultureInfo.InvariantCulture) + "."
             : "The GPS routes of this contest have been deleted.";
-        TextMeshProUGUI keep = CourseUI.Text("Kept", body, (c.RouteChoice ? "Pick runners on the right, then see their picks leg by leg. " : "Pick runners on the right, then watch their routes: the whole course or one leg at a time. ") + keptText,
+        TextMeshProUGUI keep = CourseUI.Text("Kept", body, (c.RouteChoice ? "Pick runners on the right, then see their picks leg by leg. " : "Pick runners on the right, then see their routes or watch the replay: the whole course or one leg at a time. ") + keptText,
             18, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-        CourseUI.Place(keep.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 34), new Vector2(700, 64));
-        watch = CourseUI.Button("Watch", body, "", CourseUI.ButtonKind.Primary, () => OpenReplays(c, board, new List<ContestRow>(picked)), 24);
-        CourseUI.Place((RectTransform)watch.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 34), new Vector2(420, 64));
+        keep.enableAutoSizing = true;
+        keep.fontSizeMin = 13;
+        keep.fontSizeMax = 18;
+        CourseUI.Place(keep.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 106), new Vector2(1180, 48));
+
+        // Show all / Hide all: then tick the ones wanted
+        void PickAll(bool all)
+        {
+            picked.Clear();
+            if (all) foreach (ContestRow r in rows) if (!r.dnf) picked.Add(r);
+            foreach (var (row, toggle) in toggles) ShowToggle(toggle, picked.Contains(row), c.RouteChoice);
+            ShowWatch();
+        }
+        if (kept && toggles.Count > 0)
+        {
+            Button showAll = CourseUI.Button("Show all", body, "Show all", CourseUI.ButtonKind.Light, () => PickAll(true), 20);
+            CourseUI.Place((RectTransform)showAll.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 34), new Vector2(170, 64));
+            HoverTip.Add(showAll, "Pick every runner who finished");
+            Button hideAll = CourseUI.Button("Hide all", body, "Hide all", CourseUI.ButtonKind.Light, () => PickAll(false), 20);
+            CourseUI.Place((RectTransform)hideAll.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(222, 34), new Vector2(170, 64));
+            HoverTip.Add(hideAll, "Pick nobody, then tick the runners you want to see");
+        }
+        watch = CourseUI.Button("Watch", body, "", CourseUI.ButtonKind.Primary, () => OpenReplays(c, board, new List<ContestRow>(picked), false), 24);
+        CourseUI.Place((RectTransform)watch.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 34), new Vector2(400, 64));
+        if (!c.RouteChoice && kept)
+        {
+            // Only the route choices: everyone's whole route at once, no replay (2026-11-26, the user)
+            routes = CourseUI.Button("Routes", body, "See route choices", CourseUI.ButtonKind.Secondary, () => OpenReplays(c, board, new List<ContestRow>(picked), true), 22);
+            CourseUI.Place((RectTransform)routes.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-456, 34), new Vector2(300, 64));
+            HoverTip.Add(routes, "The picked runners' whole routes on the map at once, without the replay. One leg at a time with the arrows.");
+        }
         ShowWatch();
     }
 
@@ -914,7 +945,7 @@ public class ContestsPage : MonoBehaviour
         return text;
     }
 
-    async void OpenReplays(ContestInfo c, ContestBoard board, List<ContestRow> picked)
+    async void OpenReplays(ContestInfo c, ContestBoard board, List<ContestRow> picked, bool routesOnly)
     {
         if (picked.Count == 0) return;
         CourseData course = ContestRun.ReadCourse(board.course);
@@ -939,9 +970,27 @@ public class ContestsPage : MonoBehaviour
             UIToast.Show("The map of this contest is not on this computer.");
             return;
         }
-        Dictionary<string, string> replays;
-        try { replays = await ContestCloud.ReplaysAsync(c.id, picked.ConvertAll(r => r.playerId)); }
-        catch (Exception e) { UIToast.Show(e.Message); return; }
+        // The cloud sends ContestCloud.MaxReplays at a time, so many runners are fetched in turns
+        Dictionary<string, string> replays = new Dictionary<string, string>();
+        UIProgressCard card = picked.Count > ContestCloud.MaxReplays ? UIProgressCard.Show("Fetching the GPS routes...") : null;
+        try
+        {
+            for (int i = 0; i < picked.Count; i += ContestCloud.MaxReplays)
+            {
+                if (card != null) card.Set((i + 1) + "-" + Mathf.Min(picked.Count, i + ContestCloud.MaxReplays) + " of " + picked.Count, (float)i / picked.Count);
+                List<ContestRow> part = picked.GetRange(i, Mathf.Min(ContestCloud.MaxReplays, picked.Count - i));
+                Dictionary<string, string> got = await ContestCloud.ReplaysAsync(c.id, part.ConvertAll(r => r.playerId));
+                foreach (var pair in got) replays[pair.Key] = pair.Value;
+                if (this == null) { if (card != null) card.Close(); return; }
+            }
+        }
+        catch (Exception e)
+        {
+            if (card != null) card.Close();
+            UIToast.Show(e.Message);
+            return;
+        }
+        if (card != null) card.Close();
         if (this == null) return;
         List<ContestReplay.Runner> runners = new List<ContestReplay.Runner>();
         picked.Sort((a, b) => a.place.CompareTo(b.place));
@@ -957,7 +1006,7 @@ public class ContestsPage : MonoBehaviour
             return;
         }
         if (runners.Count < picked.Count) UIToast.Show((picked.Count - runners.Count) + " of the runners have no GPS route saved.");
-        ContestReplay.Open(course, c.RouteChoice, runners, null);
+        ContestReplay.Open(course, c.RouteChoice, runners, null, routesOnly);
     }
 
     // ---- Pop-ups ----

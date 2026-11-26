@@ -328,7 +328,7 @@ public static class PrivateMaps
         if (!IsMine(map)) return OthersMissing(map);
         NetworkPlayer local = NetworkPlayer.Local;
         int waiting = 0, total = 0, progress = 0;
-        foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player == local || player.Object == null || !player.Object.IsValid) continue;
             total++;
@@ -350,7 +350,7 @@ public static class PrivateMaps
         if (map == null) return null;
         NetworkPlayer local = NetworkPlayer.Local;
         int waiting = 0, total = 0;
-        foreach (NetworkPlayer player in UnityEngine.Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player == local || player.Object == null || !player.Object.IsValid) continue;
             total++;

@@ -70,7 +70,13 @@ public partial class TvWorldBuilder
                     float ax = (float)(xy[q] - input.centerE), az = (float)(xy[q + 1] - input.centerN);
                     float bx = (float)(xy[q + 2] - input.centerE), bz = (float)(xy[q + 3] - input.centerN);
                     sbyte w = WaterSideOf(ax, az, bx, bz, 1.3f);
-                    if (w != 0) AddStep(ax, az, bx, bz, id, true, w);
+                    // A natural bank slopes softly into the water (Heights); only a street's edge is a sharp step
+                    if (w != 0)
+                    {
+                        float sx = bx - ax, sz = bz - az, sl = Math.Max(0.05f, (float)Math.Sqrt(sx * sx + sz * sz));
+                        float lx = (ax + bx) / 2f + sz / sl * w * 1.3f, lz = (az + bz) / 2f - sx / sl * w * 1.3f;
+                        AddStep(ax, az, bx, bz, id, Base(SideCell(lx, lz)) == WorldCell.Paved, w);
+                    }
                 }
             }
         }
@@ -364,7 +370,10 @@ public partial class TvWorldBuilder
             float sp = 0f, sn = 0f;
             int np = 0, nn = 0;
             for (int i = 0; i < n; i++) { if (d[i] >= 0f) { sp += piece[i].y; np++; } else { sn += piece[i].y; nn++; } }
-            step = g.force || Math.Abs(sp / np - sn / nn) > 0.25f;
+            // Every triangle along a step line is stepped, even where its two sides lie nearly level: deciding per
+            // triangle left a stepped triangle beside a sloped one, their shared edge split differently, and a
+            // see-through crack between them (2026-11-25, Anders: white triangles along the shores and the tunnel)
+            step = g.force || g.step || Math.Abs(sp / np - sn / nn) > 0.25f;
             // Where the line ends inside the piece, the piece is not stepped: the triangles beyond the line's end are
             // not cut, so a step here would leave a crack to see through (2026-11-25, Anders: a see-through triangle
             // beside a tunnel's mouth). The ground slopes over that one triangle instead.

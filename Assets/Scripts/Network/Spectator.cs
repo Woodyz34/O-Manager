@@ -84,6 +84,8 @@ public class Spectator : MonoBehaviour
         if (view == View.Deciding)
         {
             Decide();
+            // The loading card is not in the way of the results either
+            if (view == View.Deciding && canvas != null && canvas.enabled == CompetitionFlow.ResultsShown) canvas.enabled = !CompetitionFlow.ResultsShown;
             return;
         }
         // The results screen is up: it shows everything, this would only be in the way
@@ -97,24 +99,77 @@ public class Spectator : MonoBehaviour
         else if (view == View.Card) RefreshCard();
     }
 
-    // Waits a moment for the host's game modes and course to arrive, then picks how to watch
+    // Waits a moment for the host's game modes and course to arrive, then picks how to watch.
+    // (2026-11-26, Anders) The spectator used to see its own last course here, on its own map, because the scene was set
+    // up before the host's course had arrived (and a missing map fell back to the first map there is). Now the map
+    // shows only once the race's own course is known and its map is on this computer (CourseLoader.ShowRaceCourse).
+    // Until then a card with a loading bar says what it waits for; a race on the host's private map says the spectator
+    // gets it from the next game, when the host has let everyone in the lobby have it.
     void Decide()
     {
+        AnimateLoadingBar();
         float waited = Time.unscaledTime - startedAt;
         if (!ExtraModes.Known && waited < 8f) return;
         if (waited < 0.5f) return;
+        if (Time.unscaledTime < nextCheck) return;
+        nextCheck = Time.unscaledTime + 0.5f;
 
-        CourseLibrary.ApplyFromHost();
-        bool mapReady = CourseLoader.Loaded != null && CourseLoader.LoadedMap != null
-            && CourseLoader.Loaded == CourseLibrary.Current
-            && CourseLoader.LoadedScene == SceneManager.GetActiveScene().handle;
-        if (!mapReady)
+        // Nothing on the map to watch in these: the card shows how everyone is doing
+        if (RouteChoiceGame.On || RouteAnalysis.On)
         {
-            cardNote = "The map of this race could not be shown on your computer.";
-            Debug.Log("Spectator: the race's course is not set up here, showing the card");
+            CloseLoading();
             ShowCard();
             return;
         }
+
+        CourseLibrary.ApplyFromHost();
+        CourseData course = RaceCourse(out string owner, out string hostName);
+        if (course == null)
+        {
+            ShowLoading("Loading the race", "Waiting for the race's course from the host ...", -1);
+            return;
+        }
+
+        bool shown = !CourseLoader.HeldForSpectator && CourseLoader.Loaded != null && CourseLoader.LoadedMap != null
+            && CourseLoader.Loaded.id == course.id && CourseLoader.LoadedMap.id == course.mapId
+            && CourseLoader.LoadedScene == SceneManager.GetActiveScene().handle;
+        if (!shown)
+        {
+            MapDefinition map = MapDefinition.FindExact(course.mapId);
+            if (map == null)
+            {
+                if (owner.Length > 0 && owner != CloudCourses.PlayerId)
+                {
+                    // The host's own private map: only the players in the lobby get a copy, so this race can't be shown
+                    CloseLoading();
+                    cardHeading = "Private map";
+                    cardNote = hostName + " is racing on a private map, so you don't have access to it yet. "
+                        + "You get access when " + hostName + " goes back to the lobby and the next game starts.";
+                    Debug.Log("Spectator: the race is on the host's private map, showing the card");
+                    ShowCard();
+                    return;
+                }
+                // A shared map not downloaded yet: look for it, as the lobby does, and wait
+                SharedMaps.RefreshForLobby();
+                string downloading = SharedMaps.Downloading;
+                ShowLoading("The map has not loaded yet",
+                    (downloading != null ? "Downloading the map " + downloading + " ..." : "Getting the map of " + course.name + " ...")
+                    + "\nYou see the race as soon as the map is on your computer.", -1);
+                return;
+            }
+            if (!CourseLoader.ShowRaceCourse(course, map))
+            {
+                CloseLoading();
+                cardNote = "The map of this race could not be shown on your computer.";
+                Debug.Log("Spectator: the race's map could not be shown here, showing the card");
+                ShowCard();
+                return;
+            }
+            CameraController cam = Cam;
+            if (cam != null) cam.RefreshMap();
+        }
+        CloseLoading();
+
         if (RunSession.On)
         {
             view = View.ThreeD;
@@ -122,12 +177,104 @@ public class Spectator : MonoBehaviour
             Debug.Log("Spectator: watching a run-it-yourself race");
             return;
         }
-        if (RouteChoiceGame.On || RouteAnalysis.On)
+        ShowMap();
+    }
+
+    float nextCheck;
+    string cardHeading;
+    string lastCourseText;
+    CourseData lastCourse;
+
+    // The course the host is racing, as the host published it in the lobby (the host is the one with the lobby's game
+    // mode on its player, LobbySettingsUI), or null while it has not arrived
+    CourseData RaceCourse(out string owner, out string hostName)
+    {
+        owner = "";
+        hostName = "The host";
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
-            ShowCard();
+            if (p == local || p.Object == null || !p.Object.IsValid || p.Object.HasStateAuthority) continue;
+            if (p.lobbyGameMode.Length == 0 || p.lobbyCourse.Length == 0) continue;
+            string text = p.LobbyCourseText();
+            if (text != lastCourseText)
+            {
+                lastCourseText = text;
+                lastCourse = CourseData.FromLobbyString(text);
+                if (lastCourse != null) CourseLibrary.ApplyLobbyString(text);
+            }
+            owner = p.lobbyMapOwner.ToString();
+            hostName = NameOf(p);
+            return lastCourse;
+        }
+        return null;
+    }
+
+    // ---- Loading: the race's map is not here yet ----
+
+    RectTransform loadCard;
+    TextMeshProUGUI loadTitle;
+    TextMeshProUGUI loadBody;
+    RectTransform loadFill;
+    bool loadClosed;
+
+    // progress 0..100, or -1 when it is not known (the bar then slides back and forth)
+    void ShowLoading(string title, string body, int progress)
+    {
+        view = View.Deciding;
+        BuildCanvas();
+        if (loadClosed) return;
+        if (loadCard == null)
+        {
+            Image back = CourseUI.CardPanel("Loading the race", canvas.transform);
+            loadCard = back.rectTransform;
+            CourseUI.Place(loadCard, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760f, 300f));
+            loadTitle = CourseUI.Text("Title", loadCard, "", 36, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
+            CourseUI.Place(loadTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -28f), new Vector2(680f, 52f));
+            loadBody = CourseUI.Text("Body", loadCard, "", 22, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
+            CourseUI.Place(loadBody.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(680f, 96f));
+            Image track = CourseUI.Panel("Bar", loadCard, CourseUI.FieldBorder, false);
+            CourseUI.Place(track.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 48f), new Vector2(600f, 18f));
+            Image fill = CourseUI.Panel("Fill", track.transform, CourseUI.Accent, false);
+            loadFill = fill.rectTransform;
+            loadFill.offsetMin = Vector2.zero;
+            loadFill.offsetMax = Vector2.zero;
+            Button close = CourseUI.Button("Close", loadCard, "X", CourseUI.ButtonKind.Secondary, () =>
+            {
+                loadClosed = true;
+                CloseLoading();
+            }, 24);
+            CourseUI.Place((RectTransform)close.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-12f, -12f), new Vector2(44f, 44f));
+            HoverTip.Add(close, "Close this");
+        }
+        loadTitle.text = title;
+        loadBody.text = body;
+        loadProgress = progress;
+    }
+
+    int loadProgress = -1;
+
+    void AnimateLoadingBar()
+    {
+        if (loadFill == null) return;
+        if (loadProgress >= 0)
+        {
+            loadFill.anchorMin = Vector2.zero;
+            loadFill.anchorMax = new Vector2(Mathf.Clamp01(loadProgress / 100f), 1f);
             return;
         }
-        ShowMap();
+        // Not known how far: a piece of the bar slides back and forth
+        float at = Mathf.PingPong(Time.unscaledTime * 0.6f, 0.7f);
+        loadFill.anchorMin = new Vector2(at, 0f);
+        loadFill.anchorMax = new Vector2(at + 0.3f, 1f);
+    }
+
+    void CloseLoading()
+    {
+        if (loadCard != null) Destroy(loadCard.gameObject);
+        loadCard = null;
+        loadFill = null;
+        loadTitle = null;
+        loadBody = null;
     }
 
     // ---- A normal race: the map follows a runner ----
@@ -250,7 +397,7 @@ public class Spectator : MonoBehaviour
     {
         if (cardBody == null) return;
         List<NetworkPlayer> players = new List<NetworkPlayer>();
-        foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             if (NetworkPlayer.Races(p)) players.Add(p);
         }
@@ -312,6 +459,7 @@ public class Spectator : MonoBehaviour
             }
         }
 
+        if (!string.IsNullOrEmpty(cardHeading)) cardTitle.text = cardHeading;
         text.Append('\n');
         if (players.Count > 0 && done >= players.Count) text.Append("<b>Everyone is done.</b> Waiting for the host to go on.");
         else text.Append(done).Append(" of ").Append(players.Count).Append(" done.");

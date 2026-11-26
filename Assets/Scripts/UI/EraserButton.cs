@@ -27,7 +27,8 @@ public class EraserButton : MonoBehaviour
     {
         if (button == null && Time.unscaledTime >= nextLook)
         {
-            nextLook = Time.unscaledTime + 0.5f;
+            // Not too often: GameObject.Find goes through every object in the scene (68 000 map objects on a big map)
+            nextLook = Time.unscaledTime + 2f;
             button = GameObject.Find("UndoButton");
             if (button != null) Dress(button);
         }

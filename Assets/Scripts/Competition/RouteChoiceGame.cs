@@ -397,12 +397,6 @@ public class RouteChoiceView : MonoBehaviour
     void Update()
     {
         if (failed) return;
-        // Paused from the Esc menu (alone only): the answer clock waits too (2026-11-24, the user)
-        if (GamePause.Active)
-        {
-            if (step == Step.Asking) askedAt += Time.unscaledDeltaTime;
-            return;
-        }
         ApplyPeek();
         bool keysOpen = EscMenu.IsOpen; // while the Esc menu is open (keys being changed), key presses do not answer
         switch (step)
@@ -937,7 +931,7 @@ public class RouteChoiceView : MonoBehaviour
     List<NetworkPlayer> ReadStandings()
     {
         List<NetworkPlayer> players = new List<NetworkPlayer>();
-        foreach (NetworkPlayer p in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+        foreach (NetworkPlayer p in NetworkPlayer.All())
         {
             if (NetworkPlayer.Races(p)) players.Add(p);
         }
