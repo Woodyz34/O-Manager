@@ -732,8 +732,7 @@ public class RunWorld : MonoBehaviour
     readonly Plane[] frustum = new Plane[6];
 
     // Out to here the far tree shapes; beyond, the pictures
-    // (2026-11-26: the pictures, which have the leaves, from the near distance on; the bare far shapes are only used
-    // when the pictures could not be made)
+    // (only when there are pictures: RunTrees.UsePictures)
     float FarTreesReach => look.near;
 
     void DrawTrees()

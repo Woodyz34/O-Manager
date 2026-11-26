@@ -178,6 +178,14 @@ public class LeaderboardManager : NetworkBehaviour
 
     void Update()
     {
+        // Timed for the 3D mode's slow-frame log (RunPerf, 2026-11-26)
+        long perfStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        UpdateTimed();
+        RunPerf.Add(RunPerf.Part.Leaderboard, System.Diagnostics.Stopwatch.GetTimestamp() - perfStart);
+    }
+
+    void UpdateTimed()
+    {
         if (Time.unscaledTime >= nextOrderRefresh)
         {
             nextOrderRefresh = Time.unscaledTime + orderRefreshInterval;

@@ -403,6 +403,14 @@ public class AgentMovement : NetworkBehaviour
 
     void Update()
     {
+        // Timed for the 3D mode's slow-frame log (RunPerf, 2026-11-26)
+        long perfStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        UpdateTimed();
+        RunPerf.Add(RunPerf.Part.Agent2D, System.Diagnostics.Stopwatch.GetTimestamp() - perfStart);
+    }
+
+    void UpdateTimed()
+    {
         if (ActiveScene.Name == "Lobby")
         {
             // De andra spelarnas objekt ligger annars kvar där de stod när banan tog slut

@@ -41,7 +41,15 @@ public class RunnerCollision : MonoBehaviour
     {
     }
 
-    private void Update()
+    void Update()
+    {
+        // Timed for the 3D mode's slow-frame log (RunPerf, 2026-11-26)
+        long perfStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        UpdateTimed();
+        RunPerf.Add(RunPerf.Part.Collision2D, System.Diagnostics.Stopwatch.GetTimestamp() - perfStart);
+    }
+
+    void UpdateTimed()
     {
         if (!RunnerMapCollision.player.HasInputAuthority)
         {

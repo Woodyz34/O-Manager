@@ -27,10 +27,12 @@ public class RunPerf : IDisposable
     float nextLook;
 
     // Parts of the run-yourself session's own frame (RunSession), measured by hand
-    static readonly string[] partNames = { "runner", "hand map", "online", "window search", "menu check", "punch", "world" };
+    static readonly string[] partNames = { "runner", "hand map", "online", "window search", "menu check", "punch", "world",
+                                           "2D runner", "2D collisions", "clock", "leaderboard", "player", "mistakes", "game mode" };
     static readonly long[] partTicks = new long[partNames.Length];
     static readonly long[] lastPartTicks = new long[partNames.Length];
-    public enum Part { Runner, HandMap, Online, WindowSearch, MenuCheck, Punch, World }
+    public enum Part { Runner, HandMap, Online, WindowSearch, MenuCheck, Punch, World,
+                       Agent2D, Collision2D, Clock, Leaderboard, PlayerUpdate, Mistakes, GameMode }
     public static void Add(Part part, long ticks) => partTicks[(int)part] += ticks;
     readonly List<Probe> counts = new List<Probe>();
     readonly FrameTiming[] timing = new FrameTiming[1];
@@ -178,7 +180,7 @@ public class RunPerf : IDisposable
         else sb.Append("; slowest scripts: none named (" + scripts.Count + " watched)");
         // The run-yourself session's own parts
         double tick = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-        sb.Append("; 3D session:");
+        sb.Append("; parts:");
         for (int i = 0; i < partNames.Length; i++) sb.Append(' ').Append(partNames[i]).Append(' ').Append((lastPartTicks[i] * tick).ToString("0.0"));
         sb.Append(" ms");
         foreach (Probe p in counts)
