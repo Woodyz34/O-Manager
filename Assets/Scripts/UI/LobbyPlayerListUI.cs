@@ -103,7 +103,8 @@ public class LobbyPlayerListUI : MonoBehaviour
         signature.Append(maxPlayers).Append('|').Append(localIsHost);
         foreach (NetworkPlayer player in players)
         {
-            signature.Append('|').Append(player.Object.Id).Append(':').Append(player.nickName.ToString()).Append(':').Append(player.Object.HasStateAuthority);
+            signature.Append('|').Append(player.Object.Id).Append(':').Append(player.nickName.ToString()).Append(':').Append(player.Object.HasStateAuthority)
+                .Append(':').Append(LobbySettingsUI.HasCourse(player));
         }
         if (signature.ToString() == lastSignature)
         {
@@ -131,7 +132,10 @@ public class LobbyPlayerListUI : MonoBehaviour
             Image dot = row.transform.Find("Dot").GetComponent<Image>();
 
             nameText.text = string.IsNullOrWhiteSpace(playerName) ? "Player " + player.Object.StateAuthority.PlayerId : playerName;
+            // Who is still getting the course: the host can't start until everyone has it (2026-11-26)
+            bool hasCourse = LobbySettingsUI.HasCourse(player);
             tagText.text = isLocal ? (localIsHost ? "You (host)" : "You") : "";
+            if (!hasCourse) tagText.text = (isLocal ? tagText.text + ", " : "") + "getting the course...";
             dot.color = isLocal ? localDotColor : otherDotColor;
         }
 

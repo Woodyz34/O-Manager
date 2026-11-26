@@ -102,6 +102,7 @@ public class ImposterOverlay : MonoBehaviour
 
     void Update()
     {
+        WatchForNewRole();
         if (!stage.activeSelf)
         {
             return;
@@ -131,6 +132,7 @@ public class ImposterOverlay : MonoBehaviour
             yield break;
         }
         bool amImposter = local.Object.StateAuthority == imposter;
+        knownImposter = imposter;
 
         // Secret task mode: the task is set by the host together with the imposter
         bool secretTask = SecretTasks.On;
@@ -200,6 +202,68 @@ public class ImposterOverlay : MonoBehaviour
             PlaceRoleChipRight();
             roleChip.SetActive(true);
         }
+        watchingRole = true;
+    }
+
+    // ---- A new imposter in the middle of the race ----
+
+    // The imposter left and the host made someone else the imposter (CompetitionFlow.ReplaceImposterWhoLeft). Only the
+    // new imposter is told, with a big pop-up that only they see (2026-11-26, the user); the others see nothing.
+    bool watchingRole;
+    PlayerRef knownImposter;
+    float nextRoleCheck;
+
+    void WatchForNewRole()
+    {
+        if (!watchingRole || Time.unscaledTime < nextRoleCheck) return;
+        nextRoleCheck = Time.unscaledTime + 0.5f;
+        if (CompetitionFlow.ResultsShown || !CompetitionFlow.TryGetImposter(out PlayerRef now) || now == knownImposter) return;
+        knownImposter = now;
+        NetworkPlayer local = NetworkPlayer.Local;
+        if (local == null || local.Object == null || !local.Object.IsValid || local.spectator) return;
+        if (local.Object.StateAuthority != now) return;
+        watchingRole = false;
+        StartCoroutine(NewImposterRoutine());
+    }
+
+    IEnumerator NewImposterRoutine()
+    {
+        bool secretTask = SecretTasks.On;
+        ResetStage();
+        pulseSpeed = 1.1f;
+        pulseStrength = 0.5f;
+        detailText.enableAutoSizing = true;
+        detailText.fontSizeMax = detailText.fontSize;
+        detailText.fontSizeMin = Mathf.Min(20f, detailText.fontSize);
+        smallText.text = "ONLY YOU CAN SEE THIS";
+        bigText.text = "YOU ARE NOW THE IMPOSTER";
+        bigText.color = bloodColor;
+        detailText.text = secretTask
+            ? "The imposter left the race, so you have taken over. Nobody else knows. Keep running as before and blend in: "
+              + "if the others don't pick you at the end, you win the imposter's money."
+            : "The imposter left the race, so you have taken over. Nobody else knows. From now on, try to finish last "
+              + "without the others noticing.";
+        SetAlpha(bigText, 0f);
+        SetAlpha(detailText, 0f);
+
+        yield return Fade(stageGroup, 0f, 1f, 0.4f);
+        StartCoroutine(FlashRoutine(0.5f, 0.35f));
+        yield return Flicker(smallText, 0.5f);
+        StartCoroutine(Shake(0.4f, 18f));
+        yield return SlamIn(bigText, 0.3f);
+        yield return FadeText(detailText, 0f, 0.9f, 0.4f);
+        // Long enough to be read in the middle of a race
+        yield return FlickerHold(bigText, 6f);
+        yield return Fade(stageGroup, 1f, 0f, 0.6f);
+        stage.SetActive(false);
+
+        if (!CompetitionFlow.ResultsShown)
+        {
+            roleChipText.text = secretTask ? "You are now the imposter: blend in" : "You are now the imposter: finish last";
+            PlaceRoleChipRight();
+            roleChip.SetActive(true);
+        }
+        watchingRole = true;
     }
 
     // ---- Reveal ----

@@ -9,6 +9,7 @@ using UnityEngine.SceneManagement;
 //  - no trail streak when the runner is moved to a new place (joining the lobby, starting a competition)
 //  - hidden while the player draws the route (circle, name and trail), so it does not cover the start of the line
 //  - smaller on sprint maps, which are drawn at a larger scale (1:4000), so it looks as big on the picture as in the forest
+//  - name tags of runners standing close together are stacked above each other instead of on top of each other
 // The ring, the copy and the name tag are objects in NetworkPlayerPF. Tools > O-Manager > Developer > Apply Runner Marker builds them.
 public class RunnerMarker : MonoBehaviour
 {
@@ -59,6 +60,7 @@ public class RunnerMarker : MonoBehaviour
 
     void OnEnable()
     {
+        if (!Shown.Contains(this)) Shown.Add(this);
         SceneManager.sceneLoaded += OnSceneLoaded;
         lastPosition = transform.position;
         QuietTrail(quietAfterSceneLoad);
@@ -74,6 +76,8 @@ public class RunnerMarker : MonoBehaviour
 
     void OnDisable()
     {
+        Shown.Remove(this);
+        nameShown = false;
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
@@ -202,8 +206,40 @@ public class RunnerMarker : MonoBehaviour
         }
         float tagHeight = nameTag != null ? nameTag.rect.height * scale : 0f;
         float above = radius + nameGapShare * screenHeight + tagHeight * 0.5f;
-        nameCanvas.position = transform.position + cam.transform.up * above - cam.transform.forward * 0.3f;
+        Vector3 basePosition = transform.position + cam.transform.up * above;
+
+        // Runners close together (at the same control, 2026-11-26, the user: "H( flötis )or") get their tags stacked
+        Canvas tagCanvas = nameCanvas.GetComponent<Canvas>();
+        nameShown = nameCanvas.gameObject.activeInHierarchy && (tagCanvas == null || tagCanvas.enabled)
+            && nameTag != null && nameTag.gameObject.activeSelf;
+        nameBase = basePosition;
+        nameWidth = nameTag != null ? nameTag.rect.width * scale : 0f;
+        nameHeight = tagHeight;
+        int slot = 0;
+        if (nameShown && tagHeight > 0f)
+        {
+            Vector3 right = cam.transform.right;
+            Vector3 up = cam.transform.up;
+            int me = GetInstanceID();
+            foreach (RunnerMarker other in Shown)
+            {
+                if (other == null || other == this || !other.nameShown || other.GetInstanceID() > me) continue;
+                Vector3 d = other.nameBase - basePosition;
+                if (Mathf.Abs(Vector3.Dot(d, right)) < (nameWidth + other.nameWidth) * 0.5f
+                    && Mathf.Abs(Vector3.Dot(d, up)) < Mathf.Max(tagHeight, other.nameHeight) * 0.95f)
+                {
+                    slot++;
+                }
+            }
+        }
+        nameCanvas.position = basePosition + cam.transform.up * (slot * tagHeight * 1.1f) - cam.transform.forward * 0.3f;
     }
+
+    static readonly System.Collections.Generic.List<RunnerMarker> Shown = new System.Collections.Generic.List<RunnerMarker>();
+    bool nameShown;
+    Vector3 nameBase;
+    float nameWidth;
+    float nameHeight;
 
     // ---------- trail ----------
 

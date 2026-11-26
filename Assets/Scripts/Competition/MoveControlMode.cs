@@ -91,6 +91,7 @@ public static class MoveControlMode
         moved.Clear();
         revealing = false;
         pictureMarks = null;
+        spectatorPoints = null;
     }
 
     static PathfindingManager Manager => UnityEngine.Object.FindObjectOfType<PathfindingManager>();
@@ -98,6 +99,7 @@ public static class MoveControlMode
     // Where the controls were laid, before anyone moved anything
     public static void Capture(PathfindingManager manager)
     {
+        if (spectatorPoints != null && originals == null) originals = new List<Vector3>(spectatorPoints);
         if (originals != null || manager == null || manager.controlPoints == null) return;
         originals = new List<Vector3>();
         foreach (Transform point in manager.controlPoints) originals.Add(point != null ? point.position : Vector3.zero);
@@ -105,6 +107,11 @@ public static class MoveControlMode
 
     public static Vector3 Original(int index)
     {
+        if (spectatorPoints != null)
+        {
+            Capture(null);
+            return index >= 0 && index < originals.Count ? originals[index] : Vector3.zero;
+        }
         PathfindingManager manager = Manager;
         Capture(manager);
         if (originals != null && index >= 0 && index < originals.Count) return originals[index];
@@ -267,7 +274,38 @@ public static class MoveControlMode
         Dictionary<string, float[,]> slopes = manager.slopeFactors;
         Task<List<Vector2Int>> task = Task.Run(() => NewRoute(speed, slopes, drawer, drawn, startCell, goal));
 
-        // Who moved it
+        ModeBanner.Show(null, "Control " + index + " is on the move!", Detail(index, to, movers), CourseRenderer.CoursePurple, 3.4f, false, ModeBanner.LoadSound("control_whoosh"));
+
+        // Show the old place and the new one
+        if (agent.CamController != null)
+        {
+            agent.CamController.FocusOnSegment(startCell, goal);
+        }
+
+        yield return FlyAndLand(point, index, from, to);
+
+        // Wait for the new route (it is usually long done)
+        float waited = 0f;
+        while (!task.IsCompleted && waited < 8f)
+        {
+            waited += Time.deltaTime;
+            yield return null;
+        }
+        if (task.IsCompleted && !task.IsFaulted && task.Result != null && task.Result.Count > 0)
+        {
+            agent.Initialize(task.Result);
+        }
+        else if (task.IsFaulted)
+        {
+            Debug.LogWarning("Move a control: could not work out the new route: " + task.Exception);
+        }
+        revealing = false;
+        proceed?.Invoke();
+    }
+
+    // Who moved it, and how far
+    static string Detail(int index, Vector3 to, List<NetworkPlayer> movers)
+    {
         List<string> names = new List<string>();
         foreach (NetworkPlayer mover in movers) names.Add(mover.Object.HasStateAuthority ? "you" : BearMode.Name(mover));
         string who = names.Count == 1 ? names[0] : string.Join(", ", names.GetRange(0, names.Count - 1)) + " and " + names[names.Count - 1];
@@ -280,15 +318,98 @@ public static class MoveControlMode
             detail = (mine ? (names.Count > 1 ? "Moved by you and someone else, so it lands in the middle" : "Moved by you") : names.Count > 1 ? "Moved by " + names.Count + " players, so it lands in the middle" : "Moved by someone")
                      + ": " + Mathf.RoundToInt(meters) + " m from where it was laid.";
         }
-        ModeBanner.Show(null, "Control " + index + " is on the move!", detail, CourseRenderer.CoursePurple, 3.4f, false, ModeBanner.LoadSound("control_whoosh"));
+        return detail;
+    }
 
-        // Show the old place and the new one
-        if (agent.CamController != null)
+    // ---- A spectator ----
+
+    // The spectator's controls: worked out from the race's course, as it is drawn for the spectator
+    // (CourseLoader.ShowRaceCourse). Its PathfindingManager holds no real controls.
+    static List<Vector3> spectatorPoints;
+
+    public static void BeginSpectating()
+    {
+        CourseData course = CourseLoader.Loaded;
+        MapDefinition map = CourseLoader.LoadedMap;
+        if (course == null || map == null) return;
+        spectatorPoints = new List<Vector3>();
+        foreach (CoursePoint point in course.AllPoints())
         {
-            agent.CamController.FocusOnSegment(startCell, goal);
+            Vector3 world = map.ToWorld(point);
+            world.z = -1.2f;
+            spectatorPoints.Add(world);
         }
+        originals = null;
+        Capture(null);
+    }
 
-        // The control lifts off, flies to its new place spinning and lands with a puff
+    // A spectator draws nothing, so InterceptAllDrawn never runs for it. A control the runners are drawing to is shown
+    // at its new place once nobody is drawing to it any more (the moves are then final). Moves made before the spectator
+    // came are put in place at once; a new one flies there as for the runners.
+    public static void SpectatorTick()
+    {
+        if (!On || revealing || spectatorPoints == null || spectatorPoints.Count < 3) return;
+        List<NetworkPlayer> runners = new List<NetworkPlayer>();
+        foreach (NetworkPlayer p in NetworkPlayer.All()) if (NetworkPlayer.Races(p)) runners.Add(p);
+        if (runners.Count == 0) return;
+        int last = spectatorPoints.Count - 1;
+        for (int index = 1; index < last; index++)
+        {
+            if (handled.Contains(index)) continue;
+            bool reached = false, stillDrawing = false, passed = true;
+            foreach (NetworkPlayer runner in runners)
+            {
+                if (runner.raceLeg >= index || runner.raceFinished) reached = true;
+                if (runner.raceLeg == index && runner.drawingNow && !runner.raceFinished) stillDrawing = true;
+                if (runner.raceLeg <= index && !runner.raceFinished) passed = false;
+            }
+            if (!reached || stillDrawing) continue;
+
+            List<NetworkPlayer> movers = new List<NetworkPlayer>();
+            Vector2 sum = Vector2.zero;
+            foreach (NetworkPlayer player in runners)
+            {
+                if (!MovedTo(player, index, out Vector2 target)) continue;
+                movers.Add(player);
+                sum += target;
+            }
+            // Nobody has moved it (yet: a runner still choosing a runner has not started drawing)
+            if (movers.Count == 0)
+            {
+                if (passed) handled.Add(index);
+                continue;
+            }
+            handled.Add(index);
+            movers.Sort((a, b) => a.Object.StateAuthority.PlayerId.CompareTo(b.Object.StateAuthority.PlayerId));
+            // The middle of the moves. (The runners nudge it off ground nobody can run on, with their own map grid,
+            // which the spectator does not have; that is rare and only a few metres.)
+            Vector2 middle = sum / movers.Count;
+            Vector3 from = spectatorPoints[index];
+            Vector3 to = new Vector3(middle.x, middle.y, from.z);
+            if (passed)
+            {
+                spectatorPoints[index] = to;
+                moved[index] = to;
+                Redraw(-1, -1);
+                continue;
+            }
+            ModeBanner.Show(null, "Control " + index + " is on the move!", Detail(index, to, movers), CourseRenderer.CoursePurple, 3.4f, false, ModeBanner.LoadSound("control_whoosh"));
+            revealing = true;
+            GameModeRuntime.Host.StartCoroutine(SpectatorFly(index, from, to));
+            return;
+        }
+    }
+
+    static IEnumerator SpectatorFly(int index, Vector3 from, Vector3 to)
+    {
+        yield return FlyAndLand(null, index, from, to);
+        revealing = false;
+    }
+
+    // The control lifts off, flies to its new place spinning and lands with a puff (point: the runner's control; null
+    // for a spectator)
+    static IEnumerator FlyAndLand(Transform point, int index, Vector3 from, Vector3 to)
+    {
         Redraw(index, -1);
         GameObject flying = ControlMark("Flying control " + index, index.ToString(), CourseRenderer.CoursePurple, 35);
         List<GameObject> trail = new List<GameObject>();
@@ -313,7 +434,8 @@ public static class MoveControlMode
             FadeTrail(trail);
             yield return null;
         }
-        point.position = to;
+        if (point != null) point.position = to;
+        else if (spectatorPoints != null && index < spectatorPoints.Count) spectatorPoints[index] = to;
         moved[index] = to;
         UnityEngine.Object.Destroy(flying);
         Redraw(-1, -1);
@@ -337,24 +459,6 @@ public static class MoveControlMode
         }
         UnityEngine.Object.Destroy(puff);
         foreach (GameObject dot in trail) if (dot != null) UnityEngine.Object.Destroy(dot);
-
-        // Wait for the new route (it is usually long done)
-        float waited = 0f;
-        while (!task.IsCompleted && waited < 8f)
-        {
-            waited += Time.deltaTime;
-            yield return null;
-        }
-        if (task.IsCompleted && !task.IsFaulted && task.Result != null && task.Result.Count > 0)
-        {
-            agent.Initialize(task.Result);
-        }
-        else if (task.IsFaulted)
-        {
-            Debug.LogWarning("Move a control: could not work out the new route: " + task.Exception);
-        }
-        revealing = false;
-        proceed?.Invoke();
     }
 
     // The drawn line, then on from where it ends to the control's new place, made into a route with A* in a narrow
@@ -391,9 +495,14 @@ public static class MoveControlMode
     // whose first place is shown faded (the player's own move, before the others know)
     public static void Redraw(int skip, int shadow)
     {
-        PathfindingManager manager = Manager;
-        if (manager == null) return;
-        List<Transform> points = manager.controlPoints;
+        List<Vector3> points = spectatorPoints;
+        if (points == null)
+        {
+            PathfindingManager manager = Manager;
+            if (manager == null) return;
+            points = new List<Vector3>();
+            foreach (Transform point in manager.controlPoints) points.Add(point != null ? point.position : Vector3.zero);
+        }
         CourseRenderer course = FindCourseRenderer();
         if (course == null)
         {
@@ -409,18 +518,18 @@ public static class MoveControlMode
             CourseRenderer.MarkKind kind = i == 0 ? CourseRenderer.MarkKind.Start : i == last ? CourseRenderer.MarkKind.Finish : CourseRenderer.MarkKind.Control;
             marks.Add(new CourseRenderer.Mark
             {
-                position = points[i].position,
+                position = points[i],
                 kind = kind,
                 label = kind == CourseRenderer.MarkKind.Control ? i.ToString() : "",
                 color = CourseRenderer.CoursePurple,
-                toward = i == 0 && points.Count > 1 ? points[1].position - points[0].position : Vector3.zero
+                toward = i == 0 && points.Count > 1 ? points[1] - points[0] : Vector3.zero
             });
             if (i > 0 && i - 1 != skip)
             {
                 lines.Add(new CourseRenderer.Line
                 {
-                    from = points[i - 1].position,
-                    to = points[i].position,
+                    from = points[i - 1],
+                    to = points[i],
                     fromKind = i - 1 == 0 ? CourseRenderer.MarkKind.Start : CourseRenderer.MarkKind.Control,
                     toKind = kind,
                     color = CourseRenderer.CoursePurple
@@ -444,7 +553,7 @@ public static class MoveControlMode
     }
 
     // Old map pictures have the course printed in them, so the moved controls are drawn on top of the picture
-    static void DrawOnPicture(int skip, int shadow, List<Transform> points)
+    static void DrawOnPicture(int skip, int shadow, List<Vector3> points)
     {
         if (pictureMarks == null)
         {
@@ -453,7 +562,7 @@ public static class MoveControlMode
         pictureMarks.sizeFactor = CourseRenderer.SizeFor(CourseLoader.LoadedMap);
         List<CourseRenderer.Mark> marks = new List<CourseRenderer.Mark>();
         Dictionary<int, Vector3> show = new Dictionary<int, Vector3>(moved);
-        if (shadow > 0 && shadow < points.Count) show[shadow] = points[shadow].position;
+        if (shadow > 0 && shadow < points.Count) show[shadow] = points[shadow];
         foreach (KeyValuePair<int, Vector3> pair in show)
         {
             if (pair.Key == skip) continue;

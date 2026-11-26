@@ -37,6 +37,8 @@ public static class CourseLibrary
     }
 
     static string lastLobbyString;
+    // The host's course text this computer has set up last (LobbySettingsUI: the player has the course)
+    public static string LastLobbyString => lastLobbyString;
 
     // A player who is not the host takes the course the host has published in the lobby
     public static void ApplyLobbyString(string text)

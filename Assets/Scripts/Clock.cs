@@ -156,6 +156,22 @@ public class Clock : MonoBehaviour
         secoundBox.text = s.ToString("00");
     }
 
+    // A spectator's clock: the watched runner's time, or the time of the runner who has been out longest
+    static int SpectatorSeconds()
+    {
+        Transform watchedAt = CameraController.Watched;
+        NetworkPlayer watched = watchedAt != null ? watchedAt.GetComponent<NetworkPlayer>() : null;
+        if (NetworkPlayer.Races(watched)) return RaceSeconds(watched);
+        int most = 0;
+        foreach (NetworkPlayer p in NetworkPlayer.All())
+        {
+            if (NetworkPlayer.Races(p)) most = Mathf.Max(most, RaceSeconds(p));
+        }
+        return most;
+    }
+
+    static int RaceSeconds(NetworkPlayer p) => p.hourCount * 3600 + p.minuterCount * 60 + p.secoundCount;
+
     // Back from a replay: the race's own time again
     public void ShowOwnTime()
     {
@@ -167,6 +183,18 @@ public class Clock : MonoBehaviour
 
     public void UpdateTimer()
     {
+        // Watching a race (joined in the middle): no race clock of its own. It used to count from when the spectator
+        // came in, so it said 9:31 while the runners were at 18 minutes (2026-11-26, the user). Now it shows the time
+        // of the runner being watched.
+        if (agentMovement != null && agentMovement.HasStateAuthority)
+        {
+            NetworkPlayer self = GetComponent<NetworkPlayer>();
+            if (self != null && self.Object != null && self.Object.IsValid && self.spectator)
+            {
+                ShowReplayTime(SpectatorSeconds());
+                return;
+            }
+        }
         if(agentMovement.manualPathDrawer == null)
         {
             return;

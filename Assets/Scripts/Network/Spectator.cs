@@ -177,6 +177,8 @@ public class Spectator : MonoBehaviour
             Debug.Log("Spectator: watching a run-it-yourself race");
             return;
         }
+        // Bears and moved controls show for the spectator too (2026-11-26, the user)
+        GameModeRuntime.StartForSpectator();
         ShowMap();
     }
 

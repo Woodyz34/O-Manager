@@ -449,10 +449,12 @@ public class BearWatcher : MonoBehaviour
 
     readonly Dictionary<int, Vector3> lastPlace = new Dictionary<int, Vector3>();
 
-    // Your own bears are shown faded; someone else's only once found.
+    // Your own bears are shown faded; someone else's only once found. A spectator sees every bear, the ones not found
+    // yet faded (2026-11-26, the user: the spectator saw no bears at all).
     // Relays: a bear taken away at a new leg is hidden, and a bear hidden somewhere new is unfound and can scare again.
     void SyncViews()
     {
+        bool seeAll = NetworkPlayer.LocalWatches;
         foreach (NetworkPlayer player in NetworkPlayer.All())
         {
             if (player.Object == null || !player.Object.IsValid) continue;
@@ -478,7 +480,7 @@ public class BearWatcher : MonoBehaviour
                 if (!placed) continue;
                 lastPlace[key] = bear;
                 bool found = BearMode.IsFound(key);
-                if (!mine && !found) continue;
+                if (!mine && !found && !seeAll) continue;
                 View view = GetView(key);
                 view.root.transform.position = new Vector3(bear.x, bear.y, -1.4f);
                 view.root.transform.localScale = Vector3.one * BearMode.DrawnMeters(bear.z) * U;

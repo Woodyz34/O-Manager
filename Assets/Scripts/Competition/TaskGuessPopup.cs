@@ -28,7 +28,9 @@ public class TaskGuessPopup : MonoBehaviour
         GameObject go = new GameObject("Task guess", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         Canvas canvas = go.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 210;
+        // Above the results screen (sorting order 500). At 210 it was drawn under it, so the caught imposter never saw
+        // the tasks and could not pick one (2026-11-26, the user). Under the imposter overlay (600).
+        canvas.sortingOrder = 560;
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
         Current = go.AddComponent<TaskGuessPopup>();
         Current.Build(tasks, canPick, imposterName, onPick);

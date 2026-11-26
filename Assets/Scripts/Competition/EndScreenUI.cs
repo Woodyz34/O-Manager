@@ -353,8 +353,9 @@ public class EndScreenUI : MonoBehaviour
             CountVotes();
         }
 
-        // Secret task mode: a caught imposter gets one guess at the task, and wins if it is right
-        if (secretTaskMode && caught)
+        // Secret task mode: a caught imposter gets one guess at the task, and wins if it is right. Not an imposter who
+        // took over when the first one left: they had the task until then, so the guess would be a sure win.
+        if (secretTaskMode && caught && !CompetitionFlow.ImposterTookOver)
         {
             votePanel.SetActive(false);
             yield return TaskGuessRoutine(overlay);
@@ -405,7 +406,8 @@ public class EndScreenUI : MonoBehaviour
         {
             detail = correct + " of " + votersCount + " runners guessed right.";
         }
-        if (secretTaskMode && caught)
+        bool tookOver = CompetitionFlow.ImposterTookOver;
+        if (secretTaskMode && caught && !tookOver)
         {
             // The task stays secret until the imposter has guessed it
             detail += "\nBut " + NameOf(imposter) + " gets one guess at the task...";
@@ -414,6 +416,8 @@ public class EndScreenUI : MonoBehaviour
         {
             detail += "\nThe task was: " + SecretTasks.Short(secretTask);
         }
+        // Told only now, after the race (2026-11-26, the user: nobody should know while racing)
+        if (tookOver) detail += "\n" + NameOf(imposter) + " took over as imposter when the first one left the race.";
         return new ImposterOverlay.RevealResult { caught = caught, detail = detail };
     }
 
@@ -525,7 +529,8 @@ public class EndScreenUI : MonoBehaviour
             {
                 // Caught, but the right guess at the task wins after all: the same money as getting away
                 bool won = !caught || taskGuessedRight;
-                total += AddLine(!caught ? "Got away with it" : taskGuessedRight ? "Caught, but guessed the task" : "Caught, and the guess was wrong",
+                total += AddLine(!caught ? "Got away with it" : taskGuessedRight ? "Caught, but guessed the task"
+                    : CompetitionFlow.ImposterTookOver ? "Caught by the others" : "Caught, and the guess was wrong",
                     won ? CompetitionRewards.ForImposterEscape(votersCount) : 0);
             }
         }

@@ -38,6 +38,7 @@ public class ReadyUIHandler : NetworkBehaviour
     }
 
     bool remaking;
+    float nextWaitCheck;
 
     // After a race on an AI course, Start game lays a new AI course with the same kind, length and
     // number of controls (unless the host picked another course in the meantime), shows it to everyone
@@ -78,8 +79,23 @@ public class ReadyUIHandler : NetworkBehaviour
             UIToast.Show("Could not lay a new AI course (" + result.error + "). Running the same course again.");
             AICoursePanel.RacedCourseId = null;
         }
+        // Everyone needs the new course before the race starts: wait for it a while (StartGame says who is missing)
+        float waitUntil = Time.realtimeSinceStartup + 20f;
+        PublishCourseNow();
+        while (Time.realtimeSinceStartup < waitUntil && LobbySettingsUI.CourseStartProblem(Runner) != null)
+        {
+            await Task.Yield();
+            if (this == null) return;
+        }
         remaking = false;
         StartGame();
+    }
+
+    void PublishCourseNow()
+    {
+        NetworkPlayer local = NetworkPlayer.Local;
+        if (local == null || local.Object == null || !local.Object.IsValid || mapHandler == null || mapHandler.course == null) return;
+        local.SetLobbyCourseText(mapHandler.course.ToLobbyString());
     }
 
     public void StartGame()
@@ -149,6 +165,16 @@ public class ReadyUIHandler : NetworkBehaviour
             UIToast.Show(mapProblem);
             return;
         }
+        // Everyone in the lobby must have the course (and its map) before it starts (2026-11-26, the user: a player
+        // who had not got the course yet was taken into the race anyway). The course is sent again first, in case the
+        // host changed it a moment ago.
+        PublishCourseNow();
+        string waitProblem = LobbySettingsUI.CourseStartProblem(Runner);
+        if (waitProblem != null)
+        {
+            UIToast.Show(waitProblem);
+            return;
+        }
 
         // The lobby stays open while it races: a player who joins now watches the race (SessionRacing, Spectator)
         SessionRacing.Set(Runner, true);
@@ -212,6 +238,15 @@ public class ReadyUIHandler : NetworkBehaviour
         if (buttonReady.activeSelf != show)
         {
             buttonReady.SetActive(show);
+        }
+        // Start game looks greyed while someone in the lobby is still getting the course
+        if (show && Time.unscaledTime >= nextWaitCheck)
+        {
+            nextWaitCheck = Time.unscaledTime + 0.5f;
+            CanvasGroup group = buttonReady.GetComponent<CanvasGroup>();
+            if (group == null) group = buttonReady.AddComponent<CanvasGroup>();
+            float alpha = LobbySettingsUI.CourseStartProblem(Runner) != null ? 0.5f : 1f;
+            if (group.alpha != alpha) group.alpha = alpha;
         }
         foreach (GameObject button in hostOnlyButtons)
         {
