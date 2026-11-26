@@ -444,6 +444,7 @@ public class RunWorld : MonoBehaviour
     void OnDestroy()
     {
         if (gcSliceSaved) UnityEngine.Scripting.GarbageCollector.incrementalTimeSliceNanoseconds = savedGcSlice;
+        Shader.SetGlobalVector(ThinId, Vector4.zero);
         probe?.Dispose();
         probe = null;
         QualitySettings.shadowDistance = savedShadowDistance;
@@ -836,8 +837,15 @@ public class RunWorld : MonoBehaviour
     // (only when there are pictures: RunTrees.UsePictures)
     float FarTreesReach => look.near;
 
+    static readonly int ThinId = Shader.PropertyToID("_TvThin"), ThinCenterId = Shader.PropertyToID("_TvLodCenter");
+
     void DrawTrees()
     {
+        // The undergrowth thins out with distance (2026-11-26, Anders chose it for Ultra's lag): all of it up to 40 % of
+        // its reach, a third of it from 85 % on, each tuft fading out on its share of the pixels (TvAtlasLit)
+        Vector3 runnerAt = transform.TransformPoint(ToScene(playerE, playerN, 0f));
+        Shader.SetGlobalVector(ThinCenterId, new Vector4(runnerAt.x, runnerAt.z, 0f, 0f));
+        Shader.SetGlobalVector(ThinId, new Vector4(look.detail * 0.4f, look.detail * 0.85f, 0.33f, 1f));
         if (trees == null) return;
         trees.Clear();
         bool cull = viewCamera != null && viewCamera.isActiveAndEnabled;

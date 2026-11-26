@@ -60,6 +60,10 @@ Shader "O-Manager/TvAtlasLit"
         // _TvLodCenter.xy: the runner, from whom the distances are counted
         float4 _TvLod;
         float4 _TvLodCenter;
+        // The undergrowth thinned out with distance (RunWorld, 2026-11-26, Anders: Ultra lagged): all of it up to x
+        // metres from the runner, only the share z of it from y metres on; w > 0.5: on. Each tuft has its own number
+        // 0..1 in the fourth uv (TvMesh.ranks; 0: never thinned) and shows while it is below the share there.
+        float4 _TvThin;
 
         struct Input
         {
@@ -94,6 +98,25 @@ Shader "O-Manager/TvAtlasLit"
                 float going = _TvLod.z > 0.001 ? saturate((d - (_TvLod.z - _TvLod.w)) / max(_TvLod.w, 0.01)) : 0.0;
                 float coming = _TvLod.x > 0.001 ? saturate((d - (_TvLod.x - _TvLod.y)) / max(_TvLod.y, 0.01)) : 1.0;
                 o.atlas.w = going > 0.0 ? -1.0 - going : coming;
+            }
+            // Thinned undergrowth: a tuft past its share fades out on its share of the pixels, and one well past it is
+            // folded to a point, so the graphics card draws nothing for it
+            if (_TvThin.w > 0.5 && v.texcoord.w > 0.0005)
+            {
+                float2 wp = mul(unity_ObjectToWorld, v.vertex).xz;
+                float d = distance(wp, _TvLodCenter.xy);
+                float share = lerp(1.0, _TvThin.z, saturate((d - _TvThin.x) / max(_TvThin.y - _TvThin.x, 0.01)));
+                float room = share - v.texcoord.w;
+                if (room < -0.04)
+                {
+                    v.vertex = float4(0, -1000, 0, 1);
+                }
+                else
+                {
+                    float keep = saturate(room / 0.05);
+                    o.atlas.w = o.atlas.w >= 0.0 ? o.atlas.w * keep : o.atlas.w;
+                    if (keep <= 0.0) o.atlas.w = 0.0;
+                }
             }
             // Leaves and needles stir a little in the wind: more at the tip of a card (v near 1) than at its base
             // (not the cards lying flat on the ground, litter and leaf tops: 2026-11-25, Anders: the litter moved)

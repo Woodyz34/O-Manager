@@ -164,7 +164,7 @@ public static class RunSettings
             case Quality.High:
                 return new Look { view = 330f, near = 96f, detail = 56f, undergrowth = 0.6f, shadows = 2, shadowDistance = 60f, msaa = 4, reliefFar = 30f, aniso = AnisotropicFiltering.ForceEnable };
             case Quality.Ultra:
-                return new Look { view = 420f, near = 130f, detail = 72f, undergrowth = 1f, shadows = 3, shadowDistance = 110f, msaa = 8, reliefFar = 50f, aniso = AnisotropicFiltering.ForceEnable };
+                return new Look { view = 420f, near = 130f, detail = 50f, undergrowth = 1f, shadows = 3, shadowDistance = 110f, msaa = 4, reliefFar = 50f, aniso = AnisotropicFiltering.ForceEnable };
             default:
                 return new Look { view = 230f, near = 60f, detail = 36f, undergrowth = 0.3f, shadows = 1, shadowDistance = 32f, msaa = 2, reliefFar = 15f, aniso = AnisotropicFiltering.Enable };
         }

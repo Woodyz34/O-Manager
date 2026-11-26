@@ -151,7 +151,7 @@ public class TvWorldView : MonoBehaviour
     public struct PlainCorner { public Vector3 p, n; public Color32 c; }
 
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    public struct TexturedCorner { public Vector3 p, n; public Color32 c; public Vector3 uv; }
+    public struct TexturedCorner { public Vector3 p, n; public Color32 c; public Vector4 uv; }   // uv.w: TvMesh.ranks
 
     static readonly VertexAttributeDescriptor[] PlainLayout =
     {
@@ -165,7 +165,7 @@ public class TvWorldView : MonoBehaviour
         new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
         new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
         new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4),
-        new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 3),
+        new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 4),
     };
 
     // A mesh's corners as Unity wants them. Made on a background thread, so the main thread only hands them over.
@@ -223,7 +223,8 @@ public class TvWorldView : MonoBehaviour
             if (textured != null)
             {
                 List<float> u = s.uvs;
-                textured[to] = new TexturedCorner { p = pos, n = nor, c = col, uv = new Vector3(u[a], u[a + 1], u[a + 2]) };
+                float rank = s.ranks != null && from < s.ranks.Count ? s.ranks[from] : 0f;
+                textured[to] = new TexturedCorner { p = pos, n = nor, c = col, uv = new Vector4(u[a], u[a + 1], u[a + 2], rank) };
             }
             else plain[to] = new PlainCorner { p = pos, n = nor, c = col };
         }

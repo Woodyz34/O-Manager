@@ -629,7 +629,7 @@ public partial class TvWorldBuilder
         waterMesh = new TvMesh { name = "Water", castShadows = false };
         treeMeshes = new[] { new TvMesh { name = "Trees", group = TvMesh.Near } };
         treeFarMesh = new TvMesh { name = "Trees far", castShadows = false, group = TvMesh.Far };
-        tuftMeshes = new[] { new TvMesh { name = "Undergrowth", castShadows = false } };
+        tuftMeshes = new[] { new TvMesh { name = "Undergrowth", castShadows = false, ranks = new List<float>() } };
         thicketMesh = new TvMesh { name = "Thickets" };
         litterMesh = new TvMesh { name = "Litter", castShadows = false };
 
