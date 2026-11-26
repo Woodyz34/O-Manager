@@ -1378,7 +1378,7 @@ public partial class TvWorldBuilder
     static readonly TvColor Open = TvColor.Hex("#a39a58"), OpenGreen = TvColor.Hex("#8a9a4e"), Rough = TvColor.Hex("#4f4530"),
         RoughGreen = TvColor.Hex("#4a5630"), LightGreen = TvColor.Hex("#48642f"), MidGreen = TvColor.Hex("#3a5428"), DarkGreen = TvColor.Hex("#2f4722"),
         Field = TvColor.Hex("#b8a85a"), Field2 = TvColor.Hex("#a39a50"), Water = TvColor.Hex("#4c6a7c"), WaterDeep = TvColor.Hex("#3c5566"),
-        Rock = TvColor.Hex("#8c8a84"), RockDark = TvColor.Hex("#6d6c69"), LichenRock = TvColor.Hex("#b9bba6"), SandColor = TvColor.Hex("#c2ad7c"),
+        Rock = TvColor.Hex("#a3a39f"), RockDark = TvColor.Hex("#8d8d89"), LichenRock = TvColor.Hex("#b9bba6"), SandColor = TvColor.Hex("#c2ad7c"),
         Paved = TvColor.Hex("#8a8782"), Plot = TvColor.Hex("#8f9a4e"), MarshColor = TvColor.Hex("#6f7440"), Wet = TvColor.Hex("#4a4a2e"),
         Soil = TvColor.Hex("#6b563c");
 
@@ -2045,7 +2045,7 @@ public partial class TvWorldBuilder
 
         // Rocks: granite broken by flat planes, moss on top where the ground is mossy, pale lichen spots
         float mossy = look.ground == TerrainLook.Moss ? 0.5f : look.ground == TerrainLook.Stone || look.ground == TerrainLook.Lichen || look.ground == TerrainLook.Sand ? 0.18f : 0.4f;
-        TvColor granite = TvColor.Hex("#75736d"), granite2 = TvColor.Hex("#6c6b68"), mossG = TvColor.Hex("#667a3a");
+        TvColor granite = TvColor.Hex("#9e9e99"), granite2 = TvColor.Hex("#94948f"), mossG = TvColor.Hex("#667a3a");
         TvShape RockShape(float sx, float sy, float sz, float oy, int detail, int cuts, TvColor c)
         {
             var b = new TvShapeBuilder(random);
@@ -2190,8 +2190,8 @@ public partial class TvWorldBuilder
             float x = p.x, z = p.z;
             switch (p.kind)
             {
-                case WorldPointKind.Boulder: AddRock(x, z, Rr(1.05f, 1.5f), 0.1f, true); break;
-                case WorldPointKind.LargeBoulder: AddRock(x, z, Rr(2.1f, 2.7f), 0.1f, true); break;
+                case WorldPointKind.Boulder: AddRock(x, z, random.Value() < 0.25f ? Rr(1.6f, 2.2f) : Rr(1.05f, 1.6f), 0.1f, true); break;
+                case WorldPointKind.LargeBoulder: AddRock(x, z, Rr(2.3f, 3.6f), 0.1f, true); break;
                 case WorldPointKind.BoulderCluster:
                 {
                     int count = 4 + (int)(random.Value() * 3f);
@@ -3503,16 +3503,9 @@ public partial class TvWorldBuilder
             }
             else
             {
-                // Moss cushions over old stumps and stones, most in spruce forest (2026-11-25, Anders' photos)
                 bool spruceWood = look.forest == TerrainLook.Spruce;
-                if (look.ground == TerrainLook.Moss && moundShapes != null && random.Value() < (spruceWood ? 0.085f : 0.015f))
-                {
-                    float ms = Rr(0.7f, 1.5f);
-                    tuftMeshes[Tile(x, z)].Add(moundShapes[(int)(random.Value() * moundShapes.Length) % moundShapes.Length], x, H(x, z) - 0.03f, z,
-                        ms, ms * Rr(0.7f, 1.3f), ms, Rr(0f, 6.283f), Rr(0.78f, 1.08f));
-                    world.tufts++;
-                    continue;
-                }
+                // (2026-11-25, Anders: the moss cushions floated, flat and without detail, like green heaps: taken out;
+                // the moss is the ground itself)
                 if (rough <= 0.42f || random.Value() > Sm(0.42f, 0.62f, rough)) continue;
                 // Inside a carpet: thick in some spots, thinner in others, moss showing between the bushes
                 // (2026-11-25, Anders' photos of bilberry)

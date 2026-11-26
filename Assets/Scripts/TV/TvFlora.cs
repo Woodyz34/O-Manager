@@ -17,7 +17,9 @@ public static class TvAtlas
         Plaster = 25, Brick = 26, WoodPanel = 27, RoofTiles = 28, MetalSheet = 29, Concrete = 30, Glass = 31,
         MossSock = 32, BilberryTop = 33, LichenTop = 34, PineBarkLow2 = 35,
         // 2026-11-25 (Anders' photos of clear-cuts and heather): logging slash, a heather bush from above, churned soil
-        Slash = 36, HeatherTop = 37, Soil = 38, ReindeerLichen = 39;
+        Slash = 36, HeatherTop = 37, Soil = 38, ReindeerLichen = 39,
+        // 2026-11-25 (Anders: bilberry was still pictures, not 3D): one sprig of a few leaves, set all round 3D stems
+        BilberrySprig = 40;
 
     // Tiles from this one on are leaves and plants: lit softly through, as light comes through a leaf
     public const int FirstFoliage = 5;

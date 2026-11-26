@@ -229,7 +229,7 @@ public partial class TvWorldBuilder
             float crown0 = h * crownStart, crownH = h - crown0;
             float cy = crown0 + crownH * 0.55f;
             int branches = detail >= 3 ? 26 : detail == 2 ? 20 : detail == 1 ? 13 : 8;
-            int cardsPer = detail >= 3 ? 7 : detail == 2 ? 5 : detail == 1 ? 3 : 2;
+            int cardsPer = detail >= 3 ? 10 : detail == 2 ? 7 : detail == 1 ? 4 : 2;
             float cardSize = detail >= 2 ? 1.3f : detail == 1 ? 1.6f : 2.2f;
             float az0 = Rr(0f, 6.28f);
             for (int i = 0; i < branches; i++)
@@ -306,8 +306,8 @@ public partial class TvWorldBuilder
             // Live branches: an open-grown spruce keeps them from low down; one in a forest loses the lower half in
             // the shade and keeps only dead grey twigs there (2026-11-25, Anders' photos of spruce forest)
             float live = young ? 0.02f : h * crown * Rr(0.85f, 1.15f);
-            float step = young ? (detail >= 2 ? 0.22f : 0.32f) : detail >= 3 ? 0.42f : detail == 2 ? 0.55f : detail == 1 ? 0.75f : 1.2f;
-            int per = young ? (detail >= 2 ? 4 : 3) : detail >= 2 ? 5 : detail == 1 ? 4 : 3;
+            float step = young ? (detail >= 2 ? 0.16f : 0.26f) : detail >= 3 ? 0.42f : detail == 2 ? 0.55f : detail == 1 ? 0.75f : 1.2f;
+            int per = young ? (detail >= 2 ? 6 : 4) : detail >= 2 ? 5 : detail == 1 ? 4 : 3;
             float lmax = young ? h * 0.36f : (crown > 0.3f ? 2.0f : 2.7f) * Rr(0.85f, 1.1f);
             float az0 = Rr(0f, 6.28f);
             int whorl = 0;
@@ -332,8 +332,16 @@ public partial class TvWorldBuilder
                     float nx = dx * 0.7f, ny = 1f, nz = dz * 0.7f;
                     b.Card(tx - ux * 0.04f, y, tz - uz * 0.04f, sx, sy, sz, ux, uy, uz, nx, ny, nz, TvAtlas.SpruceSpray,
                            Grey(shade * 0.82f), Grey(Math.Min(1f, shade * 1.1f)), detail >= 1 ? Rr(0.12f, 0.3f) : 0f);
+                    // The same spray stood on edge across it (2026-11-25, Anders: you could see straight through a small
+                    // spruce): from the side a branch is a thick mass of needles, not a thin line
+                    if (detail >= 1 && (young || rel > 0.25f))
+                    {
+                        float vh = half * 0.75f;
+                        b.Card(tx - ux * 0.04f, y - vh * 0.5f, tz - uz * 0.04f, 0f, vh * 0.5f, 0f, ux * 0.95f, uy * 0.95f - vh * 0.3f, uz * 0.95f, nx, ny * 0.5f, nz,
+                               TvAtlas.SpruceSpray, Grey(shade * 0.72f), Grey(shade));
+                    }
                     // Hanging side sprays under it (the curtain of a spruce branch)
-                    if (detail >= 2 && !young && rel < 0.85f)
+                    if (detail >= 2 && (!young || rel < 0.6f) && rel < 0.85f)
                     {
                         float cx = tx + ux * 0.55f, cy = y + uy * 0.55f, cz = tz + uz * 0.55f;
                         float hang = ll * 0.32f;
@@ -388,7 +396,7 @@ public partial class TvWorldBuilder
             b.Limb(trunk, rad, sides, TvAtlas.BirchBark, young ? 1f : Around(rad[1], 0.5f), 1.0f, Shades(seg + 1, Grey(0.9f), White));
             float crown0 = h * (young ? 0.25f : Rr(0.4f, 0.52f)), crownH = h - crown0;
             int branches = young ? (detail >= 2 ? 5 : 3) : detail >= 3 ? 18 : detail == 2 ? 13 : detail == 1 ? 9 : 6;
-            int cardsPer = young ? 2 : detail >= 3 ? 6 : detail == 2 ? 4 : detail == 1 ? 3 : 2;
+            int cardsPer = young ? 3 : detail >= 3 ? 10 : detail == 2 ? 7 : detail == 1 ? 4 : 2;
             float size = young ? 0.7f : detail >= 2 ? 1.25f : detail == 1 ? 1.55f : 2.1f;
             float az0 = Rr(0f, 6.28f), cy = crown0 + crownH * 0.5f;
             for (int i = 0; i < branches; i++)
@@ -451,7 +459,7 @@ public partial class TvWorldBuilder
                 if (detail >= 1) b.Limb(line, Taper(4, 0.12f, 0.03f), detail >= 2 ? 5 : 4, barkTile, 1f, 0.7f, new[] { bark.Shade(0.8f) });
                 tips.Add(line[9]); tips.Add(line[10]); tips.Add(line[11]);
             }
-            int cards = detail >= 3 ? 120 : detail == 2 ? 80 : detail == 1 ? 45 : 22;
+            int cards = detail >= 3 ? 190 : detail == 2 ? 130 : detail == 1 ? 60 : 22;
             float size = detail >= 2 ? 1.7f : detail == 1 ? 2.2f : 3f;
             for (int k = 0; k < cards; k++)
             {
@@ -600,6 +608,63 @@ public partial class TvWorldBuilder
             return b.Done();
         }
 
+        // A bilberry bush in 3D (2026-11-25, Anders: the bushes were still flat pictures in a box; the white flowers
+        // with real volume looked much better): green zigzag stems up from the moss, branching, and small sprigs of a
+        // few leaves set all round them at every angle, darker inside and low down. No two the same.
+        TvShape BerryBush(int detail, float r, float h)
+        {
+            var b = new TvShapeBuilder(random);
+            int stems = detail >= 3 ? 5 : detail == 2 ? 5 : detail == 1 ? 4 : 3;
+            int perStem = detail >= 3 ? 6 : detail == 2 ? 5 : detail == 1 ? 4 : 3;
+            TvColor stemC = Tint(0.62f, 0.85f, 0.42f);
+            for (int i = 0; i < stems; i++)
+            {
+                float a = Rr(0f, 6.283f), d = r * Rr(0f, 0.45f);
+                float x = (float)Math.Cos(a) * d, z = (float)Math.Sin(a) * d;
+                float lean = Rr(0.05f, 0.35f), la = a + Rr(-0.6f, 0.6f);
+                float hh = h * Rr(0.7f, 1.1f);
+                // a zigzag stem in 4 pieces
+                var pts = new float[15];
+                float px = x, py = -0.02f, pz = z;
+                for (int k = 0; k <= 4; k++)
+                {
+                    pts[k * 3] = px; pts[k * 3 + 1] = py; pts[k * 3 + 2] = pz;
+                    float zz = (k % 2 == 0 ? 1f : -1f) * Rr(0.01f, 0.03f);
+                    px += (float)Math.Cos(la) * lean * hh / 4f + (float)Math.Sin(la) * zz;
+                    pz += (float)Math.Sin(la) * lean * hh / 4f - (float)Math.Cos(la) * zz;
+                    py += hh / 4f;
+                }
+                // the stems only on Ultra (each is more triangles than its leaves); below, the sprigs hide them
+                if (detail >= 3)
+                    b.Limb(new[] { pts[0], pts[1], pts[2], pts[6], pts[7], pts[8], pts[12], pts[13], pts[14] }, new[] { 0.0045f, 0.003f, 0.0015f }, 3,
+                           TvAtlas.DeadWood, 0.1f, 0.3f, new[] { stemC.Shade(0.7f), stemC });
+                for (int k = 0; k < perStem; k++)
+                {
+                    // up the top two thirds of the stem, the sprigs pointing out and up all round
+                    float t = 0.15f + 0.85f * (k + Rr(0.1f, 0.9f)) / perStem;
+                    float ft = t * 4f;
+                    int i0 = Math.Min(3, (int)ft);
+                    float fr = ft - i0;
+                    float sx0 = pts[i0 * 3] + (pts[i0 * 3 + 3] - pts[i0 * 3]) * fr, sy0 = pts[i0 * 3 + 1] + (pts[i0 * 3 + 4] - pts[i0 * 3 + 1]) * fr,
+                          sz0 = pts[i0 * 3 + 2] + (pts[i0 * 3 + 5] - pts[i0 * 3 + 2]) * fr;
+                    float sa = Rr(0f, 6.283f), up = Rr(0.1f, 0.9f);
+                    float len = Rr(0.12f, 0.18f) * (0.8f + 0.4f * t);
+                    float ox = (float)Math.Cos(sa) * (float)Math.Cos(up), oy = (float)Math.Sin(up), oz = (float)Math.Sin(sa) * (float)Math.Cos(up);
+                    // the sprig's width runs across, turned at random round its own length
+                    float roll = Rr(0f, 3.14f);
+                    float qx = -(float)Math.Sin(sa), qz = (float)Math.Cos(sa);
+                    float wx = qx * (float)Math.Cos(roll) - ox * oy * (float)Math.Sin(roll), wy = (float)Math.Cos(up) * (float)Math.Sin(roll),
+                          wz = qz * (float)Math.Cos(roll) - oz * oy * (float)Math.Sin(roll);
+                    float half = len * 0.5f;
+                    float shade = 0.5f + 0.5f * t * Rr(0.75f, 1f);
+                    float nx = sx0 + ox * 0.5f, nz = sz0 + oz * 0.5f;
+                    b.Card(sx0, sy0, sz0, wx * half, wy * half, wz * half, ox * len, oy * len, oz * len, nx, 0.8f, nz, TvAtlas.BilberrySprig,
+                           Grey(shade * 0.7f), Grey(Math.Min(1f, shade * 1.08f)));
+                }
+            }
+            return b.Done();
+        }
+
         TvShape FernShape(int fronds)
         {
             var b = new TvShapeBuilder(random);
@@ -646,9 +711,8 @@ public partial class TvWorldBuilder
         // Bilberry (2026-11-25, Anders' photos): one calm bright green, a rounded clump with a top of leaves seen
         // from above, so the clumps grow together into a carpet instead of a jumble of stars
         // Single bushes now (2026-11-25), a few of each so neighbours differ
-        f.berrySet = new[] { OneBush(q >= 1 ? 4 : 3, 2, 0.3f, 0.3f, TvAtlas.Bilberry, TvAtlas.BilberryTop, 0.45f),
-                             OneBush(q >= 1 ? 5 : 3, 2, 0.36f, 0.34f, TvAtlas.Bilberry, TvAtlas.BilberryTop, 0.42f),
-                             OneBush(q >= 1 ? 4 : 3, 1, 0.26f, 0.26f, TvAtlas.Bilberry, TvAtlas.BilberryTop, 0.5f) };
+        f.berrySet = new[] { BerryBush(q, 0.3f, 0.3f), BerryBush(q, 0.36f, 0.34f), BerryBush(q, 0.26f, 0.26f), BerryBush(q, 0.32f, 0.36f),
+                             BerryBush(q, 0.28f, 0.24f), BerryBush(q, 0.34f, 0.3f) };
         f.berry = f.berrySet[0];
         f.berryNear = OneBush(many - 1, 3, 0.34f, 0.32f, TvAtlas.Bilberry, TvAtlas.BilberryTop, 0.42f);
         f.heathSet = new[] { OneBush(q >= 1 ? 4 : 3, 1, 0.3f, 0.3f, TvAtlas.Heather, TvAtlas.HeatherTop, 0.4f),
@@ -851,7 +915,9 @@ public partial class TvWorldBuilder
                     float a = Rr(0f, 6.283f), l = Rr(1.6f, 5f), r0 = Rr(0.05f, 0.13f);
                     float bx = x + (float)Math.Cos(a) * l, bz = z + (float)Math.Sin(a) * l;
                     if (Blocked(bx, bz, 0.6f)) continue;
-                    Log(x, y + r0 * 0.6f, z, bx, H(bx, bz) + r0 * 0.4f, bz, r0, r0 * 0.55f, random.Value() < 0.5f ? TvAtlas.SpruceBark : TvAtlas.DeadWood);
+                    // (2026-11-25, Anders asked what the stick with white dots was: a thin branch with spruce bark, whose pale
+                    // lichen patches shrank to dots; thin ones are bare grey-brown wood now)
+                    Log(x, y + r0 * 0.6f, z, bx, H(bx, bz) + r0 * 0.4f, bz, r0, r0 * 0.55f, r0 > 0.1f && random.Value() < 0.5f ? TvAtlas.SpruceBark : TvAtlas.DeadWood);
                 }
                 else if (Q >= 1)
                 {

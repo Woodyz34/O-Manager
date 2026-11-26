@@ -81,7 +81,7 @@ Shader "O-Manager/TvAtlasLit"
             o.atlas = v.texcoord.xyz;
             // Leaves and needles stir a little in the wind: more at the tip of a card (v near 1) than at its base
             // (not the cards lying flat on the ground, litter and leaf tops: 2026-11-25, Anders: the litter moved)
-            if (_Wind > 0.001 && abs(v.normal.y) < 0.85 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || (v.texcoord.z >= 32.5 && v.texcoord.z < 34.5) || (v.texcoord.z >= 36.5 && v.texcoord.z < 37.5)))
+            if (_Wind > 0.001 && abs(v.normal.y) < 0.85 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || (v.texcoord.z >= 32.5 && v.texcoord.z < 34.5) || (v.texcoord.z >= 36.5 && v.texcoord.z < 37.5) || (v.texcoord.z >= 39.5 && v.texcoord.z < 40.5)))
             {
                 float3 w = mul(unity_ObjectToWorld, v.vertex).xyz;
                 float tip = saturate(v.texcoord.y + 0.25);
@@ -117,6 +117,13 @@ Shader "O-Manager/TvAtlasLit"
             float a = TvHash(i), b = TvHash(i + float3(1, 0, 0)), c = TvHash(i + float3(0, 1, 0)), d = TvHash(i + float3(1, 1, 0));
             float e = TvHash(i + float3(0, 0, 1)), g = TvHash(i + float3(1, 0, 1)), h = TvHash(i + float3(0, 1, 1)), k = TvHash(i + float3(1, 1, 1));
             return lerp(lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y), lerp(lerp(e, g, f.x), lerp(h, k, f.x), f.y), f.z);
+        }
+
+        // Fine noise that fades to its middle when its spots get smaller than about two pixels (fw = metres per
+        // pixel), so it never sparkles into white and dark specks (2026-11-25, Anders: specks on the trunks)
+        float TvNoiseAA (float3 p, float fw)
+        {
+            return lerp(0.5, TvNoise(p), saturate(2.0 - fw * 2.5));
         }
 
         half TvSurfaceGrain (float3 p, float depth)
@@ -157,7 +164,17 @@ Shader "O-Manager/TvAtlasLit"
             // The tile's picture: u, v repeat inside the tile's inner part (its padding keeps the neighbours out)
             float tile = floor(IN.atlas.z + 0.5);
             float2 duvx = ddx(IN.atlas.xy), duvy = ddy(IN.atlas.xy);
+            float fw = length(fwidth(IN.worldPos));
             half4 tex = TvTile(tile, IN.atlas.xy, duvx, duvy);
+            // Stones and cliffs never show the picture's repeat (2026-11-25, Anders: a pattern of black lines on the
+            // cliffs; every part of every 3D object its own): the same picture at another scale and place is blended
+            // in by a slow noise of the world position, so no two metres of rock look alike
+            if (tile > 19.5 && tile < 21.5)
+            {
+                half4 tex2 = TvTile(tile, IN.atlas.xy * 0.41 + float2(0.37, 0.71), duvx * 0.41, duvy * 0.41);
+                float w = smoothstep(0.3, 0.7, TvNoise(IN.worldPos * 0.23 + 3.0));
+                tex.rgb = lerp(tex.rgb, tex2.rgb, w);
+            }
             if (tile < -0.5) tex = half4(1, 1, 1, 1);
             c *= tex.rgb;
             // A tree's own life on its bark (TreeLife in TV/TvMesh.cs): damp streaks, moss up the foot on its damp
@@ -173,21 +190,21 @@ Shader "O-Manager/TvAtlasLit"
                     float a = (code - 0.02) / 0.47;
                     float li = floor(a * 4.0 + 0.02);
                     float moss = saturate((a - li * 0.25) / 0.24);
-                    float n = TvNoise(wp * 2.3) * 0.5 + TvNoise(wp * 7.1 + 3.1) * 0.33 + TvNoise(wp * 21.0 + 9.7) * 0.17;
-                    float th = 1.02 - moss * 0.75;
+                    float n = TvNoise(wp * 2.3) * 0.5 + TvNoise(wp * 7.1 + 3.1) * 0.33 + TvNoiseAA(wp * 21.0 + 9.7, fw * 21.0) * 0.17;
+                    float th = 1.02 - min(moss, 0.8) * 0.75;   // never the whole trunk green
                     float mm = moss > 0.02 ? smoothstep(th - 0.05, th + 0.05, n) : 0.0;
-                    float3 mc = lerp(float3(0.40, 0.52, 0.14), float3(0.64, 0.74, 0.26), TvNoise(wp * 37.0));
-                    mc *= 0.7 + 0.45 * TvNoise(wp * 90.0);
+                    float3 mc = lerp(float3(0.40, 0.52, 0.14), float3(0.64, 0.74, 0.26), TvNoiseAA(wp * 37.0, fw * 37.0));
+                    mc *= 0.7 + 0.45 * TvNoiseAA(wp * 90.0, fw * 90.0);
                     mc = mc * mc;
-                    float ln = TvNoise(wp * 9.0 + 11.0) * 0.6 + TvNoise(wp * 26.0 + 5.0) * 0.4;
+                    float ln = TvNoise(wp * 9.0 + 11.0) * 0.6 + TvNoiseAA(wp * 26.0 + 5.0, fw * 26.0) * 0.4;
                     float lm = li > 1.5 ? smoothstep(0.68 - li * 0.03, 0.72 - li * 0.03, ln) * (0.12 + 0.08 * li) : 0.0;
-                    float3 lc = float3(0.6, 0.62, 0.56) * (0.8 + 0.3 * TvNoise(wp * 50.0));
+                    float3 lc = float3(0.6, 0.62, 0.56) * (0.8 + 0.3 * TvNoiseAA(wp * 50.0, fw * 50.0));
                     lc = lc * lc;
                     c = lerp(c, lc, lm * 0.85);
                     // A birch's foot: black, cracked up and down
                     if (tile > 2.5 && tile < 3.5)
                     {
-                        float cr = TvNoise(float3(wp.x * 14.0, wp.y * 1.6, wp.z * 14.0)) * 0.7 + TvNoise(wp * 40.0) * 0.3;
+                        float cr = TvNoise(float3(wp.x * 14.0, wp.y * 1.6, wp.z * 14.0)) * 0.7 + TvNoiseAA(wp * 40.0, fw * 40.0) * 0.3;
                         float bm = smoothstep(1.0 - moss * 0.9, 1.12 - moss * 0.9, n * 0.6 + cr * 0.4 + 0.05);
                         float3 bc = float3(0.05, 0.045, 0.04) * (0.5 + 1.5 * cr);
                         c = lerp(c, bc, bm);
@@ -205,20 +222,24 @@ Shader "O-Manager/TvAtlasLit"
                 float3 wn = normalize(IN.worldNormal);
                 c *= 0.84 + 0.3 * TvNoise(wp * 0.35 + 5.0);
                 c = lerp(c, c * float3(1.14, 0.98, 0.88), smoothstep(0.55, 0.75, TvNoise(wp * 0.6 + 17.0)));
-                c = lerp(c, c * float3(0.78, 0.8, 0.85), smoothstep(0.6, 0.8, TvNoise(wp * 0.45 + 40.0)));
+                c = lerp(c, c * float3(0.88, 0.9, 0.93), smoothstep(0.6, 0.8, TvNoise(wp * 0.45 + 40.0)));
                 if (tile > 20.5)
                 {
-                    c *= 0.88 + 0.2 * smoothstep(0.25, 0.7, TvNoise(float3(wp.x * 2.2, wp.y * 0.22, wp.z * 2.2)));
-                    c = lerp(c, c * float3(1.2, 0.95, 0.75), smoothstep(0.74, 0.86, TvNoise(float3(wp.x * 1.3, wp.y * 0.3, wp.z * 1.3) + 9.0)) * 0.4);
+                    c *= 0.94 + 0.1 * smoothstep(0.25, 0.7, TvNoise(float3(wp.x * 2.2, wp.y * 0.22, wp.z * 2.2)));
+                    c = lerp(c, c * float3(1.2, 0.95, 0.75), smoothstep(0.74, 0.86, TvNoise(float3(wp.x * 1.3, wp.y * 0.3, wp.z * 1.3) + 9.0)) * 0.15);
                 }
                 float mossAmt = code > 0.01 ? saturate((code - 0.02) / 0.47) : (tile > 20.5 ? 0.45 : 0.0);
-                float n3 = TvNoise(wp * 2.1) * 0.55 + TvNoise(wp * 6.3 + 2.0) * 0.3 + TvNoise(wp * 19.0 + 7.0) * 0.15;
+                float n3 = TvNoise(wp * 2.1) * 0.55 + TvNoise(wp * 6.3 + 2.0) * 0.3 + TvNoiseAA(wp * 19.0 + 7.0, fw * 19.0) * 0.15;
                 float upf = saturate((wn.y - 0.1) * 1.4);
                 float m = upf * (0.35 + mossAmt * 0.7) + (n3 - 0.5) * 0.8 + mossAmt * 0.25 - 0.32;
                 float mm = mossAmt > 0.01 ? smoothstep(0.0, 0.08, m) : 0.0;
-                float3 mc = lerp(float3(0.36, 0.48, 0.13), float3(0.62, 0.72, 0.24), TvNoise(wp * 31.0));
-                mc *= 0.7 + 0.45 * TvNoise(wp * 80.0);
+                float3 mc = lerp(float3(0.36, 0.48, 0.13), float3(0.62, 0.72, 0.24), TvNoiseAA(wp * 31.0, fw * 31.0));
+                mc *= 0.7 + 0.45 * TvNoiseAA(wp * 80.0, fw * 80.0);
                 mc = mc * mc;
+                // pale crust lichen in big patches where there is no moss (2026-11-25, Anders' photos: white parts)
+                float ln2 = TvNoise(wp * 1.3 + 21.0) * 0.65 + TvNoise(wp * 4.1 + 6.0) * 0.35;
+                float lw = smoothstep(0.6, 0.66, ln2) * (1.0 - mm);
+                c = lerp(c, float3(0.6, 0.61, 0.53) * (0.9 + 0.2 * TvNoise(wp * 9.0)), lw * 0.4);
                 c = lerp(c, mc, mm);
             }
             if (_Surface > 0.001)
@@ -227,21 +248,24 @@ Shader "O-Manager/TvAtlasLit"
                 c *= 1.0 + v * 0.75 * _Surface;
             }
             o.Albedo = c;
-            o.Foliage = (tile >= 4.5 && tile < 19.5) || (tile >= 32.5 && tile < 34.5) || (tile >= 35.5 && tile < 37.5) ? 1.0 : 0.0;
+            o.Foliage = (tile >= 4.5 && tile < 19.5) || (tile >= 32.5 && tile < 34.5) || (tile >= 35.5 && tile < 37.5) || (tile >= 39.5 && tile < 40.5) ? 1.0 : 0.0;
             // Relief (2026-11-25, Anders: the bark looked flat, like a picture): the picture's light and dark read
             // as height, bent into the normal from the screen's own slopes (no tangents needed); fades out far away
             float3 n = normalize(IN.worldNormal);
-            bool solid = tile > -0.5 && (tile < 4.5 || (tile > 19.5 && tile < 32.5) || (tile > 34.5 && tile < 35.5) || tile > 37.5);
+            bool solid = tile > -0.5 && (tile < 4.5 || (tile > 19.5 && tile < 32.5) || (tile > 34.5 && tile < 35.5) || (tile > 37.5 && tile < 39.5) || tile > 40.5);
             float bump = solid && _BumpFar > 0.5 ? _Bump * saturate(1.0 - IN.tvDepth / _BumpFar) : 0.0;
             if (bump > 0.0)
             {
-                float hgt = dot(tex.rgb, float3(0.3, 0.5, 0.2));
+                // (2026-11-25, Anders: still specks on the trunks) the relief from the picture a little blurred (a mip
+                // level or two up), so only real cracks and plates stand out, not each texel's grain
+                float2 bx = duvx * 3.0, by = duvy * 3.0;
+                float hgt = dot(TvTile(tile, IN.atlas.xy, bx, by).rgb, float3(0.3, 0.5, 0.2));
                 float3 dpx = ddx(IN.worldPos), dpy = ddy(IN.worldPos);
                 // the picture's slope from two more looks one pixel over, not ddx/ddy of the height (those are the
                 // same for 2 x 2 pixels, which showed as square specks up close)
-                float hx = dot(TvTile(tile, IN.atlas.xy + duvx, duvx, duvy).rgb, float3(0.3, 0.5, 0.2));
-                float hy = dot(TvTile(tile, IN.atlas.xy + duvy, duvx, duvy).rgb, float3(0.3, 0.5, 0.2));
-                float dhx = hx - hgt, dhy = hy - hgt;
+                float hx = dot(TvTile(tile, IN.atlas.xy + duvx * 2.0, bx, by).rgb, float3(0.3, 0.5, 0.2));
+                float hy = dot(TvTile(tile, IN.atlas.xy + duvy * 2.0, bx, by).rgb, float3(0.3, 0.5, 0.2));
+                float dhx = (hx - hgt) * 0.5, dhy = (hy - hgt) * 0.5;
                 float3 r1 = cross(dpy, n), r2 = cross(n, dpx);
                 float det = dot(dpx, r1);
                 float3 grad = sign(det) * (dhx * r1 + dhy * r2);
