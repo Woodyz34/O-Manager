@@ -250,7 +250,7 @@ public static class CompetitionFlow
         {
             ImposterOverlay.Instance.HideRoleChip();
         }
-        GameAnalytics.Record("race_finished", "seconds", Mathf.RoundToInt(PlayedSeconds));
+        GameAnalytics.RecordRace("race_finished", "seconds", Mathf.RoundToInt(PlayedSeconds));
         EndScreenUI.Show();
     }
 

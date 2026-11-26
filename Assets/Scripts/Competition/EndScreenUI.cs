@@ -566,6 +566,7 @@ public class EndScreenUI : MonoBehaviour
         {
             Money.Instance.AddMoney(total);
         }
+        GameAnalytics.RecordRace("money_earned", "source", "race", "kr", total);
         balanceText.text = Balance();
         StartCoroutine(CountUp(total));
     }

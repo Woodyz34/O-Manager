@@ -680,6 +680,7 @@ public class RouteChoiceView : MonoBehaviour
             asked.Add(leg);
         }
         ContestRun.OnRouteChoiceFinished(score, asked);
+        GameAnalytics.RecordRace("route_choice_finished", "score", score, "legs", asked != null ? asked.Count : 0);
     }
 
     void BuildOverlay()
@@ -1005,6 +1006,7 @@ public class RouteChoiceView : MonoBehaviour
         {
             balanceBefore = Money.Instance.GetMoney();
             Money.Instance.AddMoney(paidTookPart + paidForPlace);
+            GameAnalytics.RecordRace("money_earned", "source", "route_choice", "kr", paidTookPart + paidForPlace);
         }
     }
 

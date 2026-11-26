@@ -407,7 +407,7 @@ public class SinglePlayerMenu : MonoBehaviour
         });
         if (result.Ok)
         {
-            GameAnalytics.Record("single_player_started", "terrain", CourseLibrary.Current != null && CourseLibrary.Current.IsSprint() ? "sprint" : "forest");
+            GameAnalytics.RecordRace("single_player_started");
         }
         if (!result.Ok)
         {
