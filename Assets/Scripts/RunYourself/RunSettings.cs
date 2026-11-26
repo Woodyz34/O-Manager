@@ -157,7 +157,7 @@ public static class RunSettings
             // The undergrowth is flat cards with pictures since 2026-11-25, about a tenth of the triangles of the old
             // lumpy tufts, so every level has more of it than before
             case Quality.Low:
-                return new Look { view = 150f, near = 50f, detail = 26f, undergrowth = 0.12f, shadows = 0, shadowDistance = 0f, msaa = 1, reliefFar = 0f, aniso = AnisotropicFiltering.Disable };
+                return new Look { view = 140f, near = 40f, detail = 20f, undergrowth = 0.08f, shadows = 0, shadowDistance = 0f, msaa = 1, reliefFar = 0f, aniso = AnisotropicFiltering.Disable };
             case Quality.High:
                 return new Look { view = 330f, near = 96f, detail = 56f, undergrowth = 0.6f, shadows = 2, shadowDistance = 60f, msaa = 4, reliefFar = 30f, aniso = AnisotropicFiltering.ForceEnable };
             case Quality.Ultra:

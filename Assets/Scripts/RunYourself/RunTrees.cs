@@ -420,9 +420,11 @@ public class RunTrees
             }
             else
             {
-                int i = set.far[t];
+                // Past the near distance in a piece still close: the Medium trees (with their leaves) until the
+                // piece turns to pictures, not the bare far shapes (2026-11-26, Anders: the leaves popped up close by)
+                int i = set.near[t];
                 if (i < 0) continue;
-                list = farLists[i];
+                list = midPlainLists[i];
             }
             list.Add(moved ? toWorld * where[t] : where[t]);
         }
