@@ -15,7 +15,12 @@ using UnityEngine.Rendering;
 // Nothing is moved further than 70 m from the runner. Each pose is one small shared mesh; a person is one renderer.
 public class RunPeople : MonoBehaviour
 {
-    const float AnimateReach = 70f, TurnReach = 25f, CheerReach = 12f;
+    // 2026-11-26 (Anders: sprint still lagged, fewer or simpler people is fine): half the people, 16 looks instead
+    // of 64 (a quarter of the bodies to make), moving only within 50 m (far ones a third of the frames), and
+    // nobody drawn further than 110 m away.
+    const float AnimateReach = 50f, TurnReach = 25f, CheerReach = 12f, NearEveryFrame = 25f, DrawReach = 110f;
+    const int Looks = 16;
+    int frameNo;
 
     Material material;
     bool shadows;
@@ -30,6 +35,10 @@ public class RunPeople : MonoBehaviour
         public MeshFilter filter;
         public TvWorld world;
         public Vector3 home;            // in the piece's metres
+        public Vector3 at;              // where in the scene (pieces never move)
+        public MeshRenderer renderer;
+        public float ground;            // the ground's height at home
+        public int index;
         public float yaw, len, phase, turned;
         public int kind, look, shown = -1;
     }
@@ -57,7 +66,7 @@ public class RunPeople : MonoBehaviour
 
     Mesh MeshFor(TvCityShapes.Act act, int frame, int look, bool child)
     {
-        int key = (((int)act * TvCityShapes.Frames + frame) * 64 + look) * 2 + (child ? 1 : 0);
+        int key = (((int)act * TvCityShapes.Frames + frame) * Looks + look) * 2 + (child ? 1 : 0);
         if (meshes.TryGetValue(key, out Mesh mesh)) return mesh;
         if (made.TryGetValue(key, out TvShape shape))
         {
@@ -94,7 +103,7 @@ public class RunPeople : MonoBehaviour
         foreach (TvCityShapes.Act act in acts)
             for (int f = 0; f < TvCityShapes.Frames; f++)
             {
-                int key = (((int)act * TvCityShapes.Frames + f) * 64 + p.look) * 2 + (child ? 1 : 0);
+                int key = (((int)act * TvCityShapes.Frames + f) * Looks + p.look) * 2 + (child ? 1 : 0);
                 if (!meshes.ContainsKey(key)) Ask(act, f, p.look, child, key);
             }
     }
@@ -104,18 +113,22 @@ public class RunPeople : MonoBehaviour
         if (byPiece.ContainsKey(key) || root == null) return;
         var list = new List<Person>();
         List<float> d = world.people;
-        for (int i = 0; i + 5 < d.Count; i += 6)
+        for (int i = 0, n = 0; i + 5 < d.Count; i += 6, n++)
         {
+            if ((n & 1) == 1) continue;   // every second person only
             var person = new Person
             {
                 world = world,
                 home = new Vector3(d[i], 0f, d[i + 1]),
                 yaw = d[i + 2],
                 kind = (int)d[i + 3],
-                look = (int)d[i + 4] % 64,
+                look = (int)d[i + 4] % Looks,
                 len = d[i + 5],
-                phase = (float)((i * 0.61803) % 1.0) * 10f
+                phase = (float)((i * 0.61803) % 1.0) * 10f,
+                index = n
             };
+            person.ground = world.HeightAt(person.home.x, person.home.z);
+            person.at = root.TransformPoint(person.home);
             person.turned = person.yaw;
             var go = new GameObject("Person");
             go.transform.SetParent(root, false);
@@ -128,6 +141,7 @@ public class RunPeople : MonoBehaviour
             r.lightProbeUsage = LightProbeUsage.Off;
             r.reflectionProbeUsage = ReflectionProbeUsage.Off;
             r.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
+            person.renderer = r;
             AskAhead(person);
             Show(person, person.kind == 1 ? TvCityShapes.Act.Walk : TvCityShapes.Act.Idle, 0);
             Place(person, person.home, person.yaw, 0f);
@@ -157,7 +171,7 @@ public class RunPeople : MonoBehaviour
 
     void Place(Person p, Vector3 at, float yaw, float lift)
     {
-        float y = p.world.HeightAt(at.x, at.z) + lift;
+        float y = (p.kind == 1 ? p.world.HeightAt(at.x, at.z) : p.ground) + lift;
         p.t.localPosition = new Vector3(at.x, y, at.z);
         p.t.localRotation = Quaternion.Euler(0f, yaw * Mathf.Rad2Deg, 0f);
     }
@@ -167,16 +181,25 @@ public class RunPeople : MonoBehaviour
         uploadsLeft = UploadsPerFrame;
         if (!hasPlayer) return;
         float time = Time.time, dt = Time.deltaTime;
+        frameNo++;
+        bool drawCheck = frameNo % 10 == 0;
         foreach (List<Person> list in byPiece.Values)
         {
             foreach (Person p in list)
             {
                 if (p.t == null) continue;
-                Vector3 at = p.t.position;
+                Vector3 at = p.at;
                 float dx = player.x - at.x, dz = player.z - at.z, d2 = dx * dx + dz * dz;
+                if (drawCheck)
+                {
+                    bool draw = d2 < DrawReach * DrawReach;
+                    if (p.renderer.enabled != draw) p.renderer.enabled = draw;
+                }
                 if (d2 > AnimateReach * AnimateReach) continue;
+                // Far ones move a third of the frames (each on its own frame, so the work is spread out)
+                if (d2 > NearEveryFrame * NearEveryFrame && (frameNo + p.index) % 3 != 0) continue;
                 if (p.kind == 1) Walk(p, time);
-                else Watch(p, time, dt, dx, dz, d2);
+                else Watch(p, time, dt * (d2 > NearEveryFrame * NearEveryFrame ? 3f : 1f), dx, dz, d2);
             }
         }
     }

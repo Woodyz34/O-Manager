@@ -239,6 +239,7 @@ public class Spawner : MonoBehaviour, INetworkRunnerCallbacks
         {
             StartCoroutine(HideLoadingScreen());
         }
+        SceneLoader.HideBusy();
         Debug.Log("OnScenLoadDone happend");
         
     }
@@ -278,6 +279,12 @@ public class Spawner : MonoBehaviour, INetworkRunnerCallbacks
             loadingScreenInstance.SetActive(true);
             if (loadingSlider != null)
                 loadingSlider.value = 0f;
+        }
+        else
+        {
+            // No page of its own here: the game's loading page with its turning ring, so a long scene change
+            // (ending a race on a big map) never looks frozen (2026-11-26)
+            SceneLoader.ShowBusy("Loading");
         }
     }
 

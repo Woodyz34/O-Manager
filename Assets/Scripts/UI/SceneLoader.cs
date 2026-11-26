@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -73,26 +75,106 @@ public class SceneLoader : MonoBehaviour
 
     // Leaves a network game and then changes scene. The scene only changes once the runner has shut down:
     // loading it while the runner is still leaving made Photon kick the player and log an error.
-    public static async void LeaveSession(NetworkRunner runner, string scene)
+    // 2026-11-26 (Anders: ending a race on Fossum stood still for about 4 s before the menu came): the loading page
+    // with its turning ring is shown first, the race's own objects (the 2D map has some 70 000, plus the 3D world)
+    // are cleared a few thousand a frame so the page keeps moving, and the new scene loads in the background.
+    public static void LeaveSession(NetworkRunner runner, string scene, string message = "Leaving")
     {
+        loading = true;
+        Runner().StartCoroutine(Leave(runner, scene, message));
+    }
+
+    static IEnumerator Leave(NetworkRunner networkRunner, string scene, string message)
+    {
+        GameObject page = Page();
+        LoadingScreenUI ui = page != null ? page.GetComponent<LoadingScreenUI>() : null;
+        if (ui != null) ui.SetMessage(message);
+        if (ui != null && ui.slider != null) ui.slider.value = 0f;
+        if (page != null) page.SetActive(true);
+        yield return null;   // the page is drawn before anything heavy starts
+        yield return null;
+
         // Leaving on purpose: not a lost connection (SessionGuard)
         SessionGuard.Leaving = true;
+        Task shutdown = null;
         try
         {
-            if (runner != null && runner.IsRunning)
-            {
-                await runner.Shutdown();
-            }
+            if (networkRunner != null && networkRunner.IsRunning) shutdown = networkRunner.Shutdown();
         }
         catch (Exception e)
         {
             Debug.LogWarning("SceneLoader: leaving the session failed: " + e.Message);
         }
-        finally
+        float waitUntil = Time.unscaledTime + 10f;
+        while (shutdown != null && !shutdown.IsCompleted && Time.unscaledTime < waitUntil) yield return null;
+        if (shutdown != null && shutdown.IsFaulted) Debug.LogWarning("SceneLoader: leaving the session failed: " + shutdown.Exception?.GetBaseException().Message);
+        SessionGuard.Leaving = false;
+
+        yield return ClearActiveScene(ui);
+        yield return runner.Run(page, scene, message, LoadSceneMode.Single, null);
+    }
+
+    // Switches the open scene off and destroys it a few thousand objects a frame, so the loading page keeps turning
+    // instead of the whole lot going in one frame when the next scene opens. Objects that belong to the network
+    // (a runner, network objects) are left for the scene change.
+    static IEnumerator ClearActiveScene(LoadingScreenUI ui)
+    {
+        const int PerFrame = 4000;
+        Scene scene = SceneManager.GetActiveScene();
+        var doomed = new List<GameObject>();
+        foreach (GameObject root in scene.GetRootGameObjects())
         {
-            SessionGuard.Leaving = false;
+            if (root == null) continue;
+            if (root.GetComponentInChildren<NetworkRunner>(true) != null || root.GetComponentInChildren<NetworkObject>(true) != null) continue;
+            doomed.Add(root);
         }
-        SceneManager.LoadScene(scene);
+        // Off first: no script of the race runs (or misses a destroyed object) while it is taken apart
+        foreach (GameObject root in doomed)
+        {
+            try { root.SetActive(false); }
+            catch (Exception e) { Debug.LogWarning("SceneLoader: " + e.Message); }
+        }
+        yield return null;
+        int total = 0, done = 0;
+        foreach (GameObject root in doomed) if (root != null) total += root.transform.childCount + 1;
+        int thisFrame = 0;
+        foreach (GameObject root in doomed)
+        {
+            if (root == null) continue;
+            Transform t = root.transform;
+            for (int i = t.childCount - 1; i >= 0; i--)
+            {
+                Destroy(t.GetChild(i).gameObject);
+                done++;
+                if (++thisFrame >= PerFrame)
+                {
+                    thisFrame = 0;
+                    if (ui != null && ui.slider != null && total > 0) ui.slider.value = 0.3f * done / total;
+                    yield return null;
+                }
+            }
+            Destroy(root);
+            done++;
+            thisFrame += 50;
+        }
+        yield return null;
+    }
+
+    // The loading page over a network scene change (Fusion loads the scene itself; Spawner calls these)
+    public static void ShowBusy(string message)
+    {
+        GameObject page = Page();
+        if (page == null) return;
+        LoadingScreenUI ui = page.GetComponent<LoadingScreenUI>();
+        if (ui != null) ui.SetMessage(message);
+        if (ui != null && ui.slider != null) ui.slider.value = 0f;
+        page.SetActive(true);
+    }
+
+    public static void HideBusy()
+    {
+        if (loading || cachedPage == null) return;
+        cachedPage.SetActive(false);
     }
 
     static GameObject Page()
