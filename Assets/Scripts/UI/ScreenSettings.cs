@@ -155,7 +155,9 @@ public class ScreenSettings : MonoBehaviour
 
         // Pages that make their canvases while running (popups, pack opening, end screen) are fitted
         // as soon as they show up. Checking a few times a second is cheap: there are only a handful.
-        if (Time.unscaledTime >= nextCanvasCheck)
+        // Not in a 3D race: there the search took up to 54 ms on Fossum (2026-11-26), and every page made there fits
+        // itself (ScreenSettings.Fit)
+        if (Time.unscaledTime >= nextCanvasCheck && RunSession.Active == null)
         {
             nextCanvasCheck = Time.unscaledTime + 1f;   // (every 0.2 s cost up to 20 ms on Fossum, 2026-11-26)
             // Counted by Canvas, not CanvasScaler: a search for a script type looks through every script in the scene

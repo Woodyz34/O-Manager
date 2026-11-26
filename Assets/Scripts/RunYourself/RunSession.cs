@@ -102,6 +102,8 @@ public partial class RunSession : MonoBehaviour
     // (2026-11-26, Anders chose it for Ultra's lag): the 2D runner stands still, nothing there needs them
     SimulationMode2D savedSim2D = SimulationMode2D.FixedUpdate;
     bool sim2DPaused;
+    // The 2D map is out of sight under the 3D race: its objects wait to be made until it shows again (GeoJsonSpawner)
+    public static bool TwoDAway => Active != null && Active.sim2DPaused;
 
     void PauseTwoDPhysics(bool pause)
     {
