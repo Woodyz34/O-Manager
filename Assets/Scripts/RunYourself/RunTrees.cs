@@ -399,7 +399,7 @@ public class RunTrees
         foreach (List<Matrix4x4> l in farLists) l.Clear();
         foreach (List<Matrix4x4> l in midLists) l.Clear();
         foreach (List<Matrix4x4> l in midPlainLists) l.Clear();
-        foreach (List<Matrix4x4> l in shadowLists) l.Clear();
+        if (shadowLists != null) foreach (List<Matrix4x4> l in shadowLists) l.Clear();
     }
 
     // The reaches of the levels, in metres from the runner (RunWorld sets them for its quality)
