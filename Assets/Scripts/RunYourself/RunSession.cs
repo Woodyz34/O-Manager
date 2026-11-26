@@ -275,9 +275,6 @@ public partial class RunSession : MonoBehaviour
         await WarmUp(se, sn);
         if (this == null) return;
         world.Loading = false;
-        loadingCard.Close();
-        loadingCard = null;
-        if (backdrop != null) Destroy(backdrop);
 
         float yaw = Bearing(points[0], points[1]);
         sounds = RunSounds.Create(transform, RunSettings.Woman, UnityEngine.Random.Range(0, int.MaxValue));
@@ -290,6 +287,16 @@ public partial class RunSession : MonoBehaviour
         handMap = RunMap.Create(player, mapDef, points, mainMask);
         handMap.transform.SetParent(transform, true);
         EnsureListener();
+        // The loading page goes only after the runner's eyes and the hand map have drawn a few frames behind it: the
+        // first of them read the map picture and stopped for up to half a second (2026-11-26, Anders on Fossum)
+        for (int i = 0; i < 3; i++)
+        {
+            await Task.Yield();
+            if (this == null) return;
+        }
+        loadingCard.Close();
+        loadingCard = null;
+        if (backdrop != null) Destroy(backdrop);
 
         track = new RelayTrack { label = RunnerName, isLocal = true, color = TrackColour(), runnerClock = true };
         if (watchOnly)

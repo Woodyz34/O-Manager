@@ -266,6 +266,11 @@ public class TvWorldView : MonoBehaviour
             bounds.SetMinMax(lo, hi);
         }
 
+        // The working arrays of Split: as long as the whole mesh (a million corners and more for a piece's undergrowth),
+        // longer than the shared pool keeps (2^20), so they had to be made new each time: a pool of its own for them
+        // (2026-11-26, Anders on Fossum Ultra: tens of MB of garbage in one go)
+        static readonly System.Buffers.ArrayPool<int> SplitPool = System.Buffers.ArrayPool<int>.Create(1 << 24, 6);
+
         // A big mesh cut into parts the graphics card gets one at a time (2026-11-26, Anders on Fossum Ultra: a piece's
         // undergrowth of a million corners stopped the game for 100-200 ms): each triangle to the square (tiles x
         // tiles over 2 x radius) its middle is in, and a square with more than maxCorners corners into several parts.
@@ -286,7 +291,7 @@ public class TvWorldView : MonoBehaviour
             float size = 2f * radius / tiles;
             // Which square each triangle goes to, counted first so each square's list is made at its size
             int triCount = t.Count / 3;
-            var pool = System.Buffers.ArrayPool<int>.Shared;
+            var pool = SplitPool;
             int[] tileOf = pool.Rent(Math.Max(1, triCount));
             var perTile = new int[tiles * tiles];
             for (int k = 0; k < triCount; k++)

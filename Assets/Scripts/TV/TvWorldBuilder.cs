@@ -627,11 +627,11 @@ public partial class TvWorldBuilder
         pathMesh = new TvMesh(true) { name = "Paths", castShadows = false };
         wireMesh = new TvMesh(true) { name = "Wires", castShadows = false };
         waterMesh = new TvMesh(true) { name = "Water", castShadows = false };
-        treeMeshes = new[] { new TvMesh(true) { name = "Trees", group = TvMesh.Near } };
+        treeMeshes = new[] { new TvMesh(true, true) { name = "Trees", group = TvMesh.Near } };
         treeFarMesh = new TvMesh(true) { name = "Trees far", castShadows = false, group = TvMesh.Far };
-        tuftMeshes = new[] { new TvMesh(true) { name = "Undergrowth", castShadows = false, ranks = TvMesh.PooledFloats() } };
-        thicketMesh = new TvMesh(true) { name = "Thickets" };
-        litterMesh = new TvMesh(true) { name = "Litter", castShadows = false };
+        tuftMeshes = new[] { new TvMesh(true, true) { name = "Undergrowth", castShadows = false, ranks = TvMesh.PooledFloats(true) } };
+        thicketMesh = new TvMesh(true, true) { name = "Thickets" };
+        litterMesh = new TvMesh(true, true) { name = "Litter", castShadows = false };
 
         MakeShapes();
         Heights();

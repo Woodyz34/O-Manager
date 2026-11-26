@@ -25,13 +25,16 @@ public class TvMesh
     // pooled: the lists come from a pool of lists already grown big (the run-yourself world's pieces, 2026-11-26,
     // Anders on Fossum Ultra: the garbage of growing lists of a million corners stopped the game now and then); give
     // them back with Recycle once the mesh is made from them
-    public TvMesh(bool pooled)
+    // big: a mesh of very many corners (the undergrowth, thickets, litter, the full trees) gets the biggest lists in the
+    // pool and the others the smallest, so a big mesh does not grow a small list again and again (2026-11-26: up to
+    // 50 MB of garbage in one go on Fossum Ultra)
+    public TvMesh(bool pooled, bool big = false)
     {
-        positions = pooled ? Pool<float>.Take() : new List<float>();
-        normals = pooled ? Pool<float>.Take() : new List<float>();
-        colors = pooled ? Pool<byte>.Take() : new List<byte>();
-        triangles = pooled ? Pool<int>.Take() : new List<int>();
-        uvs = pooled ? Pool<float>.Take() : new List<float>();
+        positions = pooled ? Pool<float>.Take(big) : new List<float>();
+        normals = pooled ? Pool<float>.Take(big) : new List<float>();
+        colors = pooled ? Pool<byte>.Take(big) : new List<byte>();
+        triangles = pooled ? Pool<int>.Take(big) : new List<int>();
+        uvs = pooled ? Pool<float>.Take(big) : new List<float>();
     }
 
     // The lists back to the pool; the mesh is empty and must not be used after this
@@ -46,21 +49,44 @@ public class TvMesh
         ranks = null;
     }
 
-    public static List<float> PooledFloats() => Pool<float>.Take();
+    public static List<float> PooledFloats(bool big = false) => Pool<float>.Take(big);
 
     static class Pool<T>
     {
-        static readonly System.Collections.Concurrent.ConcurrentBag<List<T>> bag = new System.Collections.Concurrent.ConcurrentBag<List<T>>();
-        const int MaxKept = 48;
+        static readonly List<List<T>> kept = new List<List<T>>();
+        const int MaxKept = 160;   // a piece has some 15 meshes of 5 lists each, and two are built at once
 
-        public static List<T> Take() => bag.TryTake(out List<T> list) ? list : new List<T>();
+        public static List<T> Take(bool big)
+        {
+            lock (kept)
+            {
+                if (kept.Count == 0) return new List<T>();
+                int best = 0;
+                for (int i = 1; i < kept.Count; i++)
+                    if (big ? kept[i].Capacity > kept[best].Capacity : kept[i].Capacity < kept[best].Capacity) best = i;
+                List<T> list = kept[best];
+                kept[best] = kept[kept.Count - 1];
+                kept.RemoveAt(kept.Count - 1);
+                return list;
+            }
+        }
 
         public static void Give(List<T> list)
         {
-            // Only lists worth keeping: big ones, and not too many of them
-            if (list == null || list.Capacity < 4096 || bag.Count >= MaxKept) return;
+            // Only lists worth keeping: big ones; when the pool is full the smallest goes
+            if (list == null || list.Capacity < 4096) return;
             list.Clear();
-            bag.Add(list);
+            lock (kept)
+            {
+                if (kept.Count < MaxKept)
+                {
+                    kept.Add(list);
+                    return;
+                }
+                int smallest = 0;
+                for (int i = 1; i < kept.Count; i++) if (kept[i].Capacity < kept[smallest].Capacity) smallest = i;
+                if (kept[smallest].Capacity < list.Capacity) kept[smallest] = list;
+            }
         }
     }
     // The run-yourself undergrowth (2026-11-26, Anders: Ultra lagged): each shape's own number 0..1 (the same for all
