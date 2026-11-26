@@ -1915,6 +1915,41 @@ public partial class TvWorldBuilder
 
     enum Thing { Lamp, Bench, Bin, Tree, Car, Bike, Cafe, Planter, Pots, Sitter, Bollard, OldLamp }
 
+    // A street thing: a copy (RunThings) when the run-yourself world asked for them, else into the "Town things" mesh
+    void TownThing(TvShape shape, float x, float y, float z, float sx, float sy, float sz, float yaw)
+    {
+        List<float> rec = world.thingRecords;
+        if (rec == null)
+        {
+            townThingMesh.Add(shape, x, y, z, sx, sy, sz, yaw);
+            return;
+        }
+        rec.Add(CopyIndex(shape)); rec.Add(x); rec.Add(y); rec.Add(z); rec.Add(sx); rec.Add(sy); rec.Add(sz); rec.Add(yaw);
+    }
+
+    // The ready-made shapes drawn as copies, each with its number (the same shape object always has the same one)
+    static readonly List<TvShape> copyShapes = new List<TvShape>();
+    static readonly Dictionary<TvShape, int> copyIndex = new Dictionary<TvShape, int>();
+
+    public static int CopyIndex(TvShape shape)
+    {
+        lock (copyShapes)
+        {
+            if (!copyIndex.TryGetValue(shape, out int i))
+            {
+                i = copyShapes.Count;
+                copyShapes.Add(shape);
+                copyIndex[shape] = i;
+            }
+            return i;
+        }
+    }
+
+    public static TvShape CopyShape(int index)
+    {
+        lock (copyShapes) return index >= 0 && index < copyShapes.Count ? copyShapes[index] : null;
+    }
+
     static TvShape Shape(Thing thing, int look, TvCityShapes.Style style)
     {
         int key = ((int)thing * 64 + look) * 2 + (int)style;
@@ -2053,27 +2088,27 @@ public partial class TvWorldBuilder
                 {
                     if (h < 0.4f && FarFrom(x, z, 12f, 0) && Free(x, z, 1f) && LevelAt(x, z, y, 0.4f))
                     {
-                        townThingMesh.Add(Shape(Thing.Lamp, look % 5, style), x, y, z, 1f, 1f, 1f, alongEdge);
+                        TownThing(Shape(Thing.Lamp, look % 5, style), x, y, z, 1f, 1f, 1f, alongEdge);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.18f });
                         Mark(x, z, 0.5f, 0);
                         continue;
                     }
                     if (!wall && h > 0.55f && h < 0.75f && FarFrom(x, z, 14f, 1) && Free(x, z, 1.4f) && LevelAt(x, z, y, 1.1f))
                     {
-                        townThingMesh.Add(Shape(Thing.Bench, 0, style), x, y, z, 1f, 1f, 1f, faceOut);
+                        TownThing(Shape(Thing.Bench, 0, style), x, y, z, 1f, 1f, 1f, faceOut);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.55f });
                         if (h2 < 0.45f)
                         {
                             // Someone sitting on it (still: they are drawn with the street)
                             float off = h2 < 0.2f ? -0.4f : 0.4f;
-                            townThingMesh.Add(Shape(Thing.Sitter, look % 24, style), x - ez * off, y, z + ex * off, 1f, 1f, 1f, faceOut);
+                            TownThing(Shape(Thing.Sitter, look % 24, style), x - ez * off, y, z + ex * off, 1f, 1f, 1f, faceOut);
                         }
                         Mark(x, z, 1.2f, 1);
                         continue;
                     }
                     if (h > 0.75f && h < 0.82f && FarFrom(x, z, 15f, 2) && Free(x, z, 0.8f) && LevelAt(x, z, y, 0.4f))
                     {
-                        townThingMesh.Add(Shape(Thing.Bin, 0, style), x, y, z, 1f, 1f, 1f, faceOut);
+                        TownThing(Shape(Thing.Bin, 0, style), x, y, z, 1f, 1f, 1f, faceOut);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.25f });
                         Mark(x, z, 0.5f, 2);
                         continue;
@@ -2084,7 +2119,7 @@ public partial class TvWorldBuilder
                     if (!Old && !wall && across >= 10f && d[(minDir + 4) % 8] >= 6f && h > 0.82f && h < 0.95f && FarFrom(x, z, 7f, 3) && Free(x, z, 3f) && LevelAt(x, z, y, 2.4f)
                         && RoomForCar(x, z, ex, ez))
                     {
-                        townThingMesh.Add(Shape(Thing.Car, look % 12, style), x, y, z, 1f, 1f, 1f, alongEdge + (h2 < 0.5f ? 0f : (float)Math.PI));
+                        TownThing(Shape(Thing.Car, look % 12, style), x, y, z, 1f, 1f, 1f, alongEdge + (h2 < 0.5f ? 0f : (float)Math.PI));
                         foreach (float s in new[] { -1.4f, 0f, 1.4f })
                             world.solids.Add(new TvSolid { x = x - ez * s, z = z + ex * s, r = 0.95f });
                         Mark(x, z, 2.6f, 3);
@@ -2096,20 +2131,20 @@ public partial class TvWorldBuilder
                 {
                     if (min < 1.3f && h > 0.4f && h < 0.5f && FarFrom(x, z, 4f, 4) && Free(x, z, 1f))
                     {
-                        townThingMesh.Add(Shape(Thing.Bike, look % 8, style), x, y, z, 1f, 1f, 1f, alongEdge);
+                        TownThing(Shape(Thing.Bike, look % 8, style), x, y, z, 1f, 1f, 1f, alongEdge);
                         Mark(x, z, 1f, 4);
                         continue;
                     }
                     if (min >= 1.3f && across >= 7f && h > 0.5f && h < 0.6f && FarFrom(x, z, 5f, 5) && Free(x, z, 1.6f))
                     {
-                        townThingMesh.Add(Shape(Thing.Cafe, look % 8, style), x, y, z, 1f, 1f, 1f, faceOut);
+                        TownThing(Shape(Thing.Cafe, look % 8, style), x, y, z, 1f, 1f, 1f, faceOut);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.9f });
                         Mark(x, z, 1.6f, 5);
                         continue;
                     }
                     if (min < 1.3f && h > 0.6f && h < 0.7f && FarFrom(x, z, 5f, 6) && Free(x, z, 0.8f))
                     {
-                        townThingMesh.Add(Old ? Shape(Thing.Pots, look % 6, style) : Shape(Thing.Planter, 0, style), x, y, z, 1f, 1f, 1f, faceOut);
+                        TownThing(Old ? Shape(Thing.Pots, look % 6, style) : Shape(Thing.Planter, 0, style), x, y, z, 1f, 1f, 1f, faceOut);
                         world.solids.Add(new TvSolid { x = x, z = z, r = 0.4f });
                         Mark(x, z, 0.6f, 6);
                         continue;
@@ -2120,9 +2155,9 @@ public partial class TvWorldBuilder
                 {
                     // A real tree with bark and leaves (2026-11-25): a lime-like broad-leaved tree, now and then a birch;
                     // the old town keeps its orange trees in pots
-                    if (Old || beechNear == null) townThingMesh.Add(Shape(Thing.Tree, look % 4, style), x, y, z, 1f, 1f, 1f, h2 * 6.28f);
-                    else if (look % 4 == 2) townThingMesh.Add(birchNear[(int)(h2 * 97f) % birchNear.Length], x, y, z, 0.62f, 0.62f, 0.62f, h2 * 6.28f);
-                    else townThingMesh.Add(beechNear[(int)(h2 * 97f) % beechNear.Length], x, y, z, 0.5f, 0.52f, 0.5f, h2 * 6.28f);
+                    if (Old || beechNear == null) TownThing(Shape(Thing.Tree, look % 4, style), x, y, z, 1f, 1f, 1f, h2 * 6.28f);
+                    else if (look % 4 == 2) TownThing(birchNear[(int)(h2 * 97f) % birchNear.Length], x, y, z, 0.62f, 0.62f, 0.62f, h2 * 6.28f);
+                    else TownThing(beechNear[(int)(h2 * 97f) % beechNear.Length], x, y, z, 0.5f, 0.52f, 0.5f, h2 * 6.28f);
                     world.solids.Add(new TvSolid { x = x, z = z, r = 0.3f });
                     Mark(x, z, 1.5f, 7);
                     continue;
@@ -2625,7 +2660,7 @@ public partial class TvWorldBuilder
                 look2 = look2 * 7 + 3;
                 if (TvRandom.Hash((int)Math.Floor((cx + ox) * 3f + u * 5f), (int)Math.Floor((cz + oz) * 3f)) < 0.25f) continue;   // a gap now and then
                 float v = -hw + 0.95f, x = cx + ux * u - uz * v, z = cz + uz * u + ux * v;
-                townThingMesh.Add(Shape(Thing.Bike, Math.Abs(look2) % 8, input.town.style), x, H(x, z), z, 1f, 1f, 1f, -angle);
+                TownThing(Shape(Thing.Bike, Math.Abs(look2) % 8, input.town.style), x, H(x, z), z, 1f, 1f, 1f, -angle);
             }
         }
     }

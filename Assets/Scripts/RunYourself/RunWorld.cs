@@ -78,6 +78,7 @@ public class RunWorld : MonoBehaviour
         public Piece[] quads;
         public Piece parent;
         public RunTufts.Set tuftSet;        // the undergrowth's plants as copies (RunTufts), with the detail
+        public RunThings.Set thingSet;      // a town's street things as copies (RunThings), with the base
         public float dist;
         public float onCourse = -1f;        // how far the piece is from the course's legs (-1: not worked out yet)
         public bool nearOn;
@@ -112,6 +113,7 @@ public class RunWorld : MonoBehaviour
         public List<TvWorldView.MeshArrays> arrays;
         public RunTrees.Set treeSet;
         public RunTufts.Set tuftSet;
+        public RunThings.Set thingSet;
         public int made;            // how many of arrays have their mesh made (HandOver, one at a time)
     }
 
@@ -411,6 +413,8 @@ public class RunWorld : MonoBehaviour
         trees = RunTrees.Create(quality, atlasMaterial, look.shadows > 0, sun);
         tufts?.Destroy();
         tufts = RunTufts.Create(quality, atlasMaterial);
+        things?.Destroy();
+        things = data.town != null ? RunThings.Create(atlasMaterial, look.shadows > 0) : null;
         if (trees != null)
         {
             // The finest trees only right round the runner; shadows only as far as they are drawn (RunTrees)
@@ -424,6 +428,14 @@ public class RunWorld : MonoBehaviour
             trees.fullReach = quality >= (int)RunSettings.Quality.Ultra ? 24f : quality >= (int)RunSettings.Quality.High ? 18f
                 : Mathf.Min(look.near, look.shadows > 0 ? trees.shadowReach : look.near);
             trees.nearReach = look.near;
+            // On Low the full trees reach 20 m past the near distance, so the change to the plain far shapes (which lack
+            // the side sprays and thin branches) comes where the fog has begun, not right in front of the runner
+            // (2026-11-26, Anders: on Low some branches were half see-through at first and then came)
+            if (quality <= (int)RunSettings.Quality.Low)
+            {
+                trees.nearReach = look.near + 20f;
+                trees.nearBand = 15f;
+            }
             // Fewer far trees further out (2026-11-26, Anders: 8 000-10 000 far trees on Ultra): all of them up to
             // 40 % of the view, a third of them at 90 %, each fading out on its share of the pixels
             trees.farThinStart = Mathf.Max(look.near + 30f, look.view * 0.4f);
@@ -510,6 +522,7 @@ public class RunWorld : MonoBehaviour
         if (tapeMesh != null) Destroy(tapeMesh);
         trees?.Destroy();
         tufts?.Destroy();
+        things?.Destroy();
     }
 
     // ---- Map points and the scene ----
@@ -759,7 +772,12 @@ public class RunWorld : MonoBehaviour
         {
             nextPlan = Time.unscaledTime + 0.15f;
             Plan();
+            double toMs = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            planParts = (perf.ElapsedTicks - t0) * toMs >= 10.0
+                ? " [hills " + (planHide * toMs).ToString("0.0") + ", tiers and people " + (planOther * toMs).ToString("0.0") + ", dropping " + (planDrop * toMs).ToString("0.0") + "]"
+                : null;
         }
+        else planParts = null;
         long t1 = perf.ElapsedTicks;
         while (finished.TryDequeue(out Done done)) uploading.Enqueue(done);
         HandOver();
@@ -767,17 +785,20 @@ public class RunWorld : MonoBehaviour
         Reveal();
         DrawTrees();
         DrawTufts();
+        DrawThings();
         Fades();
         long t3 = perf.ElapsedTicks;
         RunPerf.Add(RunPerf.Part.World, t3 - t0);
         // The frame time Unity gives now is the frame before's, so that frame's own parts go with it
         Watch(lastPlanTicks, lastHandTicks, lastTreeTicks);
+        lastPlanParts = planParts;
         lastPlanTicks = t1 - t0;
         lastHandTicks = t2 - t1;
         lastTreeTicks = t3 - t2;
     }
 
     long lastPlanTicks, lastHandTicks, lastTreeTicks;
+    string lastPlanParts;
 
     // ---- What a slow frame was spent on, in the log (2026-11-25, Anders: big maps lagged; the log says why) ----
     // A frame over 50 ms is written as "RunPerf: ..." (at most every 2 s): the whole frame, this world's own parts of
@@ -804,15 +825,16 @@ public class RunWorld : MonoBehaviour
         probe.Frame(frame, slow);
         if (!slow) return;
         slowFrames++;
-        if (frame > worstFrame) { worstFrame = frame; worstPlan = plan * ms; worstHand = hand * ms; worstTrees = tree * ms; }
+        if (frame > worstFrame) { worstFrame = frame; worstPlan = plan * ms; worstPlanParts = lastPlanParts; worstHand = hand * ms; worstTrees = tree * ms; }
         if (Time.unscaledTime < nextPerfLog) return;
         nextPerfLog = Time.unscaledTime + 2f;
         int ready = 0;
         foreach (Piece p in pieces.Values) if (p.ready) ready++;
-        Debug.Log("RunPerf: " + slowFrames + " slow frames, worst " + worstFrame.ToString("0") + " ms (plan " + worstPlan.ToString("0.0")
+        Debug.Log("RunPerf: " + slowFrames + " slow frames, worst " + worstFrame.ToString("0") + " ms (plan " + worstPlan.ToString("0.0") + worstPlanParts
                   + ", meshes to the graphics card " + worstHand.ToString("0.0") + ", trees " + worstTrees.ToString("0.0") + " ms)"
                   + (cleaned ? ", memory cleaned (GC) this frame" : "") + "; pieces " + ready + "/" + pieces.Count
                   + ", waiting " + uploading.Count + ", jobs " + jobs + ", trees as " + (trees != null ? "copies (" + trees.Stats + ")" : "meshes")
+                  + (things != null ? ", town things as copies " + things.Drawn : "")
                   + ", quality " + RunSettings.QualityName((RunSettings.Quality)quality)
                   + (slowMesh != null ? ", slowest mesh: " + slowMesh : "")
                   + "\nRunPerf whole frame: " + probe.TakeWorst());
@@ -822,8 +844,14 @@ public class RunWorld : MonoBehaviour
         slowMeshMs = 0;
     }
 
+    // What the planning's time went on (the RunPerf line, when the planning was slow): the hill test, the tiers and
+    // people of the pieces, the dropping of pieces left behind
+    long planHide, planOther, planDrop;
+    string planParts, worstPlanParts;
+
     void Plan()
     {
+        planHide = planOther = planDrop = 0;
         float view = look.view;
         int ix0 = (int)Math.Floor((playerE - view - anchorE) / PieceSize), ix1 = (int)Math.Floor((playerE + view - anchorE) / PieceSize);
         int iz0 = (int)Math.Floor((playerN - view - anchorN) / PieceSize), iz1 = (int)Math.Floor((playerN + view - anchorN) / PieceSize);
@@ -882,7 +910,10 @@ public class RunWorld : MonoBehaviour
                     p.treeTier = tier;
                 }
             }
+            long h0 = perf.ElapsedTicks;
             if (p.ready && !p.hidden && p.root != null && Hidden(p)) Hide(p, true);
+            long h1 = perf.ElapsedTicks;
+            planHide += h1 - h0;
             if (p.ready)
             {
                 bool nearOn = p.dist < look.near;
@@ -903,12 +934,15 @@ public class RunWorld : MonoBehaviour
                     }
                 }
             }
+            planOther += perf.ElapsedTicks - h1;
         }
+        long d0 = perf.ElapsedTicks;
         foreach (long key in drop)
         {
             Drop(pieces[key]);
             pieces.Remove(key);
         }
+        planDrop += perf.ElapsedTicks - d0;
 
         // The nearest piece first; a piece right round the runner before any undergrowth
         while (jobs < MaxJobs && (nextBase != null || nextDetail != null || nextTrees != null))
@@ -948,6 +982,7 @@ public class RunWorld : MonoBehaviour
 
     RunTrees trees;
     RunTufts tufts;
+    RunThings things;
     // The runner's eyes (RunSession sets it): pieces with far trees outside its picture are not drawn
     public Camera viewCamera;
     readonly Plane[] frustum = new Plane[6];
@@ -988,7 +1023,7 @@ public class RunWorld : MonoBehaviour
                 if (!GeometryUtility.TestPlanesAABB(frustum, b)) continue;
             }
             // (a piece only just past the near distance looks at each tree: the runner may have come closer since)
-            trees.Add(p.treeSet, p.treeTier == 1 && p.dist > look.near + 12f, me.x, me.z, toWorld, moved);
+            trees.Add(p.treeSet, p.treeTier == 1 && p.dist > trees.nearReach + 12f, me.x, me.z, toWorld, moved);
         }
         Vector3 at = transform.TransformPoint(ToScene(playerE, playerN, 0f));
         trees.Draw(new Bounds(at, new Vector3(look.view * 2f + 200f, 4000f, look.view * 2f + 200f)));
@@ -1027,6 +1062,35 @@ public class RunWorld : MonoBehaviour
             }
             tufts.Add(q.tuftSet, toWorld, moved);
         }
+    }
+
+    // A town's street things as copies (RunThings): each piece in reach whose box is in the picture. They reach a
+    // little past the near distance and fade out over the last 12 m, each by its own distance (no piece pops).
+    float ThingsReach => look.near + 24f;
+
+    void DrawThings()
+    {
+        if (things == null) return;
+        things.Clear();
+        bool cull = viewCamera != null && viewCamera.isActiveAndEnabled;
+        if (cull) GeometryUtility.CalculateFrustumPlanes(viewCamera, tuftFrustum);
+        Matrix4x4 toWorld = transform.localToWorldMatrix;
+        bool moved = !toWorld.isIdentity;
+        float reach = ThingsReach;
+        foreach (Piece p in pieces.Values)
+        {
+            if (!p.ready || p.hidden || p.thingSet == null || p.dist > reach) continue;
+            if (cull)
+            {
+                Vector3 c = transform.TransformPoint(ToScene(p.ce, p.cn, (p.minY + p.maxY) * 0.5f + 6f));
+                var b = new Bounds(c, new Vector3(PieceSize + 8f, p.maxY - p.minY + 40f, PieceSize + 8f));
+                // (with shadows a thing just outside the picture can still throw its shadow into it)
+                if (look.shadows == 0 && !GeometryUtility.TestPlanesAABB(tuftFrustum, b)) continue;
+            }
+            things.Add(p.thingSet, toWorld, moved);
+        }
+        Vector3 at = transform.TransformPoint(ToScene(playerE, playerN, 0f));
+        things.Draw(new Bounds(at, new Vector3(reach * 2f + 100f, 4000f, reach * 2f + 100f)), reach, 12f);
     }
 
     // How close the runner comes before a piece gets its full trees (a little before they are drawn)
@@ -1090,7 +1154,7 @@ public class RunWorld : MonoBehaviour
     {
         if (p.dist < HideFrom || p.world == null) return false;
         // The eyes, a little high (the head bobs, the runner jumps)
-        float eye = GroundY(playerE, playerN) + 2.8f;
+        float eye = HillY(playerE, playerN) + 2.8f;
         float top = p.maxY + (data.town != null ? 45f : 32f);
         for (int a = -1; a <= 1; a++)
         {
@@ -1103,6 +1167,17 @@ public class RunWorld : MonoBehaviour
         return true;
     }
 
+    // The bare ground's height for the hill test: no cliff tops, stairs or tunnel roofs (GroundY looks through all of
+    // a town piece's caps and tunnels for every point: with some thousand points a check that was most of a 63 ms
+    // frame in Tranås, 2026-11-26)
+    float HillY(double e, double n)
+    {
+        int ix = (int)Math.Floor((e - anchorE) / PieceSize), iz = (int)Math.Floor((n - anchorN) / PieceSize);
+        if (pieces.TryGetValue(Key(ix, iz), out Piece p) && p.world != null)
+            return p.world.HeightAt((float)(e - p.ce), (float)(n - p.cn));
+        return terrain.MapHeight(e, n) - baseHeight;
+    }
+
     // Whether the ground rises above the line from the eyes to (te, tn) at height top somewhere between them
     bool Blocked(float eye, double te, double tn, float top)
     {
@@ -1113,7 +1188,7 @@ public class RunWorld : MonoBehaviour
         for (int i = 1; i < steps; i++)
         {
             double f = (double)i / steps;
-            float ground = GroundY(playerE + de * f, playerN + dn * f) - 0.5f;
+            float ground = HillY(playerE + de * f, playerN + dn * f) - 0.5f;
             if (ground > eye + (top - eye) * (float)f) return true;
         }
         return false;
@@ -1257,6 +1332,8 @@ public class RunWorld : MonoBehaviour
         input.skipNearTrees = p.dist > TreesReach;
         input.treeRecords = trees != null;
         RunTrees copies = trees;
+        RunThings thingCopies = things;
+        input.thingRecords = thingCopies != null;
         Vector3 offset = ToScene(p.ce, p.cn, 0f);
         // The flags that stand in this piece
         input.flags = new List<float>();
@@ -1277,6 +1354,8 @@ public class RunWorld : MonoBehaviour
             {
                 done.world = TvWorldBuilder.Build(input);
                 if (copies != null) done.treeSet = copies.Prepare(done.world.treeRecords, offset);
+                if (thingCopies != null) done.thingSet = thingCopies.Prepare(done.world.thingRecords, offset);
+                done.world.thingRecords = null;
                 done.arrays = Parts(done.world.meshes, false);
                 done.world.meshes.Clear();
             }
@@ -1526,6 +1605,7 @@ public class RunWorld : MonoBehaviour
             }
         }
         ShowTier(p);
+        p.thingSet = things != null ? done.thingSet : null;
         // The trees as copies (RunTrees): nothing more to make for them; the picture cards for far away
         float lo = float.MaxValue, hi = float.MinValue;
         if (p.world.ground != null) foreach (float g in p.world.ground) { if (g < lo) lo = g; if (g > hi) hi = g; }
@@ -1661,6 +1741,7 @@ public class RunWorld : MonoBehaviour
         p.cardMesh = null;
         p.cardRenderer = null;
         p.treeSet = null;
+        p.thingSet = null;
         p.lean.Clear();
         foreach (Mesh m in p.meshes) if (m != null) Destroy(m);
         p.meshes.Clear();
