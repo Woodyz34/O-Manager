@@ -64,6 +64,17 @@ Shader "O-Manager/TvAtlasLit"
         // metres from the runner, only the share z of it from y metres on; w > 0.5: on. Each tuft has its own number
         // 0..1 in the fourth uv (TvMesh.ranks; 0: never thinned) and shows while it is below the share there.
         float4 _TvThin;
+        // The far trees thinned out (RunTrees, 2026-11-26): all up to x metres, the share z of them from y on; w > 0.5: on
+        float4 _TvFarThin;
+
+        // A tree's own number 0..1 from where it stands (the same sums as RunTrees.Rank)
+        float TvRank (float2 p)
+        {
+            float3 q = frac(float3(p.x * 0.1031, p.y * 0.1031, p.x * 0.0973));
+            float d = q.x * (q.y + 33.33) + q.y * (q.z + 33.33) + q.z * (q.x + 33.33);
+            q += d;
+            return frac((q.x + q.y) * q.z);
+        }
 
         struct Input
         {
@@ -98,6 +109,11 @@ Shader "O-Manager/TvAtlasLit"
                 float going = _TvLod.z > 0.001 ? saturate((d - (_TvLod.z - _TvLod.w)) / max(_TvLod.w, 0.01)) : 0.0;
                 float coming = _TvLod.x > 0.001 ? saturate((d - (_TvLod.x - _TvLod.y)) / max(_TvLod.y, 0.01)) : 1.0;
                 o.atlas.w = going > 0.0 ? -1.0 - going : coming;
+                if (_TvFarThin.w > 0.5 && d > _TvFarThin.x && going <= 0.0)
+                {
+                    float share = lerp(1.0, _TvFarThin.z, saturate((d - _TvFarThin.x) / max(_TvFarThin.y - _TvFarThin.x, 1.0)));
+                    o.atlas.w *= saturate((share - TvRank(root)) / 0.1);
+                }
             }
             // Thinned undergrowth: a tuft past its share fades out on its share of the pixels, and one well past it is
             // folded to a point, so the graphics card draws nothing for it

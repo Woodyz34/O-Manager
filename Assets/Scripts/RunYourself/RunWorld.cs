@@ -74,6 +74,7 @@ public class RunWorld : MonoBehaviour
         public readonly List<Mesh> detailMeshes = new List<Mesh>();
         public bool detailBuilding;
         public float dist;
+        public float onCourse = -1f;        // how far the piece is from the course's legs (-1: not worked out yet)
         public bool nearOn;
         public readonly List<Renderer> lean = new List<Renderer>();   // a town's leaner houses, hidden under the full ones
         public bool leanHidden, peopleOn;
@@ -113,6 +114,35 @@ public class RunWorld : MonoBehaviour
     readonly Queue<Done> uploading = new Queue<Done>();
     int jobs;
     const int MaxJobs = 2;
+
+    // ---- Which piece is built next (2026-11-26, Anders: build what is right round me and where the course goes; the
+    // pieces far away can wait and come slowly, a little now and then) ----
+    List<CoursePoint> courseLine = new List<CoursePoint>();   // the start, the controls and the finish
+    const float CourseCorridor = 90f;    // a piece this close to a leg counts as on the course
+    const float FarCalm = 0.35f;         // seconds between two far pieces started while running
+    float lastFarStart = -10f;
+
+    float CourseDistance(Piece p)
+    {
+        if (p.onCourse >= 0f) return p.onCourse;
+        double best = double.MaxValue;
+        for (int i = 0; i + 1 < courseLine.Count; i++)
+        {
+            double ax = courseLine[i].e, az = courseLine[i].n, bx = courseLine[i + 1].e, bz = courseLine[i + 1].n;
+            double dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+            double t = l2 > 1e-6 ? Math.Max(0.0, Math.Min(1.0, ((p.ce - ax) * dx + (p.cn - az) * dz) / l2)) : 0.0;
+            double qx = p.ce - (ax + dx * t), qz = p.cn - (az + dz * t);
+            best = Math.Min(best, Math.Sqrt(qx * qx + qz * qz));
+        }
+        p.onCourse = courseLine.Count < 2 ? 1e6f : (float)Math.Max(0.0, best - Half);
+        return p.onCourse;
+    }
+
+    // How soon a piece is wanted: its distance, less on the course's legs
+    float Want(Piece p) => CourseDistance(p) < CourseCorridor ? p.dist * 0.6f : p.dist;
+
+    // Close enough that it must come at once (else it waits its turn, one at a time)
+    bool Urgent(Piece p) => Loading || Want(p) < look.near + PieceSize;
     float nextPlan;
     double playerE, playerN;
     bool hasPlayer;
@@ -136,6 +166,8 @@ public class RunWorld : MonoBehaviour
         world.anchorN = Math.Floor(start.n);
         world.baseHeight = Mathf.Round(terrain.MapHeight(world.anchorE, world.anchorN));
         world.flagPoints = new List<CoursePoint>(flags);
+        world.courseLine = new List<CoursePoint>(flags.Count + 1) { start };
+        world.courseLine.AddRange(flags);
         world.flagE = new double[flags.Count];
         world.flagN = new double[flags.Count];
         for (int i = 0; i < flags.Count; i++)
@@ -382,6 +414,11 @@ public class RunWorld : MonoBehaviour
             trees.fullReach = quality >= (int)RunSettings.Quality.Ultra ? 24f : quality >= (int)RunSettings.Quality.High ? 18f
                 : Mathf.Min(look.near, look.shadows > 0 ? trees.shadowReach : look.near);
             trees.nearReach = look.near;
+            // Fewer far trees further out (2026-11-26, Anders: 8 000-10 000 far trees on Ultra): all of them up to
+            // 40 % of the view, a third of them at 90 %, each fading out on its share of the pixels
+            trees.farThinStart = Mathf.Max(look.near + 30f, look.view * 0.4f);
+            trees.farThinEnd = Mathf.Max(trees.farThinStart + 20f, look.view * 0.9f);
+            trees.farThinShare = 0.33f;
         }
         if (trees != null)
         {
@@ -759,7 +796,7 @@ public class RunWorld : MonoBehaviour
                 drop.Add(pair.Key);
                 continue;
             }
-            if (!p.ready && !p.building && (nextBase == null || p.dist < nextBase.dist)) nextBase = p;
+            if (!p.ready && !p.building && (nextBase == null || Want(p) < Want(nextBase))) nextBase = p;
             if (p.ready && p.detail == null && !p.detailBuilding && p.dist <= look.detail && (nextDetail == null || p.dist < nextDetail.dist)) nextDetail = p;
             if (p.detail != null && p.dist > look.detail + 16f) DropDetail(p, true);
             if (p.ready && !p.treesNear && !p.treesBuilding && p.dist <= TreesReach && (nextTrees == null || p.dist < nextTrees.dist)) nextTrees = p;
@@ -814,6 +851,17 @@ public class RunWorld : MonoBehaviour
             }
             else if (nextBase != null && (nextDetail == null || nextBase.dist <= nextDetail.dist + 40f))
             {
+                // A far piece only when nothing else is being built, and not more often than every FarCalm seconds:
+                // less garbage at once, so the memory clean-up does not stop the game
+                if (!Urgent(nextBase))
+                {
+                    if (jobs > 0 || Time.unscaledTime - lastFarStart < FarCalm)
+                    {
+                        nextBase = null;
+                        continue;
+                    }
+                    lastFarStart = Time.unscaledTime;
+                }
                 StartBase(nextBase);
                 nextBase = NextUnbuilt();
             }
@@ -1061,7 +1109,7 @@ public class RunWorld : MonoBehaviour
     {
         Piece best = null;
         foreach (Piece p in pieces.Values)
-            if (!p.ready && !p.building && (best == null || p.dist < best.dist)) best = p;
+            if (!p.ready && !p.building && (best == null || Want(p) < Want(best))) best = p;
         return best;
     }
 

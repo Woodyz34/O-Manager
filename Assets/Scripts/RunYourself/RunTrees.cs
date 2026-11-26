@@ -406,6 +406,32 @@ public class RunTrees
 
     // The reaches of the levels, in metres from the runner (RunWorld sets them for its quality)
     public float fullReach = 30f, nearReach = 96f, shadowReach = 60f;
+    // Far trees thinned out: all up to farThinStart, the share farThinShare of them from farThinEnd on (0: off).
+    // Which tree stays is its own number from where it stands (Rank, the same in TvAtlasLit), so every player sees
+    // the same trees and each fades out on its share of the pixels instead of popping.
+    public float farThinStart, farThinEnd, farThinShare;
+
+    // The tree's own number 0..1 from where it stands (as TvAtlasLit's TvRank)
+    static float Rank(float x, float z)
+    {
+        float px = Frac(x * 0.1031f), py = Frac(z * 0.1031f), pz = Frac(x * 0.0973f);
+        float dot = px * (py + 33.33f) + py * (pz + 33.33f) + pz * (px + 33.33f);
+        px += dot; py += dot; pz += dot;
+        return Frac((px + py) * pz);
+    }
+
+    static float Frac(float v) => v - Mathf.Floor(v);
+
+    // False when a far tree this far out is past its share (well past: the shader fades the ones near it)
+    bool FarKept(float x, float z, float d2)
+    {
+        if (farThinShare <= 0f || farThinShare >= 1f) return true;
+        float start2 = farThinStart * farThinStart;
+        if (d2 <= start2) return true;
+        float d = Mathf.Sqrt(d2);
+        float share = Mathf.Lerp(1f, farThinShare, Mathf.Clamp01((d - farThinStart) / Mathf.Max(1f, farThinEnd - farThinStart)));
+        return Rank(x, z) < share + 0.12f;
+    }
     // How many metres before each change both levels are drawn (RunWorld sets them for its quality: longer on Ultra)
     public float fullBand = 5f, nearBand = 12f;
     bool HasMid => midMeshes != nearMeshes;
@@ -462,6 +488,8 @@ public class RunTrees
                 if (i < 0) continue;
                 Matrix4x4 m = moved ? toWorld * where[t] : where[t];
                 if (!InView(m.m03, m.m13 + 10f * m.m11, m.m23, 14f * Mathf.Max(m.m11, 1f))) continue;
+                float fx = where[t].m03 - px, fz = where[t].m23 - pz;
+                if (!FarKept(m.m03, m.m23, fx * fx + fz * fz)) continue;
                 farLists[i].Add(m);
             }
             return;
@@ -490,11 +518,11 @@ public class RunTrees
                 if (d2 < full2) nearLists[ni].Add(m);
                 if (d2 >= fullIn2 && (mid || d2 >= full2)) (d2 < shadow2 ? midLists : midPlainLists)[ni].Add(m);
             }
-            if (d2 >= nearIn2 && fi >= 0) farLists[fi].Add(m);
+            if (d2 >= nearIn2 && fi >= 0 && FarKept(m.m03, m.m23, d2)) farLists[fi].Add(m);
         }
     }
 
-    static readonly int LodId = Shader.PropertyToID("_TvLod"), LodCenterId = Shader.PropertyToID("_TvLodCenter");
+    static readonly int LodId = Shader.PropertyToID("_TvLod"), LodCenterId = Shader.PropertyToID("_TvLodCenter"), FarThinId = Shader.PropertyToID("_TvFarThin");
     // One copy of the trees' material per level, each with its own _TvLod (2026-11-26: a property block per draw made
     // the graphics card switch state for every draw, 600-800 "set-pass" a frame instead of 50-140)
     Material nearMat, midMat, farMat;
@@ -525,6 +553,7 @@ public class RunTrees
         nearMat.SetVector(LodId, mid ? new Vector4(0f, 1f, fullReach, fullBand) : straight ? new Vector4(0f, 1f, nearReach, nearBand) : Vector4.zero);
         midMat.SetVector(LodId, new Vector4(mid ? fullReach : 0f, fullBand, nearReach, nearBand));
         farMat.SetVector(LodId, new Vector4(nearReach, nearBand, 0f, 1f));
+        farMat.SetVector(FarThinId, new Vector4(farThinStart, farThinEnd, farThinShare, farThinShare > 0f && farThinShare < 1f ? 1f : 0f));
         Shader.SetGlobalVector(LodCenterId, new Vector4(around.center.x, around.center.z, 0f, 0f));
         var full = new RenderParams(nearMat)
         {
