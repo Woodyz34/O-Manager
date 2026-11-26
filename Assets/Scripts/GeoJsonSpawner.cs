@@ -160,6 +160,24 @@ public class GeoJsonSpawner : MonoBehaviour
     {
         var totalWatch = System.Diagnostics.Stopwatch.StartNew();
 
+        // "Run it yourself" (3D) has no 2D runners, so the 2D map objects (only there for the 2D runners' paths,
+        // streams and mistakes) are not read or made at all: on Fossum 68 000 objects and some 100 MB of garbage
+        // (2026-11-26, Anders: "why do I need 2D objects when I run in 3D?"). Nor the forest mistakes' index below
+        // (only the 2D runners make mistakes): it reads the whole map file too, 40 MB on Fossum. The map picture is kept.
+        // The modes come from the host a moment after the scene loads.
+        float waitedFor = 0f;
+        while (!ExtraModes.Known && waitedFor < 5f)
+        {
+            waitedFor += Time.unscaledDeltaTime;
+            yield return null;
+        }
+        if (RunSession.On)
+        {
+            MapFeatureIndex.Clear();
+            Debug.Log("GeoJsonSpawner: 3D race, no 2D map objects made");
+            yield break;
+        }
+
         GridMapping mapping = new GridMapping
         {
             rows = pathfindingManager.speedGrid2D.GetLength(0),
@@ -217,22 +235,6 @@ public class GeoJsonSpawner : MonoBehaviour
                 try { MapFeatureIndex.Build(indexFiles, indexMap, metresPerUnit, speedGrid, heightGrid, kinds, indexGeneration); }
                 catch (System.Exception e) { Debug.LogError("MapFeatureIndex: " + e); }
             });
-        }
-
-        // "Run it yourself" (3D) has no 2D runners, so the 2D map objects (only there for the 2D runners' paths,
-        // streams and mistakes) are not read or made at all: on Fossum 68 000 objects and some 100 MB of garbage
-        // (2026-11-26, Anders: "why do I need 2D objects when I run in 3D?"). The forest mistakes' index above and
-        // the map picture are kept. The modes come from the host a moment after the scene loads.
-        float waitedFor = 0f;
-        while (!ExtraModes.Known && waitedFor < 5f)
-        {
-            waitedFor += Time.unscaledDeltaTime;
-            yield return null;
-        }
-        if (RunSession.On)
-        {
-            Debug.Log("GeoJsonSpawner: 3D race, no 2D map objects made");
-            yield break;
         }
 
         var tasks = new List<Task<List<ParsedFeature>>>();

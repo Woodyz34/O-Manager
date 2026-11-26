@@ -725,31 +725,6 @@ public class RunWorld : MonoBehaviour
         lastPlanTicks = t1 - t0;
         lastHandTicks = t2 - t1;
         lastTreeTicks = t3 - t2;
-        CalmCleanup(Loading || rebuilding || uploading.Count > 0 || (t3 - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency > 3.0);
-    }
-
-    // ---- Memory clean-up in calm moments (2026-11-26, Anders: "when it goes fast, clean a bit more; when a lot is
-    // happening, don't") ----
-    // Unity cleans the memory a little each frame (the incremental GC), but when the building makes garbage faster than
-    // that, it has to stop the whole game for a full clean (20-40 ms on Fossum). So in frames where the main thread has
-    // time to spare (the frame is held to 60 a second) and nothing is being handed over, a few ms of that spare time
-    // goes to the clean-up; a new round starts only once 24 MB more memory is in use than after the last one.
-
-    const long CalmGrowth = 24L * 1024 * 1024;
-    long heapAfterClean = -1;
-    bool cleaningOn;
-
-    void CalmCleanup(bool busy)
-    {
-        if (busy || !UnityEngine.Scripting.GarbageCollector.isIncremental || probe == null) return;
-        double main = probe.LastMainMs;
-        if (main <= 0.0) return;
-        double spare = 1000.0 / 60.0 - main;
-        if (spare < 4.0) return;
-        if (!cleaningOn && heapAfterClean >= 0 && GC.GetTotalMemory(false) - heapAfterClean < CalmGrowth) return;
-        ulong ns = (ulong)(Math.Min(spare - 2.0, 5.0) * 1e6);
-        cleaningOn = UnityEngine.Scripting.GarbageCollector.CollectIncremental(ns);
-        if (!cleaningOn) heapAfterClean = GC.GetTotalMemory(false);
     }
 
     long lastPlanTicks, lastHandTicks, lastTreeTicks;
