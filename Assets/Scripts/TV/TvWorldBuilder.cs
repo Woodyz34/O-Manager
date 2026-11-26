@@ -2808,6 +2808,44 @@ public partial class TvWorldBuilder
                     world.solids.Add(new TvSolid { x = x, z = z, r = 1.3f });
                     break;
                 }
+                case WorldPointKind.SmallBuilding:
+                {
+                    // A small building of the forest (a hut, a shed, a shelter): red plank walls, a door and a window,
+                    // a pitched roof (2026-11-26, Anders on Fossum: the map's small buildings were missing)
+                    var t = new TvShapeBuilder(random);
+                    float hl = Rr(1.8f, 2.4f), hw = Rr(1.4f, 1.8f), eaves = 2.2f, ridge = 2.2f + hw * 0.8f;
+                    t.Box(-hl, -0.4f, -hw, hl, eaves, hw, house);
+                    t.Box(-hl - 0.02f, -0.4f, -hw - 0.02f, hl + 0.02f, 0.05f, hw + 0.02f, stone);   // the plinth
+                    t.Box(-0.45f, 0.05f, -hw - 0.04f, 0.45f, 1.95f, -hw + 0.02f, house.Shade(0.6f));   // the door
+                    t.Box(hl * 0.45f, 0.95f, -hw - 0.04f, hl * 0.45f + 0.7f, 1.6f, -hw + 0.02f, TvColor.Hex("#2c3238"));   // a window
+                    // The white corners and the gable ends up to the ridge
+                    foreach (float sx in new[] { -1f, 1f })
+                        foreach (float sz in new[] { -1f, 1f })
+                            t.Box(sx * hl - 0.06f, -0.4f, sz * hw - 0.06f, sx * hl + 0.06f, eaves, sz * hw + 0.06f, TvColor.Hex("#e8e4da"));
+                    for (int k = 0; k < 6; k++)
+                    {
+                        float f0 = k / 6f, f1 = (k + 1) / 6f, yy0 = eaves + (ridge - eaves) * f0, yy1 = eaves + (ridge - eaves) * f1;
+                        float half = hw * (1f - f1 * 0.98f);
+                        foreach (float sx in new[] { -1f, 1f })
+                            t.Box(sx * hl - 0.05f, yy0, -half, sx * hl + 0.05f, yy1, half, house);
+                    }
+                    Roof(t, hl, hw, eaves, ridge, 0.3f, roof);
+                    thingMesh.Add(t.Done(), x, y, z, 1f, 1f, 1f, Rr(0f, 6.283f));
+                    world.solids.Add(new TvSolid { x = x, z = z, r = Math.Max(hl, hw) + 0.3f });
+                    break;
+                }
+                case WorldPointKind.SmallRuin:
+                {
+                    // What is left of a small house: a low square of stones, overgrown
+                    var t = new TvShapeBuilder(random);
+                    float hl = Rr(1.6f, 2.2f), hw = Rr(1.3f, 1.7f);
+                    foreach (float sz in new[] { -1f, 1f })
+                        t.Box(-hl, -0.3f, sz * hw - 0.25f, hl, Rr(0.3f, 0.7f), sz * hw + 0.25f, stone);
+                    foreach (float sx in new[] { -1f, 1f })
+                        t.Box(sx * hl - 0.25f, -0.3f, -hw, sx * hl + 0.25f, Rr(0.3f, 0.7f), hw, stone.Shade(0.9f));
+                    thingMesh.Add(t.Done(), x, y, z, 1f, 1f, 1f, Rr(0f, 6.283f));
+                    break;
+                }
                 case WorldPointKind.FodderRack:
                 {
                     // A fodder rack: a slatted hay box on two legs under a small pitched roof
