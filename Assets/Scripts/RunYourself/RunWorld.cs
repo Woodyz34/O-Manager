@@ -1195,6 +1195,7 @@ public class RunWorld : MonoBehaviour
         {
             bool cut = detail && m.name != "Town houses full";
             list.AddRange(TvWorldView.MeshArrays.Split(m, Half, cut ? 4 : 1, MaxCorners));
+            m.Recycle();
         }
         return list;
     }
@@ -1247,6 +1248,7 @@ public class RunWorld : MonoBehaviour
                 TvWorldView.MeshArrays a = next.arrays[next.made++];
                 long m0 = perf.ElapsedTicks;
                 a.mesh = TvWorldView.ToMesh(a);
+                a.Release();
                 a.mesh.UploadMeshData(true);
                 NoteMesh(a, perf.ElapsedTicks - m0);
                 continue;
@@ -1262,14 +1264,14 @@ public class RunWorld : MonoBehaviour
             if (!kept || done.arrays == null)
             {
                 // Left behind while it was being built, or it failed: built again if it is needed after all
-                if (done.arrays != null) foreach (TvWorldView.MeshArrays a in done.arrays) if (a.mesh != null) { Destroy(a.mesh); a.mesh = null; }
+                if (done.arrays != null) foreach (TvWorldView.MeshArrays a in done.arrays) { a.Release(); if (a.mesh != null) { Destroy(a.mesh); a.mesh = null; } }
                 continue;
             }
             if (done.detail) MakeDetail(p, done.arrays);
             else if (done.trees) MakeTrees(p, done.arrays);
             else MakeBase(p, done);
             // Meshes made ahead that were not used after all (the runner moved on meanwhile)
-            foreach (TvWorldView.MeshArrays a in done.arrays) if (a.mesh != null) { Destroy(a.mesh); a.mesh = null; }
+            foreach (TvWorldView.MeshArrays a in done.arrays) { a.Release(); if (a.mesh != null) { Destroy(a.mesh); a.mesh = null; } }
         }
     }
 
@@ -1301,6 +1303,7 @@ public class RunWorld : MonoBehaviour
         {
             long m0 = perf.ElapsedTicks;
             mesh = TvWorldView.ToMesh(source);
+            source.Release();
             mesh.UploadMeshData(true);
             NoteMesh(source, perf.ElapsedTicks - m0);
         }

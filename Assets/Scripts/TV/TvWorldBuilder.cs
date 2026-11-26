@@ -619,19 +619,19 @@ public partial class TvWorldBuilder
         bog = new float[N * N];
         soil = new float[N * N];
         for (int i = 0; i < clear.Length; i++) clear[i] = 99f;
-        groundMesh = new TvMesh { name = "Ground", castShadows = false, group = TvMesh.Near };
-        rockMesh = new TvMesh { name = "Rocks" };
-        cliffMesh = new TvMesh { name = "Ground cliffs" };
-        thingMesh = new TvMesh { name = "Things" };
-        woodMesh = new TvMesh { name = "Dead wood" };
-        pathMesh = new TvMesh { name = "Paths", castShadows = false };
-        wireMesh = new TvMesh { name = "Wires", castShadows = false };
-        waterMesh = new TvMesh { name = "Water", castShadows = false };
-        treeMeshes = new[] { new TvMesh { name = "Trees", group = TvMesh.Near } };
-        treeFarMesh = new TvMesh { name = "Trees far", castShadows = false, group = TvMesh.Far };
-        tuftMeshes = new[] { new TvMesh { name = "Undergrowth", castShadows = false, ranks = new List<float>() } };
-        thicketMesh = new TvMesh { name = "Thickets" };
-        litterMesh = new TvMesh { name = "Litter", castShadows = false };
+        groundMesh = new TvMesh(true) { name = "Ground", castShadows = false, group = TvMesh.Near };
+        rockMesh = new TvMesh(true) { name = "Rocks" };
+        cliffMesh = new TvMesh(true) { name = "Ground cliffs" };
+        thingMesh = new TvMesh(true) { name = "Things" };
+        woodMesh = new TvMesh(true) { name = "Dead wood" };
+        pathMesh = new TvMesh(true) { name = "Paths", castShadows = false };
+        wireMesh = new TvMesh(true) { name = "Wires", castShadows = false };
+        waterMesh = new TvMesh(true) { name = "Water", castShadows = false };
+        treeMeshes = new[] { new TvMesh(true) { name = "Trees", group = TvMesh.Near } };
+        treeFarMesh = new TvMesh(true) { name = "Trees far", castShadows = false, group = TvMesh.Far };
+        tuftMeshes = new[] { new TvMesh(true) { name = "Undergrowth", castShadows = false, ranks = TvMesh.PooledFloats() } };
+        thicketMesh = new TvMesh(true) { name = "Thickets" };
+        litterMesh = new TvMesh(true) { name = "Litter", castShadows = false };
 
         MakeShapes();
         Heights();
@@ -865,9 +865,11 @@ public partial class TvWorldBuilder
                 case WorldLineKind.EarthBank: Cliff(c, 0.6f, 1.8f, false); break;
                 case WorldLineKind.EarthWall: Groove(c, 0.6f, 1.6f, 0.5f, false); break;
                 case WorldLineKind.Gully: Groove(c, -0.9f, 2.6f, 0.5f, false); break;
-                case WorldLineKind.Ditch: Groove(c, -0.45f, 1.3f, 0.7f, false); break;
-                case WorldLineKind.SmallStream: Groove(c, -0.4f, 1.5f, 0.3f, true, 0.45f); break;
-                case WorldLineKind.Stream: Groove(c, -0.6f, 2.6f, 0.3f, true, 1.0f); break;
+                // Every stream and water channel has some water in it, more in some places and less in others
+                // (2026-11-26, Anders: the small ones were only dug out; something blue in all of them)
+                case WorldLineKind.Ditch: Groove(c, -0.45f, 1.3f, 0.6f, true, 0.55f); break;
+                case WorldLineKind.SmallStream: Groove(c, -0.4f, 1.5f, 0.3f, true, 0.7f); break;
+                case WorldLineKind.Stream: Groove(c, -0.6f, 2.6f, 0.3f, true, 1.2f); break;
                 case WorldLineKind.NarrowMarsh:
                     // A narrow marsh: a shallow wet strip with pools here and there
                     Groove(c, -0.12f, 1.6f, 0f, false);
@@ -1053,7 +1055,13 @@ public partial class TvWorldBuilder
             float d = pair.Value, shape = 1f - Sm(0f, width, d);
             F[pair.Key] += amount * shape;
             soil[pair.Key] = Math.Max(soil[pair.Key], shape * earth);
-            if (wet) water[pair.Key] = Math.Max(water[pair.Key], 1f - Sm(waterWidth * 0.5f, waterWidth + 0.5f, d));
+            if (wet)
+            {
+                // Wider and narrower along the line, the same on every computer (by where it is on the map)
+                float px = pair.Key % N - R + ox, pz = pair.Key / N - R + oz;
+                float w = waterWidth * (0.7f + 0.6f * TvRandom.Noise(px * 0.07f + 13.1f, pz * 0.07f - 5.3f));
+                water[pair.Key] = Math.Max(water[pair.Key], 1f - Sm(w * 0.5f, w + 0.5f, d));
+            }
             clear[pair.Key] = Math.Min(clear[pair.Key], d - width * 0.5f);
         }
     }
