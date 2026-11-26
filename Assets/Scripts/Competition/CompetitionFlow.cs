@@ -62,6 +62,8 @@ public static class CompetitionFlow
         everyoneDoneAt = -1f;
         sharedPlayed = -1f;
         rememberedImposter = PlayerRef.None;
+        rememberedTookOver = false;
+        imposterGoneSince = -1f;
         sceneLoadedAt = GamePause.PlayClock;
     }
 
@@ -135,6 +137,7 @@ public static class CompetitionFlow
 
         if (!ResultsShown)
         {
+            ReplaceImposterWhoLeft(local);
             // A race without a relay: the played time stops when the last runner is in (a relay stops it after the
             // last leg, RelayRace)
             if (RelayRace.Active == null && AllPlayers(p => p.raceFinished))
@@ -391,6 +394,78 @@ public static class CompetitionFlow
     }
 
     static PlayerRef rememberedImposter;
+    static bool rememberedTookOver;
+
+    // True when the imposter of this race took over from one who left (ReplaceImposterWhoLeft)
+    public static bool ImposterTookOver
+    {
+        get
+        {
+            foreach (NetworkPlayer p in ValidPlayers())
+            {
+                if (!p.imposter.IsNone)
+                {
+                    if (p.imposterTookOver) rememberedTookOver = true;
+                    break;
+                }
+            }
+            return rememberedTookOver && InCompetition();
+        }
+    }
+
+    static float imposterGoneSince = -1f;
+
+    // The host, while the race is on: the imposter has left the game. Before, nobody could vote for them and the round
+    // was spoilt (2026-11-26, the user). Now another runner quietly becomes the imposter. The others are not told; the
+    // new imposter gets a pop-up (ImposterOverlay.WatchForNewRole). Also when the host itself was the imposter and left:
+    // the new host does it with the imposter it remembers.
+    static void ReplaceImposterWhoLeft(NetworkPlayer local)
+    {
+        if (local.Runner.GameMode == GameMode.Single || !TryGetImposter(out PlayerRef imposter))
+        {
+            imposterGoneSince = -1f;
+            return;
+        }
+        foreach (PlayerRef player in local.Runner.ActivePlayers)
+        {
+            if (player == imposter)
+            {
+                imposterGoneSince = -1f;
+                return;
+            }
+        }
+        // A moment's grace: a player list can lag a frame or two behind
+        if (imposterGoneSince < 0f)
+        {
+            imposterGoneSince = Time.unscaledTime;
+            return;
+        }
+        if (Time.unscaledTime - imposterGoneSince < 1.5f) return;
+        imposterGoneSince = -1f;
+
+        // The runners still in the race, those still out on the course first (one who is in has nothing left to do)
+        List<NetworkPlayer> stillOut = new List<NetworkPlayer>();
+        List<NetworkPlayer> all = new List<NetworkPlayer>();
+        foreach (NetworkPlayer p in ValidPlayers())
+        {
+            if (p.Object.StateAuthority == imposter) continue;
+            all.Add(p);
+            if (!p.raceFinished) stillOut.Add(p);
+        }
+        // Someone has to be left to guess
+        if (all.Count < 2) return;
+        List<NetworkPlayer> pool = stillOut.Count > 0 ? stillOut : all;
+        NetworkPlayer chosen = pool[UnityEngine.Random.Range(0, pool.Count)];
+        PlayerRef next = chosen.Object.StateAuthority;
+
+        // Secret task: the task has to stay, also if it was on the player who left (a host who left)
+        if (SecretTasks.TryGet(out int task) && local.secretTask == 0) local.secretTask = task;
+        local.imposter = next;
+        local.imposterTookOver = true;
+        rememberedImposter = next;
+        rememberedTookOver = true;
+        Debug.Log("CompetitionFlow: the imposter left the race, player " + next.PlayerId + " takes over (secretly)");
+    }
 
     public static PlayerRef PickRandomPlayer(NetworkRunner runner)
     {

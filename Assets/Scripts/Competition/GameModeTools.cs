@@ -27,9 +27,30 @@ public class GameModeRuntime : MonoBehaviour
         if (runtime.GetComponent<GameModeTools>() == null) runtime.gameObject.AddComponent<GameModeTools>();
     }
 
+    // A spectator (joined in the middle of the race) sees the bears and the moved controls too, but has no tools
+    // (2026-11-26, the user: the spectator saw neither). Called when the race's course is on the spectator's map.
+    public static void StartForSpectator()
+    {
+        if (!BearMode.On && !MoveControlMode.On) return;
+        GameModeRuntime runtime = Host;
+        if (MoveControlMode.On) MoveControlMode.BeginSpectating();
+        if (BearMode.On && runtime.GetComponent<BearWatcher>() == null) runtime.gameObject.AddComponent<BearWatcher>();
+        runtime.watching = true;
+    }
+
+    bool watching;
+    float nextWatch;
+
     void Awake()
     {
         Instance = this;
+    }
+
+    void Update()
+    {
+        if (!watching || Time.unscaledTime < nextWatch) return;
+        nextWatch = Time.unscaledTime + 0.5f;
+        MoveControlMode.SpectatorTick();
     }
 
     void OnDestroy()

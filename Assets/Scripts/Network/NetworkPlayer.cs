@@ -122,6 +122,9 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // and every player stores their own guess at the end of the competition.
     [Networked] public PlayerRef imposter { get; set; }
     [Networked] public PlayerRef imposterGuess { get; set; }
+    // Set by the host next to imposter when the first imposter left the race and someone else took over
+    // (2026-11-26, the user: the others are not told while racing; the new imposter gets a pop-up)
+    [Networked] public NetworkBool imposterTookOver { get; set; }
     [Networked] public bool hasGuessedImposter { get; set; }
     // Secret task mode: the task everyone but the imposter has, set by the host (SecretTasks; 0 = none)
     [Networked] public int secretTask { get; set; }
@@ -139,6 +142,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // Set by the other players: the id of the host's private map once their copy is ready, and how far they are (0-100)
     [Networked] public NetworkString<_64> privateMapReady { get; set; }
     [Networked] public int privateMapProgress { get; set; }
+    // Set by the other players in the lobby: a number made from the host's course once that course has arrived here
+    // and its map is on this computer (LobbySettingsUI.CourseKey). The host can only start when everyone has it
+    // (2026-11-26, the user). 0 = not yet.
+    [Networked] public int lobbyCourseReady { get; set; }
+    // The control this player's runner is on its way to in an individual race (AgentMovement.currentKontroll), so a
+    // spectator can tell when a moved control is to be shown (MoveControlMode.SpectatorTick)
+    [Networked] public int raceLeg { get; set; }
     // The chosen course in compact text form (CourseData.ToLobbyString), so the others can run it even if it is not on their computer
     [Networked] public NetworkString<_512> lobbyCourse { get; set; }
     // A relay with several courses can be longer, so it continues in these
@@ -364,6 +374,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         bool drawingNowValue = ActiveScene.Name != "Lobby" && drawing != null && drawing.timeToDraw
             && !agentMovement.WaitingForAllPlayersToDraw && !agentMovement.WaitingForAllPlayersToChooseRunner && !CompetitionFlow.ResultsShown;
         if (drawingNow != drawingNowValue) drawingNow = drawingNowValue;
+        if (raceLeg != agentMovement.currentKontroll) raceLeg = agentMovement.currentKontroll;
         float raceClock = RelayClock.ToPublish;
         if (relayRaceClock != raceClock)
         {
@@ -1156,6 +1167,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                 raceFinished = false;
                 raceDisqualified = false;
                 imposter = PlayerRef.None;
+                imposterTookOver = false;
                 imposterGuess = PlayerRef.None;
                 hasGuessedImposter = false;
                 secretTask = 0;

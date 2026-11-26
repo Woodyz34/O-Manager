@@ -191,6 +191,7 @@ public class LobbySettingsUI : MonoBehaviour
             }
             if (local.lobbyMapOwner.ToString() != mapOwner) local.lobbyMapOwner = mapOwner;
             if (local.privateMapReady.Length > 0) local.privateMapReady = "";
+            if (local.lobbyCourseReady != 0) local.lobbyCourseReady = 0;
 
             // Imposter and Secret task are always raced with Same stats (everyone runs with the same values, so the
             // runner gives nobody away): turning one of them on switches the pool and lets the host set the values
@@ -220,6 +221,7 @@ public class LobbySettingsUI : MonoBehaviour
             {
                 local.lobbyGameMode = "";
             }
+            int courseReady = 0;
             foreach (NetworkPlayer player in NetworkPlayer.All())
             {
                 if (player == local || player.Object == null || !player.Object.IsValid || player.lobbyGameMode.Length == 0)
@@ -233,8 +235,10 @@ public class LobbySettingsUI : MonoBehaviour
                 seenTasksOff = player.lobbyTasksOff;
                 hasSeenHostSettings = true;
                 FollowPrivateMap(local, player.lobbyMapOwner.ToString());
+                courseReady = HaveCourse(local, player.LobbyCourseText());
                 break;
             }
+            if (local.lobbyCourseReady != courseReady) local.lobbyCourseReady = courseReady;
             if (hasSeenHostSettings)
             {
                 string title = CourseLibrary.Current != null ? CourseTitle(CourseLibrary.Current) : seenMap;
@@ -247,6 +251,92 @@ public class LobbySettingsUI : MonoBehaviour
         imposterToggleText.text = host ? "Game mode" : "See game modes";
         imposterToggleText.color = toggleOffTextColor;
         imposterToggle.image.color = toggleOffColor;
+    }
+
+    // ---- Everyone has the course before the race starts (2026-11-26, the user) ----
+
+    // A number made from the host's course text (FNV-1a), never 0. The same on every computer for the same text.
+    public static int CourseKey(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return 0;
+        unchecked
+        {
+            uint hash = 2166136261;
+            foreach (char c in text)
+            {
+                hash ^= c;
+                hash *= 16777619;
+            }
+            int key = (int)hash;
+            return key == 0 ? 1 : key;
+        }
+    }
+
+    // Not the host: the key of the host's course once this computer has set it up and has its map, else 0
+    static int HaveCourse(NetworkPlayer local, string hostText)
+    {
+        CourseData course = CourseLibrary.Current;
+        if (string.IsNullOrEmpty(hostText) || course == null || CourseLibrary.LastLobbyString != hostText) return 0;
+        if (local.privateMapReady.ToString() != course.mapId) return 0;
+        return CourseKey(hostText);
+    }
+
+    // True when this player has the host's course (the host always has it)
+    public static bool HasCourse(NetworkPlayer player)
+    {
+        if (player == null || player.Object == null || !player.Object.IsValid) return false;
+        if (player.lobbyGameMode.Length > 0) return true;
+        string hostText = null;
+        foreach (NetworkPlayer p in NetworkPlayer.All())
+        {
+            if (p.Object != null && p.Object.IsValid && p.lobbyGameMode.Length > 0)
+            {
+                hostText = p.LobbyCourseText();
+                break;
+            }
+        }
+        // No host settings seen yet: nothing to wait for
+        if (string.IsNullOrEmpty(hostText)) return true;
+        return player.lobbyCourseReady == CourseKey(hostText);
+    }
+
+    // The host, at Start game: why it has to wait, or null when every player in the lobby has the course and its map.
+    // A player who has just come in and has no player of its own yet counts as waiting too.
+    public static string CourseStartProblem(Fusion.NetworkRunner runner)
+    {
+        NetworkPlayer local = NetworkPlayer.Local;
+        if (runner == null || local == null || runner.GameMode == Fusion.GameMode.Single) return null;
+        // The others only follow the host's course once its lobby settings are published
+        if (local.lobbyGameMode.Length == 0) return null;
+        int want = CourseKey(local.LobbyCourseText());
+        if (want == 0) return null;
+        int waiting = 0, total = 0;
+        string first = null;
+        foreach (Fusion.PlayerRef player in runner.ActivePlayers)
+        {
+            if (player == runner.LocalPlayer) continue;
+            total++;
+            NetworkPlayer found = null;
+            foreach (NetworkPlayer p in NetworkPlayer.All())
+            {
+                if (p.Object != null && p.Object.IsValid && p.Object.StateAuthority == player)
+                {
+                    found = p;
+                    break;
+                }
+            }
+            if (found != null && found.lobbyCourseReady == want) continue;
+            waiting++;
+            if (first == null)
+            {
+                string name = found != null ? found.nickName.ToString() : "";
+                first = string.IsNullOrWhiteSpace(name) ? "a player who is joining" : name;
+            }
+        }
+        if (waiting == 0) return null;
+        return waiting == 1
+            ? "Waiting for " + first + " to get the course. The race can start when everyone has it."
+            : "Waiting for " + waiting + " of " + total + " players to get the course. The race can start when everyone has it.";
     }
 
     // ---- Private maps (PrivateMaps) ----
