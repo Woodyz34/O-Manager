@@ -105,6 +105,7 @@ public class RunWorld : MonoBehaviour
         public TvWorld world;
         public List<TvWorldView.MeshArrays> arrays;
         public RunTrees.Set treeSet;
+        public int made;            // how many of arrays have their mesh made (HandOver, one at a time)
     }
 
     readonly Dictionary<long, Piece> pieces = new Dictionary<long, Piece>();
@@ -363,7 +364,11 @@ public class RunWorld : MonoBehaviour
             // 2026-11-26: the finest trees to 20 m on Ultra, 15 m on High (Anders: Ultra need not have full detail at 20 m) (on Low and Medium the trees are one level
             // out to the near distance anyway); the trees' shadows only to 50 m (70 on Ultra)
             trees.shadowReach = Mathf.Min(look.shadowDistance + 4f, quality >= (int)RunSettings.Quality.Ultra ? 70f : 50f);
-            trees.fullReach = quality >= (int)RunSettings.Quality.Ultra ? 20f : quality >= (int)RunSettings.Quality.High ? 15f
+            // The changes between the levels are gradual over a stretch: longest on Ultra (2026-11-26, Anders: start
+            // a little earlier and take a longer stretch)
+            trees.fullBand = quality >= (int)RunSettings.Quality.Ultra ? 14f : 10f;
+            trees.nearBand = quality >= (int)RunSettings.Quality.Ultra ? 35f : quality >= (int)RunSettings.Quality.High ? 25f : quality >= 1 ? 15f : 10f;
+            trees.fullReach = quality >= (int)RunSettings.Quality.Ultra ? 24f : quality >= (int)RunSettings.Quality.High ? 18f
                 : Mathf.Min(look.near, look.shadows > 0 ? trees.shadowReach : look.near);
             trees.nearReach = look.near;
         }
@@ -699,9 +704,12 @@ public class RunWorld : MonoBehaviour
                   + (cleaned ? ", memory cleaned (GC) this frame" : "") + "; pieces " + ready + "/" + pieces.Count
                   + ", waiting " + uploading.Count + ", jobs " + jobs + ", trees as " + (trees != null ? "copies (" + trees.Stats + ")" : "meshes")
                   + ", quality " + RunSettings.QualityName((RunSettings.Quality)quality)
+                  + (slowMesh != null ? ", slowest mesh: " + slowMesh : "")
                   + "\nRunPerf whole frame: " + probe.TakeWorst());
         slowFrames = 0;
         worstFrame = 0;
+        slowMesh = null;
+        slowMeshMs = 0;
     }
 
     void Plan()
@@ -1192,6 +1200,20 @@ public class RunWorld : MonoBehaviour
         int budget = Loading ? 40 : 4;
         while (uploading.Count > 0 && watch.ElapsedMilliseconds < budget)
         {
+            // One mesh at a time (2026-11-26, Anders on Fossum: one piece's meshes all at once cost 60-170 ms): a
+            // piece is only put together once all its meshes are made, and the time is checked after each
+            Done next = uploading.Peek();
+            Piece np = next.piece;
+            bool wanted = pieces.TryGetValue(Key(np.ix, np.iz), out Piece current) && current == np;
+            if (wanted && next.arrays != null && next.made < next.arrays.Count)
+            {
+                TvWorldView.MeshArrays a = next.arrays[next.made++];
+                long m0 = perf.ElapsedTicks;
+                a.mesh = TvWorldView.ToMesh(a);
+                a.mesh.UploadMeshData(true);
+                NoteMesh(a, perf.ElapsedTicks - m0);
+                continue;
+            }
             Done done = uploading.Dequeue();
             jobs--;
             Piece p = done.piece;
@@ -1203,11 +1225,14 @@ public class RunWorld : MonoBehaviour
             if (!kept || done.arrays == null)
             {
                 // Left behind while it was being built, or it failed: built again if it is needed after all
+                if (done.arrays != null) foreach (TvWorldView.MeshArrays a in done.arrays) if (a.mesh != null) { Destroy(a.mesh); a.mesh = null; }
                 continue;
             }
             if (done.detail) MakeDetail(p, done.arrays);
             else if (done.trees) MakeTrees(p, done.arrays);
             else MakeBase(p, done);
+            // Meshes made ahead that were not used after all (the runner moved on meanwhile)
+            foreach (TvWorldView.MeshArrays a in done.arrays) if (a.mesh != null) { Destroy(a.mesh); a.mesh = null; }
         }
     }
 
@@ -1219,10 +1244,29 @@ public class RunWorld : MonoBehaviour
         return go;
     }
 
+    // The slowest single mesh since the last RunPerf line: which, how big, how long
+    string slowMesh;
+    double slowMeshMs;
+
+    void NoteMesh(TvWorldView.MeshArrays a, long ticks)
+    {
+        double ms = ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        if (ms <= slowMeshMs) return;
+        slowMeshMs = ms;
+        slowMesh = a.name + " " + a.vertices.Length.ToString("N0") + " corners " + ms.ToString("0.0") + " ms";
+    }
+
     Renderer AddMesh(Transform parent, TvWorldView.MeshArrays source, List<Mesh> keep)
     {
-        Mesh mesh = TvWorldView.ToMesh(source);
-        mesh.UploadMeshData(true);
+        Mesh mesh = source.mesh;
+        source.mesh = null;
+        if (mesh == null)
+        {
+            long m0 = perf.ElapsedTicks;
+            mesh = TvWorldView.ToMesh(source);
+            mesh.UploadMeshData(true);
+            NoteMesh(source, perf.ElapsedTicks - m0);
+        }
         keep.Add(mesh);
         var go = new GameObject(source.name);
         go.transform.SetParent(parent, false);

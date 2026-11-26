@@ -155,6 +155,7 @@ public class TvWorldView : MonoBehaviour
         public int[] triangles;
         public Vector3[] uvs;       // textured meshes (TvAtlas): u, v and the atlas tile; null for plain coloured ones
         public Bounds bounds;       // worked out here, on the background thread, so the main thread need not
+        public Mesh mesh;           // the run-yourself world makes the mesh ahead, one a frame (RunWorld.HandOver)
 
         public MeshArrays(TvMesh source)
         {
