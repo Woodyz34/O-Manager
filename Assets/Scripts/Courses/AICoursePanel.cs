@@ -190,7 +190,10 @@ public class AICoursePanel : MonoBehaviour
         panel.progressFill.anchorMax = new Vector2(0f, 1f);
         panel.progressFill.offsetMin = panel.progressFill.offsetMax = Vector2.zero;
         panel.progressText = CourseUI.Text("Seconds", panel.progressRow, "", 20, CourseUI.InkMuted, FontStyles.Bold, TextAlignmentOptions.MidlineRight);
-        CourseUI.Stretch(panel.progressText.rectTransform, 340, 0, 0, 0);
+        CourseUI.Stretch(panel.progressText.rectTransform, 340, 40, 0, 0);
+        // A ring that always turns, so the panel never looks frozen while the map is read (2026-11-26, Anders: it took
+        // about 4 s before anything showed and it looked like a crash)
+        LoadingSpinner.Add(panel.progressRow, new Vector2(1f, 0.5f), new Vector2(-16f, 0f), 11f, 5f);
         panel.progressRow.gameObject.SetActive(false);
 
         // Right: preview and the result
@@ -503,6 +506,14 @@ public class AICoursePanel : MonoBehaviour
         useButton.interactable = false;
         resultText.color = CourseUI.Ink;
         resultText.text = kind == CourseGenerator.Kind.Sprint ? (barriers ? "Laying the course and placing barriers to turn dull legs into good route choices..." : "Laying the course and looking for legs with good route choices...") : "Laying the course and checking every leg...";
+        // The bar and the turning ring show at once, before the map is read (that can take a few seconds)
+        progress = null;
+        progressFill.anchorMax = new Vector2(0f, 1f);
+        progressText.text = "Reading the map...";
+        progressRow.gameObject.SetActive(true);
+        await Task.Yield();
+        await Task.Yield();
+        if (this == null) return;
 
         MapGrid grid = MapGrid.Load(map.gridName); // Resources has to be used on the main thread
         CourseGenerator.Settings settings = new CourseGenerator.Settings
@@ -516,9 +527,7 @@ public class AICoursePanel : MonoBehaviour
             progress = new CourseGenerator.Progress()
         };
         progress = settings.progress;
-        progressFill.anchorMax = new Vector2(0f, 1f);
         progressText.text = "Starting...";
-        progressRow.gameObject.SetActive(true);
         MapDefinition chosenMap = map;
         CourseGenerator.Result result = await Task.Run(() => CourseGenerator.Generate(chosenMap, grid, settings));
         if (this == null) return;

@@ -290,6 +290,7 @@ public class RunWorld : MonoBehaviour
         // relief and no grain, Medium relief out to 15 m, High the sharp bark and relief to 30 m, Ultra to 50 m
         TvWorldView.SharpBark(atlasMaterial, quality >= 2);
         atlasMaterial.SetFloat("_BumpFar", look.reliefFar);
+        surfaceGrain = atlasMaterial.GetFloat("_Surface");
         if (quality == 0) atlasMaterial.SetFloat("_Surface", 0f);
         if (data.town != null)
         {
@@ -343,23 +344,81 @@ public class RunWorld : MonoBehaviour
         savedMipLimit = QualitySettings.globalTextureMipmapLimit;
         if (quality <= (int)RunSettings.Quality.Low) QualitySettings.globalTextureMipmapLimit = Math.Max(1, savedMipLimit);
 
+        MakeTrees();
+        savedAniso = QualitySettings.anisotropicFiltering;
+        anisoSaved = true;
+        QualitySettings.anisotropicFiltering = look.aniso;
+    }
+
+    float surfaceGrain = 1f;
+
+    void MakeTrees()
+    {
         // The trees as copies of a few (null: this computer can't, the pieces make tree meshes)
+        trees?.Destroy();
         trees = RunTrees.Create(quality, atlasMaterial, look.shadows > 0, sun);
         if (trees != null)
         {
             // The finest trees only right round the runner; shadows only as far as they are drawn (RunTrees)
-            trees.fullReach = quality >= (int)RunSettings.Quality.Ultra ? 40f : 30f;
+            // 2026-11-26: the finest trees to 20 m on Ultra, 15 m on High (Anders: Ultra need not have full detail at 20 m) (on Low and Medium the trees are one level
+            // out to the near distance anyway); the trees' shadows only to 50 m (70 on Ultra)
+            trees.shadowReach = Mathf.Min(look.shadowDistance + 4f, quality >= (int)RunSettings.Quality.Ultra ? 70f : 50f);
+            trees.fullReach = quality >= (int)RunSettings.Quality.Ultra ? 20f : quality >= (int)RunSettings.Quality.High ? 15f
+                : Mathf.Min(look.near, look.shadows > 0 ? trees.shadowReach : look.near);
             trees.nearReach = look.near;
-            trees.shadowReach = Mathf.Max(trees.fullReach, look.shadowDistance + 4f);
         }
         if (trees != null)
         {
             trees.SetFog(look.view * 0.3f, look.view * 0.96f);
             Debug.Log("RunWorld: trees drawn as copies" + (trees.HasImpostors ? ", pictures beyond " + FarTreesReach.ToString("0") + " m" : " (no pictures)"));
         }
-        savedAniso = QualitySettings.anisotropicFiltering;
-        anisoSaved = true;
+    }
+
+    // ---- A new graphics level in the middle of a race (2026-11-26, Anders: changing it did nothing until the next
+    // race; it should count at once) ----
+    // Everything that depends on the level is set again and the pieces are built anew round the runner, nearest
+    // first and quickly (as while loading); until a piece is ready the ground is the map's own heights.
+
+    bool rebuilding;
+    float nextLevelCheck;
+
+    public void ChangeQuality()
+    {
+        int q = (int)RunSettings.Level;
+        if (q == quality) return;
+        quality = q;
+        look = RunSettings.Current;
+        atlasMaterial.SetFloat("_Wind", quality == 0 ? 0f : 1f);
+        TvWorldView.SharpBark(atlasMaterial, quality >= 2);
+        atlasMaterial.SetFloat("_BumpFar", look.reliefFar);
+        atlasMaterial.SetFloat("_Surface", quality == 0 ? 0f : surfaceGrain);
+        foreach (Material m in new[] { plainMaterial, groundMaterial, pavedMaterial, atlasMaterial })
+        {
+            if (m == null) continue;
+            m.SetFloat("_FogStart", look.view * 0.3f);
+            m.SetFloat("_FogEnd", look.view * 0.96f);
+        }
+        if (sun != null) sun.shadows = look.shadows == 0 ? LightShadows.None : look.shadows == 1 ? LightShadows.Hard : LightShadows.Soft;
+        QualitySettings.shadowDistance = look.shadowDistance;
+        QualitySettings.shadows = look.shadows == 0 ? ShadowQuality.Disable : look.shadows == 1 ? ShadowQuality.HardOnly : ShadowQuality.All;
+        QualitySettings.shadowCascades = look.shadows >= 3 ? 4 : look.shadows == 2 ? 2 : 1;
+        QualitySettings.shadowResolution = look.shadows >= 3 ? ShadowResolution.VeryHigh : look.shadows == 2 ? ShadowResolution.High : ShadowResolution.Medium;
+        if (savedMipLimit >= 0) QualitySettings.globalTextureMipmapLimit = quality <= (int)RunSettings.Quality.Low ? Math.Max(1, savedMipLimit) : savedMipLimit;
         QualitySettings.anisotropicFiltering = look.aniso;
+        if (people != null) people.Init(plainMaterial, look.shadows > 0);
+        if (viewCamera != null)
+        {
+            viewCamera.farClipPlane = look.view + 20f;
+            viewCamera.allowMSAA = look.msaa > 1;
+        }
+        MakeTrees();
+        foreach (Piece p in pieces.Values) Drop(p);
+        pieces.Clear();
+        hiddenPieces.Clear();
+        rebuilding = true;
+        Loading = true;
+        nextPlan = 0f;
+        Debug.Log("RunWorld: graphics changed to " + RunSettings.QualityName((RunSettings.Quality)quality) + " during the race");
     }
 
     public static Color SkyColor => Sky;
@@ -569,6 +628,18 @@ public class RunWorld : MonoBehaviour
     void Update()
     {
         if (!hasPlayer) return;
+        // A new graphics level chosen in the Esc menu counts at once
+        if (Time.unscaledTime >= nextLevelCheck)
+        {
+            nextLevelCheck = Time.unscaledTime + 0.5f;
+            if ((int)RunSettings.Level != quality) ChangeQuality();
+        }
+        // After a change of graphics: quick building until the pieces round the runner are there again
+        if (rebuilding && Ready(playerE, playerN, Mathf.Min(look.view, 90f)) >= 1f)
+        {
+            rebuilding = false;
+            Loading = false;
+        }
         long t0 = perf.ElapsedTicks;
         if (Time.unscaledTime >= nextPlan)
         {
@@ -584,8 +655,14 @@ public class RunWorld : MonoBehaviour
         Fades();
         long t3 = perf.ElapsedTicks;
         RunPerf.Add(RunPerf.Part.World, t3 - t0);
-        Watch(t1 - t0, t2 - t1, t3 - t2);
+        // The frame time Unity gives now is the frame before's, so that frame's own parts go with it
+        Watch(lastPlanTicks, lastHandTicks, lastTreeTicks);
+        lastPlanTicks = t1 - t0;
+        lastHandTicks = t2 - t1;
+        lastTreeTicks = t3 - t2;
     }
+
+    long lastPlanTicks, lastHandTicks, lastTreeTicks;
 
     // ---- What a slow frame was spent on, in the log (2026-11-25, Anders: big maps lagged; the log says why) ----
     // A frame over 50 ms is written as "RunPerf: ..." (at most every 2 s): the whole frame, this world's own parts of
@@ -620,7 +697,8 @@ public class RunWorld : MonoBehaviour
         Debug.Log("RunPerf: " + slowFrames + " slow frames, worst " + worstFrame.ToString("0") + " ms (plan " + worstPlan.ToString("0.0")
                   + ", meshes to the graphics card " + worstHand.ToString("0.0") + ", trees " + worstTrees.ToString("0.0") + " ms)"
                   + (cleaned ? ", memory cleaned (GC) this frame" : "") + "; pieces " + ready + "/" + pieces.Count
-                  + ", waiting " + uploading.Count + ", jobs " + jobs + ", trees as " + (trees != null ? "copies" : "meshes")
+                  + ", waiting " + uploading.Count + ", jobs " + jobs + ", trees as " + (trees != null ? "copies (" + trees.Stats + ")" : "meshes")
+                  + ", quality " + RunSettings.QualityName((RunSettings.Quality)quality)
                   + "\nRunPerf whole frame: " + probe.TakeWorst());
         slowFrames = 0;
         worstFrame = 0;
@@ -741,6 +819,8 @@ public class RunWorld : MonoBehaviour
         trees.Clear();
         bool cull = viewCamera != null && viewCamera.isActiveAndEnabled;
         if (cull) GeometryUtility.CalculateFrustumPlanes(viewCamera, frustum);
+        // Each tree is tested against the picture too (RunTrees), and close ones outside it give only their shadows
+        trees.SetView(cull ? frustum : null, sun != null ? sun.transform.forward : Vector3.down);
         Matrix4x4 toWorld = transform.localToWorldMatrix;
         bool moved = !toWorld.isIdentity;
         Vector3 me = ToScene(playerE, playerN, 0f);
@@ -757,7 +837,8 @@ public class RunWorld : MonoBehaviour
                 var b = new Bounds(c, new Vector3(PieceSize + 16f, p.maxY - p.minY + 50f, PieceSize + 16f));
                 if (!GeometryUtility.TestPlanesAABB(frustum, b)) continue;
             }
-            trees.Add(p.treeSet, p.treeTier == 1, me.x, me.z, toWorld, moved);
+            // (a piece only just past the near distance looks at each tree: the runner may have come closer since)
+            trees.Add(p.treeSet, p.treeTier == 1 && p.dist > look.near + 12f, me.x, me.z, toWorld, moved);
         }
         Vector3 at = transform.TransformPoint(ToScene(playerE, playerN, 0f));
         trees.Draw(new Bounds(at, new Vector3(look.view * 2f + 200f, 4000f, look.view * 2f + 200f)));

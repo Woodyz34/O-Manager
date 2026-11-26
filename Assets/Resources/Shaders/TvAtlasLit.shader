@@ -55,6 +55,11 @@ Shader "O-Manager/TvAtlasLit"
         float _FogStart;
         float _FogEnd;
         float _Fade;
+        // The trees' levels of detail (RunTrees, 2026-11-26): x where this level starts, y over how many metres
+        // before that it comes in, z where it ends, w over how many metres before that it goes (0 = no such end);
+        // _TvLodCenter.xy: the runner, from whom the distances are counted
+        float4 _TvLod;
+        float4 _TvLodCenter;
 
         struct Input
         {
@@ -62,7 +67,7 @@ Shader "O-Manager/TvAtlasLit"
             float3 worldPos;
             float3 worldNormal;
             float tvDepth;
-            float3 atlas;
+            float4 atlas;      // xyz: u, v, tile; w: the cross-fade of this corner's tree or piece (as _Fade)
         };
 
         struct SurfaceOutputTv
@@ -80,7 +85,16 @@ Shader "O-Manager/TvAtlasLit"
         void tvVert (inout appdata_full v, out Input o)
         {
             UNITY_INITIALIZE_OUTPUT(Input, o);
-            o.atlas = v.texcoord.xyz;
+            o.atlas = float4(v.texcoord.xyz, _Fade);
+            // A tree near the change to its next level: on its share of the pixels only (no pops)
+            if (_TvLod.x > 0.001 || _TvLod.z > 0.001)
+            {
+                float2 root = mul(unity_ObjectToWorld, float4(0, 0, 0, 1)).xz;
+                float d = distance(root, _TvLodCenter.xy);
+                float going = _TvLod.z > 0.001 ? saturate((d - (_TvLod.z - _TvLod.w)) / max(_TvLod.w, 0.01)) : 0.0;
+                float coming = _TvLod.x > 0.001 ? saturate((d - (_TvLod.x - _TvLod.y)) / max(_TvLod.y, 0.01)) : 1.0;
+                o.atlas.w = going > 0.0 ? -1.0 - going : coming;
+            }
             // Leaves and needles stir a little in the wind: more at the tip of a card (v near 1) than at its base
             // (not the cards lying flat on the ground, litter and leaf tops: 2026-11-25, Anders: the litter moved)
             if (_Wind > 0.001 && abs(v.normal.y) < 0.85 && ((v.texcoord.z >= 4.5 && v.texcoord.z < 19.5) || (v.texcoord.z >= 32.5 && v.texcoord.z < 34.5) || (v.texcoord.z >= 36.5 && v.texcoord.z < 37.5) || (v.texcoord.z >= 39.5 && v.texcoord.z < 40.5)))
@@ -161,12 +175,13 @@ Shader "O-Manager/TvAtlasLit"
         {
             // Cross-fade between two levels of detail of a piece (RunWorld, 2026-11-26): the coming one shows on a share
             // _Fade (0..1) of the pixels, the going one (_Fade -1..-2) on exactly the other pixels, so nothing pops
-            if (_Fade < 0.999)
+            float fade = IN.atlas.w;
+            if (fade < 0.999)
             {
                 float4 clipPos = mul(UNITY_MATRIX_VP, float4(IN.worldPos, 1.0));
                 float2 px = floor((clipPos.xy / max(abs(clipPos.w), 1e-5) * 0.5 + 0.5) * _ScreenParams.xy);
                 float dither = frac(52.9829189 * frac(dot(px, float2(0.06711056, 0.00583715))));
-                clip(_Fade >= 0 ? _Fade - dither : dither + _Fade + 1.0);
+                clip(fade >= 0 ? fade - dither : dither + fade + 1.0);
             }
             float3 c = IN.color.rgb;
             #ifndef UNITY_COLORSPACE_GAMMA
