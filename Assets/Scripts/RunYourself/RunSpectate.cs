@@ -215,10 +215,11 @@ public partial class RunSession
         foreach (Transform child in watchList) Destroy(child.gameObject);
         int legs = world != null ? world.FlagCount : 1;
         List<NetworkPlayer> all = Players();
-        // Those in first, quickest first; then those still out, the furthest first
+        // Those in first, quickest first, the disqualified after them; then those still out, the furthest first
         all.Sort((a, b) =>
         {
             if (a.raceFinished != b.raceFinished) return a.raceFinished ? -1 : 1;
+            if (a.raceFinished && a.raceDisqualified != b.raceDisqualified) return a.raceDisqualified ? 1 : -1;
             if (a.raceFinished) return a.relayTotals[0].CompareTo(b.relayTotals[0]);
             return b.run3dPunched.CompareTo(a.run3dPunched);
         });
@@ -235,7 +236,8 @@ public partial class RunSession
             string name = p.nickName.ToString();
             if (string.IsNullOrWhiteSpace(name)) name = "Player " + p.Object.StateAuthority.PlayerId;
             string state;
-            if (p.raceFinished)
+            if (p.raceFinished && p.raceDisqualified) state = "DSQ  " + RaceTime(p.relayTotals[0]);
+            else if (p.raceFinished)
             {
                 place++;
                 state = place + ".  " + RaceTime(p.relayTotals[0]);

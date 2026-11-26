@@ -614,8 +614,8 @@ public partial class RunSession : MonoBehaviour
 
     // The finish: the time and the split times go to the race like a 2D runner's, and the usual statistics screen
     // (results, split times, replay) and the usual results with prize money follow (2026-11-19, Anders: the same
-    // results as every other competition). Missing a control is told at once; the result list has no
-    // disqualification yet, so the time is still listed (comes with multiplayer).
+    // results as every other competition). Missing a control is told at once, and the runner is disqualified in
+    // every result list (DSQ after all finishers, no place, no money; 2026-11-26, the user).
     void Finish()
     {
         phase = Phase.Finished;
@@ -684,6 +684,9 @@ public partial class RunSession : MonoBehaviour
         }
         np.relaySplitLeg = 0;
         np.relaySplitCount = Mathf.Min(np.relaySplits.Length, controls + 2);
+        // A missed control or the wrong order: in, but disqualified (set before raceFinished, so nobody ever sees the
+        // runner as a finisher)
+        np.raceDisqualified = splits == null;
         np.relayLegTimes.Set(0, total);
         np.relayTotals.Set(0, total);
         np.hourCount = total / 3600;
