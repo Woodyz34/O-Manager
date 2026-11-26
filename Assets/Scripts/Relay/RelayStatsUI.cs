@@ -249,6 +249,9 @@ public class RelayStatsUI : MonoBehaviour
     bool Alone => lastTeamCount <= 1;
     int lastTeamCount = 2;
 
+    // Reached the finish with a control missed (2026-11-26, the user)
+    static string Dsq => "<color=" + Red + ">DSQ</color>";
+
     void BuildResults(List<RelayTeamResult> teams)
     {
         if (Alone)
@@ -258,7 +261,7 @@ public class RelayStatsUI : MonoBehaviour
             foreach (RelayTeamResult t in teams)
             {
                 if (race.IsRelay) Row(52, false, t.isLocal, Cell(t.team, 300, FontStyles.Bold), Cell(t.runner, 300), Cell(RelayStats.Time(t.legTime), 170), Cell(RelayStats.Time(t.total), 170));
-                else Row(52, false, t.isLocal, Cell(t.team, 300, FontStyles.Bold), Cell(t.runner, 300), Cell(RelayStats.Time(t.total), 170));
+                else Row(52, false, t.isLocal, Cell(t.team, 300, FontStyles.Bold), Cell(t.runner, 300), Cell(t.disqualified ? Dsq : RelayStats.Time(t.total), 170));
             }
             return;
         }
@@ -277,8 +280,8 @@ public class RelayStatsUI : MonoBehaviour
             if (!race.IsRelay)
             {
                 Row(52, false, t.isLocal,
-                    Cell(t.place.ToString(), 80, FontStyles.Bold), Cell(t.team, 300, FontStyles.Bold), Cell(t.runner, 300),
-                    Cell(RelayStats.Time(t.total), 170), Cell(mistakes, 230));
+                    Cell(t.disqualified ? "-" : t.place.ToString(), 80, FontStyles.Bold), Cell(t.team, 300, FontStyles.Bold), Cell(t.runner, 300),
+                    Cell(t.disqualified ? Dsq : RelayStats.Time(t.total), 170), Cell(mistakes, 230));
                 continue;
             }
             Row(52, false, t.isLocal,

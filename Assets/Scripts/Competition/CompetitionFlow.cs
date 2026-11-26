@@ -9,7 +9,8 @@ public class Standing
 {
     public PlayerRef player;
     public string name;
-    public bool finished;
+    public bool finished;      // reached the finish with every control: has a place and wins money
+    public bool disqualified;  // reached the finish but missed a control: listed as DSQ, like a runner who did not finish
     public int seconds;
     public int place;      // 1 = winner. Runners who did not finish share last place.
     public bool isLocal;
@@ -303,7 +304,8 @@ public static class CompetitionFlow
             {
                 player = p.Object.StateAuthority,
                 name = string.IsNullOrWhiteSpace(playerName) ? "Player " + p.Object.StateAuthority.PlayerId : playerName,
-                finished = p.raceFinished,
+                finished = p.raceFinished && !p.raceDisqualified,
+                disqualified = p.raceFinished && p.raceDisqualified,
                 seconds = p.hourCount * 3600 + p.minuterCount * 60 + p.secoundCount,
                 isLocal = p.Object.HasStateAuthority
             });
@@ -313,6 +315,8 @@ public static class CompetitionFlow
         {
             if (a.finished != b.finished) return a.finished ? -1 : 1;
             if (a.finished && a.seconds != b.seconds) return a.seconds.CompareTo(b.seconds);
+            // After the finishers: the disqualified, then those who never reached the finish
+            if (a.disqualified != b.disqualified) return a.disqualified ? -1 : 1;
             return a.player.PlayerId.CompareTo(b.player.PlayerId);
         });
 

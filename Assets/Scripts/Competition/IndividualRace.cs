@@ -150,6 +150,8 @@ public class IndividualRace : MonoBehaviour, IRaceStats
         if (!ContestRun.InRace) return;
         NetworkPlayer local = NetworkPlayer.Local;
         if (local == null || local.Object == null || !local.Object.IsValid || !local.raceFinished) return;
+        // Disqualified (a missed control): nothing goes to the leaderboard, no money for the time out
+        if (local.raceDisqualified) return;
         int seconds = local.hourCount * 3600 + local.minuterCount * 60 + local.secoundCount;
         RelayTrack track = (ownTracks ?? recorder.Tracks).Find(t => t != null && t.isLocal);
         // Where each control was reached, so the contest replay can show the leg splits (2026-11-24)

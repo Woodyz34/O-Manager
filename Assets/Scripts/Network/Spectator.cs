@@ -445,13 +445,20 @@ public class Spectator : MonoBehaviour
             players.Sort((a, b) =>
             {
                 if (a.raceFinished != b.raceFinished) return a.raceFinished ? -1 : 1;
+                // The disqualified after everyone who finished (2026-11-26, the user)
+                if (a.raceFinished && a.raceDisqualified != b.raceDisqualified) return a.raceDisqualified ? 1 : -1;
                 return Seconds(a).CompareTo(Seconds(b));
             });
             int place = 0;
             foreach (NetworkPlayer p in players)
             {
                 string state;
-                if (p.raceFinished)
+                if (p.raceFinished && p.raceDisqualified)
+                {
+                    done++;
+                    state = "DSQ";
+                }
+                else if (p.raceFinished)
                 {
                     done++;
                     place++;

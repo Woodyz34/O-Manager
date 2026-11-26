@@ -8,6 +8,7 @@ public class RelayTeamResult
     public string team;
     public string runner;
     public bool isLocal;
+    public bool disqualified;  // in, but a control was missed (run it yourself): ranked after everyone, shown as DSQ
 
     public int legTime;        // seconds
     public int total;          // team clock after the leg
@@ -58,12 +59,14 @@ public static class RelayStats
                 team = string.IsNullOrWhiteSpace(player.nickName.ToString()) ? "Team " + player.Object.StateAuthority.PlayerId : player.nickName.ToString(),
                 runner = player.relayRunnerName.ToString(),
                 isLocal = player.Object.HasStateAuthority,
+                disqualified = player.raceDisqualified,
                 legTime = player.relayLegTimes[leg],
                 total = player.relayTotals[leg],
                 prevTotal = leg > 0 ? player.relayTotals[leg - 1] : 0
             };
             if (result.total <= 0) continue; // has not finished the leg (left the game)
-            result.hasSplits = player.relaySplitLeg == leg && player.relaySplitCount >= points;
+            // A disqualified runner's splits miss controls: no split places or mistake estimate from them
+            result.hasSplits = !result.disqualified && player.relaySplitLeg == leg && player.relaySplitCount >= points;
             result.clocks = new int[points];
             result.variants = new int[points];
             if (result.hasSplits)
@@ -96,8 +99,9 @@ public static class RelayStats
             if (t.loss == null) t.loss = new int[points];
             if (t.mistake == null) t.mistake = new bool[points];
         }
-        Rank(teams, t => t.total, (t, p) => t.place = p);
-        Rank(teams, t => t.legTime, (t, p) => t.legPlace = p);
+        // The disqualified come after every runner who finished (2026-11-26, the user)
+        Rank(teams, t => t.disqualified ? int.MaxValue : t.total, (t, p) => t.place = p);
+        Rank(teams, t => t.disqualified ? int.MaxValue : t.legTime, (t, p) => t.legPlace = p);
         if (leg > 0) Rank(teams, t => t.prevTotal, (t, p) => t.prevPlace = p);
 
         List<RelayTeamResult> withSplits = teams.FindAll(t => t.hasSplits);

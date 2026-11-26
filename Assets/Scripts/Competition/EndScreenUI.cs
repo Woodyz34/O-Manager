@@ -222,7 +222,7 @@ public class EndScreenUI : MonoBehaviour
             Text(row, "Badge/Place").text = standing.finished ? standing.place.ToString() : "-";
             Text(row, "Name").text = standing.name;
             Text(row, "Tag").text = standing.isLocal ? "YOU" : "";
-            Text(row, "Time").text = standing.finished ? CompetitionFlow.FormatTime(standing.seconds) : "DNF";
+            Text(row, "Time").text = standing.finished ? CompetitionFlow.FormatTime(standing.seconds) : standing.disqualified ? "DSQ" : "DNF";
 
             // Rows drop in one after the other
             CanvasGroup group = row.GetComponent<CanvasGroup>();
@@ -508,7 +508,7 @@ public class EndScreenUI : MonoBehaviour
         bool amImposter = imposterMode && me.player == imposter;
         string placeLabel = me.finished
             ? CompetitionFlow.Ordinal(me.place) + " place of " + runners
-            : "Did not finish";
+            : me.disqualified ? "Disqualified" : "Did not finish";
 
         int total = 0;
         // The base money for the time played, for everyone who reached the finish (2026-11-19)

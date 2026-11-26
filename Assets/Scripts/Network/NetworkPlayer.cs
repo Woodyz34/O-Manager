@@ -98,6 +98,11 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
     // True when this player has reached the last control, so everyone can see who has finished
     [Networked] public bool raceFinished { get; set; }
 
+    // True when the player reached the finish but missed a control or took them in the wrong order (run it yourself,
+    // 2026-11-26, the user). raceFinished is still true, so everyone knows the player is in, but the player has no
+    // place: listed as DSQ after every finisher, with no money for the race.
+    [Networked] public bool raceDisqualified { get; set; }
+
     // A player who joined while the lobby was out racing (2026-11-24): only watches this race (Spectator) and races
     // from the next one. Spectators are left out of everything in the race: waiting for everyone, standings,
     // leaderboards, results, relays. Set by the player itself when it arrives in the middle of a race, cleared in the lobby.
@@ -1117,6 +1122,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             // A new competition starts: nobody has finished or guessed yet
             raceFinished = false;
+            raceDisqualified = false;
             run3dFlags = 0;
             run3dPunched = 0;
             ClearRelayResults();
@@ -1143,6 +1149,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
                 hasDrawn = false;
                 hasReachedControl = false;
                 raceFinished = false;
+                raceDisqualified = false;
                 imposter = PlayerRef.None;
                 imposterGuess = PlayerRef.None;
                 hasGuessedImposter = false;
