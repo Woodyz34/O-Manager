@@ -93,16 +93,26 @@ const MAX_REPLAY_PLAYERS = 10;
 function replaysUntil(id) { return endOf(id) + REPLAY_DAYS[id[0]] * 86400000; }
 const CLEANED_KEEP = 400;
 
-// Prizes (2026-11-19, the user): runner packs for the best, money for the rest.
-//   top      money (kr) for places 1-3, on top of their packs
-//   growth   kr added to a bonus pot for every player who finishes (2026-11-20, the user: more players
-//            give more money, never more packs); places 1-3 share the pot as in "share" (percent)
-//   packs    runner packs for places 1-3: "weekly" (Elite 15 %, Gold 35 %, Silver 50 %), "daily" (Elite 5 %,
-//            Gold 25 %, Silver 70 %), "normal" (the shop's pack). The odds are in the game (PrizePacks.cs).
-//   next     money for places 4-6, tookPart for everyone else who finished. A tie shares the place and its prize.
+// Prizes (2026-11-19, the user): runner packs for the best, money for everyone who finishes.
+// 2026-11-26 (the user): 4th of 15 got only 150 kr and 7th-15th all the same 100 kr. Now:
+//   - places 1-3 all get packs (in a daily contest a Silver pack each), and 1st much more money than 2nd and 3rd
+//   - everyone else goes smoothly from "tookPart" for the last place up to "fourth" % of what 3rd gets
+//   - everyone gets more with every player who finishes; kept small so the packs do not flood the game
+//   top        base money (kr) for places 1-3, on top of their packs
+//   topGrowth  kr more for places 1-3 for every player who finishes
+//   tookPart   base money for the last place
+//   everyone   kr more for every place (also 1-3) for every player who finishes
+//   fourth     4th gets this % of 3rd's money; places between 4th and last are spread evenly
+//   packs      runner packs for places 1-3: "weekly" (Golden pack), "daily" (Silver pack), "normal" (the shop's
+//              Bronze pack). The odds are in the game (PrizePacks.cs). A tie shares the place and its prize.
+//   next, growth, share: only for older game versions that still show the prizes the old way
+// Daily with 15 players: 1st Silver pack + 1 010 kr, 2nd Silver + 540, 3rd Silver + 380, 4th 305 ... 15th 160 kr.
+// Weekly with 15 players: 1st Golden + 1 670 kr, 2nd Silver + Bronze + 995, 3rd Silver + 695, 4th 555 ... 15th 320 kr.
 const PRIZES = {
-  w: { top: [0, 0, 0], packs: [["weekly"], ["daily", "normal"], ["daily"]], next: [300, 275, 250], tookPart: 200, growth: 50, share: [50, 30, 20] },
-  d: { top: [0, 500, 300], packs: [["daily"], [], []], next: [150, 130, 115], tookPart: 100, growth: 25, share: [50, 30, 20] }
+  w: { top: [800, 500, 350], topGrowth: [50, 25, 15], tookPart: 200, everyone: 8, fourth: 80,
+       packs: [["weekly"], ["daily", "normal"], ["daily"]], next: [200], growth: 0, share: [0, 0, 0] },
+  d: { top: [500, 300, 200], topGrowth: [30, 12, 8], tookPart: 100, everyone: 4, fourth: 80,
+       packs: [["daily"], ["daily"], ["daily"]], next: [100], growth: 0, share: [0, 0, 0] }
 };
 
 module.exports = async ({ params, context, logger }) => {
@@ -299,18 +309,21 @@ function standings(id, board) {
     list[i].place = i > 0 && better(kind, list[i - 1], list[i]) === 0 ? list[i - 1].place : i + 1;
   }
   const rules = PRIZES[id[0]];
-  const bonus = rules.growth * list.length;
   for (const row of list) {
-    row.prize = prize(rules, row.place, bonus);
+    row.prize = prize(rules, row.place, list.length);
     row.packs = row.place <= 3 ? rules.packs[row.place - 1] : [];
   }
   return list;
 }
 
-function prize(rules, place, bonus) {
-  if (place <= 3) return Math.round((rules.top[place - 1] + bonus * rules.share[place - 1] / 100) / 5) * 5;
-  if (place <= 6) return rules.next[place - 4];
-  return rules.tookPart;
+function prize(rules, place, players) {
+  const round5 = kr => Math.round(kr / 5) * 5;
+  const n = Math.max(players, place);
+  if (place <= 3) return round5(rules.top[place - 1] + (rules.topGrowth[place - 1] + rules.everyone) * n);
+  const last = rules.tookPart + rules.everyone * n;
+  const fourth = Math.max(last, prize(rules, 3, n) * rules.fourth / 100);
+  if (n <= 4) return round5(last);
+  return round5(last + (fourth - last) * (n - place) / (n - 4));
 }
 
 function publicRows(list, me) {

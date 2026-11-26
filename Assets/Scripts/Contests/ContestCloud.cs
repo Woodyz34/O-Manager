@@ -167,6 +167,26 @@ public class ContestPrizeRules
     public int tookPart;
     public int growth;     // kr more in the top three's bonus pot for every player who finishes
     public int[] share;    // how the pot is shared among places 1-3, in percent
+    // 2026-11-26 (the user): everyone gets more with more players, and 4th to last rise evenly toward 3rd.
+    // Missing (0/null) from an older cloud script; then the old fields above are used.
+    public int[] topGrowth;   // kr more for places 1-3 for every player who finishes
+    public int everyone;      // kr more for every place for every player who finishes
+    public int fourth;        // 4th gets this % of 3rd's money
+
+    public bool NewRules => topGrowth != null && topGrowth.Length >= 3 && fourth > 0;
+
+    // The same sum as the cloud's prize() in Docs/cloud-code/Contests.js
+    public int Prize(int place, int players)
+    {
+        int n = System.Math.Max(players, place);
+        if (place <= 3) return Round5(top[place - 1] + (topGrowth[place - 1] + everyone) * (float)n);
+        float last = tookPart + everyone * (float)n;
+        float fourthKr = System.Math.Max(last, Prize(3, n) * fourth / 100f);
+        if (n <= 4) return Round5(last);
+        return Round5(last + (fourthKr - last) * (n - place) / (n - 4f));
+    }
+
+    static int Round5(float kr) => (int)System.Math.Round(kr / 5f, System.MidpointRounding.AwayFromZero) * 5;
 }
 
 // Talks to the Cloud Code script "Contests" with the player's own sign-in. Everything that matters (one try each,
