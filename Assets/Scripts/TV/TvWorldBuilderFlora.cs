@@ -300,8 +300,9 @@ public partial class TvWorldBuilder
             float h = height * Rr(0.93f, 1.07f);
             int seg = young ? 3 : detail >= 2 ? 8 : 5;
             float[] trunk = TrunkLine(h, young ? 0.03f : Rr(0.03f, 0.14f), seg, out float[] rad, young ? 0.04f : 0.21f * Rr(0.8f, 1.12f), young ? 0.008f : 0.025f, young ? -0.05f : -0.35f);
-            if (!young || detail >= 2)
-                b.Limb(trunk, rad, young ? 4 : detail >= 3 ? 9 : detail >= 2 ? 7 : 5, TvAtlas.SpruceBark, young ? 1f : Around(rad[1], 0.4f), 0.4f,
+            // (a young one has its thin trunk on every level: 2026-11-26, Anders saw straight through the small spruces
+            // on Low, where it had none)
+            b.Limb(trunk, rad, young ? 4 : detail >= 3 ? 9 : detail >= 2 ? 7 : 5, TvAtlas.SpruceBark, young ? 1f : Around(rad[1], 0.4f), 0.4f,
                        Shades(seg + 1, Tint(0.86f, 0.85f, 0.83f), White));
             // Live branches: an open-grown spruce keeps them from low down; one in a forest loses the lower half in
             // the shade and keeps only dead grey twigs there (2026-11-25, Anders' photos of spruce forest)

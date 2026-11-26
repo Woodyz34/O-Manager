@@ -1335,7 +1335,7 @@ def heather_top():
 
 def slash():
     """Logging slash (hygge, Anders' photos): cut spruce and pine branches lying criss-cross, grey-brown wood, some
-    with rust-red dead needles still on, pale fresh cut ends; for cards lying on the ground and in low heaps."""
+    with rust-red dead needles still on; for cards lying on the ground and in low heaps."""
     c = Canvas()
     g = np.random.default_rng(161)
 
@@ -1347,8 +1347,8 @@ def slash():
             y += math.sin(a) * ln / 7
             pts.append((x, y))
         c.taper(pts, w, w * 0.4, mix('#4c4036', '#7a6a58', g.random()), mix('#5a4c40', '#8a7a66', g.random()))
-        if depth == 0:
-            c.ellipse(pts[0][0], pts[0][1], w / 1300, w / 1300, rgba('#d8c49a'))
+        # (2026-11-26, Anders: the pale sawn ends showed as white dots on every stick; the ends are the wood's own
+        # colour now)
         if needles and depth >= 1:
             for i in range(1, len(pts)):
                 px, py = pts[i]

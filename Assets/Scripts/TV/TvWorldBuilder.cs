@@ -108,6 +108,10 @@ public class TvWorldInput
     // The run-yourself undergrowth as copies too (RunTufts, 2026-11-26, Anders chose it): the detail build makes no
     // undergrowth mesh, only a list of where each plant stands (TvWorld.tuftRecords)
     public bool tuftRecords;
+    // And a town's street things (lamps, benches, cars, bicycles, street trees ...) as copies (RunThings, 2026-11-26,
+    // Anders: the sprint lagged now and then, the copies worked so well in the forest): the base build makes no
+    // "Town things" mesh, only a list of where each thing stands (TvWorld.thingRecords)
+    public bool thingRecords;
     // How detailed the trees, the undergrowth and the forest floor are made (RunSettings.Quality): 0 Low, 1 Medium,
     // 2 High, 3 Ultra. The TV controls use High.
     public int quality = 2;
@@ -146,6 +150,11 @@ public class TvWorld
     // scale, yaw, tint. null when not asked for. A pooled list: give it back (TvMesh.GiveFloats) when read.
     public const int TuftRecordSize = 7;
     public List<float> tuftRecords;
+
+    // TvWorldInput.thingRecords: a town's street things, ThingRecordSize numbers each: the shape (TvWorldBuilder.
+    // CopyShape), x, y, z, scale x, y, z, yaw. null when not asked for. A pooled list: give it back when read.
+    public const int ThingRecordSize = 8;
+    public List<float> thingRecords;
 
     // A town's tunnels near the piece (run yourself: in the tunnel or up on its roof, two levels): ax, az, ux, uz,
     // length, half width, floor height at the start and at the end, for each
@@ -668,6 +677,7 @@ public partial class TvWorldBuilder
             }
             return;
         }
+        if (input.thingRecords && input.town != null) world.thingRecords = TvMesh.PooledFloats(true);
         Ground();
         Waters();
         Stones();
