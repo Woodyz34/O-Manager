@@ -13,6 +13,15 @@ using UnityEngine.Rendering;
 //  - beyond that every tree is one upright card with a picture of its kind (an impostor), taken of the real trees
 //    from four sides when the race loads (TvImpostor shader).
 // Plain arrays are made on the background threads (Prepare); the main thread only draws (Draw).
+//
+// Levels of detail per tree (2026-11-26, Anders: "the closest must look very fine, then a little worse step by step,
+// no sharp changes"), chosen by each tree's own distance every frame, so the changes come one tree at a time on a
+// circle round the runner instead of a whole 64 m piece at once:
+//  - closest (FullReach: 30 m on High, 40 m on Ultra): the trees of the chosen quality;
+//  - then out to the near distance: the plainer Medium trees (about a third of the triangles on High);
+//  - then the far shapes (about a tenth), then the pictures.
+// Only trees within the shadow distance cast shadows: before, every full tree out to the near distance was drawn into
+// the shadow maps again although no shadow is drawn that far out.
 public class RunTrees
 {
     public const int Shades = 4, Views = 4;
@@ -22,7 +31,8 @@ public class RunTrees
     static readonly Color32 Key = new Color32(255, 0, 255, 255);
 
     readonly Mesh[] nearMeshes, farMeshes;
-    readonly List<Matrix4x4>[] nearLists, farLists;
+    readonly Mesh[] midMeshes;                  // the Medium quality's trees, same order; = nearMeshes on Low and Medium
+    readonly List<Matrix4x4>[] nearLists, farLists, midLists, midPlainLists;
     readonly Material material;
     public Material impostorMaterial;           // null when the pictures could not be made: far shapes all the way out
     Texture2D impostorTexture;
@@ -56,10 +66,19 @@ public class RunTrees
         farCount = far.Length;
         nearMeshes = Copies(near, "Tree");
         farMeshes = Copies(far, "Tree far");
-        nearLists = new List<Matrix4x4>[nearMeshes.Length];
-        farLists = new List<Matrix4x4>[farMeshes.Length];
-        for (int i = 0; i < nearLists.Length; i++) nearLists[i] = new List<Matrix4x4>();
-        for (int i = 0; i < farLists.Length; i++) farLists[i] = new List<Matrix4x4>();
+        TvShape[] mid = quality >= 2 ? TvWorldBuilder.TreeShapes(1, true) : null;
+        midMeshes = mid != null && mid.Length == near.Length ? Copies(mid, "Tree mid") : nearMeshes;
+        nearLists = Lists(nearMeshes.Length);
+        farLists = Lists(farMeshes.Length);
+        midLists = Lists(nearMeshes.Length);
+        midPlainLists = Lists(nearMeshes.Length);
+    }
+
+    static List<Matrix4x4>[] Lists(int n)
+    {
+        var lists = new List<Matrix4x4>[n];
+        for (int i = 0; i < n; i++) lists[i] = new List<Matrix4x4>();
+        return lists;
     }
 
     // Null when this computer can't draw copies (the race then builds the tree meshes as before)
@@ -108,6 +127,7 @@ public class RunTrees
     {
         foreach (Mesh m in nearMeshes) if (m != null) UnityEngine.Object.Destroy(m);
         foreach (Mesh m in farMeshes) if (m != null) UnityEngine.Object.Destroy(m);
+        if (midMeshes != nearMeshes) foreach (Mesh m in midMeshes) if (m != null) UnityEngine.Object.Destroy(m);
         if (impostorMaterial != null) UnityEngine.Object.Destroy(impostorMaterial);
         if (impostorTexture != null) UnityEngine.Object.Destroy(impostorTexture);
     }
@@ -364,18 +384,47 @@ public class RunTrees
     {
         foreach (List<Matrix4x4> l in nearLists) l.Clear();
         foreach (List<Matrix4x4> l in farLists) l.Clear();
+        foreach (List<Matrix4x4> l in midLists) l.Clear();
+        foreach (List<Matrix4x4> l in midPlainLists) l.Clear();
     }
 
-    public void Add(Set set, bool full, Matrix4x4 toWorld, bool moved)
+    // The reaches of the levels, in metres from the runner (RunWorld sets them for its quality)
+    public float fullReach = 30f, nearReach = 96f, shadowReach = 60f;
+
+    // A piece's trees, each at the level its own distance from the runner (x, z in the run world's space) gives.
+    // farOnly: the whole piece is past the near distance (no need to look at each tree).
+    public void Add(Set set, bool farOnly, float px, float pz, Matrix4x4 toWorld, bool moved)
     {
         if (set == null) return;
-        int[] which = full ? set.near : set.far;
-        List<Matrix4x4>[] lists = full ? nearLists : farLists;
-        for (int t = 0; t < which.Length; t++)
+        if (farOnly)
         {
-            int i = which[t];
-            if (i < 0) continue;
-            lists[i].Add(moved ? toWorld * set.where[t] : set.where[t]);
+            for (int t = 0; t < set.far.Length; t++)
+            {
+                int i = set.far[t];
+                if (i >= 0) farLists[i].Add(moved ? toWorld * set.where[t] : set.where[t]);
+            }
+            return;
+        }
+        float full2 = fullReach * fullReach, near2 = nearReach * nearReach;
+        float shadow2 = shadows ? shadowReach * shadowReach : -1f;
+        Matrix4x4[] where = set.where;
+        for (int t = 0; t < where.Length; t++)
+        {
+            float dx = where[t].m03 - px, dz = where[t].m23 - pz, d2 = dx * dx + dz * dz;
+            List<Matrix4x4> list;
+            if (d2 < near2)
+            {
+                int i = set.near[t];
+                if (i < 0) continue;
+                list = d2 < full2 ? nearLists[i] : d2 < shadow2 ? midLists[i] : midPlainLists[i];
+            }
+            else
+            {
+                int i = set.far[t];
+                if (i < 0) continue;
+                list = farLists[i];
+            }
+            list.Add(moved ? toWorld * where[t] : where[t]);
         }
     }
 
@@ -392,7 +441,9 @@ public class RunTrees
         };
         var plain = full;
         plain.shadowCastingMode = ShadowCastingMode.Off;
-        DrawAll(full, nearMeshes, nearLists);
+        DrawAll(full, nearMeshes, nearLists);       // the closest are always within the shadow distance
+        DrawAll(full, midMeshes, midLists);
+        DrawAll(plain, midMeshes, midPlainLists);
         DrawAll(plain, farMeshes, farLists);
     }
 

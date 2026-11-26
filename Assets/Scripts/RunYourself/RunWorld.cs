@@ -89,6 +89,10 @@ public class RunWorld : MonoBehaviour
         public Renderer cardRenderer;
         public int treeTier;
         public float minY, maxY;
+        // A cross-fade between two levels of detail going on (FadeTime): what comes, what goes, what then to do
+        public float fadeStart = -1f;
+        public readonly List<Renderer> fadeIn = new List<Renderer>(), fadeOut = new List<Renderer>();
+        public Action fadeDone;
     }
 
     class Done
@@ -336,6 +340,13 @@ public class RunWorld : MonoBehaviour
         trees = RunTrees.Create(quality, atlasMaterial, look.shadows > 0, sun);
         if (trees != null)
         {
+            // The finest trees only right round the runner; shadows only as far as they are drawn (RunTrees)
+            trees.fullReach = quality >= (int)RunSettings.Quality.Ultra ? 40f : 30f;
+            trees.nearReach = look.near;
+            trees.shadowReach = Mathf.Max(trees.fullReach, look.shadowDistance + 4f);
+        }
+        if (trees != null)
+        {
             trees.SetFog(look.view * 0.3f, look.view * 0.96f);
             Debug.Log("RunWorld: trees drawn as copies" + (trees.HasImpostors ? ", pictures beyond " + FarTreesReach.ToString("0") + " m" : " (no pictures)"));
         }
@@ -561,6 +572,7 @@ public class RunWorld : MonoBehaviour
         HandOver();
         long t2 = perf.ElapsedTicks;
         DrawTrees();
+        Fades();
         long t3 = perf.ElapsedTicks;
         RunPerf.Add(RunPerf.Part.World, t3 - t0);
         Watch(t1 - t0, t2 - t1, t3 - t2);
@@ -637,7 +649,7 @@ public class RunWorld : MonoBehaviour
             }
             if (!p.ready && !p.building && (nextBase == null || p.dist < nextBase.dist)) nextBase = p;
             if (p.ready && p.detail == null && !p.detailBuilding && p.dist <= look.detail && (nextDetail == null || p.dist < nextDetail.dist)) nextDetail = p;
-            if (p.detail != null && p.dist > look.detail + 16f) DropDetail(p);
+            if (p.detail != null && p.dist > look.detail + 16f) DropDetail(p, true);
             if (p.ready && !p.treesNear && !p.treesBuilding && p.dist <= TreesReach && (nextTrees == null || p.dist < nextTrees.dist)) nextTrees = p;
             if (p.treesOwn && p.dist > TreesReach + 60f) DropTrees(p);
             if (p.ready && trees != null && p.treeSet != null)
@@ -655,7 +667,7 @@ public class RunWorld : MonoBehaviour
                 if (nearOn != p.nearOn)
                 {
                     p.nearOn = nearOn;
-                    ShowTier(p);
+                    ShowTier(p, true);
                 }
                 // A town's people walk and watch only round the runner
                 if (people != null)
@@ -717,17 +729,19 @@ public class RunWorld : MonoBehaviour
         if (cull) GeometryUtility.CalculateFrustumPlanes(viewCamera, frustum);
         Matrix4x4 toWorld = transform.localToWorldMatrix;
         bool moved = !toWorld.isIdentity;
+        Vector3 me = ToScene(playerE, playerN, 0f);
         foreach (Piece p in pieces.Values)
         {
             if (!p.ready || p.treeSet == null || p.treeTier == 2) continue;
             // The full trees close by are always drawn (their shadows fall into the picture from behind too)
-            if (p.treeTier == 1 && cull)
+            // (and pieces whose trees are all beyond the shadows: nothing of them reaches the picture from outside it)
+            if (cull && (p.treeTier == 1 || p.dist > trees.shadowReach))
             {
                 Vector3 c = transform.TransformPoint(ToScene(p.ce, p.cn, (p.minY + p.maxY) * 0.5f + 10f));
                 var b = new Bounds(c, new Vector3(PieceSize + 16f, p.maxY - p.minY + 50f, PieceSize + 16f));
                 if (!GeometryUtility.TestPlanesAABB(frustum, b)) continue;
             }
-            trees.Add(p.treeSet, p.treeTier == 0, toWorld, moved);
+            trees.Add(p.treeSet, p.treeTier != 0, me.x, me.z, toWorld, moved);
         }
         Vector3 at = transform.TransformPoint(ToScene(playerE, playerN, 0f));
         trees.Draw(new Bounds(at, new Vector3(look.view * 2f + 200f, 4000f, look.view * 2f + 200f)));
@@ -738,12 +752,86 @@ public class RunWorld : MonoBehaviour
 
     // Which of a piece's meshes are drawn: the full ones close by, the far copies further out (and the far trees as long
     // as the full ones aren't made yet)
-    void ShowTier(Piece p)
+    // smooth: the change cross-fades (FadeTime) instead of popping
+    void ShowTier(Piece p, bool smooth = false)
     {
+        EndFade(p);
         bool nearOn = p.nearOn;
-        foreach (Renderer r in p.near) if (r != null) r.enabled = nearOn;
-        foreach (Renderer r in p.far) if (r != null) r.enabled = !nearOn || (!p.treesNear && p.farTrees.Contains(r));
-        if (p.leanHidden) foreach (Renderer r in p.lean) if (r != null) r.enabled = false;
+        foreach (Renderer r in p.near) if (r != null) Show(p, r, nearOn && !(p.leanHidden && p.lean.Contains(r)), smooth);
+        foreach (Renderer r in p.far) if (r != null) Show(p, r, !nearOn || (!p.treesNear && p.farTrees.Contains(r)), smooth);
+        if (smooth) StartFade(p, null);
+    }
+
+    void Show(Piece p, Renderer r, bool on, bool smooth)
+    {
+        if (!smooth) r.enabled = on;
+        else if (on && !r.enabled) p.fadeIn.Add(r);
+        else if (!on && r.enabled) p.fadeOut.Add(r);
+    }
+
+    // ---- Cross-fades between the levels of detail (2026-11-26, Anders: no sharp changes, no houses popping up) ----
+    // For FadeTime both levels are drawn, each on its own share of the pixels (the _Fade dither in TvAtlasLit and
+    // TvVertexLit), the coming one more and more; then the going one is switched off. Games call it a dithered
+    // LOD cross-fade.
+
+    const float FadeTime = 0.8f;
+    readonly List<Piece> fading = new List<Piece>();
+    MaterialPropertyBlock fadeBlock;
+
+    void StartFade(Piece p, Action done)
+    {
+        if (p.fadeIn.Count == 0 && p.fadeOut.Count == 0)
+        {
+            done?.Invoke();
+            return;
+        }
+        p.fadeStart = Time.unscaledTime;
+        p.fadeDone = done;
+        foreach (Renderer r in p.fadeIn) if (r != null) r.enabled = true;
+        SetFade(p, 0f);
+        if (!fading.Contains(p)) fading.Add(p);
+    }
+
+    void SetFade(Piece p, float t)
+    {
+        if (fadeBlock == null) fadeBlock = new MaterialPropertyBlock();
+        fadeBlock.SetFloat(FadeId, t);
+        foreach (Renderer r in p.fadeIn) if (r != null) r.SetPropertyBlock(fadeBlock);
+        fadeBlock.SetFloat(FadeId, -1f - t);
+        foreach (Renderer r in p.fadeOut) if (r != null) r.SetPropertyBlock(fadeBlock);
+    }
+
+    static readonly int FadeId = Shader.PropertyToID("_Fade");
+
+    // Finishes a piece's cross-fade at once: what came stays, what went is switched off
+    void EndFade(Piece p)
+    {
+        if (p.fadeStart < 0f) return;
+        foreach (Renderer r in p.fadeIn) if (r != null) r.SetPropertyBlock(null);
+        foreach (Renderer r in p.fadeOut)
+        {
+            if (r == null) continue;
+            r.SetPropertyBlock(null);
+            r.enabled = false;
+        }
+        p.fadeIn.Clear();
+        p.fadeOut.Clear();
+        p.fadeStart = -1f;
+        fading.Remove(p);
+        Action done = p.fadeDone;
+        p.fadeDone = null;
+        done?.Invoke();
+    }
+
+    void Fades()
+    {
+        for (int i = fading.Count - 1; i >= 0; i--)
+        {
+            Piece p = fading[i];
+            float t = (Time.unscaledTime - p.fadeStart) / FadeTime;
+            if (t >= 1f) EndFade(p);
+            else SetFade(p, t);
+        }
     }
 
     Piece NextUnbuilt()
@@ -887,7 +975,7 @@ public class RunWorld : MonoBehaviour
         }
         p.treesNear = true;
         p.treesOwn = true;
-        ShowTier(p);
+        ShowTier(p, true);
     }
 
     void DropTrees(Piece p)
@@ -902,7 +990,7 @@ public class RunWorld : MonoBehaviour
         p.treeMeshes.Clear();
         p.treesNear = false;
         p.treesOwn = false;
-        ShowTier(p);
+        ShowTier(p, true);
     }
 
     // Meshes go to the graphics card a few at a time: about 4 ms a frame while running, more while loading
@@ -1037,36 +1125,55 @@ public class RunWorld : MonoBehaviour
     {
         if (p.root == null) return;
         if (p.dist > look.detail + 16f) return;   // the runner has moved on meanwhile
+        EndFade(p);
         p.detail = new GameObject("Detail");
         p.detail.transform.SetParent(p.root.transform, false);
         foreach (TvWorldView.MeshArrays m in arrays)
         {
-            AddMesh(p.detail.transform, m, p.detailMeshes);
+            Renderer added = AddMesh(p.detail.transform, m, p.detailMeshes);
+            added.enabled = false;
+            p.fadeIn.Add(added);
             // The full houses stand where the leaner ones were
             if (m.name == "Town houses full")
             {
                 p.leanHidden = true;
-                foreach (Renderer r in p.lean) r.enabled = false;
+                foreach (Renderer r in p.lean) if (r != null && r.enabled) p.fadeOut.Add(r);
             }
         }
+        // The undergrowth and the full houses fade in, the leaner houses out
+        StartFade(p, null);
     }
 
-    void DropDetail(Piece p)
+    // smooth: the detail fades out (and the leaner houses in) before it is thrown away
+    void DropDetail(Piece p, bool smooth = false)
     {
-        foreach (Mesh m in p.detailMeshes) if (m != null) Destroy(m);
+        EndFade(p);
+        GameObject old = p.detail;
+        var oldMeshes = new List<Mesh>(p.detailMeshes);
         p.detailMeshes.Clear();
-        if (p.detail != null) Destroy(p.detail);
         p.detail = null;
-        if (p.leanHidden)
+        Action throwAway = () =>
         {
-            p.leanHidden = false;
-            foreach (Renderer r in p.lean) if (r != null) r.enabled = p.nearOn;
+            foreach (Mesh m in oldMeshes) if (m != null) Destroy(m);
+            if (old != null) Destroy(old);
+        };
+        bool leanBack = p.leanHidden;
+        p.leanHidden = false;
+        if (!smooth || old == null)
+        {
+            if (leanBack) foreach (Renderer r in p.lean) if (r != null) r.enabled = p.nearOn;
+            throwAway();
+            return;
         }
+        foreach (Renderer r in old.GetComponentsInChildren<Renderer>()) if (r.enabled) p.fadeOut.Add(r);
+        if (leanBack && p.nearOn) foreach (Renderer r in p.lean) if (r != null && !r.enabled) p.fadeIn.Add(r);
+        StartFade(p, throwAway);
     }
 
     void Drop(Piece p)
     {
         p.gone = true;
+        EndFade(p);
         if (p.peopleOn && people != null) people.Despawn(Key(p.ix, p.iz));
         p.peopleOn = false;
         DropDetail(p);

@@ -20,6 +20,7 @@ Shader "O-Manager/TvVertexLit"
         _Floor ("Forest floor strength", Range(0,1)) = 0
         _FogStart ("Fog start (m)", Float) = 45
         _FogEnd ("Fog end (m)", Float) = 230
+        _Fade ("Cross-fade (1 = shown)", Float) = 1
     }
     SubShader
     {
@@ -46,6 +47,7 @@ Shader "O-Manager/TvVertexLit"
         // The TV's fog starts at 45 m and the sky takes over at 230 m; the run-yourself world sets its own (RunWorld)
         float _FogStart;
         float _FogEnd;
+        float _Fade;
 
         struct Input
         {
@@ -102,6 +104,15 @@ Shader "O-Manager/TvVertexLit"
 
         void surf (Input IN, inout SurfaceOutput o)
         {
+            // Cross-fade between two levels of detail of a piece (RunWorld, 2026-11-26): the coming one shows on a share
+            // _Fade (0..1) of the pixels, the going one (_Fade -1..-2) on exactly the other pixels, so nothing pops
+            if (_Fade < 0.999)
+            {
+                float4 clipPos = mul(UNITY_MATRIX_VP, float4(IN.worldPos, 1.0));
+                float2 px = floor((clipPos.xy / max(abs(clipPos.w), 1e-5) * 0.5 + 0.5) * _ScreenParams.xy);
+                float dither = frac(52.9829189 * frac(dot(px, float2(0.06711056, 0.00583715))));
+                clip(_Fade >= 0 ? _Fade - dither : dither + _Fade + 1.0);
+            }
             float3 c = IN.color.rgb;
             #ifndef UNITY_COLORSPACE_GAMMA
             c = GammaToLinearSpace(c);
