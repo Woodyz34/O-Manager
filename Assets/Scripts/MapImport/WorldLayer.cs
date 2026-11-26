@@ -27,7 +27,10 @@ namespace MapImport
         RockyPit, Cairn, BigTree, Bush, Spring, Well, WaterHole, Tower, SmallTower, FodderRack, Feature, RootStock,
         // Since 2026-11-20 the X of a man-made feature (530, 531) apart from the brown landform X (115); Feature is what
         // older packages have for all three
-        ManMade, Landform
+        ManMade, Landform,
+        // Since 2026-11-26 (RulesVersion 8; Anders on Fossum: two small buildings were missing in 3D): a building or a
+        // ruin too small to draw as an area, which the map draws as a point (521 / 523 "Minimum")
+        SmallBuilding, SmallRuin
     }
 
     public enum WorldLineKind : byte
@@ -303,6 +306,8 @@ namespace MapImport
                 case 527: return WorldPointKind.FodderRack;
                 case 115: return WorldPointKind.Landform;
                 case 530: case 531: return WorldPointKind.ManMade;
+                case 521: return WorldPointKind.SmallBuilding;
+                case 523: return WorldPointKind.SmallRuin;
             }
             return WorldPointKind.None;
         }

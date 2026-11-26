@@ -59,7 +59,10 @@ public class RunPeople : MonoBehaviour
     // together on a background thread and only a few are handed to the graphics card a frame (2026-11-26: made on the
     // main thread, a street full of new people cost 50-150 ms a frame on sprint maps); until a pose is ready the
     // person keeps the one shown.
-    readonly ConcurrentDictionary<int, TvShape> made = new ConcurrentDictionary<int, TvShape>();
+    // (2026-11-26: the corners are also put in Unity's order on the background thread, and the hand-over stops after
+    // 2 ms a frame; up to 139 ms a frame went to people on sprint maps)
+    readonly ConcurrentDictionary<int, TvWorldView.MeshArrays> made = new ConcurrentDictionary<int, TvWorldView.MeshArrays>();
+    readonly System.Diagnostics.Stopwatch uploadWatch = new System.Diagnostics.Stopwatch();
     readonly HashSet<int> asked = new HashSet<int>();
     int uploadsLeft;
     const int UploadsPerFrame = 6;
@@ -68,12 +71,12 @@ public class RunPeople : MonoBehaviour
     {
         int key = (((int)act * TvCityShapes.Frames + frame) * Looks + look) * 2 + (child ? 1 : 0);
         if (meshes.TryGetValue(key, out Mesh mesh)) return mesh;
-        if (made.TryGetValue(key, out TvShape shape))
+        if (made.TryGetValue(key, out TvWorldView.MeshArrays shape))
         {
-            if (uploadsLeft <= 0) return null;
+            if (uploadsLeft <= 0 || uploadWatch.ElapsedTicks > 2 * System.Diagnostics.Stopwatch.Frequency / 1000) return null;
             uploadsLeft--;
             made.TryRemove(key, out _);
-            mesh = TvWorldView.ToMesh(shape, "Person");
+            mesh = TvWorldView.ToMesh(shape);
             mesh.UploadMeshData(true);
             meshes[key] = mesh;
             return mesh;
@@ -87,7 +90,13 @@ public class RunPeople : MonoBehaviour
         if (!asked.Add(key)) return;
         Task.Run(() =>
         {
-            try { made[key] = TvCityShapes.Figure(new TvRandom(look * 13 + 5), look, child, TvCityShapes.Animate(act, frame, look)); }
+            try
+            {
+                TvShape figure = TvCityShapes.Figure(new TvRandom(look * 13 + 5), look, child, TvCityShapes.Animate(act, frame, look));
+                var m = new TvMesh { name = "Person" };
+                m.Add(figure, 0f, 0f, 0f, 1f, 1f, 1f, 0f);
+                made[key] = new TvWorldView.MeshArrays(m);
+            }
             catch (Exception e) { Debug.LogWarning("RunPeople: " + e.Message); }
         });
     }
@@ -179,6 +188,7 @@ public class RunPeople : MonoBehaviour
     void Update()
     {
         uploadsLeft = UploadsPerFrame;
+        uploadWatch.Restart();
         if (!hasPlayer) return;
         float time = Time.time, dt = Time.deltaTime;
         frameNo++;

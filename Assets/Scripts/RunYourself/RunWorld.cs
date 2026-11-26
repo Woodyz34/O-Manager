@@ -277,8 +277,19 @@ public class RunWorld : MonoBehaviour
         r.reflectionProbeUsage = ReflectionProbeUsage.Off;
     }
 
+    // The memory cleaning (GC) gets more time each frame while running, so it keeps up with the building of the world
+    // and does not have to stop the whole game for a long cleaning now and then (2026-11-26: 20-480 ms stops)
+    ulong savedGcSlice;
+    bool gcSliceSaved;
+
     void Make()
     {
+        if (UnityEngine.Scripting.GarbageCollector.isIncremental)
+        {
+            savedGcSlice = UnityEngine.Scripting.GarbageCollector.incrementalTimeSliceNanoseconds;
+            gcSliceSaved = true;
+            UnityEngine.Scripting.GarbageCollector.incrementalTimeSliceNanoseconds = 6000000;
+        }
         look = RunSettings.Current;
         quality = (int)RunSettings.Level;
         plainMaterial = TvWorldView.NewObjectMaterial();
@@ -432,6 +443,7 @@ public class RunWorld : MonoBehaviour
 
     void OnDestroy()
     {
+        if (gcSliceSaved) UnityEngine.Scripting.GarbageCollector.incrementalTimeSliceNanoseconds = savedGcSlice;
         probe?.Dispose();
         probe = null;
         QualitySettings.shadowDistance = savedShadowDistance;
