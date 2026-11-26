@@ -215,7 +215,9 @@ public class EscMenu : MonoBehaviour
 
     static NetworkRunner ActiveRunner()
     {
-        foreach (NetworkRunner runner in FindObjectsByType<NetworkRunner>(FindObjectsSortMode.None))
+        // Fusion's own list of runners: a search for the script type looked through every script in the scene, 20 ms
+        // a frame on Fossum (68 000 map objects) while the menu was open (2026-11-26)
+        foreach (NetworkRunner runner in NetworkRunner.Instances)
         {
             if (runner != null && runner.IsRunning)
             {

@@ -157,7 +157,7 @@ public class ScreenSettings : MonoBehaviour
         // as soon as they show up. Checking a few times a second is cheap: there are only a handful.
         if (Time.unscaledTime >= nextCanvasCheck)
         {
-            nextCanvasCheck = Time.unscaledTime + 0.2f;
+            nextCanvasCheck = Time.unscaledTime + 1f;   // (every 0.2 s cost up to 20 ms on Fossum, 2026-11-26)
             // Counted by Canvas, not CanvasScaler: a search for a script type looks through every script in the scene
             // (a big map has 68 000 map objects with scripts), a Canvas search only through the canvases (2026-11-25)
             int count = FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Length;

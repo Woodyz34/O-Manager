@@ -945,6 +945,8 @@ public partial class TvWorldBuilder
     // stretch of map, from the map's own position, so they run on from piece to piece.
     static bool CutKind(int kind) => kind == WorldCell.RoughOpen || kind == WorldCell.RoughOpenTrees;
 
+    const bool ScarifiedRows = false;
+
     void ClearCut()
     {
         if (input.town != null) return;
@@ -1067,13 +1069,18 @@ public partial class TvWorldBuilder
                 g.GroundCard(lx, lz, len * Rr(0.8f, 1.1f), halfW * Rr(0.8f, 1.2f), yaw, Height, TvAtlas.Soil, col, 0f, 1f, 0.025f);
             }
         }
-        // Scarified rows every 2.4 m, broken
-        for (float u = (float)Math.Floor((uC - corner) / 2.4f) * 2.4f; u < uC + corner; u += 2.4f)
-            Strip(u, -corner, corner, 1.5f, 0.72f, 0.36f, 0.8f, 41, Grey(0.92f), 0.25f);
-        // Wheel ruts: a pair every 24 m, darker and wetter, unbroken
-        for (float u = (float)Math.Floor((uC - corner) / 24f) * 24f + 7f; u < uC + corner; u += 24f)
-            for (int side = -1; side <= 1; side += 2)
-                Strip(u + side * 0.95f, -corner, corner, 1.2f, 0.95f, 0.26f, 0.7f, 43 + side, Tint(0.62f, 0.58f, 0.55f), 1.4f);
+        // The scarified rows and the wheel ruts are left out since 2026-11-26 (Anders: the brown and light rectangles in
+        // rows looked odd, and ruts look like a path that is not on the map)
+        if (ScarifiedRows)
+        {
+            // Scarified rows every 2.4 m, broken
+            for (float u = (float)Math.Floor((uC - corner) / 2.4f) * 2.4f; u < uC + corner; u += 2.4f)
+                Strip(u, -corner, corner, 1.5f, 0.72f, 0.36f, 0.8f, 41, Grey(0.92f), 0.25f);
+            // Wheel ruts: a pair every 24 m, darker and wetter, unbroken
+            for (float u = (float)Math.Floor((uC - corner) / 24f) * 24f + 7f; u < uC + corner; u += 24f)
+                for (int side = -1; side <= 1; side += 2)
+                    Strip(u + side * 0.95f, -corner, corner, 1.2f, 0.95f, 0.26f, 0.7f, 43 + side, Tint(0.62f, 0.58f, 0.55f), 1.4f);
+        }
         if (!g.Empty) woodMesh.Add(g.Done(), 0f, 0f, 0f, 1f, 1f, 1f, 0f);
     }
 

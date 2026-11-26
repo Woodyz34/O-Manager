@@ -133,11 +133,13 @@ public class RunTrees
         foreach (Mesh m in farMeshes) if (m != null) UnityEngine.Object.Destroy(m);
         if (midMeshes != nearMeshes) foreach (Mesh m in midMeshes) if (m != null) UnityEngine.Object.Destroy(m);
         if (impostorMaterial != null) UnityEngine.Object.Destroy(impostorMaterial);
+        foreach (Material m in new[] { nearMat, midMat, farMat }) if (m != null) UnityEngine.Object.Destroy(m);
         if (impostorTexture != null) UnityEngine.Object.Destroy(impostorTexture);
     }
 
     public void SetFog(float start, float end)
     {
+        SyncMaterials();
         if (impostorMaterial == null) return;
         impostorMaterial.SetFloat("_FogStart", start);
         impostorMaterial.SetFloat("_FogEnd", end);
@@ -404,8 +406,8 @@ public class RunTrees
 
     // The reaches of the levels, in metres from the runner (RunWorld sets them for its quality)
     public float fullReach = 30f, nearReach = 96f, shadowReach = 60f;
-    // How many metres before each change both levels are drawn
-    const float FullBand = 5f, NearBand = 10f;
+    // How many metres before each change both levels are drawn (RunWorld sets them for its quality: longer on Ultra)
+    public float fullBand = 5f, nearBand = 12f;
     bool HasMid => midMeshes != nearMeshes;
 
     // The camera's view, set every frame (SetView); null: everything is drawn
@@ -465,9 +467,10 @@ public class RunTrees
             return;
         }
         bool mid = HasMid;
-        float fullIn = mid ? fullReach - FullBand : fullReach;
+        // Without a plainer level (Low, Medium) the trees go straight from the full shapes to the far ones
+        float fullIn = mid ? fullReach - fullBand : fullReach >= nearReach ? nearReach - nearBand : fullReach;
         float full2 = fullReach * fullReach, fullIn2 = fullIn * fullIn;
-        float near2 = nearReach * nearReach, nearIn = nearReach - NearBand, nearIn2 = nearIn * nearIn;
+        float near2 = nearReach * nearReach, nearIn = nearReach - nearBand, nearIn2 = nearIn * nearIn;
         float shadow2 = shadows ? shadowReach * shadowReach : -1f;
         for (int t = 0; t < where.Length; t++)
         {
@@ -485,27 +488,45 @@ public class RunTrees
             if (d2 < near2 && ni >= 0)
             {
                 if (d2 < full2) nearLists[ni].Add(m);
-                if (d2 >= fullIn2) (d2 < shadow2 ? midLists : midPlainLists)[ni].Add(m);
+                if (d2 >= fullIn2 && (mid || d2 >= full2)) (d2 < shadow2 ? midLists : midPlainLists)[ni].Add(m);
             }
             if (d2 >= nearIn2 && fi >= 0) farLists[fi].Add(m);
         }
     }
 
     static readonly int LodId = Shader.PropertyToID("_TvLod"), LodCenterId = Shader.PropertyToID("_TvLodCenter");
-    MaterialPropertyBlock nearBlock, midBlock, farBlock;
+    // One copy of the trees' material per level, each with its own _TvLod (2026-11-26: a property block per draw made
+    // the graphics card switch state for every draw, 600-800 "set-pass" a frame instead of 50-140)
+    Material nearMat, midMat, farMat;
+
+    // The copies take the trees' material's settings again (fog, wind, bark): after it changed
+    public void SyncMaterials()
+    {
+        if (nearMat == null)
+        {
+            nearMat = new Material(material) { name = "Trees near" };
+            midMat = new Material(material) { name = "Trees plainer" };
+            farMat = new Material(material) { name = "Trees far" };
+        }
+        foreach (Material m in new[] { nearMat, midMat, farMat })
+        {
+            m.CopyPropertiesFromMaterial(material);
+            m.enableInstancing = true;
+        }
+    }
 
     // around: the runner's place in the middle (the levels' distances are counted from it)
     public void Draw(Bounds around)
     {
-        if (nearBlock == null) { nearBlock = new MaterialPropertyBlock(); midBlock = new MaterialPropertyBlock(); farBlock = new MaterialPropertyBlock(); }
-        bool mid = HasMid;
+        if (nearMat == null) SyncMaterials();
+        bool mid = HasMid, straight = !mid && fullReach >= nearReach;
         // x: where it starts (0: from the runner), y: over how many metres before that it comes in; z, w: where it ends
         // and over how many metres before that it goes
-        nearBlock.SetVector(LodId, new Vector4(0f, 1f, mid ? fullReach : 0f, FullBand));
-        midBlock.SetVector(LodId, new Vector4(mid ? fullReach : 0f, FullBand, nearReach, NearBand));
-        farBlock.SetVector(LodId, new Vector4(nearReach, NearBand, 0f, 1f));
+        nearMat.SetVector(LodId, mid ? new Vector4(0f, 1f, fullReach, fullBand) : straight ? new Vector4(0f, 1f, nearReach, nearBand) : Vector4.zero);
+        midMat.SetVector(LodId, new Vector4(mid ? fullReach : 0f, fullBand, nearReach, nearBand));
+        farMat.SetVector(LodId, new Vector4(nearReach, nearBand, 0f, 1f));
         Shader.SetGlobalVector(LodCenterId, new Vector4(around.center.x, around.center.z, 0f, 0f));
-        var full = new RenderParams(material)
+        var full = new RenderParams(nearMat)
         {
             worldBounds = around,
             shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off,
@@ -516,19 +537,18 @@ public class RunTrees
         };
         var plain = full;
         plain.shadowCastingMode = ShadowCastingMode.Off;
-        full.matProps = nearBlock;
         countFull = DrawAll(full, nearMeshes, nearLists);       // the closest are always within the shadow distance
-        full.matProps = midBlock;
-        plain.matProps = midBlock;
+        full.material = midMat;
+        plain.material = midMat;
         countMid = DrawAll(full, midMeshes, midLists) + DrawAll(plain, midMeshes, midPlainLists);
-        plain.matProps = farBlock;
+        plain.material = farMat;
         countFar = DrawAll(plain, farMeshes, farLists);
         countShadow = 0;
         if (shadows && shadowLists != null)
         {
             var shadowOnly = full;
             shadowOnly.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
-            shadowOnly.matProps = null;
+            shadowOnly.material = material;
             countShadow = DrawAll(shadowOnly, midMeshes, shadowLists);
         }
     }

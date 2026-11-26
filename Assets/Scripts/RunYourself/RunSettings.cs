@@ -156,10 +156,11 @@ public static class RunSettings
         {
             // The undergrowth is flat cards with pictures since 2026-11-25, about a tenth of the triangles of the old
             // lumpy tufts, so every level has more of it than before
-            // Low (2026-11-26, Anders: Low must never lag, however plain it looks): a short view in thicker fog, the
-            // simplest trees only within 30 m and the far shapes beyond, little undergrowth only right round the runner
+            // Low (2026-11-26, Anders: Low must never lag, however plain it looks, but keep some undergrowth: rather a
+            // shorter view): a short view in thick fog, the simplest trees within 30 m and the far shapes beyond, some
+            // undergrowth round the runner
             case Quality.Low:
-                return new Look { view = 110f, near = 30f, detail = 14f, undergrowth = 0.05f, shadows = 0, shadowDistance = 0f, msaa = 1, reliefFar = 0f, aniso = AnisotropicFiltering.Disable };
+                return new Look { view = 90f, near = 30f, detail = 24f, undergrowth = 0.18f, shadows = 0, shadowDistance = 0f, msaa = 1, reliefFar = 0f, aniso = AnisotropicFiltering.Disable };
             case Quality.High:
                 return new Look { view = 330f, near = 96f, detail = 56f, undergrowth = 0.6f, shadows = 2, shadowDistance = 60f, msaa = 4, reliefFar = 30f, aniso = AnisotropicFiltering.ForceEnable };
             case Quality.Ultra:
