@@ -265,12 +265,14 @@ public partial class RunSession : MonoBehaviour
         float waited = 0f;
         while (this != null && waited < 30f)
         {
-            float share = world.Ready(se, sn, Mathf.Min(world.ViewDistance, 120f));
+            float share = world.Ready(se, sn, Mathf.Min(world.ViewDistance, 120f), true);
             loadingCard.Set("Building the forest", 0.1f + 0.9f * share);
             if (share >= 1f && waited > 0.3f) break;
             await Task.Yield();
             waited += Time.unscaledDeltaTime;
         }
+        if (this == null) return;
+        await WarmUp(se, sn);
         if (this == null) return;
         world.Loading = false;
         loadingCard.Close();
@@ -776,6 +778,59 @@ public partial class RunSession : MonoBehaviour
         if (mainCam != null) mainCam.cullingMask = show ? mainMask : 0;
         if (hud != null) hud.enabled = !show;
         PauseTwoDPhysics(!show);
+    }
+
+    // The forest round the start is drawn once, all the way round, behind the loading page: the graphics card then has
+    // every shader and picture ready, so the first look is the whole forest and not blue placeholders or an empty sky
+    // that fills in (2026-11-26, Anders: "when I start, everything should already be built right next to me").
+    // A small hidden picture, eight looks, about a tenth of a second.
+    async Task WarmUp(double se, double sn)
+    {
+        if (world == null) return;
+        var target = new RenderTexture(320, 180, 24);
+        var go = new GameObject("Warm-up camera");
+        Camera cam = go.AddComponent<Camera>();
+        cam.enabled = false;
+        cam.targetTexture = target;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = RunWorld.SkyColor;
+        cam.nearClipPlane = 0.12f;
+        cam.farClipPlane = world.ViewDistance + 20f;
+        cam.fieldOfView = 62f;
+        cam.allowHDR = false;
+        cam.renderingPath = RenderingPath.Forward;
+        cam.useOcclusionCulling = false;
+        cam.cullingMask = ~(1 << 5);   // not the UI
+        world.viewCamera = cam;
+        Vector3 eye = world.transform.TransformPoint(world.ToScene(se, sn, world.GroundY(se, sn) + 1.7f));
+        try
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                go.transform.SetPositionAndRotation(eye, Quaternion.Euler(4f, i * 45f, 0f));
+                cam.Render();
+                await Task.Yield();
+                if (this == null || world == null) return;
+            }
+#if UNITY_EDITOR
+            // The Editor makes its shaders while playing and draws them light blue until they are ready
+            float waited = 0f;
+            while (UnityEditor.ShaderUtil.anythingCompiling && waited < 4f)
+            {
+                cam.Render();
+                await Task.Yield();
+                if (this == null || world == null) return;
+                waited += Time.unscaledDeltaTime;
+            }
+#endif
+        }
+        finally
+        {
+            if (world != null) world.viewCamera = null;
+            if (go != null) Destroy(go);
+            target.Release();
+            Destroy(target);
+        }
     }
 
     // ---- Hiding the 2D game underneath ----

@@ -339,8 +339,13 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
         {
             return;
         }
-        string options = HostSettings.ToPublish;
-        if (hostOptions.ToString() != options) hostOptions = options;
+        // Looked at twice a second, not every tick: both sides are new strings each time (garbage for the memory
+        // clean-up, 2026-11-26)
+        if ((int)Runner.Tick % 30 == 0)
+        {
+            string options = HostSettings.ToPublish;
+            if (hostOptions.ToString() != options) hostOptions = options;
+        }
         if (spectator)
         {
             // Watching: nothing to tell the others about a race of its own

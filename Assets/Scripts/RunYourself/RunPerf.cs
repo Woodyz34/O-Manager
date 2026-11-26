@@ -52,6 +52,8 @@ public class RunPerf : IDisposable
     }
     readonly List<Probe> counts = new List<Probe>();
     readonly FrameTiming[] timing = new FrameTiming[1];
+    // The main thread's own work in the latest finished frame, without waiting for the next frame (-1: not known)
+    public double LastMainMs { get; private set; } = -1.0;
 
     // The worst frame since the last line, as text
     double worstFrame;
@@ -111,6 +113,7 @@ public class RunPerf : IDisposable
     public void Frame(double frameMs, bool slow)
     {
         FrameTimingManager.CaptureFrameTimings();
+        LastMainMs = FrameTimingManager.GetLatestTimings(1, timing) > 0 ? timing[0].cpuMainThreadFrameTime : -1.0;
         Rotate();
         // Scripts are looked for again every 10 s: each script's own marker only exists once it has run
         if (UnityEngine.Time.unscaledTime >= nextLook)
