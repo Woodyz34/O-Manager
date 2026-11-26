@@ -464,6 +464,14 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     void Update()
     {
+        // Timed for the 3D mode's slow-frame log (RunPerf, 2026-11-26)
+        long perfStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        UpdateTimed();
+        RunPerf.Add(RunPerf.Part.PlayerUpdate, System.Diagnostics.Stopwatch.GetTimestamp() - perfStart);
+    }
+
+    void UpdateTimed()
+    {
         if (Object == null || !Object.IsValid || !Object.HasStateAuthority || Runner == null) return;
         RacePace.Apply(agentMovement);
         WatchForStuckStart();

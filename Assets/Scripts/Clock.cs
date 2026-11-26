@@ -450,7 +450,15 @@ public class Clock : MonoBehaviour
         ticking = false;
     }
 
-    private void Update()
+    void Update()
+    {
+        // Timed for the 3D mode's slow-frame log (RunPerf, 2026-11-26)
+        long perfStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        UpdateTimed();
+        RunPerf.Add(RunPerf.Part.Clock, System.Diagnostics.Stopwatch.GetTimestamp() - perfStart);
+    }
+
+    void UpdateTimed()
     {
         if (ticking)
         {

@@ -43,6 +43,7 @@ public class RunTrees
     readonly bool shadows;
 
     public bool HasImpostors => impostorMaterial != null;
+    const bool UsePictures = false;
 
     // What one piece's trees are: which shape copy each is, and where it stands (a matrix from the run world's space)
     public class Set
@@ -89,6 +90,9 @@ public class RunTrees
         {
             atlas.enableInstancing = true;
             var trees = new RunTrees(quality, atlas, shadows);
+            // The pictures are off for now (2026-11-26, Anders on Fossum: with them nothing showed far away and the
+            // trees popped up close by): the far shapes, with their crowns, go all the way out to the fog
+            if (!UsePictures) return trees;
             try { trees.Bake(quality, sun); }
             catch (Exception e)
             {
@@ -420,11 +424,9 @@ public class RunTrees
             }
             else
             {
-                // Past the near distance in a piece still close: the Medium trees (with their leaves) until the
-                // piece turns to pictures, not the bare far shapes (2026-11-26, Anders: the leaves popped up close by)
-                int i = set.near[t];
+                int i = set.far[t];
                 if (i < 0) continue;
-                list = midPlainLists[i];
+                list = farLists[i];
             }
             list.Add(moved ? toWorld * where[t] : where[t]);
         }

@@ -29,6 +29,14 @@ public class GameModeHandler : MonoBehaviour
     // The pool is set from many places (the pop-ups, taking over as host ...): it is saved when it has changed
     void Update()
     {
+        // Timed for the 3D mode's slow-frame log (RunPerf, 2026-11-26)
+        long perfStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        UpdateTimed();
+        RunPerf.Add(RunPerf.Part.GameMode, System.Diagnostics.Stopwatch.GetTimestamp() - perfStart);
+    }
+
+    void UpdateTimed()
+    {
         if (gameMode == savedMode || string.IsNullOrWhiteSpace(gameMode)) return;
         savedMode = gameMode;
         LastPool = gameMode;
