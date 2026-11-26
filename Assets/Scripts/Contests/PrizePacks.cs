@@ -5,7 +5,7 @@ using UnityEngine;
 // Runner packs won in the weekly and daily contests (2026-11-19, the user). The cloud says which packs a place wins
 // (Docs/cloud-code/Contests.js, PRIZES); they wait here, saved on this computer, until the player opens them.
 //   Golden pack (id weekly): only Silver, Gold or Elite, the best pack in the game. Won by 1st in a weekly contest.
-//   Silver pack (id daily): only Silver, Gold or Elite, a bit worse. Won by 2nd and 3rd in a weekly contest and 1st in a daily one.
+//   Silver pack (id daily): only Silver, Gold or Elite, a bit worse. Won by 2nd and 3rd in a weekly contest and 1st-3rd in a daily one (2026-11-26).
 //   Bronze pack (id normal): the shop's pack (PackShop). Won by 2nd in a weekly contest, together with a daily pack.
 // Like the shop's packs, they only hold runners the player does not have yet.
 public static class PrizePacks

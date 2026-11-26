@@ -21,7 +21,16 @@ public class ContestsPage : MonoBehaviour
     {
         open = null;
         claimedThisSession = false;
+        lastWeekly = false;
+        lastResults = false;
+        focusId = null;
     }
+
+    // The page opens again on the tab you were on, scrolled to the contest you just ran (2026-11-26, the user:
+    // after a weekly run it went back to Today and the far left)
+    static bool lastWeekly;
+    static bool lastResults;
+    static string focusId;
 
     bool weekly = false;   // Today first (2026-11-19, the user)
     // The "Results" tab: the contests that are over, with their leaderboards and GPS routes (2026-11-24, the user)
@@ -68,8 +77,10 @@ public class ContestsPage : MonoBehaviour
         canvas.sortingOrder = 120;
         ScreenSettings.Fit(go.GetComponent<CanvasScaler>());
         open = go.AddComponent<ContestsPage>();
+        open.weekly = lastWeekly;
         open.Build();
         open.Reload();
+        if (lastResults) open.ShowResults();
         ShowTimePaid();
     }
 
@@ -154,9 +165,9 @@ public class ContestsPage : MonoBehaviour
         CourseUI.Place(head.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -34), new Vector2(1180, 200));
         TextMeshProUGUI title = CourseUI.Text("Title", head.transform, "Contests", 44, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32, -18), new Vector2(400, 60));
-        dayTab = CourseUI.Button("Day", head.transform, "Today", CourseUI.ButtonKind.Primary, () => { weekly = false; results = false; Fill(); }, 24);
+        dayTab = CourseUI.Button("Day", head.transform, "Today", CourseUI.ButtonKind.Primary, () => { weekly = false; results = false; Remember(); Fill(); }, 24);
         CourseUI.Place((RectTransform)dayTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(32, -90), new Vector2(200, 58));
-        weekTab = CourseUI.Button("Week", head.transform, "This week", CourseUI.ButtonKind.Light, () => { weekly = true; results = false; Fill(); }, 24);
+        weekTab = CourseUI.Button("Week", head.transform, "This week", CourseUI.ButtonKind.Light, () => { weekly = true; results = false; Remember(); Fill(); }, 24);
         CourseUI.Place((RectTransform)weekTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(246, -90), new Vector2(200, 58));
         resultsTab = CourseUI.Button("Results", head.transform, "Results", CourseUI.ButtonKind.Light, ShowResults, 24);
         CourseUI.Place((RectTransform)resultsTab.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(460, -90), new Vector2(200, 58));
@@ -373,6 +384,24 @@ public class ContestsPage : MonoBehaviour
 
     // ---- Cards ----
 
+    void Remember()
+    {
+        lastWeekly = weekly;
+        lastResults = results;
+    }
+
+    // Scrolls the cards so the contest you just ran is in sight (the last one of the week sends the bar to the far right)
+    void ScrollTo(List<ContestInfo> shown, string id)
+    {
+        int index = shown.FindIndex(c => c.id == id);
+        if (index < 0) return;
+        float hidden = cards.sizeDelta.x - CardsWidth;
+        if (hidden <= 0f) return;
+        float x = Mathf.Clamp(index * (cardWidth + CardGap), 0f, hidden);
+        cards.anchoredPosition = new Vector2(-x, cards.anchoredPosition.y);
+        if (cardsScroll != null) cardsScroll.StopMovement();
+    }
+
     void Fill()
     {
         if (cards == null) return;
@@ -420,6 +449,11 @@ public class ContestsPage : MonoBehaviour
         cards.anchoredPosition = Vector2.zero;
         shownCount = n;
         foreach (ContestInfo c in shown) Card(c);
+        if (focusId != null)
+        {
+            ScrollTo(shown, focusId);
+            focusId = null;
+        }
         ShowScroll();
     }
 
@@ -428,6 +462,7 @@ public class ContestsPage : MonoBehaviour
     async void ShowResults()
     {
         results = true;
+        Remember();
         if (recentBusy) { Fill(); return; }
         recentBusy = true;
         recentError = null;
@@ -620,6 +655,9 @@ public class ContestsPage : MonoBehaviour
         prizes.richText = true;
         prizes.raycastTarget = true;
         HoverTip.Add(prizes, PacksTip(c));
+        prizes.enableAutoSizing = true;   // the prize line is longer since 2026-11-26
+        prizes.fontSizeMin = 14;
+        prizes.fontSizeMax = 19;
         CourseUI.Size(prizes, 78);
 
         string state;
@@ -650,6 +688,7 @@ public class ContestsPage : MonoBehaviour
     static string PrizeText(ContestInfo c)
     {
         if (!ContestCloud.PrizeRules.TryGetValue(c.span, out ContestPrizeRules rules) || rules.top == null || rules.top.Length < 3) return "";
+        if (rules.NewRules) return NewPrizeText(c, rules);
         // The same sum as the cloud's prize(): base money plus a share of the bonus pot that grows with every player
         float bonus = rules.growth * c.entries;
         bool grows = rules.growth > 0;
@@ -666,6 +705,26 @@ public class ContestsPage : MonoBehaviour
         string text = "Prizes: 1st <b>" + Place(0) + "</b>, 2nd " + Place(1) + ", 3rd " + Place(2) + ", 4th-6th "
                + Kr(rules.next[rules.next.Length - 1]) + "+, everyone who finishes " + Kr(rules.tookPart) + ".";
         return grows ? text + " The top 3 get more money with every player." : text;
+    }
+
+    // 2026-11-26: "Prizes with 15 players: 1st Silver pack + 1 010 kr, 2nd Silver pack + 540 kr, 3rd Silver pack + 380 kr,
+    // 4th 305 kr down to 160 kr for 15th. Everyone gets more with every player."
+    static string NewPrizeText(ContestInfo c, ContestPrizeRules rules)
+    {
+        // As if the contest ended now, with you in it when you have not run yet
+        int n = Mathf.Max(1, c.entries + (c.Started ? 0 : 1));
+        string Place(int i)
+        {
+            List<string> parts = new List<string>();
+            if (rules.packs != null && i < rules.packs.Length && rules.packs[i] != null)
+                foreach (string kind in rules.packs[i]) parts.Add(PrizePacks.Name(kind));
+            parts.Add(Kr(rules.Prize(i + 1, n)));
+            return string.Join(" + ", parts);
+        }
+        string rest = n > 4 ? "4th " + Kr(rules.Prize(4, n)) + " down to " + Kr(rules.Prize(n, n)) + " for " + CompetitionFlow.Ordinal(n)
+                    : "4th and on from " + Kr(rules.Prize(4, 4));
+        return "Prizes with " + n + (n == 1 ? " player" : " players") + ": 1st <b>" + Place(0) + "</b>, 2nd " + Place(1) + ", 3rd " + Place(2)
+               + ", " + rest + ". Everyone gets more with every player.";
     }
 
     static string PacksTip(ContestInfo c)
@@ -725,6 +784,9 @@ public class ContestsPage : MonoBehaviour
             string problem = started == null ? "The contest course could not be read. Update the game." : CourseLibrary.StartProblem(started);
             if (problem != null) throw new ContestException(problem);
             card.Set("Loading the race", 1f);
+            lastWeekly = c.Weekly;
+            lastResults = false;
+            focusId = c.id;
             ContestRun.Begin(c, started);
         }
         catch (Exception e)
