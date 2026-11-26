@@ -636,10 +636,28 @@ def country_name(r):
     return COUNTRIES.get(c.upper(), c.upper())
 
 
-def game_class(r, today):
+def junior_age_limits(groups, today):
+    """Highest age each runner can have this year, from the junior classes (H18/D20/M20 ...) they ran in.
+    For runners without a birth year (WinSplits, foreign runners in Eventor): a runner in H20 in July is at
+    most 20 that year, so at most 21 the year after. Only races in the rating window count."""
+    limit = {}
+    for g in groups:
+        if (today - g["date"]).days > WINDOW_DAYS:
+            continue
+        m = re.match(r"[HDMW](\d{2})", (g.get("class") or "").strip().upper())
+        if not m or int(m.group(1)) > 20:
+            continue
+        top = int(m.group(1)) + (today.year - g["date"].year)
+        for r in g["runners"]:
+            limit[r["_key"]] = min(limit.get(r["_key"], 99), top)
+    return limit
+
+
+def game_class(r, today, age_limits=None):
     prefix = "H" if r.get("sex") == "M" else "D"
     by = r.get("birth_year")
-    age = today.year - by if by else 99
+    # No birth year: the junior classes the runner ran decide, otherwise H21/D21 (was always H21/D21 before 2026-11-26)
+    age = today.year - by if by else (age_limits or {}).get(r["id"], 99)
     return prefix + ("18" if age <= 18 else "20" if age <= 20 else "21")
 
 
@@ -701,11 +719,12 @@ def write_game_file(runners, today, groups, merged_ids=None):
         renamed = old_file.get("renamed", [])
     cards = []
     info_by_id = {r["id"]: r for r in runners}
+    age_limits = junior_age_limits(groups, today)
     for r in runners:
         if not r["visible"]:
             continue
         cards.append({
-            "id": r["id"], "name": r["name"], "man": r["sex"] == "M", "klass": game_class(r, today),
+            "id": r["id"], "name": r["name"], "man": r["sex"] == "M", "klass": game_class(r, today, age_limits),
             "country": country_name(r), "club": r.get("club") or "",
             **({} if r.get("country_sure") else {"countryGuessed": True}),
             # physics = forest speed (was "speed" before 2026-11-13); speed = sprint speed, -1 = none ("-" on the card)
