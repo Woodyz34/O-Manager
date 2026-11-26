@@ -50,6 +50,7 @@ public class TvMesh
     }
 
     public static List<float> PooledFloats(bool big = false) => Pool<float>.Take(big);
+    public static void GiveFloats(List<float> list) => Pool<float>.Give(list);
 
     static class Pool<T>
     {

@@ -105,6 +105,9 @@ public class TvWorldInput
     // The run-yourself world draws the trees as copies of a few ready-made ones (RunTrees, 2026-11-25): a piece then
     // makes no tree meshes at all, only a list of where each tree stands (TvWorld.treeRecords)
     public bool treeRecords;
+    // The run-yourself undergrowth as copies too (RunTufts, 2026-11-26, Anders chose it): the detail build makes no
+    // undergrowth mesh, only a list of where each plant stands (TvWorld.tuftRecords)
+    public bool tuftRecords;
     // How detailed the trees, the undergrowth and the forest floor are made (RunSettings.Quality): 0 Low, 1 Medium,
     // 2 High, 3 Ultra. The TV controls use High.
     public int quality = 2;
@@ -138,6 +141,11 @@ public class TvWorld
     // shape (TreeShapes(quality, false)), x, y, z, scale across, scale up, yaw, tint, tilt x, tilt z
     public const int RecordSize = 11;
     public readonly List<float> treeRecords = new List<float>();
+
+    // TvWorldInput.tuftRecords: the undergrowth, TuftRecordSize numbers each: the shape (TuftShapes(quality)), x, y, z,
+    // scale, yaw, tint. null when not asked for. A pooled list: give it back (TvMesh.GiveFloats) when read.
+    public const int TuftRecordSize = 7;
+    public List<float> tuftRecords;
 
     // A town's tunnels near the piece (run yourself: in the tunnel or up on its roof, two levels): ax, az, ux, uz,
     // length, half width, floor height at the start and at the end, for each
@@ -642,6 +650,7 @@ public partial class TvWorldBuilder
                 world.tunnels.AddRange(new[] { tp.ax, tp.az, tp.ux, tp.uz, tp.len, tp.half, tp.fa, tp.fb });
         if (input.chunkDetail)
         {
+            if (input.tuftRecords) world.tuftRecords = TvMesh.PooledFloats(true);
             if (input.baseSolids != null) world.solids.AddRange(input.baseSolids);
             int thicketSolids = world.solids.Count;
             Thickets();
@@ -3777,7 +3786,14 @@ public partial class TvWorldBuilder
             else if (shape == tuftHeath && heathSet != null) shape = heathSet[(int)(random.Value() * heathSet.Length) % heathSet.Length];
             // Every bush its own shade and size (2026-11-25, Anders: each single bush clear)
             if (bushy) { tint *= Rr(0.7f, 1f); s *= Rr(0.8f, 1.3f); }
-            tuftMeshes[Tile(x, z)].Add(shape, x, H(x, z) - 0.02f, z, s, s, s, Rr(0f, 6.283f), tint);
+            float yaw = Rr(0f, 6.283f);
+            int copy = world.tuftRecords != null ? TuftIndex(shape) : -1;
+            if (copy >= 0)
+            {
+                List<float> rec = world.tuftRecords;
+                rec.Add(copy); rec.Add(x); rec.Add(H(x, z) - 0.02f); rec.Add(z); rec.Add(s); rec.Add(yaw); rec.Add(tint);
+            }
+            else tuftMeshes[Tile(x, z)].Add(shape, x, H(x, z) - 0.02f, z, s, s, s, yaw, tint);
             world.tufts++;
         }
     }

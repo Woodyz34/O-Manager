@@ -1154,6 +1154,37 @@ public partial class TvWorldBuilder
 public partial class TvWorldBuilder
 {
     static readonly Dictionary<TvShape, int> treeIndex = new Dictionary<TvShape, int>();
+    static readonly Dictionary<TvShape, int> tuftIndex = new Dictionary<TvShape, int>();
+
+    // The undergrowth's plants for a 3D quality, always in the same order (RunTufts draws them as copies)
+    public static TvShape[] TuftShapes(int quality)
+    {
+        int q = Math.Max(0, Math.Min(3, quality));
+        Flora f;
+        lock (floraLock)
+        {
+            if (!floraCache.TryGetValue(q, out f))
+            {
+                f = BuildFlora(q);
+                floraCache[q] = f;
+            }
+        }
+        var list = new List<TvShape>();
+        void Put(TvShape s) { if (s != null && !list.Contains(s)) list.Add(s); }
+        if (f.berrySet != null) foreach (TvShape s in f.berrySet) Put(s);
+        if (f.heathSet != null) foreach (TvShape s in f.heathSet) Put(s);
+        foreach (TvShape s in new[] { f.berry, f.heath, f.grass, f.dry, f.shortGrass, f.fern, f.lingon, f.sedge, f.flowers, f.juniper }) Put(s);
+        TvShape[] shapes = list.ToArray();
+        lock (tuftIndex)
+            for (int i = 0; i < shapes.Length; i++) tuftIndex[shapes[i]] = i;
+        return shapes;
+    }
+
+    // A plant's number in TuftShapes, or -1 (then it is made into the mesh as before)
+    static int TuftIndex(TvShape shape)
+    {
+        lock (tuftIndex) return tuftIndex.TryGetValue(shape, out int i) ? i : -1;
+    }
 
     // The full trees (near) or their far copies for a 3D quality, always in the same order: pines, young pines,
     // spruces, birches, broad-leaved. Far index i is the far copy of the full shapes FarOf(i).

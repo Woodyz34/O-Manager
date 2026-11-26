@@ -117,12 +117,14 @@ Shader "O-Manager/TvAtlasLit"
             }
             // Thinned undergrowth: a tuft past its share fades out on its share of the pixels, and one well past it is
             // folded to a point, so the graphics card draws nothing for it
-            if (_TvThin.w > 0.5 && v.texcoord.w > 0.0005)
+            // (a plant drawn as a copy, RunTufts, has -1 there: its number comes from where the copy stands)
+            float tuftRank = v.texcoord.w < -0.5 ? max(TvRank(mul(unity_ObjectToWorld, float4(0, 0, 0, 1)).xz), 0.002) : v.texcoord.w;
+            if (_TvThin.w > 0.5 && tuftRank > 0.0005)
             {
                 float2 wp = mul(unity_ObjectToWorld, v.vertex).xz;
                 float d = distance(wp, _TvLodCenter.xy);
                 float share = lerp(1.0, _TvThin.z, saturate((d - _TvThin.x) / max(_TvThin.y - _TvThin.x, 0.01)));
-                float room = share - v.texcoord.w;
+                float room = share - tuftRank;
                 if (room < -0.04)
                 {
                     v.vertex = float4(0, -1000, 0, 1);
