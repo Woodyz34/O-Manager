@@ -141,7 +141,10 @@ public class TvWorldView : MonoBehaviour
 
     public static Mesh ToMesh(TvMesh source)
     {
-        return ToMesh(new MeshArrays(source));
+        var arrays = new MeshArrays(source);
+        Mesh mesh = ToMesh(arrays);
+        arrays.Release();
+        return mesh;
     }
 
     // A corner as the graphics card gets it: all of it side by side, so a mesh is handed over in one copy
@@ -175,6 +178,7 @@ public class TvWorldView : MonoBehaviour
         public bool castShadows;
         public byte group;          // TvMesh.group: the run-yourself world draws some only near or only far
         public int count;           // corners
+        public int indexCount;      // the arrays below come from a pool (ArrayPool) and may be longer than needed
         public PlainCorner[] plain; // plain coloured meshes
         public TexturedCorner[] textured;   // textured meshes (TvAtlas): u, v and the atlas tile too
         public ushort[] small;      // the triangles, when the mesh has at most 65 535 corners
@@ -182,8 +186,22 @@ public class TvWorldView : MonoBehaviour
         public Bounds bounds;       // worked out here, on the background thread, so the main thread need not
         public Mesh mesh;           // the run-yourself world makes the mesh ahead, one a frame (RunWorld.HandOver)
 
-        public bool HasUvs => textured != null;
-        public int IndexCount => small != null ? small.Length : big != null ? big.Length : 0;
+        public bool HasUvs { get; private set; }
+        public int IndexCount => indexCount;
+
+        // The arrays back to the pool, once the mesh is made from them (2026-11-26, Anders on Fossum Ultra: the
+        // garbage of the pieces' corners stopped the game for 40-170 ms now and then)
+        public void Release()
+        {
+            if (plain != null) System.Buffers.ArrayPool<PlainCorner>.Shared.Return(plain);
+            if (textured != null) System.Buffers.ArrayPool<TexturedCorner>.Shared.Return(textured);
+            if (small != null) System.Buffers.ArrayPool<ushort>.Shared.Return(small);
+            if (big != null) System.Buffers.ArrayPool<int>.Shared.Return(big);
+            plain = null;
+            textured = null;
+            small = null;
+            big = null;
+        }
 
         MeshArrays(TvMesh source, int corners)
         {
@@ -194,21 +212,27 @@ public class TvWorldView : MonoBehaviour
             if (source.uvs.Count > 0)
             {
                 source.PadUvs(source.VertexCount);
-                textured = new TexturedCorner[corners];
+                textured = System.Buffers.ArrayPool<TexturedCorner>.Shared.Rent(Math.Max(1, corners));
+                HasUvs = true;
             }
-            else plain = new PlainCorner[corners];
+            else plain = System.Buffers.ArrayPool<PlainCorner>.Shared.Rent(Math.Max(1, corners));
         }
 
         public MeshArrays(TvMesh source) : this(source, source.VertexCount)
         {
             for (int i = 0; i < count; i++) Put(source, i, i);
             List<int> t = source.triangles;
+            indexCount = t.Count;
             if (count <= 65535)
             {
-                small = new ushort[t.Count];
-                for (int i = 0; i < small.Length; i++) small[i] = (ushort)t[i];
+                small = System.Buffers.ArrayPool<ushort>.Shared.Rent(Math.Max(1, indexCount));
+                for (int i = 0; i < indexCount; i++) small[i] = (ushort)t[i];
             }
-            else big = t.ToArray();
+            else
+            {
+                big = System.Buffers.ArrayPool<int>.Shared.Rent(Math.Max(1, indexCount));
+                t.CopyTo(big);
+            }
             Bound();
         }
 
@@ -262,7 +286,8 @@ public class TvWorldView : MonoBehaviour
             float size = 2f * radius / tiles;
             // Which square each triangle goes to, counted first so each square's list is made at its size
             int triCount = t.Count / 3;
-            var tileOf = new int[triCount];
+            var pool = System.Buffers.ArrayPool<int>.Shared;
+            int[] tileOf = pool.Rent(Math.Max(1, triCount));
             var perTile = new int[tiles * tiles];
             for (int k = 0; k < triCount; k++)
             {
@@ -276,21 +301,24 @@ public class TvWorldView : MonoBehaviour
             }
             var byTile = new int[tiles * tiles][];
             var fill = new int[tiles * tiles];
-            for (int k = 0; k < byTile.Length; k++) if (perTile[k] > 0) byTile[k] = new int[perTile[k]];
+            for (int k = 0; k < byTile.Length; k++) if (perTile[k] > 0) byTile[k] = pool.Rent(perTile[k]);
             for (int k = 0; k < triCount; k++) byTile[tileOf[k]][fill[tileOf[k]]++] = k;
-            var stamp = new int[vc];   // which part the corner was last counted or copied for
-            var remap = new int[vc];
+            int[] stamp = pool.Rent(vc);   // which part the corner was last counted or copied for
+            Array.Clear(stamp, 0, vc);
+            int[] remap = pool.Rent(vc);
             int part = 0;
-            foreach (int[] tris in byTile)
+            for (int tile = 0; tile < byTile.Length; tile++)
             {
+                int[] tris = byTile[tile];
                 if (tris == null) continue;
+                int trisLength = perTile[tile];
                 int first = 0;
-                while (first < tris.Length)
+                while (first < trisLength)
                 {
                     // How many triangles fit in this part
                     part++;
                     int corners = 0, last = first;
-                    while (last < tris.Length)
+                    while (last < trisLength)
                     {
                         int fresh = 0;
                         for (int c = 0; c < 3; c++) if (stamp[t[tris[last] * 3 + c]] != part) fresh++;
@@ -306,7 +334,9 @@ public class TvWorldView : MonoBehaviour
                     part++;
                     var m = new MeshArrays(source, corners);
                     int n = 0, ic = (last - first) * 3;
-                    if (corners <= 65535) m.small = new ushort[ic]; else m.big = new int[ic];
+                    m.indexCount = ic;
+                    if (corners <= 65535) m.small = System.Buffers.ArrayPool<ushort>.Shared.Rent(ic);
+                    else m.big = System.Buffers.ArrayPool<int>.Shared.Rent(ic);
                     int w = 0;
                     for (int k = first; k < last; k++)
                         for (int c = 0; c < 3; c++)
@@ -326,6 +356,10 @@ public class TvWorldView : MonoBehaviour
                     first = last;
                 }
             }
+            pool.Return(tileOf);
+            pool.Return(stamp);
+            pool.Return(remap);
+            foreach (int[] tris in byTile) if (tris != null) pool.Return(tris);
             return list;
         }
     }
@@ -438,6 +472,7 @@ public class TvWorldView : MonoBehaviour
     void AddMesh(MeshArrays source)
     {
         Mesh mesh = ToMesh(source);
+        source.Release();
         mesh.UploadMeshData(true);   // the graphics card has it now; no copy kept in memory
         meshes.Add(mesh);
         var go = new GameObject(source.name);

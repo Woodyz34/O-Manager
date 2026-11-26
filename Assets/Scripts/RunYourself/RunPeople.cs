@@ -77,6 +77,7 @@ public class RunPeople : MonoBehaviour
             uploadsLeft--;
             made.TryRemove(key, out _);
             mesh = TvWorldView.ToMesh(shape);
+            shape.Release();
             mesh.UploadMeshData(true);
             meshes[key] = mesh;
             return mesh;

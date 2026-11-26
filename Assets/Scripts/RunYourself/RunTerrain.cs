@@ -282,6 +282,9 @@ public class RunTerrain
         float x = (float)(e - layer.minE), z = (float)(n - layer.minN);
         List<int> near = BucketAt(x, z);
         if (near == null) return g;
+        // Through water only the slowest one counts, once (2026-11-26, Anders on Fossum: a stream took ages to cross:
+        // each piece of its line slowed the runner again where two met, 0.4 x 0.4 = 0.16 of the speed)
+        float wetSpeed = 1f;
         foreach (int index in near)
         {
             Piece p = pieces[index];
@@ -296,20 +299,22 @@ public class RunTerrain
                 case WorldLineKind.FaintPath: OnTrack(ref g, d, 0.8f, speeds.Line(TerrainKind.Path, 1.1f), 0.65f, Surface.Path); break;
                 case WorldLineKind.Ride: OnTrack(ref g, d, 1.8f, speeds.Line(TerrainKind.Path, 1.05f), 0.7f, Surface.Open); break;
                 case WorldLineKind.Railway: OnTrack(ref g, d, 2.4f, 1.1f, 0.9f, Surface.Rock); break;
+                // A crossable stream is only a little slower than a small one (2026-11-26, Anders)
                 case WorldLineKind.SmallStream:
-                    if (d < 0.7f) { g.speed *= 0.6f; g.rough = Math.Max(g.rough, 1.3f); g.surface = Surface.Water; }
+                    if (d < 0.7f) { wetSpeed = Math.Min(wetSpeed, 0.7f); g.rough = Math.Max(g.rough, 1.3f); g.surface = Surface.Water; }
                     break;
                 case WorldLineKind.Stream:
-                    if (d < 1.4f) { g.speed *= 0.4f; g.rough = Math.Max(g.rough, 1.5f); g.surface = Surface.Water; }
+                    if (d < 1.4f) { wetSpeed = Math.Min(wetSpeed, 0.6f); g.rough = Math.Max(g.rough, 1.4f); g.surface = Surface.Water; }
                     break;
                 case WorldLineKind.Ditch:
-                    if (d < 0.6f) { g.speed *= 0.85f; g.rough = Math.Max(g.rough, 1.2f); }
+                    if (d < 0.6f) { wetSpeed = Math.Min(wetSpeed, 0.85f); g.rough = Math.Max(g.rough, 1.2f); }
                     break;
                 case WorldLineKind.NarrowMarsh:
-                    if (d < 1.2f) { g.speed *= 0.8f; g.rough = Math.Max(g.rough, 1.3f); g.surface = Surface.Marsh; }
+                    if (d < 1.2f) { wetSpeed = Math.Min(wetSpeed, 0.8f); g.rough = Math.Max(g.rough, 1.3f); g.surface = Surface.Marsh; }
                     break;
             }
         }
+        g.speed *= wetSpeed;
         // On a bridge or in a tunnel: a hard, quick way, whatever is under or round it
         foreach (int index in near)
         {

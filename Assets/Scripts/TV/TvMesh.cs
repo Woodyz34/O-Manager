@@ -12,13 +12,57 @@ public class TvMesh
     // The run-yourself world (RunYourself/RunWorld.cs): drawn always, only near the runner, or only far from them
     public const byte Always = 0, Near = 1, Far = 2;
     public byte group = Always;
-    public readonly List<float> positions = new List<float>();   // x, y, z
-    public readonly List<float> normals = new List<float>();
-    public readonly List<byte> colors = new List<byte>();        // r, g, b (sRGB)
-    public readonly List<int> triangles = new List<int>();
+    public readonly List<float> positions;   // x, y, z
+    public readonly List<float> normals;
+    public readonly List<byte> colors;       // r, g, b (sRGB)
+    public readonly List<int> triangles;
     // Textured meshes only (the bark and the leaves of the trees, the undergrowth, the forest floor's litter;
     // TvAtlas): u, v and which picture of the atlas, for each corner. Empty for the plain coloured meshes.
-    public readonly List<float> uvs = new List<float>();
+    public readonly List<float> uvs;
+
+    public TvMesh() : this(false) { }
+
+    // pooled: the lists come from a pool of lists already grown big (the run-yourself world's pieces, 2026-11-26,
+    // Anders on Fossum Ultra: the garbage of growing lists of a million corners stopped the game now and then); give
+    // them back with Recycle once the mesh is made from them
+    public TvMesh(bool pooled)
+    {
+        positions = pooled ? Pool<float>.Take() : new List<float>();
+        normals = pooled ? Pool<float>.Take() : new List<float>();
+        colors = pooled ? Pool<byte>.Take() : new List<byte>();
+        triangles = pooled ? Pool<int>.Take() : new List<int>();
+        uvs = pooled ? Pool<float>.Take() : new List<float>();
+    }
+
+    // The lists back to the pool; the mesh is empty and must not be used after this
+    public void Recycle()
+    {
+        Pool<float>.Give(positions);
+        Pool<float>.Give(normals);
+        Pool<byte>.Give(colors);
+        Pool<int>.Give(triangles);
+        Pool<float>.Give(uvs);
+        if (ranks != null) Pool<float>.Give(ranks);
+        ranks = null;
+    }
+
+    public static List<float> PooledFloats() => Pool<float>.Take();
+
+    static class Pool<T>
+    {
+        static readonly System.Collections.Concurrent.ConcurrentBag<List<T>> bag = new System.Collections.Concurrent.ConcurrentBag<List<T>>();
+        const int MaxKept = 48;
+
+        public static List<T> Take() => bag.TryTake(out List<T> list) ? list : new List<T>();
+
+        public static void Give(List<T> list)
+        {
+            // Only lists worth keeping: big ones, and not too many of them
+            if (list == null || list.Capacity < 4096 || bag.Count >= MaxKept) return;
+            list.Clear();
+            bag.Add(list);
+        }
+    }
     // The run-yourself undergrowth (2026-11-26, Anders: Ultra lagged): each shape's own number 0..1 (the same for all
     // its corners, 0 for a corner added on its own), so further from the runner only the shapes below a share are
     // drawn (TvAtlasLit thins them by it). null: not kept.
