@@ -111,6 +111,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
 
     // This player's object has been in the lobby (a late joiner's has not: it arrives straight in the race)
     bool beenInLobby;
+    public bool BeenInLobby => beenInLobby;
 
     // Imposter mode. The host stores who the imposter is on its own player object when the game starts,
     // and every player stores their own guess at the end of the competition.
@@ -780,6 +781,10 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             transform.position = at;
         }
         if (manager != null && manager.ChooseRunnerPanel != null) manager.ChooseRunnerPanel.SetActive(false);
+        // The waiting page (the dimmed map behind "Waiting for the others") is taken away when the race starts, which a
+        // spectator never sees: it stayed over the map and made the whole view dark (2026-11-26, Anders)
+        GameObject waitScreen = GameObject.FindGameObjectWithTag("WaitingForPlayersToConnect");
+        if (waitScreen != null) waitScreen.SetActive(false);
         if (localCamera != null && localCamera.cam != null) localCamera.cam.enabled = true;
         Debug.Log("NetworkPlayer: joined while the lobby is racing, watching this race");
         Spectator.Begin(this);
