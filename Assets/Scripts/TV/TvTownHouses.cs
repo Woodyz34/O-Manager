@@ -112,6 +112,12 @@ public partial class TvWorldBuilder
         // straight line (2026-11-23, Anders: a long slanted row had a step in its front at every home, it is one
         // smooth wall on the map) ----
         float tol = input.passable != null ? c * 0.5f : c * 0.76f;
+        // The outside always straightened with three quarters of a cell (2026-11-26, Anders: "ibland raka väggar,
+        // ibland sicksack"). The steps of a 2 m grid along a slanting wall have their outer and inner corners up to
+        // 1.4 m apart at 45 degrees and 1.8 m at 1 in 2; with the run-yourself world's tighter half cell, a slant of roughly 25 to 65
+        // degrees kept every step as a zigzag, while walls along the grid or nearly so came out straight. Where the
+        // map has the building's outline the walls stand on it instead (SnapRing).
+        float outerTol = c * 0.9f;
         var outerPos = new Dictionary<int, (float x, float z)>();
         {
             var usedO = new bool[directed.Count];
@@ -136,9 +142,9 @@ public partial class TvWorldBuilder
                 if (keys.Count < 5 || keys[0] != keys[keys.Count - 1]) continue;
                 var ring = new List<(float x, float z)>(keys.Count);
                 foreach (int key in keys) ring.Add((x0 + key % (W + 1) * c, z0 + key / (W + 1) * c));
-                var straight = StraightenLoop(ring, tol);
+                var straight = StraightenLoop(ring, outerTol);
                 // On the map's own outline where it has one: exactly straight walls and real corners
-                float near = tol + 0.05f;
+                float near = outerTol + 0.05f;
                 var onMap = SnapRing(ring);
                 if (onMap != null) { straight = onMap; near = 1.9f; }
                 if (straight.Count < 3) continue;

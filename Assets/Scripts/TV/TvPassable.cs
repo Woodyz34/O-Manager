@@ -97,6 +97,27 @@ public class TvPassable
         return false;
     }
 
+    // Closed in the grid, but the map's ground under it is ground a runner runs on (paving, grass, forest): only a
+    // blocking line (a high fence, a wall, an impassable cliff) closed it. The 2D grid draws such a line a whole 2 m
+    // cell thick, so a narrow way between two fences can be closed from end to end in the grid though open on the map
+    // (2026-11-26, Anders: every runner stopped in a gap between two fences with a path through it). In 3D the
+    // fences themselves stand there and decide. False without the map's ground kinds.
+    public bool ClosedByLine(double e, double n)
+    {
+        if (kinds == null || !Cell(e, n, out int i, out int j)) return false;
+        if (purple.Contains(i * cols + j) || speed[i, j] > 0.01f) return false;
+        switch (kinds[i * cols + j])
+        {
+            case MapImport.GroundKind.Forest: case MapImport.GroundKind.Open: case MapImport.GroundKind.Cultivated:
+            case MapImport.GroundKind.RoughOpen: case MapImport.GroundKind.OpenTrees: case MapImport.GroundKind.LightGreen:
+            case MapImport.GroundKind.Paved: case MapImport.GroundKind.Stony: case MapImport.GroundKind.Sand:
+            case MapImport.GroundKind.BareRock: case MapImport.GroundKind.BrokenGround: case MapImport.GroundKind.Stairs:
+            case MapImport.GroundKind.Canopy:
+                return true;
+        }
+        return false;
+    }
+
     // The grid lets a runner through here, so no house stands here (a cell the course's purple shapes closed keeps
     // whatever the map has: closed by them, it is no way through either way)
     public bool NoHouse(double e, double n)

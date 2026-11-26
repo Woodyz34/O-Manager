@@ -230,7 +230,8 @@ public class RunTerrain
             bool closed = passable.Closed(e, n) && !OnWay(e, n);
             // Right beside an open cell, where the 3D ground itself is open (no house, water or garden) and the course
             // has not closed it, the 3D walls and fences decide (TvPassable.NearOpen: narrow gaps and footbridges)
-            if (closed && !g.blocked && !passable.Purple(e, n) && (passable.NearOpen(e, n, passable.CellSize * 0.8) || OnTownPath(e, n))) closed = false;
+            if (closed && !g.blocked && !passable.Purple(e, n)
+                && (passable.NearOpen(e, n, passable.CellSize * 0.8) || OnTownPath(e, n) || passable.ClosedByLine(e, n))) closed = false;
             // Along a garden's edge the map's own straight line decides, not the zigzag of the 2 m cells (2026-11-23,
             // Anders): the hedge, wall or fence stands on the line, and the runner stops at it
             if (gardens != null && !passable.Purple(e, n) && gardens.Near(e, n, 2.6f))
