@@ -143,8 +143,23 @@ public class ContestReplay : MonoBehaviour
     TextMeshProUGUI legTimes;
     bool dragging;
     Vector2 dragFrom;
+    bool routesOnly;       // race: every route drawn whole, no dots, the clock stopped
+    Button routesButton;
+    readonly List<(Runner runner, Image image)> runnerButtons = new List<(Runner, Image)>();
 
-    public static ContestReplay Open(CourseData course, bool routeChoice, List<Runner> runners, Action onClose)
+    // Any number of runners (2026-11-26, the user: no limit of 10): the palette first, then colours spread round the
+    // colour wheel so neighbours still differ
+    static Color ColourFor(int i)
+    {
+        if (i < Palette.Length - 1) return Palette[1 + i];
+        float hue = (0.13f + (i - Palette.Length + 1) * 0.61803f) % 1f;
+        float value = (i / 3) % 2 == 0 ? 0.78f : 0.60f;
+        return Color.HSVToRGB(hue, 0.75f, value);
+    }
+
+    // routesOnly: the race's routes drawn whole at once, no replay (2026-11-26, the user: "se vägvalen utan att
+    // behöva kolla på reprisen"); the Replay button starts the replay from there
+    public static ContestReplay Open(CourseData course, bool routeChoice, List<Runner> runners, Action onClose, bool routesOnly = false)
     {
         GameObject go = new GameObject("Contest replay", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         Canvas canvas = go.GetComponent<Canvas>();
@@ -156,7 +171,8 @@ public class ContestReplay : MonoBehaviour
         view.routeChoice = routeChoice;
         view.runners = runners;
         view.onClose = onClose;
-        for (int i = 0; i < runners.Count; i++) runners[i].color = runners[i].me ? Palette[0] : Palette[1 + i % (Palette.Length - 1)];
+        view.routesOnly = routesOnly;
+        for (int i = 0; i < runners.Count; i++) runners[i].color = runners[i].me ? Palette[0] : ColourFor(i);
         view.Build();
         return view;
     }
@@ -303,6 +319,7 @@ public class ContestReplay : MonoBehaviour
 
     void DrawCourse()
     {
+        DrawForbidden();
         Color purple = CourseRenderer.CoursePurple;
         List<CoursePoint> points = course.AllPoints();
         float size = CourseRenderer.SizeFor(map);
@@ -346,6 +363,71 @@ public class ContestReplay : MonoBehaviour
                 }
             }
         }
+    }
+
+    // The course's out-of-bounds areas (the AI sprint barriers too), uncrossable boundaries and bridges, as in the race
+    // (ForbiddenAreaRenderer): purple north-south stripes with a border, a thick purple line, two thin side lines.
+    // Before 2026-11-26 the replay left them out, so the routes seemed to go round nothing (the user).
+    void DrawForbidden()
+    {
+        if (!ForbiddenAreas.Any(course)) return;
+        bool sprint = course.IsSprint() || map.IsSprint;
+        float m = MapDefinition.WorldUnitsPerMeter;
+        float spacing = (sprint ? 3.2f : 12f) * m;
+        float half = spacing * 0.32f / 2f;
+        float bridgeHalf = (sprint ? 2.2f : 7f) * m;
+        Color purple = CourseRenderer.CoursePurple;
+        List<Vector2[]> stripes = new List<Vector2[]>();
+        List<(List<Vector2> points, bool loop, float width)> lines = new List<(List<Vector2>, bool, float)>();
+        foreach (ForbiddenArea area in course.forbidden)
+        {
+            if (area == null || !area.IsValid) continue;
+            List<Vector3> corners = area.corners.ConvertAll(c => map.ToWorld(c));
+            if (area.bridge)
+            {
+                for (int k = 0; k + 1 < corners.Count; k++)
+                {
+                    Vector3 d = corners[k + 1] - corners[k];
+                    if (d.sqrMagnitude < 1e-8f) continue;
+                    Vector3 side = new Vector3(-d.y, d.x, 0f).normalized * bridgeHalf;
+                    lines.Add((new List<Vector2> { UV(corners[k] + side), UV(corners[k + 1] + side) }, false, 2f));
+                    lines.Add((new List<Vector2> { UV(corners[k] - side), UV(corners[k + 1] - side) }, false, 2f));
+                }
+                continue;
+            }
+            if (area.line)
+            {
+                lines.Add((corners.ConvertAll(c => UV(c)), false, 5f));
+                continue;
+            }
+            lines.Add((corners.ConvertAll(c => UV(c)), true, 2f));
+            // Stripes: at every step of the spacing across the area, the stretches of that north-south line inside it
+            float minX = float.MaxValue, maxX = float.MinValue;
+            foreach (Vector3 c in corners) { minX = Mathf.Min(minX, c.x); maxX = Mathf.Max(maxX, c.x); }
+            List<float> ys = new List<float>();
+            for (float x = Mathf.Ceil(minX / spacing) * spacing; x <= maxX; x += spacing)
+            {
+                ys.Clear();
+                for (int k = 0; k < corners.Count; k++)
+                {
+                    Vector3 a = corners[k], b = corners[(k + 1) % corners.Count];
+                    if ((a.x <= x && b.x > x) || (b.x <= x && a.x > x))
+                        ys.Add(a.y + (x - a.x) / (b.x - a.x) * (b.y - a.y));
+                }
+                ys.Sort();
+                for (int k = 0; k + 1 < ys.Count; k += 2)
+                {
+                    stripes.Add(new[]
+                    {
+                        UV(new Vector3(x - half, ys[k], 0f)), UV(new Vector3(x + half, ys[k], 0f)),
+                        UV(new Vector3(x + half, ys[k + 1], 0f)), UV(new Vector3(x - half, ys[k + 1], 0f))
+                    });
+                }
+                if (stripes.Count > 20000) break;   // a guard against broken data
+            }
+        }
+        if (stripes.Count > 0) UIQuads.Make("Out-of-bounds stripes", overlay, purple).Set(stripes);
+        for (int i = 0; i < lines.Count; i++) UIRouteLine.Make("Out-of-bounds " + i, overlay, purple, lines[i].width).Set(lines[i].points, lines[i].loop);
     }
 
     // ---- Race replay ----
@@ -395,13 +477,27 @@ public class ContestReplay : MonoBehaviour
             top -= 70f;
         }
 
-        // Who is shown
+        // Who is shown: Show all / Hide all, then any runner clicked on or off (2026-11-26, the user)
+        RectTransform allRow = CourseUI.Rect("Show all or none", side);
+        CourseUI.Place(allRow, new Vector2(0, 1), new Vector2(0, 1), new Vector2(28, top), new Vector2(424, 48));
+        CourseUI.Row(allRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        Button showAll = CourseUI.Button("Show all", allRow, "Show all", CourseUI.ButtonKind.Light, () => ShowAll(true), 20);
+        Button hideAll = CourseUI.Button("Hide all", allRow, "Hide all", CourseUI.ButtonKind.Light, () => ShowAll(false), 20);
+        CourseUI.Size(showAll, 48, -1, 1);
+        CourseUI.Size(hideAll, 48, -1, 1);
+        HoverTip.Add(hideAll, "Hide everyone, then click the runners you want to see");
+        top -= 58f;
         TextMeshProUGUI caption = CourseUI.Text("Runners caption", side, "Runners (click to show or hide)", 20, CourseUI.InkMuted, FontStyles.Bold);
         CourseUI.Place(caption.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(28, top), new Vector2(424, 30));
         legTimes = caption;
-        RectTransform list = CourseUI.Rect("Runners", side);
-        CourseUI.Place(list, new Vector2(0, 1), new Vector2(0, 1), new Vector2(28, top - 36), new Vector2(424, 600));
+        RectTransform list = CourseUI.ScrollList("Runners", side, out ScrollRect listScroll);
+        RectTransform listView = (RectTransform)listScroll.transform;
+        listView.anchorMin = new Vector2(0, 0);
+        listView.anchorMax = new Vector2(1, 1);
+        listView.offsetMin = new Vector2(28, 110);
+        listView.offsetMax = new Vector2(-28, top - 36);
         CourseUI.Column(list.gameObject, 8, new RectOffset(0, 0, 0, 0));
+        FastScroll.Add(listScroll);
         foreach (Runner r in runners)
         {
             Runner runner = r;
@@ -413,12 +509,15 @@ public class ContestReplay : MonoBehaviour
             Image swatch = CourseUI.Panel("Colour", b.transform, r.color);
             if (CourseUI.Skin != null && CourseUI.Skin.pill != null) swatch.sprite = CourseUI.Skin.pill;
             CourseUI.Place(swatch.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(14, 0), new Vector2(20, 20));
+            Image look = b.GetComponent<Image>();
+            runnerButtons.Add((runner, look));
             b.onClick.AddListener(() =>
             {
                 runner.shown = !runner.shown;
-                b.GetComponent<Image>().color = runner.shown ? CourseUI.Soft : new Color(1, 1, 1, 0.3f);
+                ShowRunnerButton(runner, look);
                 Apply();
             });
+            ShowRunnerButton(runner, look);
         }
 
         // The time bar under the map
@@ -437,17 +536,59 @@ public class ContestReplay : MonoBehaviour
         slider = CourseUI.SliderControl("Time", bar.transform, 0f, Mathf.Max(1f, endTime), 0f, false, v =>
         {
             if (settingSlider) return;
+            if (routesOnly)
+            {
+                // Dragging the time bar goes back to the replay, from where it was dragged to
+                routesOnly = false;
+                CourseUI.SetButtonText(routesButton, "Routes only");
+                CourseUI.SetButtonColor(routesButton, CourseUI.ButtonKind.Light);
+            }
             time = v;
             Apply();
         });
         CourseUI.Size(slider, 60, -1, 1);
         clockText = CourseUI.Text("Clock", bar.transform, "", 28, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Size(clockText, 60, 150);
+        routesButton = CourseUI.Button("Routes", bar.transform, "", CourseUI.ButtonKind.Light, () => SetRoutesOnly(!routesOnly), 22);
+        CourseUI.Size(routesButton, 60, 190);
+        HoverTip.Add(routesButton, "Routes only: everyone's whole route at once, without the replay. Works for the whole course and for one leg.");
+        SetRoutesOnly(routesOnly);
+    }
+
+    static void ShowRunnerButton(Runner runner, Image look)
+    {
+        if (look != null) look.color = runner.shown ? CourseUI.Soft : new Color(1, 1, 1, 0.3f);
+    }
+
+    void ShowAll(bool shown)
+    {
+        foreach (var (runner, look) in runnerButtons)
+        {
+            runner.shown = shown;
+            ShowRunnerButton(runner, look);
+        }
+        Apply();
+    }
+
+    // Routes only: the clock at the end and stopped, so every route is drawn whole; off again: the replay from the start
+    void SetRoutesOnly(bool on)
+    {
+        routesOnly = on;
+        if (routesButton != null) CourseUI.SetButtonText(routesButton, on ? "Replay" : "Routes only");
+        if (routesButton != null) CourseUI.SetButtonColor(routesButton, on ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        time = on ? endTime : 0f;
+        playing = !on;
+        if (playButton != null) CourseUI.SetButtonText(playButton, playing ? "Pause" : "Play");
         Apply();
     }
 
     void TogglePlay()
     {
+        if (routesOnly)
+        {
+            SetRoutesOnly(false);
+            return;
+        }
         if (!playing && time >= endTime) time = 0f;
         playing = !playing;
         CourseUI.SetButtonText(playButton, playing ? "Pause" : "Play");
@@ -481,7 +622,7 @@ public class ContestReplay : MonoBehaviour
             }
             r.line.gameObject.SetActive(r.shown);
             r.line.Set(shown, false);
-            r.dot.gameObject.SetActive(r.shown && any);
+            r.dot.gameObject.SetActive(r.shown && any && !(routesOnly && time >= endTime));
             r.dot.anchorMin = r.dot.anchorMax = at;
             r.dot.anchoredPosition = Vector2.zero;
             if (r.dotLabel != null)
@@ -600,9 +741,9 @@ public class ContestReplay : MonoBehaviour
         }
         if (legTimes != null) legTimes.text = raceLeg == 0 ? "Runners (click to show or hide)" : "Time on the leg (click to show or hide)";
         if (slider != null) slider.maxValue = Mathf.Max(1f, endTime);
-        time = 0f;
-        playing = true;
-        if (playButton != null) CourseUI.SetButtonText(playButton, "Pause");
+        time = routesOnly ? endTime : 0f;
+        playing = !routesOnly;
+        if (playButton != null) CourseUI.SetButtonText(playButton, playing ? "Pause" : "Play");
         Fit();
         Apply();
     }
@@ -710,6 +851,10 @@ public class ContestReplay : MonoBehaviour
         CourseUI.Place(swatch.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(12, 0), new Vector2(12, 72));
         TextMeshProUGUI text = CourseUI.Text("Text", row.transform, head + "\n<size=19>" + who + "</size>", 23, CourseUI.Ink);
         text.richText = true;
+        // Many runners on one route (no limit since 2026-11-26): the names shrink to fit
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 11;
+        text.fontSizeMax = 23;
         CourseUI.Stretch(text.rectTransform, 36, 12, 8, 8);
     }
 
