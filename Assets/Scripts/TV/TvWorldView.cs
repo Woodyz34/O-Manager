@@ -144,67 +144,224 @@ public class TvWorldView : MonoBehaviour
         return ToMesh(new MeshArrays(source));
     }
 
+    // A corner as the graphics card gets it: all of it side by side, so a mesh is handed over in one copy
+    // (2026-11-26, Anders on Fossum Ultra: one undergrowth mesh of a million corners cost 200 ms with the corners,
+    // normals, colours and pictures set one after another)
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    public struct PlainCorner { public Vector3 p, n; public Color32 c; }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    public struct TexturedCorner { public Vector3 p, n; public Color32 c; public Vector3 uv; }
+
+    static readonly VertexAttributeDescriptor[] PlainLayout =
+    {
+        new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+        new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
+        new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4),
+    };
+
+    static readonly VertexAttributeDescriptor[] TexturedLayout =
+    {
+        new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+        new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
+        new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4),
+        new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 3),
+    };
+
     // A mesh's corners as Unity wants them. Made on a background thread, so the main thread only hands them over.
     public class MeshArrays
     {
         public string name;
         public bool castShadows;
         public byte group;          // TvMesh.group: the run-yourself world draws some only near or only far
-        public Vector3[] vertices, normals;
-        public Color32[] colors;
-        public int[] triangles;
-        public Vector3[] uvs;       // textured meshes (TvAtlas): u, v and the atlas tile; null for plain coloured ones
+        public int count;           // corners
+        public PlainCorner[] plain; // plain coloured meshes
+        public TexturedCorner[] textured;   // textured meshes (TvAtlas): u, v and the atlas tile too
+        public ushort[] small;      // the triangles, when the mesh has at most 65 535 corners
+        public int[] big;           // else
         public Bounds bounds;       // worked out here, on the background thread, so the main thread need not
         public Mesh mesh;           // the run-yourself world makes the mesh ahead, one a frame (RunWorld.HandOver)
 
-        public MeshArrays(TvMesh source)
+        public bool HasUvs => textured != null;
+        public int IndexCount => small != null ? small.Length : big != null ? big.Length : 0;
+
+        MeshArrays(TvMesh source, int corners)
         {
             name = source.name;
             castShadows = source.castShadows;
             group = source.group;
-            int count = source.VertexCount;
-            vertices = new Vector3[count];
-            normals = new Vector3[count];
-            colors = new Color32[count];
-            List<float> p = source.positions, n = source.normals;
-            List<byte> c = source.colors;
+            count = corners;
+            if (source.uvs.Count > 0)
+            {
+                source.PadUvs(source.VertexCount);
+                textured = new TexturedCorner[corners];
+            }
+            else plain = new PlainCorner[corners];
+        }
+
+        public MeshArrays(TvMesh source) : this(source, source.VertexCount)
+        {
+            for (int i = 0; i < count; i++) Put(source, i, i);
+            List<int> t = source.triangles;
+            if (count <= 65535)
+            {
+                small = new ushort[t.Count];
+                for (int i = 0; i < small.Length; i++) small[i] = (ushort)t[i];
+            }
+            else big = t.ToArray();
+            Bound();
+        }
+
+        void Put(TvMesh s, int from, int to)
+        {
+            List<float> p = s.positions, n = s.normals;
+            List<byte> c = s.colors;
+            int a = from * 3;
+            var pos = new Vector3(p[a], p[a + 1], p[a + 2]);
+            var nor = new Vector3(n[a], n[a + 1], n[a + 2]);
+            var col = new Color32(c[a], c[a + 1], c[a + 2], 255);
+            if (textured != null)
+            {
+                List<float> u = s.uvs;
+                textured[to] = new TexturedCorner { p = pos, n = nor, c = col, uv = new Vector3(u[a], u[a + 1], u[a + 2]) };
+            }
+            else plain[to] = new PlainCorner { p = pos, n = nor, c = col };
+        }
+
+        void Bound()
+        {
+            if (count == 0) return;
             Vector3 lo = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue), hi = -lo;
             for (int i = 0; i < count; i++)
             {
-                vertices[i] = new Vector3(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
-                lo = Vector3.Min(lo, vertices[i]);
-                hi = Vector3.Max(hi, vertices[i]);
-                normals[i] = new Vector3(n[i * 3], n[i * 3 + 1], n[i * 3 + 2]);
-                colors[i] = new Color32(c[i * 3], c[i * 3 + 1], c[i * 3 + 2], 255);
+                Vector3 v = textured != null ? textured[i].p : plain[i].p;
+                lo = Vector3.Min(lo, v);
+                hi = Vector3.Max(hi, v);
             }
-            if (count > 0) bounds.SetMinMax(lo, hi);
-            triangles = source.triangles.ToArray();
-            if (source.uvs.Count > 0)
+            bounds.SetMinMax(lo, hi);
+        }
+
+        // A big mesh cut into parts the graphics card gets one at a time (2026-11-26, Anders on Fossum Ultra: a piece's
+        // undergrowth of a million corners stopped the game for 100-200 ms): each triangle to the square (tiles x
+        // tiles over 2 x radius) its middle is in, and a square with more than maxCorners corners into several parts.
+        // The graphics card also skips each square outside the picture. Every triangle is kept as it was.
+        public static List<MeshArrays> Split(TvMesh source, float radius, int tiles, int maxCorners)
+        {
+            var list = new List<MeshArrays>();
+            int vc = source.VertexCount;
+            if (vc == 0) return list;
+            if (tiles <= 1 && vc <= maxCorners)
             {
-                source.PadUvs(count);
-                List<float> u = source.uvs;
-                uvs = new Vector3[count];
-                for (int i = 0; i < count; i++) uvs[i] = new Vector3(u[i * 3], u[i * 3 + 1], u[i * 3 + 2]);
+                list.Add(new MeshArrays(source));
+                return list;
             }
+            if (tiles < 1) tiles = 1;
+            List<float> p = source.positions;
+            List<int> t = source.triangles;
+            float size = 2f * radius / tiles;
+            // Which square each triangle goes to, counted first so each square's list is made at its size
+            int triCount = t.Count / 3;
+            var tileOf = new int[triCount];
+            var perTile = new int[tiles * tiles];
+            for (int k = 0; k < triCount; k++)
+            {
+                int a = t[k * 3] * 3, b = t[k * 3 + 1] * 3, d = t[k * 3 + 2] * 3;
+                float x = (p[a] + p[b] + p[d]) / 3f, z = (p[a + 2] + p[b + 2] + p[d + 2]) / 3f;
+                int ti = (int)((x + radius) / size), tj = (int)((z + radius) / size);
+                ti = ti < 0 ? 0 : ti >= tiles ? tiles - 1 : ti;
+                tj = tj < 0 ? 0 : tj >= tiles ? tiles - 1 : tj;
+                tileOf[k] = tj * tiles + ti;
+                perTile[tileOf[k]]++;
+            }
+            var byTile = new int[tiles * tiles][];
+            var fill = new int[tiles * tiles];
+            for (int k = 0; k < byTile.Length; k++) if (perTile[k] > 0) byTile[k] = new int[perTile[k]];
+            for (int k = 0; k < triCount; k++) byTile[tileOf[k]][fill[tileOf[k]]++] = k;
+            var stamp = new int[vc];   // which part the corner was last counted or copied for
+            var remap = new int[vc];
+            int part = 0;
+            foreach (int[] tris in byTile)
+            {
+                if (tris == null) continue;
+                int first = 0;
+                while (first < tris.Length)
+                {
+                    // How many triangles fit in this part
+                    part++;
+                    int corners = 0, last = first;
+                    while (last < tris.Length)
+                    {
+                        int fresh = 0;
+                        for (int c = 0; c < 3; c++) if (stamp[t[tris[last] * 3 + c]] != part) fresh++;
+                        if (corners + fresh > maxCorners && last > first) break;
+                        for (int c = 0; c < 3; c++)
+                        {
+                            int v = t[tris[last] * 3 + c];
+                            if (stamp[v] != part) { stamp[v] = part; corners++; }
+                        }
+                        last++;
+                    }
+                    // The part itself
+                    part++;
+                    var m = new MeshArrays(source, corners);
+                    int n = 0, ic = (last - first) * 3;
+                    if (corners <= 65535) m.small = new ushort[ic]; else m.big = new int[ic];
+                    int w = 0;
+                    for (int k = first; k < last; k++)
+                        for (int c = 0; c < 3; c++)
+                        {
+                            int v = t[tris[k] * 3 + c];
+                            if (stamp[v] != part)
+                            {
+                                stamp[v] = part;
+                                remap[v] = n;
+                                m.Put(source, v, n);
+                                n++;
+                            }
+                            if (m.small != null) m.small[w++] = (ushort)remap[v]; else m.big[w++] = remap[v];
+                        }
+                    m.Bound();
+                    list.Add(m);
+                    first = last;
+                }
+            }
+            return list;
         }
     }
 
     public static Mesh ToMesh(MeshArrays source)
     {
-        // 2026-11-26 (a big piece of undergrowth cost 120-170 ms here on Fossum): no checking of the corners and no
-        // bounds worked out on the main thread (both are known to be right: the bounds come from the background)
+        // 2026-11-26 (a big piece of undergrowth cost 120-200 ms here on Fossum): the corners go over in one copy, no
+        // checking of the corners and no bounds worked out on the main thread (both are known to be right: the bounds
+        // come from the background)
         const MeshUpdateFlags Quick = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontRecalculateBounds
                                       | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontResetBoneBounds;
         var mesh = new Mesh { name = source.name };
-        int n = source.vertices.Length;
-        if (n > 65000) mesh.indexFormat = IndexFormat.UInt32;
-        mesh.SetVertices(source.vertices, 0, n, Quick);
-        mesh.SetNormals(source.normals, 0, n, Quick);
-        mesh.SetColors(source.colors, 0, n, Quick);
-        if (source.uvs != null) mesh.SetUVs(0, source.uvs, 0, n, Quick);
-        mesh.SetTriangles(source.triangles, 0, source.triangles.Length, 0, false);
-        if (n > 0 && source.bounds.size != Vector3.zero) mesh.bounds = source.bounds;
-        else mesh.RecalculateBounds();
+        int n = source.count, ic = source.IndexCount;
+        if (n == 0 || ic == 0) return mesh;
+        if (source.textured != null)
+        {
+            mesh.SetVertexBufferParams(n, TexturedLayout);
+            mesh.SetVertexBufferData(source.textured, 0, 0, n, 0, Quick);
+        }
+        else
+        {
+            mesh.SetVertexBufferParams(n, PlainLayout);
+            mesh.SetVertexBufferData(source.plain, 0, 0, n, 0, Quick);
+        }
+        if (source.small != null)
+        {
+            mesh.SetIndexBufferParams(ic, IndexFormat.UInt16);
+            mesh.SetIndexBufferData(source.small, 0, 0, ic, Quick);
+        }
+        else
+        {
+            mesh.SetIndexBufferParams(ic, IndexFormat.UInt32);
+            mesh.SetIndexBufferData(source.big, 0, 0, ic, Quick);
+        }
+        mesh.subMeshCount = 1;
+        mesh.SetSubMesh(0, new SubMeshDescriptor(0, ic) { bounds = source.bounds, firstVertex = 0, vertexCount = n }, Quick);
+        mesh.bounds = source.bounds;
         return mesh;
     }
 
@@ -286,7 +443,7 @@ public class TvWorldView : MonoBehaviour
         go.transform.SetParent(drawn, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         var r = go.AddComponent<MeshRenderer>();
-        r.sharedMaterial = source.uvs != null ? atlasMaterial : source.name.StartsWith("Ground", StringComparison.Ordinal) ? groundMaterial : plainMaterial;
+        r.sharedMaterial = source.HasUvs ? atlasMaterial : source.name.StartsWith("Ground", StringComparison.Ordinal) ? groundMaterial : plainMaterial;
         r.shadowCastingMode = source.castShadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
         r.receiveShadows = true;
         r.lightProbeUsage = LightProbeUsage.Off;

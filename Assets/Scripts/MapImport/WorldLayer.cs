@@ -75,7 +75,8 @@ namespace MapImport
     // The outline of an area the 3D town needs exactly (2026-11-23, Anders: the gardens were the zigzag of the 2 m
     // cells; on the map they are straight): a garden (olive green, ISSprOM 520) or ground out of bounds (709, 714,
     // a map maker's own forbidden area). One ring per part of the area (holes too), in the game's map metres.
-    public enum WorldAreaKind : byte { None = 0, Garden = 1, OutOfBounds = 2 }
+    // House (2026-11-26): a building's outline on a forest map, so the 3D world builds the house to its shape
+    public enum WorldAreaKind : byte { None = 0, Garden = 1, OutOfBounds = 2, House = 3 }
 
     public class WorldArea
     {
@@ -150,6 +151,7 @@ namespace MapImport
                 if (o.kind != SymbolKind.Area || o.symbol == null) continue;
                 if (!AreaRule(o.symbol, sprint, out byte set, out byte flag, out bool clear)) continue;
                 areas.Add((GridBuilder.TopColor(o.symbol), order++, o, set, flag, clear));
+                if (set == WorldCell.Building && !sprint) w.KeepOutline(o, WorldAreaKind.House, mpm, offE, offN);
                 if (set == WorldCell.Plot) w.KeepOutline(o, SymbolRules.Isom2017Major(o.symbol) == 520 ? WorldAreaKind.Garden : WorldAreaKind.OutOfBounds, mpm, offE, offN);
             }
             areas.Sort((a, b) => a.prio != b.prio ? b.prio.CompareTo(a.prio) : a.order.CompareTo(b.order));
