@@ -204,6 +204,8 @@ public class ReadyUIHandler : NetworkBehaviour
             serverPlayer.gameMode = selectedMode;
             // The extra game modes, for everyone to read when the competition starts
             serverPlayer.competitionModes = (int)extraModes | ExtraModes.KnownBit;
+            // Who races: everyone in the lobby now. Anyone who comes in after this watches (Spectator).
+            serverPlayer.SetRaceRoster(Runner);
             // Imposter mode: one random player gets the secret job of finishing last.
             // Secret task mode: one random player is the imposter, everyone else gets the same secret task.
             bool secretTaskOn = (extraModes & ExtraMode.SecretTask) != 0;
