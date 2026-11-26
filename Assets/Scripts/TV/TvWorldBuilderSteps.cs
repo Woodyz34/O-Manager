@@ -129,7 +129,7 @@ public partial class TvWorldBuilder
                         {
                             id++;
                             float px = float.NaN, pz = 0f;
-                            float s1 = cw.ext + 30f;
+                            float s1 = cw.ext + 0.5f;
                             for (float s = p.half + 0.6f; s <= s1 + 0.01f; s += 1f)
                             {
                                 cw.Edges(s, out float ea, out float eb);

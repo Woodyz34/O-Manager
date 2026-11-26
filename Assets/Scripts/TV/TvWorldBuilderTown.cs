@@ -848,7 +848,8 @@ public partial class TvWorldBuilder
     RoadRaise MakeRoadRaise(TunnelPlan p)
     {
         const float Far = 45f;
-        float ex = p.ax + p.ux * p.len, ez = p.az + p.uz * p.len, pad = p.half + Far + 6f;
+        float far = Math.Max(p.wayA != null ? p.wayA.ext : 0f, p.wayB != null ? p.wayB.ext : 0f);
+        float ex = p.ax + p.ux * p.len, ez = p.az + p.uz * p.len, pad = p.half + Far + 6f + far;
         var rr = new RoadRaise
         {
             x0 = (int)Math.Floor(Math.Min(p.ax, ex) - pad), z0 = (int)Math.Floor(Math.Min(p.az, ez) - pad)
@@ -869,7 +870,20 @@ public partial class TvWorldBuilder
                 rr.target[k] = float.NaN;
                 float dx = x - p.ax, dz = z - p.az, t = dx * p.ux + dz * p.uz, across = -dx * p.uz + dz * p.ux, a = Math.Abs(across);
                 Causeway cw = across < 0f ? p.wayA : p.wayB;
-                if (cw != null) continue;
+                if (cw != null)
+                {
+                    // A causeway: the road runs on from its land end along its own paving, down to the land, turning
+                    // with the road (2026-11-26, Anders: the road ran on straight at the roof's height over the open
+                    // land past the water, with asphalt over the grass)
+                    if (a <= cw.ext - 0.5f) continue;
+                    if (Base(CellAt(x, z)) == WorldCell.Building || Base(CellAt(x, z)) == WorldCell.Water) continue;
+                    cw.Edges(cw.ext, out float elo, out float ehi);
+                    float qe = t - p.len / 2f;
+                    if (a <= cw.ext + 1.2f && qe >= elo - 0.3f && qe <= ehi + 0.3f) { dist[k] = 0f; open[k] = true; any = true; continue; }
+                    if (a <= cw.ext + 1.2f) continue;
+                    open[k] = Base(SmoothCell(x, z)) == WorldCell.Paved;
+                    continue;
+                }
                 bool band = t >= 0.6f && t <= p.len - 0.6f;
                 // The tunnel's own way in front of its mouths stays down
                 if (!band && a <= p.half + 1.5f) continue;
@@ -931,7 +945,7 @@ public partial class TvWorldBuilder
                 float x = rr.x0 + i, z = rr.z0 + j;
                 float dx = x - p.ax, dz = z - p.az, t = dx * p.ux + dz * p.uz, a = Math.Abs(-dx * p.uz + dz * p.ux);
                 if ((t < 0.6f || t > p.len - 0.6f) && a <= p.half + 1.5f) continue;
-                if (Base(CellAt(x, z)) == WorldCell.Building) continue;
+                if (Base(CellAt(x, z)) == WorldCell.Building || Base(CellAt(x, z)) == WorldCell.Water) continue;
                 float best = float.NaN;
                 for (int dj = -Reach; dj <= Reach; dj++)
                     for (int di = -Reach; di <= Reach; di++)
@@ -980,7 +994,7 @@ public partial class TvWorldBuilder
     {
         foreach (TunnelPlan p in tunnelPlans)
         {
-            if (p.underHouse || (p.wayA != null && p.wayB != null)) continue;
+            if (p.underHouse) continue;
             p.raise = MakeRoadRaise(p);
             RoadRaise rr = p.raise;
             for (int k = 0; k < N * N; k++)
@@ -1026,14 +1040,7 @@ public partial class TvWorldBuilder
                 }
                 if (!overTunnel && !onWay)
                 {
-                    // Past the causeway's land end: the ground round its end ramps down from it on every side
-                    if (cw == null || a <= cw.ext || Base(CellAt(x, z)) == WorldCell.Water || (wLvl != null && wLvl[k] > -0.6f)) return;
-                    cw.Edges(cw.ext, out float ea, out float eb);
-                    float qq = t - p.len / 2f, dq = qq < ea ? ea - qq : qq > eb ? qq - eb : 0f, dEnd = (float)Math.Sqrt(dq * dq + (a - cw.ext) * (a - cw.ext));
-                    float r0 = floor + TunnelRoof - F[k];
-                    if (r0 <= 0f) return;
-                    float rmp = Math.Max(6f, Math.Min(40f, r0 * 10f));
-                    F[k] = Math.Max(F[k], Lerp(floor + TunnelRoof, F[k], Sm(0f, rmp, dEnd)));
+                    // Past the causeway's land end the road comes down along its paving (RoadRaise)
                     return;
                 }
                 bool overWater = onWay && a <= cw.ext;
@@ -1047,7 +1054,9 @@ public partial class TvWorldBuilder
                 // The land on a side with no causeway: the road is raised along its own paving (RoadRaise), not
                 // as a straight band
                 if (cw == null && a >= p.half + 1.6f && (overTunnel || onWay)) return;
-                if (input.town != null && (cw == null || a <= cw.ext + 30f))
+                // Past the causeway's end: not a straight band on over the land (RoadRaise follows the paving)
+                if (cw != null && a > cw.ext + 0.5f) return;
+                if (input.town != null && (cw == null || a <= cw.ext + 0.5f))
                 {
                     // Paved right across, up to the walls and the mouths (2026-11-24, Anders: grass and zigzag on the tunnel)
                     float inside;
