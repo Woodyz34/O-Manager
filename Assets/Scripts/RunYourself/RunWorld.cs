@@ -77,6 +77,7 @@ public class RunWorld : MonoBehaviour
         // own for its detail and its cross-fade (parent: the 64 m piece it belongs to); a town's stays whole (its houses)
         public Piece[] quads;
         public Piece parent;
+        public RunTufts.Set tuftSet;        // the undergrowth's plants as copies (RunTufts), with the detail
         public float dist;
         public float onCourse = -1f;        // how far the piece is from the course's legs (-1: not worked out yet)
         public bool nearOn;
@@ -110,6 +111,7 @@ public class RunWorld : MonoBehaviour
         public TvWorld world;
         public List<TvWorldView.MeshArrays> arrays;
         public RunTrees.Set treeSet;
+        public RunTufts.Set tuftSet;
         public int made;            // how many of arrays have their mesh made (HandOver, one at a time)
     }
 
@@ -407,6 +409,8 @@ public class RunWorld : MonoBehaviour
         // The trees as copies of a few (null: this computer can't, the pieces make tree meshes)
         trees?.Destroy();
         trees = RunTrees.Create(quality, atlasMaterial, look.shadows > 0, sun);
+        tufts?.Destroy();
+        tufts = RunTufts.Create(quality, atlasMaterial);
         if (trees != null)
         {
             // The finest trees only right round the runner; shadows only as far as they are drawn (RunTrees)
@@ -505,6 +509,7 @@ public class RunWorld : MonoBehaviour
         if (atlasMaterial != null) Destroy(atlasMaterial);
         if (tapeMesh != null) Destroy(tapeMesh);
         trees?.Destroy();
+        tufts?.Destroy();
     }
 
     // ---- Map points and the scene ----
@@ -761,6 +766,7 @@ public class RunWorld : MonoBehaviour
         long t2 = perf.ElapsedTicks;
         Reveal();
         DrawTrees();
+        DrawTufts();
         Fades();
         long t3 = perf.ElapsedTicks;
         RunPerf.Add(RunPerf.Part.World, t3 - t0);
@@ -941,6 +947,7 @@ public class RunWorld : MonoBehaviour
     // ---- The trees as copies (RunTrees) ----
 
     RunTrees trees;
+    RunTufts tufts;
     // The runner's eyes (RunSession sets it): pieces with far trees outside its picture are not drawn
     public Camera viewCamera;
     readonly Plane[] frustum = new Plane[6];
@@ -985,6 +992,41 @@ public class RunWorld : MonoBehaviour
         }
         Vector3 at = transform.TransformPoint(ToScene(playerE, playerN, 0f));
         trees.Draw(new Bounds(at, new Vector3(look.view * 2f + 200f, 4000f, look.view * 2f + 200f)));
+    }
+
+    // The undergrowth's plants as copies (RunTufts): each built square whose box is in the picture
+    readonly Plane[] tuftFrustum = new Plane[6];
+
+    void DrawTufts()
+    {
+        if (tufts == null) return;
+        tufts.Clear();
+        bool cull = viewCamera != null && viewCamera.isActiveAndEnabled;
+        if (cull) GeometryUtility.CalculateFrustumPlanes(viewCamera, tuftFrustum);
+        Matrix4x4 toWorld = transform.localToWorldMatrix;
+        bool moved = !toWorld.isIdentity;
+        foreach (Piece p in pieces.Values)
+        {
+            if (!p.ready || p.hidden) continue;
+            if (p.quads == null) { AddTufts(p, p, cull); continue; }
+            foreach (Piece q in p.quads) AddTufts(q, p, cull);
+        }
+        Vector3 at = transform.TransformPoint(ToScene(playerE, playerN, 0f));
+        // They fade out over the last 12 m of the undergrowth's reach, so a square coming or going never pops
+        tufts.Draw(new Bounds(at, new Vector3(look.detail * 2f + 100f, 4000f, look.detail * 2f + 100f)), Mathf.Max(8f, look.detail - 2f), 12f);
+
+        void AddTufts(Piece q, Piece owner, bool test)
+        {
+            if (q.tuftSet == null || q.detail == null) return;
+            if (test)
+            {
+                float half = q.parent != null ? QuadHalf : Half;
+                Vector3 c = transform.TransformPoint(ToScene(q.ce, q.cn, (owner.minY + owner.maxY) * 0.5f));
+                var b = new Bounds(c, new Vector3(half * 2f + 4f, owner.maxY - owner.minY + 6f, half * 2f + 4f));
+                if (!GeometryUtility.TestPlanesAABB(tuftFrustum, b)) return;
+            }
+            tufts.Add(q.tuftSet, toWorld, moved);
+        }
     }
 
     // How close the runner comes before a piece gets its full trees (a little before they are drawn)
@@ -1270,6 +1312,9 @@ public class RunWorld : MonoBehaviour
             input.baseSolids = near;
         }
         input.undergrowthShare = look.undergrowth;
+        RunTufts copies = tufts;
+        input.tuftRecords = copies != null;
+        Vector3 offset = ToScene(p.ce, p.cn, 0f);
         jobs++;
         Task.Run(() =>
         {
@@ -1277,6 +1322,7 @@ public class RunWorld : MonoBehaviour
             try
             {
                 TvWorld w = TvWorldBuilder.Build(input);
+                if (copies != null) done.tuftSet = copies.Prepare(w.tuftRecords, offset);
                 done.arrays = Parts(w.meshes, true, radius);
             }
             catch (Exception e)
@@ -1405,7 +1451,7 @@ public class RunWorld : MonoBehaviour
                 if (done.arrays != null) foreach (TvWorldView.MeshArrays a in done.arrays) { a.Release(); if (a.mesh != null) { Destroy(a.mesh); a.mesh = null; } }
                 continue;
             }
-            if (done.detail) MakeDetail(p, done.arrays);
+            if (done.detail) MakeDetail(p, done.arrays, done.tuftSet);
             else if (done.trees) MakeTrees(p, done.arrays);
             else MakeBase(p, done);
             // Meshes made ahead that were not used after all (the runner moved on meanwhile)
@@ -1535,13 +1581,14 @@ public class RunWorld : MonoBehaviour
         p.ready = true;
     }
 
-    void MakeDetail(Piece p, List<TvWorldView.MeshArrays> arrays)
+    void MakeDetail(Piece p, List<TvWorldView.MeshArrays> arrays, RunTufts.Set tuftSet = null)
     {
         Piece owner = p.parent ?? p;
         if (owner.root == null) return;
         if (p.dist > look.detail + 16f) return;   // the runner has moved on meanwhile
         EndFade(p);
         p.detail = new GameObject("Detail");
+        p.tuftSet = tufts != null ? tuftSet : null;
         p.detail.transform.SetParent(owner.root.transform, false);
         if (p.parent != null) p.detail.transform.localPosition = new Vector3((float)(p.ce - owner.ce), 0f, (float)(p.cn - owner.cn));
         foreach (TvWorldView.MeshArrays m in arrays)
@@ -1566,6 +1613,7 @@ public class RunWorld : MonoBehaviour
     {
         EndFade(p);
         GameObject old = p.detail;
+        p.tuftSet = null;   // the copies fade out by distance (RunTufts), nothing more to do for them
         var oldMeshes = new List<Mesh>(p.detailMeshes);
         p.detailMeshes.Clear();
         p.detail = null;
