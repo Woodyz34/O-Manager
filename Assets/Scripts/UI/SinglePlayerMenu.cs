@@ -466,6 +466,6 @@ public class SinglePlayerMenu : MonoBehaviour
             SceneLoader.LeaveSession(runner, "MainMenu");
             return;
         }
-        SceneLoader.LeaveSession(runner, "SingelPlayer");
+        SceneLoader.LeaveSession(runner, "SingelPlayer", "Leaving the race");
     }
 }

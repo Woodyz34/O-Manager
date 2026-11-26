@@ -349,7 +349,21 @@ public class EscMenu : MonoBehaviour
         }
         Close();
         // Takes every player back to the lobby (single player: back to the single-player page)
-        ReturnToLobby.LoadLobby(runner);
+        if (runner.GameMode == GameMode.Single)
+        {
+            ReturnToLobby.LoadLobby(runner);
+            return;
+        }
+        // The loading page first, drawn before the heavy scene change starts (2026-11-26)
+        SceneLoader.ShowBusy("Back to the lobby");
+        StartCoroutine(EndAfterPage(runner));
+    }
+
+    System.Collections.IEnumerator EndAfterPage(NetworkRunner runner)
+    {
+        yield return null;
+        yield return null;
+        if (runner != null) ReturnToLobby.LoadLobby(runner);
     }
 
     void OnMainMenu()
