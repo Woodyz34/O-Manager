@@ -166,7 +166,7 @@ public class CourseLoader : MonoBehaviour
 
     // Spectator: the race's own course is known and its map is on this computer. Puts the map picture in place and
     // draws the course on it, only to look at (a spectator does not run, so the runners' grid is left as it is).
-    // A relay shows the first leg of one team (the forks differ between the teams).
+    // A relay shows the leg being run with every branch of its forks (ShowRelayLeg).
     public static bool ShowRaceCourse(CourseData course, MapDefinition map)
     {
         CourseLoader loader = instance != null ? instance : FindAnyObjectByType<CourseLoader>();
@@ -206,10 +206,110 @@ public class CourseLoader : MonoBehaviour
         if (!background.courseInPicture)
         {
             course.Normalize();
-            CourseData shown = course.IsRelay() ? course.Route(0, course.AssignBranches(new System.Random(0))[0]).course : course;
-            new GameObject("Course").AddComponent<CourseRenderer>().Draw(map, shown);
+            spectatorCourse = new GameObject("Course").AddComponent<CourseRenderer>();
+            spectatorLeg = -1;
+            if (course.IsRelay()) ShowRelayLeg(0);
+            else spectatorCourse.Draw(map, course);
         }
         Debug.Log($"CourseLoader: showing the race's course '{course.name}' on {map.displayName} to a spectator");
         return true;
+    }
+
+    static CourseRenderer spectatorCourse;
+    static int spectatorLeg = -1;
+
+    // Spectator, relay: the leg the runners are out on now, with every branch of its forks (the teams run different
+    // ones), as the course builder shows a fork: 4A, 4B, ... and lines through every branch (2026-11-26, Anders)
+    public static void ShowRelayLeg(int leg)
+    {
+        CourseData course = Loaded;
+        MapDefinition map = LoadedMap;
+        if (spectatorCourse == null || course == null || map == null || !course.IsRelay()) return;
+        leg = Mathf.Clamp(leg, 0, Mathf.Max(0, course.legs - 1));
+        if (leg == spectatorLeg) return;
+        RelayLegCourse legCourse = course.LegCourse(leg);
+        if (legCourse == null) return;
+        spectatorLeg = leg;
+
+        Color color = CourseRenderer.CoursePurple;
+        var marks = new List<CourseRenderer.Mark>();
+        var lines = new List<CourseRenderer.Line>();
+        // The marks the next control (or the branches of the next fork) is drawn from
+        var from = new List<Vector3>();
+        var fromKind = new List<CourseRenderer.MarkKind>();
+        Vector3 start = map.ToWorld(legCourse.start);
+        from.Add(start);
+        fromKind.Add(CourseRenderer.MarkKind.Start);
+        int startIndex = marks.Count;
+        marks.Add(new CourseRenderer.Mark { position = start, kind = CourseRenderer.MarkKind.Start, color = color, label = "", toward = Vector3.up });
+        int number = 0;   // controls run so far
+
+        void LineTo(Vector3 to, CourseRenderer.MarkKind toKind)
+        {
+            for (int i = 0; i < from.Count; i++)
+                lines.Add(new CourseRenderer.Line { from = from[i], to = to, fromKind = fromKind[i], toKind = toKind, color = color });
+        }
+
+        foreach (RelayItem item in legCourse.items)
+        {
+            if (item.fork < 0)
+            {
+                Vector3 point = map.ToWorld(item.point);
+                number++;
+                marks.Add(new CourseRenderer.Mark { position = point, kind = CourseRenderer.MarkKind.Control, color = color, label = number.ToString() });
+                LineTo(point, CourseRenderer.MarkKind.Control);
+                from.Clear(); fromKind.Clear();
+                from.Add(point); fromKind.Add(CourseRenderer.MarkKind.Control);
+                continue;
+            }
+            RelayFork fork = course.Fork(item.fork);
+            if (fork == null || fork.branches.Count == 0) continue;
+            var ends = new List<Vector3>();
+            var endKinds = new List<CourseRenderer.MarkKind>();
+            int longest = 0;
+            for (int b = 0; b < fork.branches.Count; b++)
+            {
+                List<CoursePoint> controls = fork.branches[b].controls;
+                longest = Mathf.Max(longest, controls.Count);
+                if (controls.Count == 0)
+                {
+                    // A branch straight on to the next common control
+                    for (int i = 0; i < from.Count; i++) if (!ends.Contains(from[i])) { ends.Add(from[i]); endKinds.Add(fromKind[i]); }
+                    continue;
+                }
+                Vector3 last = Vector3.zero;
+                for (int k = 0; k < controls.Count; k++)
+                {
+                    Vector3 point = map.ToWorld(controls[k]);
+                    string label = (number + k + 1) + CourseData.BranchLetter(b);
+                    marks.Add(new CourseRenderer.Mark { position = point, kind = CourseRenderer.MarkKind.Control, color = color, label = label });
+                    if (k == 0) LineTo(point, CourseRenderer.MarkKind.Control);
+                    else lines.Add(new CourseRenderer.Line { from = last, to = point, fromKind = CourseRenderer.MarkKind.Control, toKind = CourseRenderer.MarkKind.Control, color = color });
+                    last = point;
+                }
+                ends.Add(last);
+                endKinds.Add(CourseRenderer.MarkKind.Control);
+            }
+            number += longest;
+            from = ends;
+            fromKind = endKinds;
+        }
+        Vector3 finish = map.ToWorld(legCourse.finish);
+        marks.Add(new CourseRenderer.Mark { position = finish, kind = CourseRenderer.MarkKind.Finish, color = color, label = "" });
+        LineTo(finish, CourseRenderer.MarkKind.Finish);
+        // The start's triangle points at the first control (or the middle of the first fork's branches)
+        Vector3 first = finish;
+        for (int i = 1; i < marks.Count; i++)
+        {
+            if (marks[i].kind != CourseRenderer.MarkKind.Control) continue;
+            first = marks[i].position;
+            break;
+        }
+        CourseRenderer.Mark startMark = marks[startIndex];
+        startMark.toward = first - start;
+        marks[startIndex] = startMark;
+        spectatorCourse.sizeFactor = CourseRenderer.SizeFor(map);   // smaller on sprint maps, as Draw does
+        spectatorCourse.DrawMarks(marks, lines);
+        Debug.Log($"CourseLoader: showing leg {leg + 1} of the relay with all its forks to a spectator");
     }
 }

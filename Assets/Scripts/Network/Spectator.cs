@@ -351,6 +351,9 @@ public class Spectator : MonoBehaviour
         }
         int inCount = 0;
         foreach (NetworkPlayer p in runners) if (p.raceFinished) inCount++;
+        // A relay: the leg the watched runner is out on, with all its forks (2026-11-26, Anders)
+        if (watched != null && CourseLoader.Loaded != null && CourseLoader.Loaded.IsRelay())
+            CourseLoader.ShowRelayLeg(Mathf.Max(0, watched.relayLeg));
         string who = watched != null ? NameOf(watched) : "nobody yet";
         string state = runners.Count > 0 && inCount >= runners.Count ? "Everyone is in. The results come when the host shows them."
             : inCount + " of " + runners.Count + " in";
