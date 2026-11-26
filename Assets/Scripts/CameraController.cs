@@ -218,6 +218,26 @@ public class CameraController : MonoBehaviour
             && !RouteChoiceGame.On; // nor in the route choice game
     }
 
+    private bool FollowButtonWanted()
+    {
+        if (agent == null)
+        {
+            agent = GetComponent<AgentMovement>();
+        }
+        return agent != null
+            && agent.manualPathDrawer != null
+            && !agent.manualPathDrawer.timeToDraw
+            && !agent.WaitingForAllPlayersToChooseRunner
+            && !RouteAnalysis.On
+            && !RouteChoiceGame.On;
+    }
+
+    // Whatever switches this controller off (a replay, route comparison, the 3D run) takes the button with it
+    void OnDisable()
+    {
+        HideFollowButton();
+    }
+
     private bool IsFollowingRunner()
     {
         return followRunner && IsRunPhase();
@@ -335,9 +355,10 @@ public class CameraController : MonoBehaviour
             }
         }
 
-        // Never in a replay (2026-11-20, Anders: it does nothing there and is in the way)
-        // Never in a replay or the route choice game (IsRunPhase), but always while playing, relays too (2026-11-24, Anders)
-        bool show = IsRunPhase() && RelayReplayView.Current == null;
+        // Always while a race is played, from the moment the drawing is over, also when your own runner has finished
+        // or left its leg and you watch the others (2026-11-26, Anders: it came and went). Never while only routes are
+        // shown (route analysis, the route choice game). A replay that takes the camera over has its own button.
+        bool show = FollowButtonWanted() && RelayReplayView.Current == null;
         if (followButton.gameObject.activeSelf != show)
         {
             followButton.gameObject.SetActive(show);

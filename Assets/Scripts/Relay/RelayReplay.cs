@@ -209,6 +209,7 @@ public class RelayReplayView : MonoBehaviour
     TextMeshProUGUI timeText;
     Button playButton;
     Button speedButton;
+    Button followButton;
     Slider slider;
     float time;
     float endTime;
@@ -216,6 +217,12 @@ public class RelayReplayView : MonoBehaviour
     bool playing = true;
     bool settingSlider;
     static Material material;
+
+    // Follow runner (2026-11-26, Anders: in every replay): the map keeps your runner in the middle, zoomed in. Off:
+    // the leg fitted on the screen again.
+    bool follow;
+    Bounds fitBounds;
+    bool haveFitBounds;
 
     // One leg at a time (individual races only): 0 = the whole course, k = start or control k-1 to control k
     IRaceStats race;
@@ -430,8 +437,11 @@ public class RelayReplayView : MonoBehaviour
         else if (manager != null) foreach (Transform point in manager.controlPoints) Add(point.position);
         if (any)
         {
+            fitBounds = bounds;
+            haveFitBounds = true;
             FitCamera(bounds);
             Rescale();
+            if (follow) ZoomForFollow();
         }
         if (slider != null) slider.maxValue = Mathf.Max(0.1f, endTime);
         if (legButtonText != null) legButtonText.text = leg == 0 ? "Whole course" : LegName(leg);
@@ -561,7 +571,7 @@ public class RelayReplayView : MonoBehaviour
         if (canvas == null) return;
         Image panel = CourseUI.CardPanel("Replay controls", canvas.transform);
         bar = panel.gameObject;
-        CourseUI.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 24), new Vector2(HasLegs ? 1640 : 1180, 96));
+        CourseUI.Place(panel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 24), new Vector2(HasLegs ? 1780 : 1320, 96));
         CourseUI.Row(panel.gameObject, 14, new RectOffset(20, 20, 18, 18)).childForceExpandWidth = false;
 
         playButton = CourseUI.Button("Play", panel.transform, "Pause", CourseUI.ButtonKind.Secondary, TogglePlay, 22);
@@ -574,7 +584,10 @@ public class RelayReplayView : MonoBehaviour
             time = value;
             Apply();
         });
-        CourseUI.Size(slider, 58, 420);
+        CourseUI.Size(slider, 58, 300);
+        followButton = CourseUI.Button("Follow runner", panel.transform, "Follow runner: OFF", CourseUI.ButtonKind.Light, ToggleFollow, 20);
+        CourseUI.Size(followButton, 58, 250);
+        HoverTip.Add(followButton, "The map follows your runner, zoomed in. Off: the whole leg on the screen.");
         timeText = CourseUI.Text("Clock", panel.transform, "", 24, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Size(timeText, 58, 170);
         if (HasLegs)
@@ -610,6 +623,45 @@ public class RelayReplayView : MonoBehaviour
         CourseUI.SetButtonText(playButton, playing ? "Pause" : "Play");
     }
 
+    // The track the map follows: your own, else the first one with something to show
+    int FollowIndex()
+    {
+        for (int k = 0; k < tracks.Count; k++) if (tracks[k].isLocal && markers[k].gameObject.activeSelf) return k;
+        for (int k = 0; k < markers.Count; k++) if (markers[k].gameObject.activeSelf) return k;
+        return -1;
+    }
+
+    void ToggleFollow()
+    {
+        follow = !follow;
+        if (followButton != null)
+        {
+            CourseUI.SetButtonText(followButton, follow ? "Follow runner: ON" : "Follow runner: OFF");
+            CourseUI.SetButtonColor(followButton, follow ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        }
+        if (follow) ZoomForFollow();
+        else if (haveFitBounds)
+        {
+            FitCamera(fitBounds);
+            Rescale();
+        }
+    }
+
+    void ZoomForFollow()
+    {
+        cam.orthographicSize = Mathf.Min(cam.orthographicSize, fitSize * 0.3f);
+        Rescale();
+    }
+
+    void LateUpdate()
+    {
+        if (!follow || cam == null) return;
+        int k = FollowIndex();
+        if (k < 0) return;
+        Vector3 at = markers[k].position;
+        cam.transform.position = new Vector3(at.x, at.y, cam.transform.position.z);
+    }
+
     void NextSpeed()
     {
         speed = speed >= 16f ? 1f : speed * 2f;
@@ -641,7 +693,7 @@ public class RelayReplayView : MonoBehaviour
         }
         bool anyDown = Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
         bool anyHeld = Input.GetMouseButton(0) || Input.GetMouseButton(1) || Input.GetMouseButton(2);
-        if (anyDown && !overUI)
+        if (anyDown && !overUI && !follow)
         {
             dragging = true;
             dragFrom = cam.ScreenToWorldPoint(Input.mousePosition);

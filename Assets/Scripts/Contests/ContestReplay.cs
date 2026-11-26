@@ -145,6 +145,11 @@ public class ContestReplay : MonoBehaviour
     Vector2 dragFrom;
     bool routesOnly;       // race: every route drawn whole, no dots, the clock stopped
     Button routesButton;
+    // Follow runner (2026-11-26, Anders: in every replay): the map keeps your runner (else the first shown one) in the
+    // middle, zoomed in. Off: the whole course or leg fitted again.
+    Button followButton;
+    bool follow;
+    const float FollowZoom = 4f;
     readonly List<(Runner runner, Image image)> runnerButtons = new List<(Runner, Image)>();
 
     // Any number of runners (2026-11-26, the user: no limit of 10): the palette first, then colours spread round the
@@ -265,7 +270,7 @@ public class ContestReplay : MonoBehaviour
         Rect view = viewport.rect;
         Vector2 extent = Vector2.Scale(max - min, size) * 1.15f + Vector2.one * 40f;
         fitScale = Mathf.Min(view.width / Mathf.Max(1f, extent.x), view.height / Mathf.Max(1f, extent.y));
-        zoom = 1f;
+        zoom = follow ? FollowZoom : 1f;
         Place(areaCenterUV);
     }
 
@@ -300,7 +305,7 @@ public class ContestReplay : MonoBehaviour
             RectTransformUtility.ScreenPointToLocalPointInRectangle(viewport, mouse, null, out Vector2 mouseInView);
             picture.rectTransform.anchoredPosition = mouseInView - viewport.rect.center - Vector2.Scale(beforeUV, size);
         }
-        if (overMap && (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2)))
+        if (overMap && !follow && (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2)))
         {
             dragging = true;
             dragFrom = mouse;
@@ -542,6 +547,7 @@ public class ContestReplay : MonoBehaviour
                 routesOnly = false;
                 CourseUI.SetButtonText(routesButton, "Routes only");
                 CourseUI.SetButtonColor(routesButton, CourseUI.ButtonKind.Light);
+                if (followButton != null) followButton.gameObject.SetActive(true);
             }
             time = v;
             Apply();
@@ -549,6 +555,9 @@ public class ContestReplay : MonoBehaviour
         CourseUI.Size(slider, 60, -1, 1);
         clockText = CourseUI.Text("Clock", bar.transform, "", 28, CourseUI.Ink, FontStyles.Bold, TextAlignmentOptions.Center);
         CourseUI.Size(clockText, 60, 150);
+        followButton = CourseUI.Button("Follow runner", bar.transform, "Follow runner: OFF", CourseUI.ButtonKind.Light, () => SetFollow(!follow), 20);
+        CourseUI.Size(followButton, 60, 250);
+        HoverTip.Add(followButton, "The map follows your runner, zoomed in. Off: the whole course or leg on the screen.");
         routesButton = CourseUI.Button("Routes", bar.transform, "", CourseUI.ButtonKind.Light, () => SetRoutesOnly(!routesOnly), 22);
         CourseUI.Size(routesButton, 60, 190);
         HoverTip.Add(routesButton, "Routes only: everyone's whole route at once, without the replay. Works for the whole course and for one leg.");
@@ -576,10 +585,37 @@ public class ContestReplay : MonoBehaviour
         routesOnly = on;
         if (routesButton != null) CourseUI.SetButtonText(routesButton, on ? "Replay" : "Routes only");
         if (routesButton != null) CourseUI.SetButtonColor(routesButton, on ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        if (on && follow) SetFollow(false);
+        if (followButton != null) followButton.gameObject.SetActive(!on);
         time = on ? endTime : 0f;
         playing = !on;
         if (playButton != null) CourseUI.SetButtonText(playButton, playing ? "Pause" : "Play");
         Apply();
+    }
+
+    void SetFollow(bool on)
+    {
+        follow = on;
+        if (followButton != null)
+        {
+            CourseUI.SetButtonText(followButton, on ? "Follow runner: ON" : "Follow runner: OFF");
+            CourseUI.SetButtonColor(followButton, on ? CourseUI.ButtonKind.Primary : CourseUI.ButtonKind.Light);
+        }
+        if (background == null) return;
+        if (on) zoom = Mathf.Max(zoom, FollowZoom);
+        else Fit();
+        FollowCenter();
+    }
+
+    // The map is put so the followed runner is in the middle (your own, else the first one shown)
+    void FollowCenter()
+    {
+        if (!follow || background == null) return;
+        Runner who = null;
+        foreach (Runner r in runners) if (r.shown && r.dot != null && r.dot.gameObject.activeSelf && r.me) { who = r; break; }
+        if (who == null) foreach (Runner r in runners) if (r.shown && r.dot != null && r.dot.gameObject.activeSelf) { who = r; break; }
+        if (who == null) return;
+        Place(who.dot.anchorMin);
     }
 
     void TogglePlay()
@@ -881,6 +917,7 @@ public class ContestReplay : MonoBehaviour
             }
             Apply();
         }
+        FollowCenter();
         if (Input.GetKeyDown(KeyCode.Escape)) Close();
     }
 
