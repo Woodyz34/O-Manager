@@ -73,6 +73,10 @@ public class RunWorld : MonoBehaviour
         public GameObject detail;
         public readonly List<Mesh> detailMeshes = new List<Mesh>();
         public bool detailBuilding;
+        // A forest piece's undergrowth comes in four 32 m squares (2026-11-26, Anders chose it): each is a Piece of its
+        // own for its detail and its cross-fade (parent: the 64 m piece it belongs to); a town's stays whole (its houses)
+        public Piece[] quads;
+        public Piece parent;
         public float dist;
         public float onCourse = -1f;        // how far the piece is from the course's legs (-1: not worked out yet)
         public bool nearOn;
@@ -678,16 +682,56 @@ public class RunWorld : MonoBehaviour
             if (d > reach) continue;
             total++;
             if (!p.ready) continue;
-            if (full && d <= look.detail && (p.detail == null || p.fadeStart >= 0f)) continue;
+            if (full && d <= look.detail && !DetailDone(p, e, n)) continue;
             ready++;
         }
         return total == 0 ? 0f : ready / (float)total;
     }
 
+    // The undergrowth round (e, n) in this piece is there and has faded in
+    bool DetailDone(Piece p, double e, double n)
+    {
+        Piece[] parts = DetailParts(p);
+        if (parts == null) return p.detail != null && p.fadeStart < 0f;
+        foreach (Piece q in parts)
+            if (Distance(q, e, n) <= look.detail && (q.detail == null || q.fadeStart >= 0f)) return false;
+        return true;
+    }
+
     float Distance(Piece p, double e, double n)
     {
-        double dx = Math.Max(0, Math.Abs(e - p.ce) - Half), dz = Math.Max(0, Math.Abs(n - p.cn) - Half);
+        double half = p.parent != null ? QuadHalf : Half;
+        double dx = Math.Max(0, Math.Abs(e - p.ce) - half), dz = Math.Max(0, Math.Abs(n - p.cn) - half);
         return (float)Math.Sqrt(dx * dx + dz * dz);
+    }
+
+    // ---- The undergrowth in 32 m squares ----
+    // Smaller builds make less garbage at once (fewer and shorter memory clean-ups), and only the squares within the
+    // undergrowth's reach are built, not the whole 64 m piece (2026-11-26, Anders: more undergrowth some day)
+
+    const int QuadHalf = Half / 2;
+
+    // The pieces whose undergrowth is built: the four squares of a forest piece, a town piece itself
+    Piece[] DetailParts(Piece p)
+    {
+        if (data.town != null) return null;
+        if (p.quads == null)
+        {
+            p.quads = new Piece[4];
+            for (int k = 0; k < 4; k++)
+            {
+                double qe = p.ce + (k % 2 == 0 ? -QuadHalf : QuadHalf), qn = p.cn + (k < 2 ? -QuadHalf : QuadHalf);
+                p.quads[k] = new Piece { ix = p.ix, iz = p.iz, ce = qe, cn = qn, parent = p, ready = true };
+            }
+        }
+        return p.quads;
+    }
+
+    // Whether a piece (or one of its squares) is still the one wanted where it stands
+    bool Current(Piece p)
+    {
+        Piece owner = p.parent ?? p;
+        return pieces.TryGetValue(Key(owner.ix, owner.iz), out Piece now) && now == owner && !p.gone && !owner.gone;
     }
 
     void Update()
@@ -804,8 +848,21 @@ public class RunWorld : MonoBehaviour
                 continue;
             }
             if (!p.ready && !p.building && (nextBase == null || Want(p) < Want(nextBase))) nextBase = p;
-            if (p.ready && p.detail == null && !p.detailBuilding && p.dist <= look.detail && (nextDetail == null || p.dist < nextDetail.dist)) nextDetail = p;
-            if (p.detail != null && p.dist > look.detail + 16f) DropDetail(p, true);
+            Piece[] parts = p.ready ? DetailParts(p) : null;
+            if (parts == null)
+            {
+                if (p.ready && p.detail == null && !p.detailBuilding && p.dist <= look.detail && (nextDetail == null || p.dist < nextDetail.dist)) nextDetail = p;
+                if (p.detail != null && p.dist > look.detail + 16f) DropDetail(p, true);
+            }
+            else if (p.dist <= look.detail + 16f || p.quads[0].detail != null || p.quads[1].detail != null || p.quads[2].detail != null || p.quads[3].detail != null)
+            {
+                foreach (Piece q in parts)
+                {
+                    q.dist = Distance(q, playerE, playerN);
+                    if (q.detail == null && !q.detailBuilding && q.dist <= look.detail && (nextDetail == null || q.dist < nextDetail.dist)) nextDetail = q;
+                    if (q.detail != null && q.dist > look.detail + 16f) DropDetail(q, true);
+                }
+            }
             if (p.ready && !p.treesNear && !p.treesBuilding && p.dist <= TreesReach && (nextTrees == null || p.dist < nextTrees.dist)) nextTrees = p;
             if (p.treesOwn && p.dist > TreesReach + 60f) DropTrees(p);
             if (p.ready && trees != null && p.treeSet != null)
@@ -1194,7 +1251,24 @@ public class RunWorld : MonoBehaviour
         p.detailBuilding = true;
         TvWorldInput input = Input(p);
         input.chunkDetail = true;
-        input.baseSolids = p.world.solids;
+        Piece owner = p.parent ?? p;
+        input.baseSolids = owner.world.solids;
+        int radius = Half;
+        if (p.parent != null)
+        {
+            // A square: its own centre and size, and the piece's stones and trunks moved to that centre (the ones near it)
+            radius = QuadHalf;
+            input.radius = QuadHalf;
+            float sx = (float)(owner.ce - p.ce), sz = (float)(owner.cn - p.cn);
+            var near = new List<TvSolid>();
+            foreach (TvSolid t in owner.world.solids)
+            {
+                float x = t.x + sx, z = t.z + sz;
+                if (Math.Abs(x) > QuadHalf + t.r + 2f || Math.Abs(z) > QuadHalf + t.r + 2f) continue;
+                near.Add(new TvSolid { x = x, z = z, r = t.r });
+            }
+            input.baseSolids = near;
+        }
         input.undergrowthShare = look.undergrowth;
         jobs++;
         Task.Run(() =>
@@ -1203,7 +1277,7 @@ public class RunWorld : MonoBehaviour
             try
             {
                 TvWorld w = TvWorldBuilder.Build(input);
-                done.arrays = Parts(w.meshes, true);
+                done.arrays = Parts(w.meshes, true, radius);
             }
             catch (Exception e)
             {
@@ -1251,13 +1325,14 @@ public class RunWorld : MonoBehaviour
     // squares behind the runner and beside the picture.
     const int MaxCorners = 48000;
 
-    static List<TvWorldView.MeshArrays> Parts(List<TvMesh> meshes, bool detail)
+    static List<TvWorldView.MeshArrays> Parts(List<TvMesh> meshes, bool detail, int radius = Half)
     {
         var list = new List<TvWorldView.MeshArrays>(meshes.Count);
         foreach (TvMesh m in meshes)
         {
             bool cut = detail && m.name != "Town houses full";
-            list.AddRange(TvWorldView.MeshArrays.Split(m, Half, cut ? 4 : 1, MaxCorners));
+            // the undergrowth in 16 m squares, whatever size the build
+            list.AddRange(TvWorldView.MeshArrays.Split(m, radius, cut ? Math.Max(1, radius / 8) : 1, MaxCorners));
             m.Recycle();
         }
         return list;
@@ -1306,7 +1381,7 @@ public class RunWorld : MonoBehaviour
             // piece is only put together once all its meshes are made, and the time is checked after each
             Done next = uploading.Peek();
             Piece np = next.piece;
-            bool wanted = pieces.TryGetValue(Key(np.ix, np.iz), out Piece current) && current == np;
+            bool wanted = Current(np);
             if (wanted && next.arrays != null && next.made < next.arrays.Count)
             {
                 TvWorldView.MeshArrays a = next.arrays[next.made++];
@@ -1323,8 +1398,7 @@ public class RunWorld : MonoBehaviour
             if (done.detail) p.detailBuilding = false;
             else if (done.trees) p.treesBuilding = false;
             else p.building = false;
-            long key = Key(p.ix, p.iz);
-            bool kept = pieces.TryGetValue(key, out Piece now) && now == p;
+            bool kept = Current(p);
             if (!kept || done.arrays == null)
             {
                 // Left behind while it was being built, or it failed: built again if it is needed after all
@@ -1463,11 +1537,13 @@ public class RunWorld : MonoBehaviour
 
     void MakeDetail(Piece p, List<TvWorldView.MeshArrays> arrays)
     {
-        if (p.root == null) return;
+        Piece owner = p.parent ?? p;
+        if (owner.root == null) return;
         if (p.dist > look.detail + 16f) return;   // the runner has moved on meanwhile
         EndFade(p);
         p.detail = new GameObject("Detail");
-        p.detail.transform.SetParent(p.root.transform, false);
+        p.detail.transform.SetParent(owner.root.transform, false);
+        if (p.parent != null) p.detail.transform.localPosition = new Vector3((float)(p.ce - owner.ce), 0f, (float)(p.cn - owner.cn));
         foreach (TvWorldView.MeshArrays m in arrays)
         {
             Renderer added = AddMesh(p.detail.transform, m, p.detailMeshes);
@@ -1520,6 +1596,14 @@ public class RunWorld : MonoBehaviour
         if (p.peopleOn && people != null) people.Despawn(Key(p.ix, p.iz));
         p.peopleOn = false;
         DropDetail(p);
+        if (p.quads != null)
+            foreach (Piece q in p.quads)
+            {
+                q.gone = true;
+                EndFade(q);
+                DropDetail(q);
+            }
+        p.quads = null;
         foreach (Mesh m in p.treeMeshes) if (m != null) Destroy(m);
         p.treeMeshes.Clear();
         p.treeRenderers.Clear();
