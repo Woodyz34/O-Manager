@@ -99,6 +99,9 @@ public class CameraController : MonoBehaviour
         InitializeCamera();
     }
 
+    // The map picture was put in place after the scene started (a spectator gets the race's map late, CourseLoader)
+    public void RefreshMap() => InitializeCamera();
+
     private void InitializeCamera()
     {
         pathManager = FindObjectOfType<PathfindingManager>();
