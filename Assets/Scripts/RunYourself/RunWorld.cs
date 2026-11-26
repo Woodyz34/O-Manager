@@ -113,7 +113,9 @@ public class RunWorld : MonoBehaviour
     readonly ConcurrentQueue<Done> finished = new ConcurrentQueue<Done>();
     readonly Queue<Done> uploading = new Queue<Done>();
     int jobs;
-    const int MaxJobs = 2;
+    // Two builds at once while loading (fast start); in the race only one on Ultra: its pieces make the most garbage,
+    // and one at a time keeps the memory clean-up small (2026-11-26, Anders chose it)
+    int MaxJobs => Loading || rebuilding || quality < (int)RunSettings.Quality.Ultra ? 2 : 1;
 
     // ---- Which piece is built next (2026-11-26, Anders: build what is right round me and where the course goes; the
     // pieces far away can wait and come slowly, a little now and then) ----
@@ -665,14 +667,19 @@ public class RunWorld : MonoBehaviour
     }
 
     // Share of the pieces within reach that are built and handed over (for the loading bar)
-    public float Ready(double e, double n, float reach)
+    // full (the start): the undergrowth round the runner is there too and has finished fading in, so nothing comes
+    // into sight once the race is shown
+    public float Ready(double e, double n, float reach, bool full = false)
     {
         int total = 0, ready = 0;
         foreach (Piece p in pieces.Values)
         {
-            if (Distance(p, e, n) > reach) continue;
+            float d = Distance(p, e, n);
+            if (d > reach) continue;
             total++;
-            if (p.ready) ready++;
+            if (!p.ready) continue;
+            if (full && d <= look.detail && (p.detail == null || p.fadeStart >= 0f)) continue;
+            ready++;
         }
         return total == 0 ? 0f : ready / (float)total;
     }
@@ -718,6 +725,31 @@ public class RunWorld : MonoBehaviour
         lastPlanTicks = t1 - t0;
         lastHandTicks = t2 - t1;
         lastTreeTicks = t3 - t2;
+        CalmCleanup(Loading || rebuilding || uploading.Count > 0 || (t3 - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency > 3.0);
+    }
+
+    // ---- Memory clean-up in calm moments (2026-11-26, Anders: "when it goes fast, clean a bit more; when a lot is
+    // happening, don't") ----
+    // Unity cleans the memory a little each frame (the incremental GC), but when the building makes garbage faster than
+    // that, it has to stop the whole game for a full clean (20-40 ms on Fossum). So in frames where the main thread has
+    // time to spare (the frame is held to 60 a second) and nothing is being handed over, a few ms of that spare time
+    // goes to the clean-up; a new round starts only once 24 MB more memory is in use than after the last one.
+
+    const long CalmGrowth = 24L * 1024 * 1024;
+    long heapAfterClean = -1;
+    bool cleaningOn;
+
+    void CalmCleanup(bool busy)
+    {
+        if (busy || !UnityEngine.Scripting.GarbageCollector.isIncremental || probe == null) return;
+        double main = probe.LastMainMs;
+        if (main <= 0.0) return;
+        double spare = 1000.0 / 60.0 - main;
+        if (spare < 4.0) return;
+        if (!cleaningOn && heapAfterClean >= 0 && GC.GetTotalMemory(false) - heapAfterClean < CalmGrowth) return;
+        ulong ns = (ulong)(Math.Min(spare - 2.0, 5.0) * 1e6);
+        cleaningOn = UnityEngine.Scripting.GarbageCollector.CollectIncremental(ns);
+        if (!cleaningOn) heapAfterClean = GC.GetTotalMemory(false);
     }
 
     long lastPlanTicks, lastHandTicks, lastTreeTicks;
@@ -1270,6 +1302,7 @@ public class RunWorld : MonoBehaviour
         p.treesNear = true;
         p.treesOwn = true;
         ShowTier(p, true);
+        if (Loading) EndFade(p);
     }
 
     void DropTrees(Piece p)
@@ -1472,8 +1505,9 @@ public class RunWorld : MonoBehaviour
                 foreach (Renderer r in p.lean) if (r != null && r.enabled) p.fadeOut.Add(r);
             }
         }
-        // The undergrowth and the full houses fade in, the leaner houses out
+        // The undergrowth and the full houses fade in, the leaner houses out (at once while loading: nobody sees it)
         StartFade(p, null);
+        if (Loading) EndFade(p);
     }
 
     // smooth: the detail fades out (and the leaner houses in) before it is thrown away
