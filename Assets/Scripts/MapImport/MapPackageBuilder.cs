@@ -283,7 +283,8 @@ namespace MapImport
             else if (pkg.pictureRgba != null)
             {
                 progress?.Invoke("Saving the map picture", 0.96f);
-                PngFile.Write(Path.Combine(folder, "picture.png"), pkg.pictureRgba, pkg.info.pictureWidth, pkg.info.pictureHeight);
+                // 256 colours: a big map as RGBA was over GitHub's 100 MB limit (Oslo 153 MB -> 38 MB), see PngPalette
+                PngPalette.Write(Path.Combine(folder, "picture.png"), pkg.pictureRgba, pkg.info.pictureWidth, pkg.info.pictureHeight);
                 byte[] thumb = PngFile.Shrink(pkg.pictureRgba, pkg.info.pictureWidth, pkg.info.pictureHeight, ThumbnailSide, out int tw, out int th);
                 PngFile.Write(Path.Combine(folder, "thumb.png"), thumb, tw, th);
                 pkg.pictureRgba = null;
