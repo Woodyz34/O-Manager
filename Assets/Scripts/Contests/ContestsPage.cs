@@ -359,6 +359,7 @@ public class ContestsPage : MonoBehaviour
             lines.Add(what + ": " + CompetitionFlow.Ordinal(p.place) + " of " + p.of + "  <b>+" + string.Join(" + ", won) + "</b>");
         }
         if (total > 0 && Money.Instance != null) Money.Instance.AddMoney(total);
+        GameAnalytics.Record("contest_prize", "kr", total, "packs", packs, "contests", paid.Count);
         ShowPrizePopup(lines, paid.ConvertAll(p => p.id), total, packs);
     }
 

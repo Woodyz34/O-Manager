@@ -1482,11 +1482,7 @@ public class NetworkPlayer : NetworkBehaviour, IPlayerLeft, IPackRunner
             drawer.timeToDraw = true;
         }
         Debug.Log($"{name}: Spelet startar nu!");
-        CourseData raced = CourseLibrary.CurrentOrDefault;
-        GameAnalytics.Record("race_started",
-            "mode", RelayRace.Active != null ? "relay" : RouteAnalysis.On ? "route_analysis" : RouteChoiceGame.On ? "route_choice" : "normal",
-            "terrain", raced != null && raced.IsSprint() ? "sprint" : "forest",
-            "players", NetworkPlayer.All().Length);
+        GameAnalytics.RecordRace("race_started", "players", NetworkPlayer.All().Length);
 
     }
 

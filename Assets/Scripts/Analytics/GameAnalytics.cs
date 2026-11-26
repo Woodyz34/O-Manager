@@ -90,6 +90,44 @@ public static class GameAnalytics
         try { ApplyConsent(); } catch (Exception e) { Debug.Log("GameAnalytics: " + e.Message); }
     }
 
+    // The game mode in one word: the base mode of the race that is on now (normal, relay, imposter, secret_task,
+    // route_analysis, route_choice, run_yourself, run_mass). Bears and Move a control are told apart as yes/no.
+    public static string ModeName()
+    {
+        if (ExtraModes.Is(ExtraMode.RouteChoice)) return "route_choice";
+        if (ExtraModes.Is(ExtraMode.RouteAnalysis)) return "route_analysis";
+        if (ExtraModes.Is(ExtraMode.RunMass)) return "run_mass";
+        if (ExtraModes.Is(ExtraMode.RunYourself)) return "run_yourself";
+        if (RelayRace.Active != null) return "relay";
+        if (ExtraModes.Is(ExtraMode.SecretTask)) return "secret_task";
+        if (ExtraModes.Is(ExtraMode.Imposter)) return "imposter";
+        return "normal";
+    }
+
+    // "daily", "weekly" or "none"
+    public static string ContestKind()
+    {
+        if (ContestRun.Active == null) return "none";
+        return ContestRun.Active.Weekly ? "weekly" : "daily";
+    }
+
+    // The same few values on every race event, so any event can be split by mode, terrain, single/multi player and contest.
+    // Extra values come after, as name, value, name, value ...
+    public static void RecordRace(string eventName, params object[] extra)
+    {
+        CourseData course = CourseLibrary.CurrentOrDefault;
+        NetworkPlayer local = NetworkPlayer.Local;
+        bool multi = local != null && local.Runner != null && local.Runner.GameMode != Fusion.GameMode.Single;
+        object[] all = new object[extra.Length + 10];
+        all[0] = "mode"; all[1] = ModeName();
+        all[2] = "terrain"; all[3] = course != null && course.IsSprint() ? "sprint" : "forest";
+        all[4] = "multiplayer"; all[5] = multi;
+        all[6] = "contest"; all[7] = ContestKind();
+        all[8] = "extras"; all[9] = (ExtraModes.Is(ExtraMode.Bears) ? "bears" : "") + (ExtraModes.Is(ExtraMode.MoveControl) ? "+move" : "");
+        extra.CopyTo(all, 10);
+        Record(eventName, all);
+    }
+
     // Records one event. Extra values come as name, value, name, value ... (text, whole numbers, decimals or true/false)
     public static void Record(string eventName, params object[] nameValuePairs)
     {

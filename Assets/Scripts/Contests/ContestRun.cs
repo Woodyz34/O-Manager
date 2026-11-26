@@ -269,6 +269,7 @@ public static class ContestRun
         int seconds = Mathf.RoundToInt(CompetitionFlow.PlayedSeconds);
         int kr = CompetitionRewards.ForTime(seconds);
         if (kr > 0 && Money.Instance != null) Money.Instance.AddMoney(kr);
+        GameAnalytics.RecordRace("money_earned", "source", "contest_time", "kr", kr);
         List<TimePaid> list = ReadTimePaid();
         list.Add(new TimePaid { id = c.id, seconds = seconds, kr = kr, sprint = c.Sprint });
         PlayerPrefs.SetString(LocalPrefs.Key(TimePaidKey), JsonConvert.SerializeObject(list));
