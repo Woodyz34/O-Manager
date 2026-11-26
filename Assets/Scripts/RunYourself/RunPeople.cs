@@ -196,6 +196,8 @@ public class RunPeople : MonoBehaviour
                     if (p.renderer.enabled != draw) p.renderer.enabled = draw;
                 }
                 if (d2 > AnimateReach * AnimateReach) continue;
+                // Not in the picture (behind the runner, or beside it): nobody sees them move (2026-11-26)
+                if (!p.renderer.isVisible && p.shown >= 0) continue;
                 // Far ones move a third of the frames (each on its own frame, so the work is spread out)
                 if (d2 > NearEveryFrame * NearEveryFrame && (frameNo + p.index) % 3 != 0) continue;
                 if (p.kind == 1) Walk(p, time);

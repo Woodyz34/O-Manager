@@ -156,14 +156,16 @@ public static class RunSettings
         {
             // The undergrowth is flat cards with pictures since 2026-11-25, about a tenth of the triangles of the old
             // lumpy tufts, so every level has more of it than before
+            // Low (2026-11-26, Anders: Low must never lag, however plain it looks): a short view in thicker fog, the
+            // simplest trees only within 30 m and the far shapes beyond, little undergrowth only right round the runner
             case Quality.Low:
-                return new Look { view = 140f, near = 40f, detail = 20f, undergrowth = 0.08f, shadows = 0, shadowDistance = 0f, msaa = 1, reliefFar = 0f, aniso = AnisotropicFiltering.Disable };
+                return new Look { view = 110f, near = 30f, detail = 14f, undergrowth = 0.05f, shadows = 0, shadowDistance = 0f, msaa = 1, reliefFar = 0f, aniso = AnisotropicFiltering.Disable };
             case Quality.High:
                 return new Look { view = 330f, near = 96f, detail = 56f, undergrowth = 0.6f, shadows = 2, shadowDistance = 60f, msaa = 4, reliefFar = 30f, aniso = AnisotropicFiltering.ForceEnable };
             case Quality.Ultra:
                 return new Look { view = 420f, near = 130f, detail = 72f, undergrowth = 1f, shadows = 3, shadowDistance = 110f, msaa = 8, reliefFar = 50f, aniso = AnisotropicFiltering.ForceEnable };
             default:
-                return new Look { view = 230f, near = 72f, detail = 40f, undergrowth = 0.3f, shadows = 1, shadowDistance = 32f, msaa = 2, reliefFar = 15f, aniso = AnisotropicFiltering.Enable };
+                return new Look { view = 230f, near = 60f, detail = 36f, undergrowth = 0.3f, shadows = 1, shadowDistance = 32f, msaa = 2, reliefFar = 15f, aniso = AnisotropicFiltering.Enable };
         }
     }
 
@@ -191,7 +193,7 @@ public static class RunSettings
         TextMeshProUGUI title = CourseUI.Text("Title", card.transform, "3D settings", 40, CourseUI.Ink, FontStyles.Bold);
         CourseUI.Size(title, 52);
         TextMeshProUGUI hint = CourseUI.Text("Hint", card.transform, RunSession.Active != null
-            ? "These count from your next race. Saved on this computer."
+            ? "Graphics change at once, the rest from your next race. Saved on this computer."
             : "For \"Run it yourself\". Saved on this computer.", 21, CourseUI.InkMuted);
         CourseUI.Size(hint, 30);
 

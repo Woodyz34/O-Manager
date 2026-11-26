@@ -383,6 +383,15 @@ public class RunTrees
     }
 
     // ---- Every frame ----
+    //
+    // 2026-11-26 (Anders: Fossum still lagged, even on Low, and the leaves popped a step away):
+    //  - only the trees inside the picture are drawn (each tree tested against the camera's view), plus, as shadows only,
+    //    the close ones just outside it whose shadows may fall into the picture; before, every tree all round the runner
+    //    out to the shadow distance (114 m on Ultra) was drawn, with its shadows;
+    //  - no pops between the levels: over a few metres before each change both levels are drawn, each on its share of
+    //    the pixels by the tree's distance (the _TvLod dither in TvAtlasLit), so a tree turns into the next level
+    //    gradually as the runner comes nearer or goes away;
+    //  - tree shadows only to 50 m (70 on Ultra).
 
     public void Clear()
     {
@@ -390,50 +399,112 @@ public class RunTrees
         foreach (List<Matrix4x4> l in farLists) l.Clear();
         foreach (List<Matrix4x4> l in midLists) l.Clear();
         foreach (List<Matrix4x4> l in midPlainLists) l.Clear();
+        foreach (List<Matrix4x4> l in shadowLists) l.Clear();
     }
 
     // The reaches of the levels, in metres from the runner (RunWorld sets them for its quality)
     public float fullReach = 30f, nearReach = 96f, shadowReach = 60f;
+    // How many metres before each change both levels are drawn
+    const float FullBand = 5f, NearBand = 10f;
+    bool HasMid => midMeshes != nearMeshes;
+
+    // The camera's view, set every frame (SetView); null: everything is drawn
+    readonly float[] planes = new float[24];
+    bool viewSet;
+    Vector3 shadowShift;
+    float shadowWiden;
+    List<Matrix4x4>[] shadowLists;
+
+    // planes: the camera's six; sunForward: the way the sunlight goes (the shadows fall that way)
+    public void SetView(Plane[] view, Vector3 sunForward)
+    {
+        viewSet = view != null;
+        if (!viewSet) return;
+        for (int i = 0; i < 6; i++)
+        {
+            planes[i * 4] = view[i].normal.x; planes[i * 4 + 1] = view[i].normal.y; planes[i * 4 + 2] = view[i].normal.z; planes[i * 4 + 3] = view[i].distance;
+        }
+        // A tree's shadow reaches out from it along the light, the longer the lower the sun
+        Vector2 flat = new Vector2(sunForward.x, sunForward.z);
+        float up = Mathf.Max(0.2f, -sunForward.y);
+        float length = Mathf.Min(30f, 22f * flat.magnitude / up);
+        Vector2 dir = flat.sqrMagnitude > 1e-6f ? flat.normalized : Vector2.zero;
+        shadowShift = new Vector3(dir.x, 0f, dir.y) * (length * 0.5f);
+        shadowWiden = length * 0.5f;
+    }
+
+    bool InView(float x, float y, float z, float r)
+    {
+        if (!viewSet) return true;
+        for (int i = 0; i < 24; i += 4)
+            if (planes[i] * x + planes[i + 1] * y + planes[i + 2] * z + planes[i + 3] < -r) return false;
+        return true;
+    }
+
+    // How many trees were drawn at each level in the last frame (for the RunPerf line)
+    int countFull, countMid, countFar, countShadow;
+    public string Stats => "trees drawn: full " + countFull + ", plainer " + countMid + ", far " + countFar + ", shadows only " + countShadow;
 
     // A piece's trees, each at the level its own distance from the runner (x, z in the run world's space) gives.
-    // farOnly: the whole piece is past the near distance (no need to look at each tree).
+    // farOnly: the whole piece is well past the near distance (no need to look at each tree's distance).
     public void Add(Set set, bool farOnly, float px, float pz, Matrix4x4 toWorld, bool moved)
     {
         if (set == null) return;
+        if (shadowLists == null) shadowLists = Lists(nearMeshes.Length);
+        Matrix4x4[] where = set.where;
         if (farOnly)
         {
             for (int t = 0; t < set.far.Length; t++)
             {
                 int i = set.far[t];
-                if (i >= 0) farLists[i].Add(moved ? toWorld * set.where[t] : set.where[t]);
+                if (i < 0) continue;
+                Matrix4x4 m = moved ? toWorld * where[t] : where[t];
+                if (!InView(m.m03, m.m13 + 10f * m.m11, m.m23, 14f * Mathf.Max(m.m11, 1f))) continue;
+                farLists[i].Add(m);
             }
             return;
         }
-        float full2 = fullReach * fullReach, near2 = nearReach * nearReach;
+        bool mid = HasMid;
+        float fullIn = mid ? fullReach - FullBand : fullReach;
+        float full2 = fullReach * fullReach, fullIn2 = fullIn * fullIn;
+        float near2 = nearReach * nearReach, nearIn = nearReach - NearBand, nearIn2 = nearIn * nearIn;
         float shadow2 = shadows ? shadowReach * shadowReach : -1f;
-        Matrix4x4[] where = set.where;
         for (int t = 0; t < where.Length; t++)
         {
+            Matrix4x4 m = moved ? toWorld * where[t] : where[t];
             float dx = where[t].m03 - px, dz = where[t].m23 - pz, d2 = dx * dx + dz * dz;
-            List<Matrix4x4> list;
-            if (d2 < near2)
+            float cy = m.m13 + 10f * m.m11, r = 14f * Mathf.Max(m.m11, 1f);
+            if (!InView(m.m03, cy, m.m23, r))
             {
-                int i = set.near[t];
-                if (i < 0) continue;
-                list = d2 < full2 ? nearLists[i] : d2 < shadow2 ? midLists[i] : midPlainLists[i];
+                // Outside the picture: only its shadow can show, when it is close and falls into the picture
+                if (d2 < shadow2 && set.near[t] >= 0 && InView(m.m03 + shadowShift.x, cy, m.m23 + shadowShift.z, r + shadowWiden))
+                    shadowLists[set.near[t]].Add(m);
+                continue;
             }
-            else
+            int ni = set.near[t], fi = set.far[t];
+            if (d2 < near2 && ni >= 0)
             {
-                int i = set.far[t];
-                if (i < 0) continue;
-                list = farLists[i];
+                if (d2 < full2) nearLists[ni].Add(m);
+                if (d2 >= fullIn2) (d2 < shadow2 ? midLists : midPlainLists)[ni].Add(m);
             }
-            list.Add(moved ? toWorld * where[t] : where[t]);
+            if (d2 >= nearIn2 && fi >= 0) farLists[fi].Add(m);
         }
     }
 
+    static readonly int LodId = Shader.PropertyToID("_TvLod"), LodCenterId = Shader.PropertyToID("_TvLodCenter");
+    MaterialPropertyBlock nearBlock, midBlock, farBlock;
+
+    // around: the runner's place in the middle (the levels' distances are counted from it)
     public void Draw(Bounds around)
     {
+        if (nearBlock == null) { nearBlock = new MaterialPropertyBlock(); midBlock = new MaterialPropertyBlock(); farBlock = new MaterialPropertyBlock(); }
+        bool mid = HasMid;
+        // x: where it starts (0: from the runner), y: over how many metres before that it comes in; z, w: where it ends
+        // and over how many metres before that it goes
+        nearBlock.SetVector(LodId, new Vector4(0f, 1f, mid ? fullReach : 0f, FullBand));
+        midBlock.SetVector(LodId, new Vector4(mid ? fullReach : 0f, FullBand, nearReach, NearBand));
+        farBlock.SetVector(LodId, new Vector4(nearReach, NearBand, 0f, 1f));
+        Shader.SetGlobalVector(LodCenterId, new Vector4(around.center.x, around.center.z, 0f, 0f));
         var full = new RenderParams(material)
         {
             worldBounds = around,
@@ -445,21 +516,35 @@ public class RunTrees
         };
         var plain = full;
         plain.shadowCastingMode = ShadowCastingMode.Off;
-        DrawAll(full, nearMeshes, nearLists);       // the closest are always within the shadow distance
-        DrawAll(full, midMeshes, midLists);
-        DrawAll(plain, midMeshes, midPlainLists);
-        DrawAll(plain, farMeshes, farLists);
+        full.matProps = nearBlock;
+        countFull = DrawAll(full, nearMeshes, nearLists);       // the closest are always within the shadow distance
+        full.matProps = midBlock;
+        plain.matProps = midBlock;
+        countMid = DrawAll(full, midMeshes, midLists) + DrawAll(plain, midMeshes, midPlainLists);
+        plain.matProps = farBlock;
+        countFar = DrawAll(plain, farMeshes, farLists);
+        countShadow = 0;
+        if (shadows && shadowLists != null)
+        {
+            var shadowOnly = full;
+            shadowOnly.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+            shadowOnly.matProps = null;
+            countShadow = DrawAll(shadowOnly, midMeshes, shadowLists);
+        }
     }
 
-    static void DrawAll(RenderParams rp, Mesh[] meshes, List<Matrix4x4>[] lists)
+    static int DrawAll(RenderParams rp, Mesh[] meshes, List<Matrix4x4>[] lists)
     {
         const int Batch = 1023;
-        for (int i = 0; i < meshes.Length; i++)
+        int count = 0;
+        for (int i = 0; i < meshes.Length && i < lists.Length; i++)
         {
             List<Matrix4x4> l = lists[i];
             if (l.Count == 0 || meshes[i] == null) continue;
+            count += l.Count;
             for (int start = 0; start < l.Count; start += Batch)
                 Graphics.RenderMeshInstanced(rp, meshes[i], 0, l, Math.Min(Batch, l.Count - start), start);
         }
+        return count;
     }
 }

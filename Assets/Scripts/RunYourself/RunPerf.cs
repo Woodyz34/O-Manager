@@ -33,7 +33,23 @@ public class RunPerf : IDisposable
     static readonly long[] lastPartTicks = new long[partNames.Length];
     public enum Part { Runner, HandMap, Online, WindowSearch, MenuCheck, Punch, World,
                        Agent2D, Collision2D, Clock, Leaderboard, PlayerUpdate, Mistakes, GameMode }
-    public static void Add(Part part, long ticks) => partTicks[(int)part] += ticks;
+    // Each frame's parts are kept apart: the frame time Unity gives is the frame before's, so the parts shown with
+    // it are that frame's too (2026-11-26: they were mixed with the current frame's)
+    static int partFrame = -1;
+    static void Rotate()
+    {
+        int now = UnityEngine.Time.frameCount;
+        if (now == partFrame) return;
+        if (now == partFrame + 1) Array.Copy(partTicks, lastPartTicks, partTicks.Length);
+        else Array.Clear(lastPartTicks, 0, lastPartTicks.Length);
+        Array.Clear(partTicks, 0, partTicks.Length);
+        partFrame = now;
+    }
+    public static void Add(Part part, long ticks)
+    {
+        Rotate();
+        partTicks[(int)part] += ticks;
+    }
     readonly List<Probe> counts = new List<Probe>();
     readonly FrameTiming[] timing = new FrameTiming[1];
 
@@ -41,8 +57,18 @@ public class RunPerf : IDisposable
     double worstFrame;
     string worstText;
 
+#if UNITY_EDITOR
+    bool profilerWasOn;
+#endif
+
     public RunPerf()
     {
+#if UNITY_EDITOR
+        // In the Editor each script's own time ("RunWorld.Update() [Invoke]") is only measured while the profiler
+        // records (2026-11-26: the log said "scripts Update 120 ms" but could not say which script)
+        profilerWasOn = UnityEngine.Profiling.Profiler.enabled;
+        try { UnityEngine.Profiling.Profiler.enabled = true; } catch (Exception) { }
+#endif
         AddTime(ProfilerCategory.Scripts, "Update.ScriptRunBehaviourUpdate", "scripts Update");
         AddTime(ProfilerCategory.Scripts, "PreLateUpdate.ScriptRunBehaviourLateUpdate", "scripts LateUpdate");
         AddTime(ProfilerCategory.Scripts, "FixedUpdate.ScriptRunBehaviourFixedUpdate", "scripts FixedUpdate");
@@ -85,14 +111,12 @@ public class RunPerf : IDisposable
     public void Frame(double frameMs, bool slow)
     {
         FrameTimingManager.CaptureFrameTimings();
-        // The hand-measured parts of the frame before (RunSession's Update ran before RunWorld's, or after: either way
-        // one frame's worth)
-        Array.Copy(partTicks, lastPartTicks, partTicks.Length);
-        Array.Clear(partTicks, 0, partTicks.Length);
-        if (lookedForScripts < 3 && UnityEngine.Time.unscaledTime >= nextLook)
+        Rotate();
+        // Scripts are looked for again every 10 s: each script's own marker only exists once it has run
+        if (UnityEngine.Time.unscaledTime >= nextLook)
         {
             lookedForScripts++;
-            nextLook = UnityEngine.Time.unscaledTime + 5f;
+            nextLook = UnityEngine.Time.unscaledTime + (lookedForScripts < 4 ? 5f : 10f);
             LookForScripts();
         }
         if (!slow || frameMs <= worstFrame) return;
@@ -165,7 +189,7 @@ public class RunPerf : IDisposable
         {
             if (!p.rec.Valid) continue;
             double ms = p.rec.LastValue / 1e6;
-            if (ms >= 1.0) worst.Add((ms, p.label));
+            if (ms >= 2.0) worst.Add((ms, p.label));
         }
         worst.Sort((a, b) => b.ms.CompareTo(a.ms));
         if (worst.Count > 0)
@@ -193,6 +217,9 @@ public class RunPerf : IDisposable
 
     public void Dispose()
     {
+#if UNITY_EDITOR
+        try { UnityEngine.Profiling.Profiler.enabled = profilerWasOn; } catch (Exception) { }
+#endif
         foreach (Probe p in times) p.rec.Dispose();
         foreach (Probe p in counts) p.rec.Dispose();
         foreach (Probe p in scripts) p.rec.Dispose();

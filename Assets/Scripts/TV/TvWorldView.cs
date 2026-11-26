@@ -154,6 +154,7 @@ public class TvWorldView : MonoBehaviour
         public Color32[] colors;
         public int[] triangles;
         public Vector3[] uvs;       // textured meshes (TvAtlas): u, v and the atlas tile; null for plain coloured ones
+        public Bounds bounds;       // worked out here, on the background thread, so the main thread need not
 
         public MeshArrays(TvMesh source)
         {
@@ -166,12 +167,16 @@ public class TvWorldView : MonoBehaviour
             colors = new Color32[count];
             List<float> p = source.positions, n = source.normals;
             List<byte> c = source.colors;
+            Vector3 lo = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue), hi = -lo;
             for (int i = 0; i < count; i++)
             {
                 vertices[i] = new Vector3(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
+                lo = Vector3.Min(lo, vertices[i]);
+                hi = Vector3.Max(hi, vertices[i]);
                 normals[i] = new Vector3(n[i * 3], n[i * 3 + 1], n[i * 3 + 2]);
                 colors[i] = new Color32(c[i * 3], c[i * 3 + 1], c[i * 3 + 2], 255);
             }
+            if (count > 0) bounds.SetMinMax(lo, hi);
             triangles = source.triangles.ToArray();
             if (source.uvs.Count > 0)
             {
@@ -185,14 +190,20 @@ public class TvWorldView : MonoBehaviour
 
     public static Mesh ToMesh(MeshArrays source)
     {
+        // 2026-11-26 (a big piece of undergrowth cost 120-170 ms here on Fossum): no checking of the corners and no
+        // bounds worked out on the main thread (both are known to be right: the bounds come from the background)
+        const MeshUpdateFlags Quick = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontRecalculateBounds
+                                      | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontResetBoneBounds;
         var mesh = new Mesh { name = source.name };
-        if (source.vertices.Length > 65000) mesh.indexFormat = IndexFormat.UInt32;
-        mesh.vertices = source.vertices;
-        mesh.normals = source.normals;
-        mesh.colors32 = source.colors;
-        if (source.uvs != null) mesh.SetUVs(0, source.uvs);
-        mesh.SetTriangles(source.triangles, 0);
-        mesh.RecalculateBounds();
+        int n = source.vertices.Length;
+        if (n > 65000) mesh.indexFormat = IndexFormat.UInt32;
+        mesh.SetVertices(source.vertices, 0, n, Quick);
+        mesh.SetNormals(source.normals, 0, n, Quick);
+        mesh.SetColors(source.colors, 0, n, Quick);
+        if (source.uvs != null) mesh.SetUVs(0, source.uvs, 0, n, Quick);
+        mesh.SetTriangles(source.triangles, 0, source.triangles.Length, 0, false);
+        if (n > 0 && source.bounds.size != Vector3.zero) mesh.bounds = source.bounds;
+        else mesh.RecalculateBounds();
         return mesh;
     }
 
