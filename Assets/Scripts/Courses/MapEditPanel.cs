@@ -748,7 +748,15 @@ public class MapEditPanel : MonoBehaviour
         TvHeights heights = TvHeights.Read(grid);
         Func<double, double, bool> lakeAt = WorldLayer.LakeTest(world != null ? WorldLayer.FromBytes(world) : null);
         Func<double, double, bool> closedAt = RunContourField.ClosedTest(grid);
-        return answers => RunContourField.Questions(heights, lines, points, interval, lakeAt, HeightAnswers.AsList(answers), closedAt);
+        // The questions with no answers at all: answers only take questions away from these (KeepFromStart). The
+        // map's own saved answers are left out of points.json's copy here by passing an empty list.
+        List<RunContourField.HeightQuestion> start = null;
+        return answers =>
+        {
+            if (start == null) start = RunContourField.Questions(heights, lines, points, interval, lakeAt, new List<double[]>(), closedAt);
+            return RunContourField.KeepFromStart(
+                RunContourField.Questions(heights, lines, points, interval, lakeAt, HeightAnswers.AsList(answers), closedAt), start);
+        };
     }
 
     static bool SameEdge(double[] a, double[] b)

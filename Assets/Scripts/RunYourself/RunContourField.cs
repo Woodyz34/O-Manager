@@ -735,6 +735,24 @@ public static class RunContourField
         return questions;
     }
 
+    // Answers only ever take questions away (2026-11-27, Anders: on Ängaryd sprint the count kept going up while he
+    // answered). An answer can turn a whole piece of contours round, and the levels after it then miss somewhere else,
+    // but those new misses are the solve settling round the answer, not something the map leaves open: only questions
+    // that were there before any answer (start) are kept.
+    public static List<HeightQuestion> KeepFromStart(List<HeightQuestion> found, List<HeightQuestion> start)
+    {
+        if (found == null || start == null) return found;
+        found.RemoveAll(q => !start.Exists(s => Near(s, q)));
+        return found;
+    }
+
+    static bool Near(HeightQuestion s, HeightQuestion q)
+    {
+        bool aa = MapGeometry.Dist(s.ax, s.ay, q.ax, q.ay) < 15, bb = MapGeometry.Dist(s.bx, s.by, q.bx, q.by) < 15;
+        bool ab = MapGeometry.Dist(s.ax, s.ay, q.bx, q.by) < 15, ba = MapGeometry.Dist(s.bx, s.by, q.ax, q.ay) < 15;
+        return aa && bb || ab && ba;
+    }
+
     // Whether a place lies in the part of the map the import closed off: outside the map edge, or the legend, logos and
     // the like in the margin. True when every cell within 15 m has no speed (a building or a lake is not that big
     // round a contour). grid: grid.bytes, plain.
