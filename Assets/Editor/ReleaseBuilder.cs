@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
@@ -227,6 +228,9 @@ public class ReleaseBuilder : EditorWindow
         }
         finally
         {
+            // The Mac zip and Linux tar.gz are packed in the background while Unity builds the next game
+            // (2026-11-26: they took 1:40 and 2:00 on their own). Wait for them here.
+            FinishPacking(made, problems, times);
             EditorUtility.ClearProgressBar();
             // Building Mac or Linux switches the editor to that platform; go back to what it was
             if (EditorUserBuildSettings.activeBuildTarget != activeBefore)
@@ -337,7 +341,8 @@ public class ReleaseBuilder : EditorWindow
         }
         if (File.Exists(SetupPath)) File.Delete(SetupPath);
 
-        string args = "/Q \"/DAppVersion=" + version + "\" \"/DBuildDir=" + BuildDir + "\" \"/DOutputDir=" + ReleaseDir + "\" \"" + ScriptPath + "\"";
+        // Inno Setup packs on as many cores as the computer has (LZMANumBlockThreads in O-Manager.iss)
+        string args = "/Q \"/DThreads=" + Math.Max(1, Math.Min(32, Environment.ProcessorCount)) + "\" \"/DAppVersion=" + version + "\" \"/DBuildDir=" + BuildDir + "\" \"/DOutputDir=" + ReleaseDir + "\" \"" + ScriptPath + "\"";
         string output;
         int exitCode;
         try
@@ -388,52 +393,86 @@ public class ReleaseBuilder : EditorWindow
         bool built = BuildGame(BuildTarget.StandaloneOSX, MacBuildDir, app, "Mac", problems);
         times.Add("Mac game (with switching the editor to Mac): " + Took(clock));
         if (!built) return;
-        try
-        {
-            EditorUtility.DisplayProgressBar("Build release", "Packing " + GameUpdater.MacAssetName + "…", 0.5f);
-            ReleaseArchives.ZipMacApp(Path.Combine(MacBuildDir, app), MacZipPath);
-            made.Add(GameUpdater.MacAssetName + " (" + SizeText(MacZipPath) + ")");
-            UnityEngine.Debug.Log("Release: " + MacZipPath + " (" + SizeText(MacZipPath) + ")");
-        }
-        catch (Exception e)
-        {
-            UnityEngine.Debug.LogException(e);
-            problems.Add("Mac: could not pack the zip. " + e.Message);
-        }
-        finally
-        {
-            EditorUtility.ClearProgressBar();
-            times.Add("Mac zip: " + Took(clock));
-        }
+        string appPath = Path.Combine(MacBuildDir, app);
+        StartPacking("Mac zip", GameUpdater.MacAssetName, MacZipPath, () => ReleaseArchives.ZipMacApp(appPath, MacZipPath));
     }
 
     static void BuildLinux(List<string> made, List<string> problems, List<string> times, Stopwatch clock)
     {
-        bool built = BuildGame(BuildTarget.StandaloneLinux64, LinuxBuildDir, PlayerSettings.productName + ".x86_64", "Linux", problems);
+        string product = PlayerSettings.productName;
+        bool built = BuildGame(BuildTarget.StandaloneLinux64, LinuxBuildDir, product + ".x86_64", "Linux", problems);
         times.Add("Linux game (with switching the editor to Linux): " + Took(clock));
         if (!built) return;
-        try
+        StartPacking("Linux tar.gz", GameUpdater.LinuxAssetName, LinuxTarPath, () =>
         {
-            EditorUtility.DisplayProgressBar("Build release", "Packing " + GameUpdater.LinuxAssetName + "…", 0.5f);
             // Leave out Unity's debug symbol files, players do not need them
             foreach (string debug in Directory.GetFiles(LinuxBuildDir, "*.debug", SearchOption.TopDirectoryOnly))
             {
                 File.Delete(debug);
             }
-            ReleaseArchives.TarGzFolder(LinuxBuildDir, PlayerSettings.productName, LinuxTarPath);
-            made.Add(GameUpdater.LinuxAssetName + " (" + SizeText(LinuxTarPath) + ")");
-            UnityEngine.Debug.Log("Release: " + LinuxTarPath + " (" + SizeText(LinuxTarPath) + ")");
-        }
-        catch (Exception e)
+            ReleaseArchives.TarGzFolder(LinuxBuildDir, product, LinuxTarPath);
+        });
+    }
+
+    // ---- Packing in the background ----
+    // Zipping is plain file work (no Unity calls), so it runs on another thread while Unity builds the next game.
+    // Each Unity build writes its own folder, so they never touch the same files.
+
+    class Packing
+    {
+        public string label, assetName, path;
+        public Task<Exception> task;
+        public TimeSpan took;
+    }
+
+    static readonly List<Packing> packing = new List<Packing>();
+
+    static void StartPacking(string label, string assetName, string path, Action pack)
+    {
+        var job = new Packing { label = label, assetName = assetName, path = path };
+        job.task = Task.Run(() =>
         {
-            UnityEngine.Debug.LogException(e);
-            problems.Add("Linux: could not pack the tar.gz. " + e.Message);
-        }
-        finally
+            var watch = Stopwatch.StartNew();
+            try
+            {
+                pack();
+                return null;
+            }
+            catch (Exception e)
+            {
+                return e;
+            }
+            finally
+            {
+                job.took = watch.Elapsed;
+            }
+        });
+        packing.Add(job);
+        UnityEngine.Debug.Log("Release: packing " + assetName + " in the background");
+    }
+
+    static void FinishPacking(List<string> made, List<string> problems, List<string> times)
+    {
+        foreach (Packing job in packing)
         {
-            EditorUtility.ClearProgressBar();
-            times.Add("Linux tar.gz: " + Took(clock));
+            while (!job.task.Wait(500))
+            {
+                EditorUtility.DisplayProgressBar("Build release", "Waiting for " + job.assetName + " to be packed…", 0.9f);
+            }
+            Exception error = job.task.Result;
+            times.Add(job.label + " (in the background): " + (int)job.took.TotalMinutes + ":" + job.took.Seconds.ToString("00"));
+            if (error == null && File.Exists(job.path))
+            {
+                made.Add(job.assetName + " (" + SizeText(job.path) + ")");
+                UnityEngine.Debug.Log("Release: " + job.path + " (" + SizeText(job.path) + ")");
+            }
+            else
+            {
+                if (error != null) UnityEngine.Debug.LogException(error);
+                problems.Add(job.label + ": could not be packed. " + (error != null ? error.Message : "No file was made."));
+            }
         }
+        packing.Clear();
     }
 
     // One Mac game that runs on both Intel and Apple silicon Macs. The setting lives in the Mac build module,
