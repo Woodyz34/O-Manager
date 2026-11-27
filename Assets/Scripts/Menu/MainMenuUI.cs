@@ -231,7 +231,7 @@ public class MainMenuUI : MonoBehaviour
             }
             else
             {
-                noteText.text = "Every pack holds a runner you do not have yet.";
+                noteText.text = "Every pack holds a runner you do not have yet. A tier you have collected pays money instead.";
             }
         }
         if (ownedText != null) ownedText.text = "You have " + owned + " of " + total + " runners";
