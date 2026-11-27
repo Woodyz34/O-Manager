@@ -66,7 +66,11 @@ public class MainMenuUI : MonoBehaviour
         if (ContestRun.ReturnToContests)
         {
             ContestRun.ReturnToContests = false;
+            ContestInfo finished = ContestRun.JustFinished;
+            ContestRun.JustFinished = null;
             ContestsPage.Open();
+            // A finished run goes straight to that contest's leaderboard (2026-11-27, the user)
+            if (finished != null) ContestsPage.ShowAfterRun(finished);
         }
     }
 
