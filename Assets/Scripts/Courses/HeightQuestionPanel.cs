@@ -174,6 +174,27 @@ public class HeightQuestionPanel : MonoBehaviour
         CourseUI.Button("Yes", yesNo, "Yes, skip", CourseUI.ButtonKind.Primary, () => { confirm.SetActive(false); Skip(); }, 24);
         CourseUI.Button("No", yesNo, "No", CourseUI.ButtonKind.Light, () => confirm.SetActive(false), 24);
         confirm.SetActive(false);
+
+        // Never still while the game works (2026-11-27, Anders: it stood still for minutes and looked frozen):
+        // a small ring by the count while answers are checked behind the question, a sheet over the map when
+        // there is nothing to ask until the check is done
+        checkSpinner = LoadingSpinner.Add(card.transform, new Vector2(1f, 1f), new Vector2(-46f, -120f), 13f, 5f).gameObject;
+        checkSpinner.SetActive(false);
+        busy = BusyOverlay.Add(frame.transform);
+        stopColor = stop.GetComponent<Image>().color;
+    }
+
+    GameObject checkSpinner;
+    BusyOverlay busy;
+    Color stopColor;
+
+    void Update()
+    {
+        if (checkSpinner == null || busy == null) return;
+        bool behind = checking && current != null;
+        if (checkSpinner.activeSelf != behind) checkSpinner.SetActive(behind);
+        if (checking && current == null) busy.Show("Checking the map again with your answers ...");
+        else busy.Hide();
     }
 
     static ContourLinesGraphic Lines(string name, Transform parent, Color color, float thickness)
@@ -209,13 +230,15 @@ public class HeightQuestionPanel : MonoBehaviour
                 return;
             }
             stop.interactable = true;
-            question.text = "Every uncertain contour is answered.";
+            question.text = "Every uncertain contour is answered. Press Done.";
             progress.text = Summary();
             CourseUI.SetButtonText(stop, "Done");
+            stop.GetComponent<Image>().color = CourseUI.Accent;   // the one thing left to press
             return;
         }
         stop.interactable = true;
         CourseUI.SetButtonText(stop, "Stop for now");
+        stop.GetComponent<Image>().color = stopColor;
         question.text = "Which contour is higher: <color=#E0158F>pink</color> or <color=#1E50E0>blue</color>?";
         ShowProgress();
         // Wide enough to see the hill or the slope round the two (2026-11-27, Anders: it started too close)
