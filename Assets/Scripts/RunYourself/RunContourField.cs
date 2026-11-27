@@ -576,6 +576,7 @@ public static class RunContourField
             if (best[r] < 0 || length[r] < AskAbove) continue;
             var ed = edges[best[r] / 2];
             bool first = best[r] % 2 == 0;
+            if (OnTop(contours[ed.a - 1], contours[ed.b - 1])) continue;
             HeightQuestion q = Question(contours, first ? ed.a : ed.b, first ? ed.b : ed.a, closest, ox, oy, res);
             if (q == null) continue;
             q.length = length[r];
@@ -613,6 +614,7 @@ public static class RunContourField
             if (byTop != 0 && byTop == Math.Sign(got)) continue;
             // A tiny ring (a small knoll or pit, raised or sunk by itself in RunContours) is not worth a question
             if (TinyRing(contours[ed.a - 1]) || TinyRing(contours[ed.b - 1])) continue;
+            if (OnTop(contours[ed.a - 1], contours[ed.b - 1])) continue;
             HeightQuestion q = Question(contours, ed.a, ed.b, closest, ox, oy, res);
             if (q == null) continue;
             // Far apart where they face each other: the rays crossed open ground, not a slope between the two
@@ -642,6 +644,55 @@ public static class RunContourField
     }
 
     static bool TinyRing(Contour c) => c.line.closed && Length(c.line.xy) < 60;
+
+    // Two contours drawn on top of each other for a stretch (a line drawn twice, or two pieces that overlap where they
+    // were joined): there is no "higher" to see on the map, so they are not asked about (2026-11-27, Anders: "ibland
+    // ligger strecken i varandra", the hard questions on Illern). True when 15 m of the shorter one, or a third of it,
+    // lies within 1.5 m of the other.
+    static bool OnTop(Contour a, Contour b)
+    {
+        double[] s = a.line.xy, l = b.line.xy;
+        double ls = Length(s), ll = Length(l);
+        if (ls > ll) { (s, l) = (l, s); ls = ll; }
+        if (s.Length < 4 || l.Length < 4) return false;
+        double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+        for (int i = 0; i + 1 < l.Length; i += 2)
+        {
+            minX = Math.Min(minX, l[i]); maxX = Math.Max(maxX, l[i]);
+            minY = Math.Min(minY, l[i + 1]); maxY = Math.Max(maxY, l[i + 1]);
+        }
+        const double Near = 1.5;
+        double need = Math.Min(15, ls / 3), onTop = 0;
+        for (int i = 0; i + 3 < s.Length; i += 2)
+        {
+            double x0 = s[i], y0 = s[i + 1], x1 = s[i + 2], y1 = s[i + 3];
+            double seg = Math.Sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
+            int steps = Math.Max(1, (int)Math.Ceiling(seg));
+            for (int k = 0; k < steps; k++)
+            {
+                double t = (k + 0.5) / steps, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
+                if (x < minX - Near || x > maxX + Near || y < minY - Near || y > maxY + Near) continue;
+                if (DistToLine(l, x, y, Near) < Near) onTop += seg / steps;
+            }
+            if (onTop >= need) return true;
+        }
+        return false;
+    }
+
+    // Distance from (x, y) to the polyline, stopping early once under stopAt
+    static double DistToLine(double[] l, double x, double y, double stopAt)
+    {
+        double best = double.MaxValue;
+        for (int i = 0; i + 3 < l.Length; i += 2)
+        {
+            double ax = l[i], ay = l[i + 1], bx = l[i + 2], by = l[i + 3];
+            double dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+            double t = len2 > 0 ? Math.Max(0, Math.Min(1, ((x - ax) * dx + (y - ay) * dy) / len2)) : 0;
+            double ex = ax + dx * t - x, ey = ay + dy * t - y, d = Math.Sqrt(ex * ex + ey * ey);
+            if (d < best) { best = d; if (best < stopAt) return best; }
+        }
+        return best;
+    }
 
     // Whether b is higher (1) or lower (-1) than its neighbour a by the way to the nearest top from each; 0 when that
     // says nothing or the two disagree. sa: the side of a that b is on, sb: the side of b that a is on.
