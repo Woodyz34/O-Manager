@@ -724,12 +724,43 @@ public static class RunContourField
     // The contours still uncertain on a map, biggest first (an empty list when there are none; null when the contours
     // can't be read at all). Slow on a big map: run it on a background thread.
     public static List<HeightQuestion> Questions(TvHeights grid, byte[] linesJson, byte[] pointsJson, double eq, Func<double, double, bool> lakeAt,
-                                                 List<double[]> answers)
+                                                 List<double[]> answers, Func<double, double, bool> closedAt = null)
     {
         if (grid == null || grid.h == null || linesJson == null) return null;
         var questions = new List<HeightQuestion>();
         Build(grid, ReadLines(linesJson), ReadTicks(pointsJson), eq > 0.5 ? eq : 5, null, ReadWater(linesJson, pointsJson), lakeAt, answers, questions);
+        // Not about the legend, a badge or anything else printed round the map (2026-11-27, Anders: Störyd asked
+        // about the contour sample in the legend)
+        if (closedAt != null) questions.RemoveAll(q => closedAt(q.ax, q.ay) || closedAt(q.bx, q.by));
         return questions;
+    }
+
+    // Whether a place lies in the part of the map the import closed off: outside the map edge, or the legend, logos and
+    // the like in the margin. True when every cell within 15 m has no speed (a building or a lake is not that big
+    // round a contour). grid: grid.bytes, plain.
+    public static Func<double, double, bool> ClosedTest(byte[] grid)
+    {
+        try
+        {
+            if (grid == null || grid.Length < 36 || BitConverter.ToInt32(grid, 0) != 0x4452474F) return null;
+            float minx = BitConverter.ToSingle(grid, 8), miny = BitConverter.ToSingle(grid, 12), cell = BitConverter.ToSingle(grid, 24);
+            int rows = BitConverter.ToInt32(grid, 28), cols = BitConverter.ToInt32(grid, 32);
+            long count = (long)rows * cols;
+            if (rows <= 0 || cols <= 0 || cell <= 0f || grid.Length < 36 + count * 4) return null;
+            var speed = new float[count];
+            Buffer.BlockCopy(grid, 36, speed, 0, (int)count * 4);
+            int k = Math.Max(1, (int)Math.Ceiling(15 / cell));
+            return (e, n) =>
+            {
+                int c0 = (int)Math.Round((e - minx) / cell), r0 = (int)Math.Round((n - miny) / cell);
+                if (r0 < 0 || c0 < 0 || r0 >= rows || c0 >= cols) return true;
+                for (int r = r0 - k; r <= r0 + k; r++)
+                    for (int c = c0 - k; c <= c0 + k; c++)
+                        if (r >= 0 && c >= 0 && r < rows && c < cols && speed[r * cols + c] > 0f) return false;
+                return true;
+            };
+        }
+        catch (Exception) { return null; }
     }
 
     // An answer: a point on contour A, a point on contour B (game metres) and 1 when A is higher, -1 lower, 0 as high

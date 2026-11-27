@@ -350,7 +350,7 @@ public class MapEditPanel : MonoBehaviour
             string given = count == 0 ? "" : count == 1 ? " (1 answered)" : " (" + count + " answered)";
             if (counting) heightsText.text = "Heights: checking the contours ...";
             else if (questionsLeft > 0)
-                heightsText.text = "Heights: " + (questionsLeft == 1 ? "1 contour needs" : questionsLeft + " contours need") + " an answer: which is higher?" + given;
+                heightsText.text = "Heights: " + (questionsLeft == 1 ? "1 contour needs" : questionsLeft + " contours need") + " an answer: which is higher? (answers can change the count)" + given;
             else if (questionsLeft == 0)
                 heightsText.text = "Heights: every contour is settled" + (questionsSkipped == 0 ? "." : questionsSkipped == 1 ? " (1 skipped)." : " (" + questionsSkipped + " skipped).") + given;
             else heightsText.text = "Heights: " + (count == 0 ? "no answers about uncertain contours yet." : count == 1 ? "1 answer about an uncertain contour." : count + " answers about uncertain contours.");
@@ -747,7 +747,8 @@ public class MapEditPanel : MonoBehaviour
         if (grid == null || lines == null) return _ => null;
         TvHeights heights = TvHeights.Read(grid);
         Func<double, double, bool> lakeAt = WorldLayer.LakeTest(world != null ? WorldLayer.FromBytes(world) : null);
-        return answers => RunContourField.Questions(heights, lines, points, interval, lakeAt, HeightAnswers.AsList(answers));
+        Func<double, double, bool> closedAt = RunContourField.ClosedTest(grid);
+        return answers => RunContourField.Questions(heights, lines, points, interval, lakeAt, HeightAnswers.AsList(answers), closedAt);
     }
 
     static bool SameEdge(double[] a, double[] b)
