@@ -211,7 +211,7 @@ public class MapEditPanel : MonoBehaviour
             CourseUI.Size(heightsText, -1, -1, 1);
             heightsButton = CourseUI.Button("Heights button", heightsRow, "Uncertain contours...", CourseUI.ButtonKind.Secondary, OpenHeights, 20);
             CourseUI.Size(heightsButton, -1, 300);
-            HoverTip.Add(heightsButton, "Go through the contours whose height the game is unsure of, one at a time: is it higher or lower than the contour next to it? This makes the 3D ground right.");
+            HoverTip.Add(heightsButton, "Go through the contours whose height the game is unsure of, one at a time: which of two contours is higher? This makes the 3D ground right. Skipped ones are not asked again until only skipped ones are left.");
         }
 
         statusText = CourseUI.Text("Status", card.transform, "", 20, CourseUI.Forest, FontStyles.Bold);
@@ -248,6 +248,7 @@ public class MapEditPanel : MonoBehaviour
     // in the same colour as "the map needs saving") ----
 
     int questionsLeft = -1;            // -1: not counted yet (or could not be)
+    int questionsSkipped;              // uncertain contours the player chose to skip (heightskips.txt), not counted as left
     bool counting;
     Task<Func<double[], List<RunContourField.HeightQuestion>>> finder;
 
@@ -274,7 +275,7 @@ public class MapEditPanel : MonoBehaviour
             double[] now = heightAnswers;
             List<RunContourField.HeightQuestion> found = await Task.Run(() => find(now));
             if (this == null) return;
-            questionsLeft = found != null ? found.Count : -1;
+            CountLeft(found);
         }
         catch (Exception e)
         {
@@ -284,6 +285,19 @@ public class MapEditPanel : MonoBehaviour
         }
         counting = false;
         Refresh();
+    }
+
+    // Skipped questions are not left: the player has seen them and chose to leave them as the game guessed
+    void CountLeft(List<RunContourField.HeightQuestion> found)
+    {
+        questionsSkipped = 0;
+        if (found == null) { questionsLeft = -1; return; }
+        List<RunContourField.HeightQuestion> skips = HeightQuestionPanel.ReadSkips(map.folder);
+        int left = 0;
+        foreach (RunContourField.HeightQuestion q in found)
+            if (HeightQuestionPanel.IsSkipped(skips, q)) questionsSkipped++;
+            else left++;
+        questionsLeft = left;
     }
 
     static TMP_InputField LabelledInput(Transform parent, string label, string placeholder, int limit, string value)
@@ -336,8 +350,9 @@ public class MapEditPanel : MonoBehaviour
             string given = count == 0 ? "" : count == 1 ? " (1 answered)" : " (" + count + " answered)";
             if (counting) heightsText.text = "Heights: checking the contours ...";
             else if (questionsLeft > 0)
-                heightsText.text = "Heights: " + (questionsLeft == 1 ? "1 contour needs" : questionsLeft + " contours need") + " an answer: higher or lower?" + given;
-            else if (questionsLeft == 0) heightsText.text = "Heights: every contour is settled." + given;
+                heightsText.text = "Heights: " + (questionsLeft == 1 ? "1 contour needs" : questionsLeft + " contours need") + " an answer: which is higher?" + given;
+            else if (questionsLeft == 0)
+                heightsText.text = "Heights: every contour is settled" + (questionsSkipped == 0 ? "." : questionsSkipped == 1 ? " (1 skipped)." : " (" + questionsSkipped + " skipped).") + given;
             else heightsText.text = "Heights: " + (count == 0 ? "no answers about uncertain contours yet." : count == 1 ? "1 answer about an uncertain contour." : count + " answers about uncertain contours.");
             if (HeightsChanged) heightsText.text += " The 3D ground is made again when you save.";
             heightsText.color = HeightsChanged || questionsLeft > 0 ? CourseUI.Accent : CourseUI.Ink;
@@ -611,13 +626,15 @@ public class MapEditPanel : MonoBehaviour
                 SetStatus("The contours of this map could not be read.", true);
                 return;
             }
-            questionsLeft = questions.Count;
+            CountLeft(questions);
             Refresh();
             if (questions.Count == 0)
             {
                 SetStatus("The game is sure of every contour on this map. Nothing to answer.", false);
                 return;
             }
+            // Only skipped ones left: asking again means the player wants another look at them
+            if (questionsLeft == 0) HeightQuestionPanel.WriteSkips(folder, null);
             SetStatus("", false);
             string pendingFolder = folder;
             HeightQuestionPanel.Open(transform, map, questions, heightAnswers, find, chosen =>

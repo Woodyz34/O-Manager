@@ -28,6 +28,7 @@ public class HeightQuestionPanel : MonoBehaviour
     List<RunContourField.HeightQuestion> rest = new List<RunContourField.HeightQuestion>();
     int answeredNow;
     readonly List<RunContourField.HeightQuestion> skipped = new List<RunContourField.HeightQuestion>();
+    int skippedBefore;   // skips from earlier visits (heightskips.txt)
     readonly Stack<(double[] answers, RunContourField.HeightQuestion q, bool skip)> undo = new Stack<(double[], RunContourField.HeightQuestion, bool)>();
     bool checking, checkAgain;         // the map is being checked again with the answers (and should be once more after)
     double viewWidth;                  // metres across the picture
@@ -58,6 +59,8 @@ public class HeightQuestionPanel : MonoBehaviour
         panel.find = find;
         panel.onDone = onDone;
         panel.onChange = onChange;
+        panel.skipped.AddRange(ReadSkips(map.folder));
+        panel.skippedBefore = panel.skipped.Count;
         panel.answers = answers;
         if (questions != null) panel.rest.AddRange(questions);
         panel.Build(dim.transform);
@@ -253,13 +256,13 @@ public class HeightQuestionPanel : MonoBehaviour
     {
         int left = rest.Count + (current != null ? 1 : 0);
         progress.text = (left == 1 ? "1 question left" : left + " questions left") + (checking ? " (checking your answers ...)" : "")
-                        + (answeredNow > 0 || skipped.Count > 0 ? "   ·   " + Summary() : "");
+                        + (answeredNow > 0 || skipped.Count > skippedBefore ? "   ·   " + Summary() : "");
     }
 
     string Summary()
     {
         string s = answeredNow == 1 ? "1 answer" : answeredNow + " answers";
-        if (skipped.Count > 0) s += ", " + skipped.Count + " skipped";
+        if (skipped.Count > skippedBefore) s += ", " + (skipped.Count - skippedBefore) + " skipped";
         return s + ". They are kept when you press Save in Edit map.";
     }
 
@@ -282,6 +285,7 @@ public class HeightQuestionPanel : MonoBehaviour
         if (q == null) return;
         undo.Push((answers, q, true));
         skipped.Add(q);
+        WriteSkips(map.folder, skipped);
         current = null;
         Next();
     }
@@ -290,7 +294,7 @@ public class HeightQuestionPanel : MonoBehaviour
     {
         if (undo.Count == 0) return;
         var last = undo.Pop();
-        if (last.skip) skipped.Remove(last.q);
+        if (last.skip) { skipped.Remove(last.q); WriteSkips(map.folder, skipped); }
         else answeredNow--;
         bool answersChanged = !ReferenceEquals(answers, last.answers);
         answers = last.answers;
@@ -354,12 +358,58 @@ public class HeightQuestionPanel : MonoBehaviour
         return MapGeometry.Dist(a.ax, a.ay, b.ax, b.ay) < 5 && MapGeometry.Dist(a.bx, a.by, b.bx, b.by) < 5;
     }
 
-    bool WasSkipped(RunContourField.HeightQuestion q)
+    bool WasSkipped(RunContourField.HeightQuestion q) => IsSkipped(skipped, q);
+
+    public static bool IsSkipped(List<RunContourField.HeightQuestion> skips, RunContourField.HeightQuestion q)
     {
-        foreach (RunContourField.HeightQuestion s in skipped)
+        if (skips == null) return false;
+        foreach (RunContourField.HeightQuestion s in skips)
             if (MapGeometry.Dist(s.ax, s.ay, q.ax, q.ay) < 15 || MapGeometry.Dist(s.ax, s.ay, q.bx, q.by) < 15
                 || MapGeometry.Dist(s.bx, s.by, q.ax, q.ay) < 15) return true;
         return false;
+    }
+
+    // ---- Skips kept in the map's folder (2026-11-27, Anders: after "every contour is answered" Edit map still said
+    // 5 contours need an answer: the 4 skipped ones came back). Only on this computer; not sent with the map. ----
+
+    public const string SkipFile = "heightskips.txt";
+
+    public static List<RunContourField.HeightQuestion> ReadSkips(string folder)
+    {
+        var list = new List<RunContourField.HeightQuestion>();
+        try
+        {
+            string file = System.IO.Path.Combine(folder, SkipFile);
+            if (!System.IO.File.Exists(file)) return list;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            foreach (string line in System.IO.File.ReadAllLines(file))
+            {
+                string[] p = line.Split(',');
+                if (p.Length < 4) continue;
+                if (double.TryParse(p[0], System.Globalization.NumberStyles.Float, inv, out double ax)
+                    && double.TryParse(p[1], System.Globalization.NumberStyles.Float, inv, out double ay)
+                    && double.TryParse(p[2], System.Globalization.NumberStyles.Float, inv, out double bx)
+                    && double.TryParse(p[3], System.Globalization.NumberStyles.Float, inv, out double by))
+                    list.Add(new RunContourField.HeightQuestion { ax = ax, ay = ay, bx = bx, by = by });
+            }
+        }
+        catch (Exception e) { Debug.LogWarning("HeightQuestionPanel: could not read the skips: " + e.Message); }
+        return list;
+    }
+
+    public static void WriteSkips(string folder, List<RunContourField.HeightQuestion> skips)
+    {
+        try
+        {
+            string file = System.IO.Path.Combine(folder, SkipFile);
+            if (skips == null || skips.Count == 0) { if (System.IO.File.Exists(file)) System.IO.File.Delete(file); return; }
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var lines = new List<string>();
+            foreach (RunContourField.HeightQuestion q in skips)
+                lines.Add(q.ax.ToString("0.##", inv) + "," + q.ay.ToString("0.##", inv) + "," + q.bx.ToString("0.##", inv) + "," + q.by.ToString("0.##", inv));
+            System.IO.File.WriteAllLines(file, lines);
+        }
+        catch (Exception e) { Debug.LogWarning("HeightQuestionPanel: could not keep the skips: " + e.Message); }
     }
 
     void Finish()
