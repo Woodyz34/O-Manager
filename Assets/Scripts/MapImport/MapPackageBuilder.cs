@@ -170,10 +170,11 @@ namespace MapImport
             pkg.kinds = grid.kind;
 
             // What grows where, the stones, cliffs and paths: for the 3D view of a TV control. The map works without it.
+            WorldLayer world = null;
             try
             {
                 var worldSw = System.Diagnostics.Stopwatch.StartNew();
-                WorldLayer world = WorldLayer.Build(map, extent, offE, offN, sprint);
+                world = WorldLayer.Build(map, extent, offE, offN, sprint);
                 pkg.world = world.ToBytes();
                 Log($"World layer: {world.cols} x {world.rows} cells of {world.cell:0.#} m, {world.points.Count} points, {world.lines.Count} lines, {pkg.world.Length / 1024} kB in {worldSw.ElapsedMilliseconds} ms");
             }
@@ -194,7 +195,7 @@ namespace MapImport
                 {
                     var groundSw = System.Diagnostics.Stopwatch.StartNew();
                     pkg.runHeights = global::RunContours.Bake(global::TvHeights.Read(pkg.grid), Encoding.UTF8.GetBytes(pkg.linesJson),
-                                                              Encoding.UTF8.GetBytes(pkg.pointsJson), info.contourInterval);
+                                                              Encoding.UTF8.GetBytes(pkg.pointsJson), info.contourInterval, null, WorldLayer.LakeTest(world));
                     Log(pkg.runHeights != null
                         ? $"3D ground: {pkg.runHeights.Length / 1024} kB in {groundSw.ElapsedMilliseconds} ms"
                         : "3D ground: the contours could not be solved; it is made in the race from the grid");

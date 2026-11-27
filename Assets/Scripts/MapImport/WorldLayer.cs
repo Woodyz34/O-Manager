@@ -117,6 +117,14 @@ namespace MapImport
         public List<WorldLine> lines = new List<WorldLine>();
         public List<WorldArea> areas = new List<WorldArea>();   // empty in layers made before version 3
 
+        // Whether a place is open water (a lake, a pond, a wide river), for the run-yourself ground (RunContours); null
+        // without a layer
+        public static Func<double, double, bool> LakeTest(WorldLayer layer)
+        {
+            if (layer == null || layer.cells == null) return null;
+            return (e, n) => (layer.At(e, n) & WorldCell.BaseMask) == WorldCell.Water;
+        }
+
         // What is at a place; outside the layer it is plain forest
         public byte At(double e, double n)
         {

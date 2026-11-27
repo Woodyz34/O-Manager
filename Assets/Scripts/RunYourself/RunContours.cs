@@ -26,7 +26,9 @@ public static class RunContours
 
     // The ground made exactly from the contours (RunContourField), with the tops of knolls and the bottoms of hollows
     // added inside the innermost rings; the 10 m grid with the rings added when the contours can't be solved
-    public static TvHeights Detailed(string mapId, TvHeights grid, byte[] linesJson, byte[] pointsJson, float interval, System.Action<string> log = null, string cacheFile = null)
+    // lakeAt: whether a place (game metres) is open water (lakes, ponds), from the map's 3D world layer; null: not known
+    public static TvHeights Detailed(string mapId, TvHeights grid, byte[] linesJson, byte[] pointsJson, float interval, System.Action<string> log = null, string cacheFile = null,
+                                     Func<double, double, bool> lakeAt = null)
     {
         if (grid == null || grid.h == null || linesJson == null) return grid;
         lock (typeof(RunContours))
@@ -39,7 +41,7 @@ public static class RunContours
             lock (typeof(RunContours)) { cachedFor = mapId; cached = saved; }
             return saved;
         }
-        TvHeights fine = Make(grid, linesJson, pointsJson, interval, log, out bool exact);
+        TvHeights fine = Make(grid, linesJson, pointsJson, interval, log, lakeAt, out bool exact);
         if (fine == null) return grid;
         lock (typeof(RunContours))
         {
@@ -55,15 +57,18 @@ public static class RunContours
     // here and keeps it in the map package as runheights.bytes, so a race only reads it. The file says which version of
     // this code made it and how long the lines and points it was made from were, so a stale one is never used.
 
-    public const int Version = 5;          // raise when the ground comes out differently (the old files are then remade)
+    public const int Version = 6;          // raise when the ground comes out differently (the old files are then remade)
                                            // 5 (2026-11-27): only real slope ticks, which way is up solved for the whole map at once
+                                           // 6 (2026-11-27): index contours on one level over the whole map, lakes flat, half-index
+                                           // contours joined, contour pieces with no known slope left out
     const int PackageMagic = 0x32485552;   // "RUH2"
 
     // The ground for a map package (gzipped), or null when the map has no heights or the contours can't be solved
-    public static byte[] Bake(TvHeights grid, byte[] linesJson, byte[] pointsJson, float interval, Action<string> log = null)
+    public static byte[] Bake(TvHeights grid, byte[] linesJson, byte[] pointsJson, float interval, Action<string> log = null,
+                              Func<double, double, bool> lakeAt = null)
     {
         if (grid == null || grid.h == null || linesJson == null) return null;
-        TvHeights fine = Make(grid, linesJson, pointsJson, interval, log, out bool exact);
+        TvHeights fine = Make(grid, linesJson, pointsJson, interval, log, lakeAt, out bool exact);
         if (fine == null || !exact) return null;
         byte[] body = ToBytes(fine);
         if (body == null) return null;
@@ -110,13 +115,15 @@ public static class RunContours
     }
 
     // The fine ground: exact (from the contours) or the 10 m grid made finer when they can't be solved; null on failure
-    static TvHeights Make(TvHeights grid, byte[] linesJson, byte[] pointsJson, float interval, Action<string> log, out bool exact)
+    static TvHeights Make(TvHeights grid, byte[] linesJson, byte[] pointsJson, float interval, Action<string> log,
+                          Func<double, double, bool> lakeAt, out bool exact)
     {
         exact = false;
         float eq = interval > 0.5f ? interval : 5f;
         List<RunContourField.Line> lines = RunContourField.ReadLines(linesJson);
         TvHeights fine = null;
-        try { fine = RunContourField.Build(grid, lines, RunContourField.ReadTicks(pointsJson), eq, log, RunContourField.ReadWater(linesJson, pointsJson)); }
+        try { fine = RunContourField.Build(grid, lines, RunContourField.ReadTicks(pointsJson), eq, log, RunContourField.ReadWater(linesJson, pointsJson),
+                                                 lakeAt); }
         catch (Exception e) { log?.Invoke("contour field failed: " + e.Message); }
         exact = fine != null;
         if (!exact) fine = Upsampled(grid);

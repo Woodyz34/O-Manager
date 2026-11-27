@@ -38,7 +38,7 @@ public static class RunContourField
 
     // The fine heights, or null when the contours can't be solved (then the 10 m grid is used)
     public static TvHeights Build(TvHeights grid, List<Line> lines, List<double[]> ticks, double eq, Action<string> log = null,
-                                   List<double[]> water = null)
+                                   List<double[]> water = null, Func<double, double, bool> lakeAt = null)
     {
         if (grid == null || lines == null || eq <= 0) return null;
         ticks = RealTicks(lines, ticks);
@@ -84,6 +84,19 @@ public static class RunContourField
                     GridBuilder.Supercover((w[i] - ox) / res, (w[i + 1] - oy) / res, (w[i + 2] - ox) / res, (w[i + 3] - oy) / res, C, R,
                                            (x, y) => wet[y * C + x] = true);
             }
+        }
+
+        // Open water (lakes, ponds, wide rivers) from the map's 3D world layer (lakes have no lines in lines.json): -1
+        // here, numbered by piece in LakeLevels
+        int[] lake = null;
+        if (lakeAt != null)
+        {
+            lake = new int[R * C];
+            bool anyLake = false;
+            for (int y = 0; y < R; y++)
+                for (int x = 0; x < C; x++)
+                    if (lakeAt(ox + (x + 0.5) * res, oy + (y + 0.5) * res)) { lake[y * C + x] = -1; anyLake = true; }
+            if (!anyLake) lake = null;
         }
 
         // ---- What the map says about which way is up, contour by contour ----
@@ -225,7 +238,7 @@ public static class RunContourField
         for (int i = 0; i <= contours.Count; i++) adj[i] = new List<int>();
         for (int e = 0; e < edges.Count; e++) { adj[edges[e].a].Add(e); adj[edges[e].b].Add(e); }
 
-        bool[] accepted = Orient(contours, edges, ev, strong, anyIndex, out int dropped);
+        bool[] accepted = Orient(contours, edges, ev, strong, anyIndex, out int dropped, out int[] pieceOf);
         int knownSlope = 0;
         foreach (Contour c in contours)
         {
@@ -258,9 +271,14 @@ public static class RunContourField
                 weight[e] = baseWeight[e] / (1 + (r / 0.5) * (r / 0.5));
             }
         }
+        if (anyIndex) AlignIndex(contours, edges, diff, baseWeight, level, pieceOf);
+        var lakes = LakeLevels(lake, contours, level, ids, C, R, res);
         ids = null;
         var known = new bool[contours.Count + 1];
-        foreach (Contour c in contours) known[c.id] = adj[c.id].Count > 0;
+        // Only a contour tied to a neighbour by its slope has a level (2026-11-27: a 12 m piece of an index contour on
+        // Delsjön whose slope nothing said kept the level 0 and stood as a spike 40 m above the hillside)
+        for (int e = 0; e < edges.Count; e++)
+            if (baseWeight[e] > 0) known[edges[e].a] = known[edges[e].b] = true;
         int nested = NestLevels(contours, level, known, out bool[] certain, out bool[] hasInside);
 
         // ---- The ground: fixed on every contour, smooth in between ----
@@ -275,6 +293,10 @@ public static class RunContourField
             c.line.solved = true;
             Fix(c.p, c.line.level, sum, count, C, R);
         }
+        // Lakes: one flat surface a little under the lowest contour by the shore
+        if (lakes != null)
+            for (int i = 0; i < lakes.Length; i++)
+                if (!double.IsNaN(lakes[i])) { sum[i] += lakes[i] * eq; count[i]++; }
         if (!Fill(z, isFixed, sum, count, R, C)) return null;
 
         // ---- A small knoll or hollow on a slope: level with the ground round it ----
@@ -386,6 +408,151 @@ public static class RunContourField
         return kept;
     }
 
+    // ---- Lakes and ponds lie flat, under every contour round them ----
+    // No contour is drawn across water, so the ground over a lake was filled in from the contours on its far shores
+    // and rose above the contour along its own bank: a ditch ran along the shore (Delsjön, Fossum), and the water of a
+    // large lake sloped. Each piece of open water is held at one level, a fifth of an interval under the contour met
+    // going out from it (within 25 m), when at least four in five of those contours are at the same level. Else it is
+    // a river running downhill, or the contours round it don't agree: left to the contours. Returns each cell's water
+    // level (in intervals; NaN on land), or null.
+    static double[] LakeLevels(int[] label, List<Contour> contours, double[] level, int[] ids, int C, int R, double res)
+    {
+        if (label == null) return null;
+        var result = new double[R * C];
+        for (int i = 0; i < result.Length; i++) result[i] = double.NaN;
+        int reach = (int)Math.Ceiling(25 / res);
+        var queue = new List<int>();
+        var dist = new Dictionary<int, int>();
+        var met = new List<double>();
+        int next = 0;
+        for (int start = 0; start < label.Length; start++)
+        {
+            if (label[start] != -1) continue;
+            // The piece of water
+            int id = ++next;
+            queue.Clear();
+            queue.Add(start);
+            label[start] = id;
+            for (int qi = 0; qi < queue.Count; qi++)
+            {
+                int c = queue[qi], x = c % C, y = c / C;
+                if (x > 0 && label[c - 1] == -1) { label[c - 1] = id; queue.Add(c - 1); }
+                if (x < C - 1 && label[c + 1] == -1) { label[c + 1] = id; queue.Add(c + 1); }
+                if (y > 0 && label[c - C] == -1) { label[c - C] = id; queue.Add(c - C); }
+                if (y < R - 1 && label[c + C] == -1) { label[c + C] = id; queue.Add(c + C); }
+            }
+            int size = queue.Count;
+            if (size * res * res < 50) continue;   // a puddle
+            // Out from it over land, up to the first contour each way
+            dist.Clear();
+            met.Clear();
+            var front = new List<int>(queue);
+            foreach (int c in front) dist[c] = 0;
+            for (int qi = 0; qi < front.Count; qi++)
+            {
+                int c = front[qi], d = dist[c];
+                int v = ids[c];
+                if (v != 0)
+                {
+                    if (contours[v - 1].orientation != 0) met.Add(Math.Round(level[v]));
+                    continue;   // not beyond the first contour
+                }
+                if (d >= reach) continue;
+                int x = c % C, y = c / C;
+                void Go(int n) { if (!dist.ContainsKey(n) && label[n] != id) { dist[n] = d + 1; front.Add(n); } }
+                if (x > 0) Go(c - 1);
+                if (x < C - 1) Go(c + 1);
+                if (y > 0) Go(c - C);
+                if (y < R - 1) Go(c + C);
+            }
+            if (met.Count < 3) continue;
+            met.Sort();
+            // A few contours by an outlet, or one wrongly levelled, don't set the level of the whole lake
+            double low = met[met.Count / 10], mid = met[met.Count / 2];
+            if (mid - low > 1.01) continue;
+            // The shore all round at one level: else the contours round it don't agree, and the lake is left to them
+            int atMid = 0;
+            foreach (double v in met) if (v == mid) atMid++;
+            if (atMid < 0.8 * met.Count) continue;
+            foreach (int c in queue) result[c] = Math.Min(low, mid) - 0.2;
+        }
+        return result;
+    }
+
+    // ---- Every fifth contour an index contour, all over the map ----
+    // The pieces the slope was joined into above are tied to each other only by the pairs left out of them, so two
+    // large pieces can end up one interval apart in the levels solved from all pairs: on Fossum the index contours of
+    // the east half sat one interval above those of the west, and the seam between them a step or a ridge. Each piece
+    // is moved the fewest whole intervals that bring its index contours to the level (mod 5) most index contours have,
+    // and the levels solved again with every index contour held at its own index level.
+    static void AlignIndex(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, double[] diff,
+                           double[] baseWeight, double[] level, int[] pieceOf)
+    {
+        int Mod5(double v) => (((int)Math.Round(v)) % 5 + 5) % 5;
+        // Index contour length at each level mod 5, for each piece and for the whole map
+        var votes = new Dictionary<int, double[]>();
+        var all = new double[5];
+        double total = 0;
+        foreach (Contour c in contours)
+        {
+            if (!c.line.index || c.orientation == 0) continue;
+            double len = Length(c.p);
+            int r = Mod5(level[c.id]);
+            if (!votes.TryGetValue(pieceOf[c.id], out double[] v)) votes[pieceOf[c.id]] = v = new double[5];
+            v[r] += len;
+            all[r] += len;
+            total += len;
+        }
+        if (total <= 0) return;
+        int best = 0;
+        for (int r = 1; r < 5; r++) if (all[r] > all[best]) best = r;
+        // A map whose index contours don't keep to every fifth level (not index contours after all): left as it is
+        if (all[best] < 0.4 * total) return;
+        var shift = new Dictionary<int, int>();
+        foreach (var kv in votes)
+        {
+            int top = 0;
+            for (int r = 1; r < 5; r++) if (kv.Value[r] > kv.Value[top]) top = r;
+            int d = ((best - top) % 5 + 5) % 5;
+            shift[kv.Key] = d > 2 ? d - 5 : d;
+        }
+        // The anchors: an extra pair from the level 0 (index 0, no contour) to each index contour at its index level
+        var ext = new List<(int a, int b, int sa, int sb, double w)>(edges);
+        var extDiff = new List<double>(diff);
+        var extW = new List<double>(baseWeight);
+        foreach (Contour c in contours)
+        {
+            if (c.orientation == 0) continue;
+            if (shift.TryGetValue(pieceOf[c.id], out int d)) level[c.id] += d;
+            if (!c.line.index) continue;
+            double at = level[c.id];
+            double target = Math.Round((at - best) / 5) * 5 + best;
+            ext.Add((0, c.id, 1, 1, 0));
+            extDiff.Add(target);
+            extW.Add(Math.Max(20, Length(c.p) / 10));
+        }
+        level[0] = 0;
+        double[] dArr = extDiff.ToArray(), w = extW.ToArray(), w0 = (double[])w.Clone();
+        for (int outer = 0; outer < 5; outer++)
+        {
+            ContourHeights.SolveLevels(level, ext, dArr, w);
+            for (int e = 0; e < edges.Count; e++)
+            {
+                double r = level[ext[e].b] - level[ext[e].a] - dArr[e];
+                w[e] = w0[e] / (1 + (r / 0.5) * (r / 0.5));
+            }
+        }
+        double zero = level[0];
+        for (int i = 0; i < level.Length; i++) level[i] -= zero;
+    }
+
+    static double Length(double[] p)
+    {
+        double len = 0;
+        for (int i = 0; i + 3 < p.Length; i += 2) len += MapGeometry.Dist(p[i], p[i + 1], p[i + 2], p[i + 3]);
+        return len;
+    }
+
     // ---- Which way is up, for the whole map at once (2026-11-27, Anders: "höjdkurvorna ska vara 100 %") ----
     // Two contours next to each other (no contour between) are either one interval apart, the slope going on from one
     // to the other, or at the same level with a ridge or a valley between them. Which of the two, and so which way the
@@ -396,14 +563,15 @@ public static class RunContourField
     // Slogebo: the slope from the marsh up to the hill went down). A pair is not joined, or joined the other way (a
     // ridge or valley), when that would
     //   - break the index contours: every fifth contour is an index contour, so two index contours next to each other
-    //     are always at the same level and an index contour and a plain one never are, and the plain ones in between
-    //     must count up (or down) to the next index contour,
+    //     are always at the same level, an index contour and a plain one never are, and all the index contours of a
+    //     piece lie at the same level (mod 5). Plain contours may lie at an index level (2026-11-27, Bondberget: some
+    //     mappers draw index contours only here and there; counting those broke the right answer at control 4),
     //   - turn the slope round a loop of pairs the other way than the pairs already joined, or
     //   - turn ticks or knoll rings in one piece against those in the other.
     // The slope ticks counted here are only real ones (RealTicks). Sets every contour's orientation (1: the left side is
     // up, -1: the right, 0: nothing says); returns which pairs were joined as they were seen.
     static bool[] Orient(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, double[] ev, double[] strong,
-                         bool useIndex, out int dropped)
+                         bool useIndex, out int dropped, out int[] pieceOf)
     {
         int n = contours.Count + 1;
         // Union-find: a contour's orientation is p times its root's, its level its root's plus q times the root's orientation
@@ -412,8 +580,8 @@ public static class RunContourField
         var q = new int[n];
         var sumEv = new double[n];
         var sumStrong = new double[n];
-        // For each root: how many of the piece's contours would break the index rule, for each of the root's level
-        // (mod 5) and orientation: [r * 2 + (o > 0 ? 0 : 1)]
+        // For each root: how many of the piece's index contours would lie off an index level, for each of the root's
+        // level (mod 5) and orientation: [r * 2 + (o > 0 ? 0 : 1)]
         var broken = new int[n][];
         for (int i = 0; i < n; i++) { parent[i] = i; p[i] = 1; }
         foreach (Contour c in contours)
@@ -421,7 +589,7 @@ public static class RunContourField
             sumEv[c.id] = ev[c.id];
             sumStrong[c.id] = strong[c.id];
             var b = new int[10];
-            for (int r = 0; r < 5; r++) b[r * 2] = b[r * 2 + 1] = (r == 0) != c.line.index ? 1 : 0;
+            for (int r = 0; r < 5; r++) b[r * 2] = b[r * 2 + 1] = c.line.index && r != 0 ? 1 : 0;
             broken[c.id] = b;
         }
         var path = new List<int>();
@@ -450,6 +618,7 @@ public static class RunContourField
         var accepted = new bool[edges.Count];
         var merged = new int[10];
         dropped = 0;
+        pieceOf = new int[n];
         foreach (int e in order)
         {
             var (a, b, sa, sb, _) = edges[e];
@@ -501,6 +670,7 @@ public static class RunContourField
         foreach (Contour c in contours)
         {
             int r = Find(c.id, out int pc, out _);
+            pieceOf[c.id] = r;
             c.orientation = sumEv[r] > 0 ? pc : sumEv[r] < 0 ? -pc : 0;
         }
         return accepted;
@@ -768,13 +938,101 @@ public static class RunContourField
         // ring round a knoll or a hollow is known as closed (2026-11-20, as ContourHeights does at the import). Index
         // contours and plain ones are joined each on their own: they are never the same contour, and an end of one
         // that happened to lie by an end of the other made one line at two levels (2026-11-27)
-        foreach (double[] p in ContourHeights.StitchContours(contours, 1.0))
-            list.Add(new Line { xy = CloseSmallGap(p, out bool closed), closed = closed });
-        foreach (double[] p in ContourHeights.StitchContours(indexes, 1.0))
-            list.Add(new Line { xy = CloseSmallGap(p, out bool closed), closed = closed, index = true });
+        // A mapper may draw only part of a contour as an index contour, the rest plain (Fossum): a piece of index contour
+        // that goes straight on into a plain one is joined to it, and the line is not counted as an index contour.
+        foreach (var (p, index) in JoinIndexToPlain(ContourHeights.StitchContours(contours, 1.0), ContourHeights.StitchContours(indexes, 1.0)))
+            list.Add(new Line { xy = CloseSmallGap(p, out bool closed), closed = closed, index = index });
         foreach (double[] p in ContourHeights.StitchContours(forms, 1.0))
             list.Add(new Line { xy = CloseSmallGap(p, out bool closed), closed = closed, formLine = true });
         return list;
+    }
+
+    // Index contour pieces joined to the plain contour they go straight on into (ends within 1 m, the line carrying on
+    // in the same direction, not turning back as where two contours touch at a cliff); a joined line is not an index
+    // contour. Returns every line with whether it is an index contour.
+    static List<(double[] p, bool index)> JoinIndexToPlain(List<double[]> plain, List<double[]> indexes)
+    {
+        var result = new List<(double[] p, bool index)>();
+        var used = new bool[plain.Count];
+        // The way a line leaves at its end (end 0: its first point, 1: its last): from a point 3 m back (or its far end)
+        bool Away(double[] p, int end, out double x, out double y, out double dx, out double dy)
+        {
+            int n = p.Length / 2, i = end == 0 ? 0 : n - 1, step = end == 0 ? 1 : -1;
+            x = p[2 * i]; y = p[2 * i + 1];
+            dx = dy = 0;
+            if (n < 2 || MapGeometry.IsClosed(p, 1.0)) return false;
+            int k = i + step;
+            while (k + step >= 0 && k + step < n && MapGeometry.Dist(x, y, p[2 * k], p[2 * k + 1]) < 3) k += step;
+            double d = MapGeometry.Dist(x, y, p[2 * k], p[2 * k + 1]);
+            if (d < 1e-6) return false;
+            dx = (x - p[2 * k]) / d; dy = (y - p[2 * k + 1]) / d;
+            return true;
+        }
+        // The plain lines' ends, by 2 m squares
+        var ends = new Dictionary<long, List<(int j, int e, double x, double y, double dx, double dy)>>();
+        for (int j = 0; j < plain.Count; j++)
+            for (int e = 0; e < 2; e++)
+            {
+                if (!Away(plain[j], e, out double x, out double y, out double dx, out double dy)) continue;
+                long key = (long)Math.Floor(x / 2) * 1000003L + (long)Math.Floor(y / 2);
+                if (!ends.TryGetValue(key, out var list)) ends[key] = list = new List<(int j, int e, double x, double y, double dx, double dy)>();
+                list.Add((j, e, x, y, dx, dy));
+            }
+        foreach (double[] start in indexes)
+        {
+            double[] line = start;
+            bool mixed = false;
+            for (int end = 0; end < 2; end++)
+            {
+                // Each end may carry on into several plain pieces one after the other
+                for (int guard = 0; guard < 50; guard++)
+                {
+                    if (!Away(line, end, out double xi, out double yi, out double dxi, out double dyi)) break;
+                    int found = -1, foundEnd = 0;
+                    long cx = (long)Math.Floor(xi / 2), cy = (long)Math.Floor(yi / 2);
+                    for (long gy = cy - 1; gy <= cy + 1 && found < 0; gy++)
+                        for (long gx = cx - 1; gx <= cx + 1 && found < 0; gx++)
+                        {
+                            if (!ends.TryGetValue(gx * 1000003L + gy, out List<(int j, int e, double x, double y, double dx, double dy)> here)) continue;
+                            foreach (var t in here)
+                                if (!used[t.j] && MapGeometry.Dist(xi, yi, t.x, t.y) <= 1.0 && dxi * t.dx + dyi * t.dy < -0.7)
+                                { found = t.j; foundEnd = t.e; break; }
+                        }
+                    if (found < 0) break;
+                    used[found] = true;
+                    mixed = true;
+                    double[] other = plain[found];
+                    if (end == 1)
+                    {
+                        // line ... end, then the plain piece from its meeting end on
+                        double[] b = foundEnd == 0 ? other : Reverse(other);
+                        var m = new double[line.Length + b.Length - 2];
+                        Array.Copy(line, m, line.Length);
+                        Array.Copy(b, 2, m, line.Length, b.Length - 2);
+                        line = m;
+                    }
+                    else
+                    {
+                        // the plain piece up to its meeting end, then line
+                        double[] b = foundEnd == 1 ? other : Reverse(other);
+                        var m = new double[b.Length + line.Length - 2];
+                        Array.Copy(b, m, b.Length - 2);
+                        Array.Copy(line, 0, m, b.Length - 2, line.Length);
+                        line = m;
+                    }
+                }
+            }
+            result.Add((line, !mixed));
+        }
+        for (int j = 0; j < plain.Count; j++) if (!used[j]) result.Add((plain[j], false));
+        return result;
+    }
+
+    static double[] Reverse(double[] p)
+    {
+        var q = new double[p.Length];
+        for (int i = 0, n = p.Length / 2; i < n; i++) { q[2 * i] = p[2 * (n - 1 - i)]; q[2 * i + 1] = p[2 * (n - 1 - i) + 1]; }
+        return q;
     }
 
     // A ring the mapper left with a small gap between its ends (2026-11-22, Anders: a hill on Nya Slogebo became a

@@ -230,7 +230,8 @@ public partial class RunSession : MonoBehaviour
         if (fromPackage != null) detailed = fromPackage;
         else
         {
-            try { detailed = await Task.Run(() => RunContours.Detailed(mapId, plain.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile)); }
+            try { detailed = await Task.Run(() => RunContours.Detailed(mapId, plain.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile,
+                                                                                MapImport.WorldLayer.LakeTest(plain.layer))); }
             catch (Exception e) { Debug.LogWarning("RunSession: contours: " + e); }
         }
         if (this == null) return;
