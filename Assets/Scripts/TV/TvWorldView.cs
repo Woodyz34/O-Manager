@@ -412,9 +412,13 @@ public class TvWorldView : MonoBehaviour
         // A sprint map is a town (2026-11-20, Anders: TV controls in relays on sprint maps)
         TvWorldData.Data data = await TvWorldData.LoadAsync(map, map != null && map.IsSprint);
         if (data == null) return null;
+        // The same ground, edge lines and town rules as the run-yourself world (RunGround.cs), so an update there reaches the TV too
+        try { data = await RunGround.LoadAsync(map, data); }
+        catch (Exception e) { Debug.LogWarning("TvWorldView: ground: " + e); }
         var input = new TvWorldInput
         {
             town = data.town,
+            passable = map != null && map.IsSprint ? RunGround.Passable(map) : null,
             layer = data.layer,
             heights = data.heights,
             look = data.look,

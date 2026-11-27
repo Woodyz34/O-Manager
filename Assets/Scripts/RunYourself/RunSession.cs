@@ -201,42 +201,12 @@ public partial class RunSession : MonoBehaviour
             Fail("This map has no 3D world. Import it again (OCAD or OOM) to run it yourself.");
             return;
         }
-        data = WithHills(data, RunSettings.Hills);
-        // The knolls and hollows the mapper drew with contours and form lines, which the 10 m height grid rounds away
-        loadingCard.Set("Shaping the ground from the contours (the first time on a map takes a little while)", 0.06f);
-        byte[] linesJson = TvWorldData.LinesJson(mapDef), pointsJson = TvWorldData.PointsJson(mapDef);
-        float interval = TvWorldData.ContourInterval(mapDef);
-        string mapId = mapDef.id;
-        // The ground from the contours is kept on disk; a new version of the map's lines (an import) gets a new file
-        string cacheFile = System.IO.Path.Combine(Application.persistentDataPath, "RunHeights",
-            Safe(mapId) + "-" + (linesJson != null ? linesJson.Length : 0) + "-" + (pointsJson != null ? pointsJson.Length : 0) + "-v4.bytes");
-        TvWorldData.Data plain = data;
-        TvHeights detailed = plain.heights;
-        // The map's edge lines of areas (banks, boundaries, paved edges): the 3D ground follows them up close
-        try { await Task.Run(() => TvEdges.Attach(plain.layer, linesJson)); }
-        catch (Exception e) { Debug.LogWarning("RunSession: edges: " + e); }
+        // The same ground as the TV controls get (RunGround.cs)
+        try { data = await RunGround.LoadAsync(mapDef, data, (text, p) => loadingCard.Set(text, p)); }
+        catch (Exception e) { Debug.LogWarning("RunSession: ground: " + e); }
         if (this == null) return;
-        // Made once with the map (import, Edit map, a shared map's download, the built-in maps: runheights.bytes); worked
-        // out here only for a map built before 2026-11-25, and then kept on this computer
-        byte[] baked = TvWorldData.RunHeightsBytes(mapDef);
-        TvHeights fromPackage = null;
-        if (baked != null)
-        {
-            try { fromPackage = await Task.Run(() => RunContours.FromPackage(mapId, baked, linesJson, pointsJson)); }
-            catch (Exception e) { Debug.LogWarning("RunSession: baked ground: " + e); }
-            if (this == null) return;
-            if (fromPackage == null) Debug.Log("RunSession: the map's runheights.bytes is from another version; the ground is worked out again");
-        }
-        if (fromPackage != null) detailed = fromPackage;
-        else
-        {
-            try { detailed = await Task.Run(() => RunContours.Detailed(mapId, plain.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile)); }
-            catch (Exception e) { Debug.LogWarning("RunSession: contours: " + e); }
-        }
-        if (this == null) return;
-        data = new TvWorldData.Data { mapId = plain.mapId, layer = plain.layer, heights = detailed, look = plain.look, speeds = plain.speeds, town = plain.town };
         loadingCard.Set("Reading the terrain", 0.08f);
-        passable = Passable(mapDef);
+        passable = RunGround.Passable(mapDef);
         TvPassable gate = passable;
         List<ForbiddenArea> forbidden = course.forbidden;
         try { terrain = await Task.Run(() => new RunTerrain(data.layer, data.heights, data.speeds, data.town, forbidden, gate)); }
@@ -320,22 +290,6 @@ public partial class RunSession : MonoBehaviour
 
     TvPassable passable;
 
-    // The 2D race's grid (with the course's out-of-bounds areas and barriers in it), so the 3D world closes where the
-    // race does (2026-11-20). Null when the scene has no grid for this map.
-    static TvPassable Passable(MapDefinition map)
-    {
-        PathfindingManager manager = FindAnyObjectByType<PathfindingManager>();
-        if (manager == null || manager.speedGrid2D == null || map == null) return null;
-        float[,] speed = manager.speedGrid2D;
-        if (speed.GetLength(0) != map.rows || speed.GetLength(1) != map.cols)
-        {
-            Debug.LogWarning("RunSession: the scene's grid is not this map's (" + speed.GetLength(0) + "x" + speed.GetLength(1) + ")");
-            return null;
-        }
-        byte[] kinds = map.gridName != null && map.gridName.EndsWith("grid")
-            ? MapPackages.LoadBytes(map.gridName.Substring(0, map.gridName.Length - 4) + "kinds", ".bytes") : null;
-        return new TvPassable(speed, ForbiddenAreas.CompetitionCells, map.minx, map.miny, map.maxx, map.maxy, map.IsSprint, kinds);
-    }
 
     // The player's colour for the GPS line, never white or near white (2026-11-19, Anders: white cannot be seen on the map)
     static Color TrackColour()
@@ -346,29 +300,10 @@ public partial class RunSession : MonoBehaviour
         return light > 0.8f || (light > 0.6f && saturation < 0.25f) ? CourseUI.Accent : c;
     }
 
-    static string Safe(string name)
-    {
-        var b = new System.Text.StringBuilder();
-        foreach (char ch in name ?? "map") b.Append(char.IsLetterOrDigit(ch) || ch == '-' || ch == '_' ? ch : '_');
-        return b.ToString();
-    }
 
     static string Hint() => "W A S D: run    Mouse: look    Space: jump    Left mouse: map up/down    F4: speed and ground\n"
                             + "With the map up: scroll to zoom, hold right mouse to move it, Q / E to turn it, Shift / Ctrl for the next / previous leg";
 
-    // The world with the hills made higher (a copy: the TV controls keep the map's own heights). Heights are stretched
-    // round the mean, so the lowest and highest ground move apart and every slope gets steeper by the same share.
-    static TvWorldData.Data WithHills(TvWorldData.Data data, float scale)
-    {
-        TvHeights source = data.heights;
-        if (source == null || source.h == null || source.h.Length == 0 || Mathf.Approximately(scale, 1f)) return data;
-        double sum = 0;
-        foreach (float v in source.h) sum += v;
-        float mean = (float)(sum / source.h.Length);
-        TvHeights higher = new TvHeights { cell = source.cell, minx = source.minx, miny = source.miny, rows = source.rows, cols = source.cols, h = new float[source.h.Length] };
-        for (int i = 0; i < source.h.Length; i++) higher.h[i] = mean + (source.h[i] - mean) * scale;
-        return new TvWorldData.Data { mapId = data.mapId, layer = data.layer, heights = higher, look = data.look, speeds = data.speeds, town = data.town };
-    }
 
     // A spot near the start where the runner can stand
     void FreeSpot(ref double e, ref double n)
