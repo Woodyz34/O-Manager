@@ -15,7 +15,9 @@ public class RunPlayer : MonoBehaviour
     // Real-life running speed (m/s) in white forest at the middle of every terrain slider: 3:58 min/km
     // (2026-11-19: was 3.4, then 3.8; Anders's courses still felt slow, he expects about 6 min/km over a whole course)
     public const float ForestSpeed = 4.2f;
-    const float Reach = 0.3f;            // half the runner's width
+    // Half the runner's width: shoulder to shoulder about half a metre (2026-11-27: was 0.3, and with what the walls
+    // and fences kept round them a gap between two walls that shows on the map was shut)
+    const float Reach = 0.25f;
     const float EyeHeight = 1.68f;
 
     public RunWorld world;
@@ -227,10 +229,11 @@ public class RunPlayer : MonoBehaviour
             }
             if (terrain.Blocked(ne, nn, Reach) || TunnelBlocks(e, n, ne, nn))
             {
-                // Slide along whatever is in the way
-                if (!terrain.Blocked(ne, n, Reach) && !TunnelBlocks(e, n, ne, n)) nn = n;
-                else if (!terrain.Blocked(e, nn, Reach) && !TunnelBlocks(e, n, e, nn)) ne = e;
-                else
+                // Slide along whatever is in the way: first a little to either side of the way the runner goes, then
+                // more, so a slanting wall or the corner of a gap's end leads the runner along and into the gap
+                // (2026-11-27, Anders: one got stuck at a narrow opening). Only straight north-south or east-west
+                // before, which stopped the runner at every wall that is not.
+                if (!Slide(ref ne, ref nn, step))
                 {
                     speed *= 0.3f;
                     break;
@@ -258,6 +261,29 @@ public class RunPlayer : MonoBehaviour
             distance += (float)Math.Sqrt(de * de + dn * dn);
             Moved?.Invoke(pe, pn, e, n);
         }
+    }
+
+    // A free step from (e, n) turned away from the way the runner goes, shorter the more it turns, the smallest turn
+    // first. At most 60 degrees: a runner going straight at a wall stops there (or slides north-south/east-west)
+    static readonly float[] SlideAngles = { 20f, -20f, 40f, -40f, 60f, -60f };
+
+    bool Slide(ref double ne, ref double nn, float step)
+    {
+        foreach (float a0 in SlideAngles)
+        {
+            float a = a0 * Mathf.Deg2Rad, c = Mathf.Cos(a), s = Mathf.Sin(a);
+            float dx = moveDirX * c + moveDirZ * s, dz = -moveDirX * s + moveDirZ * c;
+            double te = e + dx * step * c, tn = n + dz * step * c;
+            if (terrain.Blocked(te, tn, Reach) || TunnelBlocks(e, n, te, tn)) continue;
+            if (terrain.Crosses(e, n, te, tn, out _, out bool wall, out _) && wall) continue;
+            ne = te;
+            nn = tn;
+            return true;
+        }
+        // Straight north-south or east-west, as before
+        if (!terrain.Blocked(ne, n, Reach) && !TunnelBlocks(e, n, ne, n)) { nn = n; return true; }
+        if (!terrain.Blocked(e, nn, Reach) && !TunnelBlocks(e, n, e, nn)) { ne = e; return true; }
+        return false;
     }
 
     // A tunnel's walls: in the tunnel the runner goes only along it, on its roof not off over a mouth, and from the
