@@ -783,6 +783,12 @@ public class PackOpening : MonoBehaviour
             titleText.text = tier == RunnerTier.Elite ? "ELITE RUNNER!" : "NEW RUNNER!";
             subtitleText.text = RunnerCards.TierName(tier) + "   <color=#FBF4DA>OVERALL " + RunnerCards.Overall(result.card) + "</color>";
         }
+        else if (result.money > 0)
+        {
+            // The tier is already complete: the pack pays money instead
+            titleText.text = "ALREADY HAVE THEM ALL";
+            subtitleText.text = RunnerCards.TierName(tier) + "   <color=#FBF4DA>+" + MoneyLabel.Format(result.money) + "</color>";
+        }
         else
         {
             // Packs only hold runners the player is missing, so this is only seen with an old save

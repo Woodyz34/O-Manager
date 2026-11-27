@@ -8,10 +8,11 @@ public class PackResult
     public bool isNew;
     public int paid;
     public bool committed;   // paid for and added to the collection (PackShop.Commit)
+    public int money;        // above 0: the tier was already complete, so the pack pays this much instead of a new runner
 }
 
-// Prices and odds for runner packs. One pack always holds exactly one runner,
-// and only runners the player does not have yet, so there are never duplicates.
+// Prices and odds for runner packs. One pack holds one runner the player does not have yet, so there are never
+// duplicates. If the tier that was drawn is already complete, the pack pays money instead (MoneyForTier).
 public static class PackShop
 {
     public const int PackPrice = 200;
@@ -46,6 +47,19 @@ public static class PackShop
         }
     }
 
+    // Money a pack pays when its tier is already completely collected (2026-11-27, the user: the odds stay fixed, so
+    // Elite does not get easier to get, and a complete tier gives money instead)
+    public static int MoneyForTier(RunnerTier tier)
+    {
+        switch (tier)
+        {
+            case RunnerTier.Elite: return 2000;
+            case RunnerTier.Gold: return 800;
+            case RunnerTier.Silver: return 300;
+            default: return 50;
+        }
+    }
+
     public static int CurrentPrice()
     {
         return FirstPackFree && RunnerCollection.PacksOpened == 0 ? 0 : PackPrice;
@@ -76,10 +90,10 @@ public static class PackShop
         return Available().Count == 0;
     }
 
-    // The chance, from 0 to 1, that a pack holds a runner of this tier
+    // The chance, from 0 to 1, that a pack rolls this tier. Always the fixed odds: a complete tier gives money.
     public static float Chance(RunnerTier tier)
     {
-        return Chance(tier, Available());
+        return Percent(tier) / 100f;
     }
 
     static float Chance(RunnerTier tier, List<CardData> available)
@@ -101,7 +115,7 @@ public static class PackShop
         {
             return null;
         }
-        return new PackResult { card = Draw(), paid = CurrentPrice(), isNew = true };
+        return Draw();
     }
 
     // Pays for the pack and puts its runner in the collection. Safe to call more than once.
@@ -113,14 +127,46 @@ public static class PackShop
         {
             Money.Instance.AddMoney(-result.paid);
         }
-        result.isNew = RunnerCollection.AddFromPack(result.card.RunnerName);
-        GameAnalytics.Record("pack_opened", "tier", RunnerCards.Tier(result.card).ToString(), "paid", result.paid, "is_new", result.isNew);
+        if (result.money > 0)
+        {
+            // Tier already complete: money, and the runner shown is one the player owns
+            result.isNew = false;
+            if (Money.Instance != null) Money.Instance.AddMoney(result.money);
+        }
+        else
+        {
+            result.isNew = RunnerCollection.AddFromPack(result.card.RunnerName);
+        }
+        GameAnalytics.Record("pack_opened", "tier", RunnerCards.Tier(result.card).ToString(), "paid", result.paid, "is_new", result.isNew, "money", result.money);
     }
 
-    // First the tier, by the fixed odds; then any runner of that tier the player does not have yet
-    static CardData Draw()
+    // First the tier, by the fixed odds (every tier counts, also complete ones); then any runner of that tier the
+    // player does not have yet. If the tier is complete the pack pays money and shows a runner of the tier.
+    static PackResult Draw()
     {
-        return DrawFrom(Available());
+        float roll = Random.value * (Percent(RunnerTier.Elite) + Percent(RunnerTier.Gold) + Percent(RunnerTier.Silver) + Percent(RunnerTier.Bronze));
+        RunnerTier picked = RunnerTier.Bronze;
+        for (int i = (int)RunnerTier.Elite; i >= 0; i--)
+        {
+            picked = (RunnerTier)i;
+            roll -= Percent(picked);
+            if (roll <= 0f) break;
+        }
+        List<CardData> unowned = Available().FindAll(c => RunnerCards.Tier(c) == picked);
+        PackResult result = new PackResult { paid = CurrentPrice(), isNew = true };
+        if (unowned.Count > 0)
+        {
+            result.card = unowned[Random.Range(0, unowned.Count)];
+            return result;
+        }
+        // Complete tier: money, and show one of the tier's runners (the player owns it); if the tier has no runner at
+        // all, any runner of the collection
+        List<CardData> shown = RunnerCards.InPacks().FindAll(c => RunnerCards.Tier(c) == picked);
+        if (shown.Count == 0) shown = RunnerCards.InPacks();
+        result.card = shown[Random.Range(0, shown.Count)];
+        result.money = MoneyForTier(picked);
+        result.isNew = false;
+        return result;
     }
 
     // A runner from these by the shop's fixed tier odds; also used for the normal pack won in a contest (PrizePacks)
