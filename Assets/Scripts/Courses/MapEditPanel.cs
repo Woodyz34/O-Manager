@@ -79,6 +79,14 @@ public class MapEditPanel : MonoBehaviour
         panel.heightAnswers = HeightAnswers.Clean(info.heightAnswers);
         panel.Build(dim.transform);
         IsOpen = true;
+        // Answers given before the game stopped (they are written after every answer): saved now
+        double[] pending = ReadPending(map.folder);
+        if (pending != null && !SameEdge(pending, panel.heightAnswers))
+        {
+            panel.heightAnswers = pending;
+            panel.SaveHeightsNow();
+        }
+        else if (pending != null) DeletePending(map.folder);
     }
 
     static MapPackageInfo ReadInfo(string folder)
@@ -551,12 +559,13 @@ public class MapEditPanel : MonoBehaviour
                 return;
             }
             SetStatus("", false);
+            string pendingFolder = folder;
             HeightQuestionPanel.Open(transform, map, questions, heightAnswers, find, chosen =>
             {
                 heightAnswers = HeightAnswers.Clean(chosen);
                 Refresh();
-                if (HeightsChanged) SetStatus("Press Save to keep your answers about the contours.", false);
-            });
+                if (HeightsChanged) SaveHeightsNow();
+            }, chosen => WritePending(pendingFolder, chosen));
         }
         catch (Exception e)
         {
@@ -565,6 +574,85 @@ public class MapEditPanel : MonoBehaviour
             working = false;
             Refresh();
             SetStatus("Could not look at the contours: " + e.Message, true);
+        }
+    }
+
+    // ---- Answers kept at once (2026-11-27, Anders: the game crashed before "Stop for now", and the answers were lost) ----
+    // Every answer is written to heightanswers.pending in the map's folder; when the questions close (or Edit map opens
+    // and finds the file) the answers go into the map straight away, without pressing Save. A public map's new answers
+    // are sent to the other players with the next Save.
+
+    const string PendingFile = "heightanswers.pending";
+
+    static void WritePending(string folder, double[] answers)
+    {
+        try
+        {
+            double[] clean = HeightAnswers.Clean(answers);
+            var parts = new List<string>();
+            if (clean != null) foreach (double v in clean) parts.Add(v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+            File.WriteAllText(Path.Combine(folder, PendingFile), string.Join(",", parts));
+        }
+        catch (Exception e) { Debug.LogWarning("MapEditPanel: could not keep the answers: " + e.Message); }
+    }
+
+    static double[] ReadPending(string folder)
+    {
+        try
+        {
+            string file = Path.Combine(folder, PendingFile);
+            if (!File.Exists(file)) return null;
+            var values = new List<double>();
+            foreach (string part in File.ReadAllText(file).Split(','))
+                if (double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v)) values.Add(v);
+            return values.Count == 0 ? new double[0] : HeightAnswers.Clean(values.ToArray()) ?? new double[0];
+        }
+        catch (Exception) { return null; }
+    }
+
+    static void DeletePending(string folder)
+    {
+        try { File.Delete(Path.Combine(folder, PendingFile)); } catch (Exception) { }
+    }
+
+    bool heightsToShare;   // answers saved here that a public map has not sent to the other players yet
+
+    // Puts the answers into the map now: points.json and the 3D ground are made again (no Save needed)
+    async void SaveHeightsNow()
+    {
+        if (working) return;
+        working = true;
+        Refresh();
+        string folder = map.folder;
+        MapPackageInfo current = info;
+        double[] answers = HeightAnswers.Clean(heightAnswers);
+        try
+        {
+            await Task.Run(() =>
+            {
+                MapPackageBuilder.ApplyHeightAnswers(folder, current, answers, (step, share) => { progressShare = share; progressStep = step; });
+                MapPackageBuilder.WriteInfo(folder, current);
+            });
+            progressStep = null;
+            DeletePending(folder);
+            TvWorldData.Forget();
+            RunContours.Forget();
+            heightsToShare = !info.isPrivate;
+            if (this == null) return;
+            working = false;
+            Refresh();
+            int count = HeightAnswers.Count(answers);
+            SetStatus((count == 1 ? "1 answer" : count + " answers") + " about the contours saved in the map."
+                      + (info.isPrivate ? "" : " Press Save to send them to the other players too."), false);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("MapEditPanel: could not save the answers: " + e);
+            progressStep = null;
+            if (this == null) return;
+            working = false;
+            Refresh();
+            SetStatus("Could not save the answers now (" + e.Message + "). Press Save to try again.", true);
         }
     }
 
@@ -614,7 +702,7 @@ public class MapEditPanel : MonoBehaviour
         bool rebuild = edgeChanged || terrainChanged || TypeChanged || FileChanged || OldRules;
         bool lookChanged = !look.SameAs(info.look);
         bool heightsChanged = HeightsChanged;
-        bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild || lookChanged || heightsChanged
+        bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild || lookChanged || heightsChanged || heightsToShare
                        || (!isPrivate && (sender != (info.sender ?? "") || contact != (info.contact ?? "")));
         if (!changed && !goPrivate && !goPublic)
         {
@@ -754,6 +842,7 @@ public class MapEditPanel : MonoBehaviour
             MapDefinition saved = MapDefinition.All.Find(m => m.id == updated.id);
             UIToast.Show("Saved " + name + "." + cloudNote, 7f);
             working = false;
+            DeletePending(folder);
             onSaved?.Invoke(saved, rebuild);
             Destroy(gameObject);
         }

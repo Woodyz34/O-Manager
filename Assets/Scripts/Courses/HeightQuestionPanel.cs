@@ -22,6 +22,7 @@ public class HeightQuestionPanel : MonoBehaviour
     MapDefinition map;
     Func<double[], List<RunContourField.HeightQuestion>> find;   // the questions left with these answers (background thread)
     Action<double[]> onDone;
+    Action<double[]> onChange;   // after every answer: kept on disk at once, so nothing is lost if the game stops
     double[] answers;
     RunContourField.HeightQuestion current;                       // the question on screen, or null
     List<RunContourField.HeightQuestion> rest = new List<RunContourField.HeightQuestion>();
@@ -47,7 +48,7 @@ public class HeightQuestionPanel : MonoBehaviour
     static readonly Vector2 Area = new Vector2(1100, 600);
 
     public static void Open(Transform canvas, MapDefinition map, List<RunContourField.HeightQuestion> questions, double[] answers,
-                            Func<double[], List<RunContourField.HeightQuestion>> find, Action<double[]> onDone)
+                            Func<double[], List<RunContourField.HeightQuestion>> find, Action<double[]> onDone, Action<double[]> onChange = null)
     {
         if (IsOpen) return;
         var dim = CourseUI.Panel("Uncertain contours", canvas, new Color(0.08f, 0.14f, 0.1f, 0.7f), false);
@@ -56,6 +57,7 @@ public class HeightQuestionPanel : MonoBehaviour
         panel.map = map;
         panel.find = find;
         panel.onDone = onDone;
+        panel.onChange = onChange;
         panel.answers = answers;
         if (questions != null) panel.rest.AddRange(questions);
         panel.Build(dim.transform);
@@ -231,6 +233,7 @@ public class HeightQuestionPanel : MonoBehaviour
         undo.Push((answers, q, false));
         answers = HeightAnswers.With(answers, RunContourField.Answer(q, relation));
         answeredNow++;
+        onChange?.Invoke(answers);
         current = null;
         Next();
         Recheck();
@@ -254,6 +257,7 @@ public class HeightQuestionPanel : MonoBehaviour
         else answeredNow--;
         bool answersChanged = !ReferenceEquals(answers, last.answers);
         answers = last.answers;
+        if (answersChanged) onChange?.Invoke(answers);
         if (current != null) rest.Insert(0, current);
         current = last.q;
         Show();
