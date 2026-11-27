@@ -68,9 +68,34 @@ namespace MapImport
             }
 
             // ---- Which way is up ----
+            // Only points that are real ticks: on their contour and across it (RealTicks)
+            var tickObjects = new List<MapObject>();
+            var tickDx = new List<double>();
+            var tickDy = new List<double>();
             foreach (MapObject o in map.objects)
             {
                 if (o.kind != SymbolKind.Point || !SymbolRules.IsSlopeTick(o.symbol) || o.symbol.point == null) continue;
+                if (!TickDirection(o.symbol, out double tx, out double ty)) continue;
+                double a = o.angle * Math.PI / 180;
+                tickObjects.Add(o);
+                tickDx.Add(tx * Math.Cos(a) - ty * Math.Sin(a));
+                tickDy.Add(tx * Math.Sin(a) + ty * Math.Cos(a));
+            }
+            var tickX = new double[tickObjects.Count];
+            var tickY = new double[tickObjects.Count];
+            var tickCode = new int[tickObjects.Count];
+            for (int t = 0; t < tickObjects.Count; t++)
+            {
+                tickX[t] = tickObjects[t].parts[0][0];
+                tickY[t] = tickObjects[t].parts[0][1];
+                tickCode[t] = tickObjects[t].symbol.major * 1000 + tickObjects[t].symbol.minor;
+            }
+            bool[] realTick = RealTicks(lines, tickX, tickY, tickDx.ToArray(), tickDy.ToArray(), tickCode, 2.0 / mpm);
+            var realTicks = new HashSet<MapObject>();
+            for (int t = 0; t < tickObjects.Count; t++) if (realTick[t]) realTicks.Add(tickObjects[t]);
+            foreach (MapObject o in map.objects)
+            {
+                if (o.kind != SymbolKind.Point || !realTicks.Contains(o)) continue;
                 if (!TickDirection(o.symbol, out double tx, out double ty)) continue;
                 double a = o.angle * Math.PI / 180;
                 double dx = tx * Math.Cos(a) - ty * Math.Sin(a), dy = tx * Math.Sin(a) + ty * Math.Cos(a);
@@ -425,6 +450,90 @@ namespace MapImport
             double len = Math.Sqrt(best);
             x /= len; y /= len;
             return true;
+        }
+
+        // Which points of the contour symbols are real slope ticks (2026-11-27). A tick sits on its contour or form line and
+        // points across it. Some maps have other points in the contour symbols: on Nya Slogebo 101.2, 101.3, 103.2 and
+        // 103.3 lie some 8-10 m beside the lines and run along them (always pointing about the same way), and read as
+        // ticks they turned the slopes round them, and so whole hillsides, upside down. A symbol whose points mostly
+        // don't sit on a line across it is not a tick at all; of the rest, a point off its line or along it is left out.
+        // lines and points in the same units; maxDist: how far from its line a tick may sit; dx, dy: the way each point
+        // points (NaN: not known); code: each point's symbol
+        internal static bool[] RealTicks(List<double[]> lines, double[] px, double[] py, double[] dx, double[] dy, int[] code, double maxDist)
+        {
+            int n = px.Length;
+            var ok = new bool[n];
+            if (n == 0) return ok;
+            double bucket = Math.Max(maxDist * 4, 1e-6);
+            var hash = new Dictionary<long, List<(int line, int seg)>>();
+            long Key(long bx, long by) => (bx << 32) ^ (by & 0xffffffffL);
+            for (int l = 0; l < lines.Count; l++)
+            {
+                double[] p = lines[l];
+                for (int i = 0; i + 3 < p.Length; i += 2)
+                {
+                    long x0 = (long)Math.Floor(Math.Min(p[i], p[i + 2]) / bucket), x1 = (long)Math.Floor(Math.Max(p[i], p[i + 2]) / bucket);
+                    long y0 = (long)Math.Floor(Math.Min(p[i + 1], p[i + 3]) / bucket), y1 = (long)Math.Floor(Math.Max(p[i + 1], p[i + 3]) / bucket);
+                    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) continue;
+                    for (long bx = x0; bx <= x1; bx++)
+                        for (long by = y0; by <= y1; by++)
+                        {
+                            long k = Key(bx, by);
+                            if (!hash.TryGetValue(k, out var list)) hash[k] = list = new List<(int, int)>();
+                            list.Add((l, i));
+                        }
+                }
+            }
+            var dist = new double[n];
+            var across = new double[n];   // |cos| between the point's way and its line: 0 straight across, 1 along
+            for (int t = 0; t < n; t++)
+            {
+                double best = double.MaxValue, cos = double.NaN;
+                long cx = (long)Math.Floor(px[t] / bucket), cy = (long)Math.Floor(py[t] / bucket);
+                for (long bx = cx - 1; bx <= cx + 1; bx++)
+                    for (long by = cy - 1; by <= cy + 1; by++)
+                    {
+                        if (!hash.TryGetValue(Key(bx, by), out var list)) continue;
+                        foreach (var (l, i) in list)
+                        {
+                            double[] p = lines[l];
+                            double ax = p[i], ay = p[i + 1], sx = p[i + 2] - ax, sy = p[i + 3] - ay, l2 = sx * sx + sy * sy;
+                            if (l2 <= 0) continue;
+                            double u = Math.Max(0, Math.Min(1, ((px[t] - ax) * sx + (py[t] - ay) * sy) / l2));
+                            double qx = ax + u * sx - px[t], qy = ay + u * sy - py[t], d = Math.Sqrt(qx * qx + qy * qy);
+                            if (d >= best) continue;
+                            best = d;
+                            double dl = Math.Sqrt(dx[t] * dx[t] + dy[t] * dy[t]);
+                            cos = double.IsNaN(dl) || dl < 1e-9 ? double.NaN : Math.Abs((sx * dx[t] + sy * dy[t]) / (Math.Sqrt(l2) * dl));
+                        }
+                    }
+                dist[t] = best;
+                across[t] = cos;
+            }
+            // Symbol by symbol
+            var bad = new HashSet<int>();
+            var byCode = new Dictionary<int, List<int>>();
+            for (int t = 0; t < n; t++)
+            {
+                if (!byCode.TryGetValue(code[t], out var list)) byCode[code[t]] = list = new List<int>();
+                list.Add(t);
+            }
+            foreach (var kv in byCode)
+            {
+                var ds = new List<double>();
+                var cs = new List<double>();
+                foreach (int t in kv.Value)
+                {
+                    ds.Add(dist[t]);
+                    if (!double.IsNaN(across[t])) cs.Add(across[t]);
+                }
+                ds.Sort();
+                cs.Sort();
+                if (ds[ds.Count / 2] > maxDist || (cs.Count > 0 && cs[cs.Count / 2] > 0.6)) bad.Add(kv.Key);
+            }
+            for (int t = 0; t < n; t++)
+                ok[t] = !bad.Contains(code[t]) && dist[t] <= maxDist * 1.5 && (double.IsNaN(across[t]) || across[t] <= 0.75);
+            return ok;
         }
 
         internal static int Nearest(int[] ids, int C, int R, double px, double py, int reach)

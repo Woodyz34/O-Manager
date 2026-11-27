@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using MapImport;
@@ -17,6 +18,9 @@ using UnityEngine.UI;
 //  - Forest or Sprint can be changed; the map is built again, since the symbols mean different things on a sprint map.
 //  - "Update map file" (2026-11-19) builds the map again from a new version of the map file, with the same id, so the
 //    courses on it stay (before, the map had to be deleted and imported again, and its courses went with it).
+//  - "Uncertain contours" (2026-11-27) asks about the contours whose height the game is unsure of (HeightQuestionPanel):
+//    higher, lower or as high as the contour next to them. The answers are kept with the map (map.json and points.json)
+//    and the 3D ground is made again with them when it is saved, without building the whole map again.
 //  - Delete removes the map from this computer and from the cloud, so no player gets it any more (other players'
 //    copies are deleted the next time they look for shared maps). It asks once more first.
 // Courses on the map stay where they are: the map's coordinates do not depend on the edge (MapPackageBuilder.Build).
@@ -32,6 +36,7 @@ public class MapEditPanel : MonoBehaviour
     bool edgeChanged;
     TerrainSpeeds terrain;
     TerrainLook look;          // ground, trees and undergrowth for the 3D view of a TV control; needs no rebuild
+    double[] heightAnswers;    // answers about uncertain contours (HeightQuestionPanel); only the 3D ground is made again
     bool terrainChanged;
     string mapType;
     float deleteConfirmUntil = -1f;
@@ -43,7 +48,8 @@ public class MapEditPanel : MonoBehaviour
     Button publicButton, privateButton, edgeButton, terrainButton, lookButton, saveButton, cancelButton;
     Button forestButton, sprintButton, deleteButton;
     TextMeshProUGUI typeText;
-    TextMeshProUGUI visibilityText, edgeText, terrainText, lookText, statusText, fileText;
+    TextMeshProUGUI visibilityText, edgeText, terrainText, lookText, statusText, fileText, heightsText;
+    Button heightsButton;
     Button fileButton;
     // A new version of the map file (2026-11-19): the map is built again from it, keeping its id, so the courses on it stay
     string newSourceName;
@@ -70,6 +76,7 @@ public class MapEditPanel : MonoBehaviour
         panel.terrain = info.terrain != null ? info.terrain.Copy() : new TerrainSpeeds();
         panel.look = info.look != null ? info.look.Safe() : new TerrainLook();
         panel.mapType = string.IsNullOrEmpty(info.mapType) ? "forest" : info.mapType;
+        panel.heightAnswers = HeightAnswers.Clean(info.heightAnswers);
         panel.Build(dim.transform);
         IsOpen = true;
     }
@@ -97,7 +104,7 @@ public class MapEditPanel : MonoBehaviour
     void Build(Transform root)
     {
         Image card = CourseUI.CardPanel("Card", root);
-        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 988));
+        CourseUI.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, info.hasHeights ? 1052 : 988));
         CourseUI.Column(card.gameObject, 12, new RectOffset(36, 36, 30, 30));
 
         CourseUI.Size(CourseUI.Text("Title", card.transform, "Edit map", 36, CourseUI.Ink, FontStyles.Bold), 44);
@@ -183,6 +190,21 @@ public class MapEditPanel : MonoBehaviour
         lookButton = CourseUI.Button("Look button", lookRow, "Terrain look...", CourseUI.ButtonKind.Secondary, OpenLook, 20);
         CourseUI.Size(lookButton, -1, 300);
 
+        // The contours the game is unsure of: higher or lower than the one next to them (only maps with heights)
+        if (info.hasHeights)
+        {
+            RectTransform heightsRow = CourseUI.Rect("Heights row", card.transform);
+            CourseUI.Row(heightsRow.gameObject, 10, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = false;
+            CourseUI.Size(heightsRow, 52);
+            heightsText = CourseUI.Text("Heights", heightsRow, "", 20, CourseUI.Ink);
+            heightsText.alignment = TextAlignmentOptions.MidlineLeft;
+            heightsText.textWrappingMode = TextWrappingModes.Normal;
+            CourseUI.Size(heightsText, -1, -1, 1);
+            heightsButton = CourseUI.Button("Heights button", heightsRow, "Uncertain contours...", CourseUI.ButtonKind.Secondary, OpenHeights, 20);
+            CourseUI.Size(heightsButton, -1, 300);
+            HoverTip.Add(heightsButton, "Go through the contours whose height the game is unsure of, one at a time: is it higher or lower than the contour next to it? This makes the 3D ground right.");
+        }
+
         statusText = CourseUI.Text("Status", card.transform, "", 20, CourseUI.Forest, FontStyles.Bold);
         statusText.textWrappingMode = TextWrappingModes.Normal;
         CourseUI.Size(statusText, 60);
@@ -256,10 +278,19 @@ public class MapEditPanel : MonoBehaviour
         fileText.color = FileChanged ? CourseUI.Accent : CourseUI.Ink;
         lookText.text = TerrainLookPanel.Describe(look);
         lookText.color = look.SameAs(info.look) ? CourseUI.Ink : CourseUI.Accent;
-        foreach (Selectable s in new Selectable[] { publicButton, privateButton, forestButton, sprintButton, deleteButton, edgeButton, terrainButton, lookButton, fileButton, cancelButton, nameField, clubField, senderField, contactField })
-            s.interactable = !working;
+        if (heightsText != null)
+        {
+            int count = HeightAnswers.Count(heightAnswers);
+            heightsText.text = "Heights: " + (count == 0 ? "no answers about uncertain contours yet." : count == 1 ? "1 answer about an uncertain contour." : count + " answers about uncertain contours.")
+                               + (HeightsChanged ? " The 3D ground is made again when you save." : "");
+            heightsText.color = HeightsChanged ? CourseUI.Accent : CourseUI.Ink;
+        }
+        foreach (Selectable s in new Selectable[] { publicButton, privateButton, forestButton, sprintButton, deleteButton, edgeButton, terrainButton, lookButton, fileButton, heightsButton, cancelButton, nameField, clubField, senderField, contactField })
+            if (s != null) s.interactable = !working;
         saveButton.interactable = !working && (isPrivate || ContactGiven());
     }
+
+    bool HeightsChanged => !SameEdge(heightAnswers, HeightAnswers.Clean(info.heightAnswers));
 
     bool TypeChanged => mapType != (string.IsNullOrEmpty(info.mapType) ? "forest" : info.mapType);
 
@@ -491,6 +522,67 @@ public class MapEditPanel : MonoBehaviour
         TerrainLookPanel.Open(transform, look, chosen => { look = chosen; Refresh(); });
     }
 
+    // The contours the game is unsure of, worked out from the map's files with the answers given so far, then asked
+    // about one at a time (HeightQuestionPanel)
+    async void OpenHeights()
+    {
+        if (working || HeightQuestionPanel.IsOpen) return;
+        working = true;
+        Refresh();
+        SetStatus("Looking for contours the game is unsure of ...", false);
+        string folder = map.folder;
+        float interval = info.contourInterval;
+        try
+        {
+            Func<double[], List<RunContourField.HeightQuestion>> find = await Task.Run(() => QuestionFinder(folder, interval));
+            double[] now = heightAnswers;
+            List<RunContourField.HeightQuestion> questions = await Task.Run(() => find(now));
+            if (this == null) return;
+            working = false;
+            Refresh();
+            if (questions == null)
+            {
+                SetStatus("The contours of this map could not be read.", true);
+                return;
+            }
+            if (questions.Count == 0)
+            {
+                SetStatus("The game is sure of every contour on this map. Nothing to answer.", false);
+                return;
+            }
+            SetStatus("", false);
+            HeightQuestionPanel.Open(transform, map, questions, heightAnswers, find, chosen =>
+            {
+                heightAnswers = HeightAnswers.Clean(chosen);
+                Refresh();
+                if (HeightsChanged) SetStatus("Press Save to keep your answers about the contours.", false);
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("MapEditPanel: uncertain contours: " + e);
+            if (this == null) return;
+            working = false;
+            Refresh();
+            SetStatus("Could not look at the contours: " + e.Message, true);
+        }
+    }
+
+    // Reads the map's files once; the function gives the questions left with some answers (slow: background thread)
+    static Func<double[], List<RunContourField.HeightQuestion>> QuestionFinder(string folder, float interval)
+    {
+        byte[] Read(string name)
+        {
+            string file = Path.Combine(folder, name);
+            return File.Exists(file) ? MapPackageBuilder.Plain(File.ReadAllBytes(file)) : null;
+        }
+        byte[] grid = Read("grid.bytes"), lines = Read("lines.json"), points = Read("points.json"), world = Read("world.bytes");
+        if (grid == null || lines == null) return _ => null;
+        TvHeights heights = TvHeights.Read(grid);
+        Func<double, double, bool> lakeAt = WorldLayer.LakeTest(world != null ? WorldLayer.FromBytes(world) : null);
+        return answers => RunContourField.Questions(heights, lines, points, interval, lakeAt, HeightAnswers.AsList(answers));
+    }
+
     static bool SameEdge(double[] a, double[] b)
     {
         if (a == null || b == null) return a == b;
@@ -521,7 +613,8 @@ public class MapEditPanel : MonoBehaviour
         bool goPublic = !isPrivate && info.isPrivate;
         bool rebuild = edgeChanged || terrainChanged || TypeChanged || FileChanged || OldRules;
         bool lookChanged = !look.SameAs(info.look);
-        bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild || lookChanged
+        bool heightsChanged = HeightsChanged;
+        bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild || lookChanged || heightsChanged
                        || (!isPrivate && (sender != (info.sender ?? "") || contact != (info.contact ?? "")));
         if (!changed && !goPrivate && !goPublic)
         {
@@ -545,6 +638,7 @@ public class MapEditPanel : MonoBehaviour
                 double[] newEdge = edge;
                 TerrainSpeeds newTerrain = terrain.Copy();
                 TerrainLook newLook = look.Copy();
+                double[] newAnswers = heightAnswers;
                 string newType = mapType;
                 string building = folder + ".rebuild";
                 string sourceCopy = PrivateMaps.SourceFile(folder, info);
@@ -556,6 +650,7 @@ public class MapEditPanel : MonoBehaviour
                     file.boundary = newEdge;
                     file.terrain = newTerrain;
                     file.look = newLook;
+                    file.heightAnswers = newAnswers;
                     MapPackage package = MapImportPanel.BuildPackage(file, name, newType, ownPng,
                         (step, share) => { progressShare = share; progressStep = step; });
                     MapPackageInfo i = package.info;
@@ -588,9 +683,21 @@ public class MapEditPanel : MonoBehaviour
                 Directory.Move(building, folder);
                 MapGrid.Forget(map.gridName);
                 TvWorldData.Forget();
+                RunContours.Forget();
                 MapPlayArea.Forget(map.id);
                 MapPackages.ForgetCached(folder);
             }
+            // New answers about uncertain contours only: points.json and the 3D ground are made again, not the whole map
+            else if (heightsChanged)
+            {
+                MapPackageInfo current = info;
+                double[] newAnswers = heightAnswers;
+                await Task.Run(() => MapPackageBuilder.ApplyHeightAnswers(folder, current, newAnswers, (step, share) => { progressShare = share; progressStep = step; }));
+                progressStep = null;
+                TvWorldData.Forget();
+                RunContours.Forget();
+            }
+            updated.heightAnswers = HeightAnswers.Clean(heightAnswers);
             updated.name = name;
             updated.ownerClub = club;
             // A new version: shared and used instead of the built-in map until this version is built in

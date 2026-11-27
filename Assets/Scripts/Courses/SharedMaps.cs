@@ -57,6 +57,7 @@ public static class SharedMaps
         public double[] boundary;         // paper mm, or null for the whole map
         public TerrainLook look;          // ground, trees and undergrowth for the 3D view, or null for the normal look
         public TerrainSpeeds terrain;     // the terrain sliders, or null for the normal speeds (maps shared before them)
+        public double[] heightAnswers;    // answers about uncertain contours (Edit map), or null
         public long sharedAt;             // unix seconds
         public long editedAt;             // the map's version (MapPackageInfo.editedAt); 0 for maps shared before versions
         [JsonIgnore] public string ownerId;
@@ -92,6 +93,7 @@ public static class SharedMaps
             boundary = info.boundary != null && info.boundary.Length >= 6 ? info.boundary : null,
             terrain = info.terrain != null && !info.terrain.IsDefault() ? info.terrain.Copy() : null,
             look = info.look != null && !info.look.IsDefault() ? info.look.Safe() : null,
+            heightAnswers = HeightAnswers.Clean(info.heightAnswers),
             sharedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             editedAt = info.editedAt
         });
@@ -176,6 +178,7 @@ public static class SharedMaps
                 m.author = CourseData.SafeText(m.author, 40);
                 if (m.sharedAt > now) m.sharedAt = now;
                 if (double.IsNaN(m.contourInterval) || m.contourInterval < 0 || m.contourInterval > 100) m.contourInterval = 0;
+                m.heightAnswers = HeightAnswers.Clean(m.heightAnswers);
                 if (m.boundary != null && (m.boundary.Length > 400 || Array.Exists(m.boundary, v => double.IsNaN(v) || double.IsInfinity(v)))) m.boundary = null;
                 m.ownerId = ownerId;
                 others.Add(m);
@@ -321,6 +324,7 @@ public static class SharedMaps
             if (m.boundary != null && m.boundary.Length >= 6) file.boundary = m.boundary;
             file.terrain = m.terrain;
             file.look = m.look;
+            file.heightAnswers = HeightAnswers.Clean(m.heightAnswers);
             string type = m.mapType == "sprint" || m.mapType == "both" ? m.mapType : "forest";
             MapPackage package = MapImportPanel.BuildPackage(file, m.name, type, ownPng, null);
             package.info.id = m.id;

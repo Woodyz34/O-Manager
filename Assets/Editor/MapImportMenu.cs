@@ -307,7 +307,9 @@ public static class MapImportMenu
             if (lines == null || grid == null) return;
             if (File.Exists(file) && RunContours.FromPackage(null, MapPackages.Unpack(File.ReadAllBytes(file)), lines, points) != null) return;
             EditorUtility.DisplayProgressBar("Build imported maps", "Shaping the 3D ground of " + info.name + " from the contours", 0.5f);
-            byte[] made = RunContours.Bake(TvHeights.Read(grid), lines, points, info.contourInterval > 0.5f ? info.contourInterval : 5f);
+            byte[] world = ReadPlain(Path.Combine(folder, "world.bytes"));
+            byte[] made = RunContours.Bake(TvHeights.Read(grid), lines, points, info.contourInterval > 0.5f ? info.contourInterval : 5f, null,
+                                           MapImport.WorldLayer.LakeTest(world != null ? MapImport.WorldLayer.FromBytes(world) : null));
             if (made != null) File.WriteAllBytes(file, made);
             Debug.Log("Build imported maps: 3D ground of " + info.name + (made != null ? " made (" + made.Length / 1024 + " kB)" : " could not be made from the contours"));
         }

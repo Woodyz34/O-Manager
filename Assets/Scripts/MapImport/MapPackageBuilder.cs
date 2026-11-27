@@ -65,6 +65,9 @@ namespace MapImport
         // The version of the passability rules the grid was built with (SymbolRules.RulesVersion); 0 = before 2026-11-20.
         // A map built with older rules is built again from its file when it is saved in Edit map.
         public int rulesVersion;
+        // The player's answers about contours the game was unsure of, from Edit map (RunContourField.Answer: five
+        // numbers each, game metres). Written into points.json too, so the 3D ground follows them. Empty when none.
+        public double[] heightAnswers;
     }
 
     public class MapPackage
@@ -161,6 +164,7 @@ namespace MapImport
                 boundary = map.boundary != null && map.boundary.Length >= 6 ? map.boundary : null,
                 terrain = map.terrain != null ? map.terrain.Copy() : new TerrainSpeeds(),
                 look = map.look != null ? map.look.Safe() : new TerrainLook(),
+                heightAnswers = HeightAnswers.Clean(map.heightAnswers),
                 crs = map.crsCode,
                 created = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 editedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
@@ -170,10 +174,11 @@ namespace MapImport
             pkg.kinds = grid.kind;
 
             // What grows where, the stones, cliffs and paths: for the 3D view of a TV control. The map works without it.
+            WorldLayer world = null;
             try
             {
                 var worldSw = System.Diagnostics.Stopwatch.StartNew();
-                WorldLayer world = WorldLayer.Build(map, extent, offE, offN, sprint);
+                world = WorldLayer.Build(map, extent, offE, offN, sprint);
                 pkg.world = world.ToBytes();
                 Log($"World layer: {world.cols} x {world.rows} cells of {world.cell:0.#} m, {world.points.Count} points, {world.lines.Count} lines, {pkg.world.Length / 1024} kB in {worldSw.ElapsedMilliseconds} ms");
             }
@@ -194,7 +199,7 @@ namespace MapImport
                 {
                     var groundSw = System.Diagnostics.Stopwatch.StartNew();
                     pkg.runHeights = global::RunContours.Bake(global::TvHeights.Read(pkg.grid), Encoding.UTF8.GetBytes(pkg.linesJson),
-                                                              Encoding.UTF8.GetBytes(pkg.pointsJson), info.contourInterval);
+                                                              Encoding.UTF8.GetBytes(pkg.pointsJson), info.contourInterval, null, WorldLayer.LakeTest(world));
                     Log(pkg.runHeights != null
                         ? $"3D ground: {pkg.runHeights.Length / 1024} kB in {groundSw.ElapsedMilliseconds} ms"
                         : "3D ground: the contours could not be solved; it is made in the race from the grid");
@@ -310,6 +315,13 @@ namespace MapImport
             {
                 sb.Append("  \"boundary\": [");
                 for (int k = 0; k < i.boundary.Length; k++) sb.Append(k > 0 ? "," : "").Append(i.boundary[k].ToString("0.###", CultureInfo.InvariantCulture));
+                sb.Append("],\n");
+            }
+            double[] answers = HeightAnswers.Clean(i.heightAnswers);
+            if (answers != null)
+            {
+                sb.Append("  \"heightAnswers\": [");
+                for (int k = 0; k < answers.Length; k++) sb.Append(k > 0 ? "," : "").Append(answers[k].ToString("0.##", CultureInfo.InvariantCulture));
                 sb.Append("],\n");
             }
             S("author", i.author); S("sender", i.sender); S("ownerClub", i.ownerClub); S("contact", i.contact); S("created", i.created); N("editedAt", i.editedAt);
@@ -447,10 +459,65 @@ namespace MapImport
                     }
                 }
             }
-            points.Append("]}");
+            points.Append(']');
+            AppendAnswers(points, map.heightAnswers);
+            points.Append('}');
             lines.Append("]}");
             pointsJson = points.ToString();
             linesJson = lines.ToString();
+        }
+
+        // The player's answers about uncertain contours (Edit map) after the features of points.json, where
+        // RunContourField.ReadAnswers finds them: ,"HeightAnswers":[...]
+        static void AppendAnswers(StringBuilder sb, double[] heightAnswers)
+        {
+            double[] answers = HeightAnswers.Clean(heightAnswers);
+            if (answers == null) return;
+            sb.Append(",\"HeightAnswers\":[");
+            for (int k = 0; k < answers.Length; k++) sb.Append(k > 0 ? "," : "").Append(answers[k].ToString("0.##", CultureInfo.InvariantCulture));
+            sb.Append(']');
+        }
+
+        // New answers about uncertain contours for a map package on disk, without building the map again: they go into
+        // points.json and the 3D ground (runheights.bytes) is made again with them. Slow on a big map: background thread.
+        public static void ApplyHeightAnswers(string folder, MapPackageInfo info, double[] answers, Action<string, float> progress = null)
+        {
+            string pointsFile = Path.Combine(folder, "points.json");
+            if (!File.Exists(pointsFile)) throw new FileNotFoundException("The map has no points.json.");
+            string text = Encoding.UTF8.GetString(Plain(File.ReadAllBytes(pointsFile)));
+            int old = text.LastIndexOf(",\"HeightAnswers\":[", StringComparison.Ordinal);
+            int end = text.LastIndexOf('}');
+            if (end < 0) throw new InvalidDataException("points.json could not be read.");
+            var sb = new StringBuilder(text, 0, old >= 0 ? old : end, text.Length + 64 + (answers != null ? answers.Length * 10 : 0));
+            AppendAnswers(sb, answers);
+            sb.Append('}');
+            File.WriteAllText(pointsFile, sb.ToString());
+            info.heightAnswers = HeightAnswers.Clean(answers);
+
+            string runHeights = Path.Combine(folder, "runheights.bytes");
+            byte[] grid = ReadPlain(Path.Combine(folder, "grid.bytes")), lines = ReadPlain(Path.Combine(folder, "lines.json"));
+            if (!info.hasHeights || grid == null || lines == null) return;
+            progress?.Invoke("Shaping the 3D ground from the contours", 0.5f);
+            byte[] world = ReadPlain(Path.Combine(folder, "world.bytes"));
+            byte[] made = global::RunContours.Bake(global::TvHeights.Read(grid), lines, Encoding.UTF8.GetBytes(sb.ToString()),
+                                                   info.contourInterval > 0.5f ? info.contourInterval : 5f, null,
+                                                   WorldLayer.LakeTest(world != null ? WorldLayer.FromBytes(world) : null));
+            if (made != null) File.WriteAllBytes(runHeights, made);
+            else if (File.Exists(runHeights)) File.Delete(runHeights);   // the old one would not match the new points.json
+        }
+
+        static byte[] ReadPlain(string file) => File.Exists(file) ? Plain(File.ReadAllBytes(file)) : null;
+
+        // A file as it is, or unzipped when it was gzipped (big files of the built-in maps)
+        public static byte[] Plain(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length < 2 || bytes[0] != 0x1f || bytes[1] != 0x8b) return bytes;
+            using (var input = new System.IO.Compression.GZipStream(new MemoryStream(bytes), System.IO.Compression.CompressionMode.Decompress))
+            using (var output = new MemoryStream())
+            {
+                input.CopyTo(output);
+                return output.ToArray();
+            }
         }
 
         static void AppendCoord(StringBuilder sb, double x, double y)

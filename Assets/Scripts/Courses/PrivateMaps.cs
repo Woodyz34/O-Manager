@@ -49,6 +49,7 @@ public static class PrivateMaps
         public double[] boundary;         // paper mm, or null for the whole map
         public TerrainLook look;          // ground, trees and undergrowth for the 3D view, or null for the normal look
         public TerrainSpeeds terrain;     // the terrain sliders, or null for the normal speeds
+        public double[] heightAnswers;    // answers about uncertain contours (Edit map), or null
         public long sharedAt;             // unix seconds, when the map file was uploaded
         public List<string> guests = new List<string>();
         public long until;                // unix seconds
@@ -117,6 +118,7 @@ public static class PrivateMaps
                 boundary = info.boundary != null && info.boundary.Length >= 6 ? info.boundary : null,
                 terrain = info.terrain != null && !info.terrain.IsDefault() ? info.terrain.Copy() : null,
                 look = info.look != null && !info.look.IsDefault() ? info.look.Safe() : null,
+                heightAnswers = HeightAnswers.Clean(info.heightAnswers),
                 sharedAt = info.sharedAt,
                 guests = new List<string>(guestIds),
                 until = until
@@ -285,6 +287,7 @@ public static class PrivateMaps
             if (entry.boundary != null && entry.boundary.Length >= 6) file.boundary = entry.boundary;
             file.terrain = entry.terrain;
             file.look = entry.look;
+            file.heightAnswers = HeightAnswers.Clean(entry.heightAnswers);
             string type = entry.mapType == "sprint" || entry.mapType == "both" ? entry.mapType : "forest";
             MapPackage package = MapImportPanel.BuildPackage(file, entry.name, type, ownPng,
                 (step, share) => GuestProgress = 60 + Mathf.RoundToInt(share * 39));

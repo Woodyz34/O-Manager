@@ -29,7 +29,7 @@ public static class RunGround
         string mapId = mapDef.id;
         // The ground from the contours is kept on disk; a new version of the map's lines (an import) gets a new file
         string cacheFile = System.IO.Path.Combine(Application.persistentDataPath, "RunHeights",
-            Safe(mapId) + "-" + (linesJson != null ? linesJson.Length : 0) + "-" + (pointsJson != null ? pointsJson.Length : 0) + "-v4.bytes");
+            Safe(mapId) + "-" + (linesJson != null ? linesJson.Length : 0) + "-" + (pointsJson != null ? pointsJson.Length : 0) + "-v" + RunContours.Version + ".bytes");
         TvHeights detailed = data.heights;
         // The map's edge lines of areas (banks, boundaries, paved edges): the 3D ground follows them up close
         try { await Task.Run(() => TvEdges.Attach(plain.layer, linesJson)); }
@@ -47,7 +47,8 @@ public static class RunGround
         if (fromPackage != null) detailed = fromPackage;
         else
         {
-            try { detailed = await Task.Run(() => RunContours.Detailed(mapId, data.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile)); }
+            try { detailed = await Task.Run(() => RunContours.Detailed(mapId, data.heights, linesJson, pointsJson, interval, m => Debug.Log("RunContours: " + m), cacheFile,
+                                                                                MapImport.WorldLayer.LakeTest(plain.layer))); }
             catch (Exception e) { Debug.LogWarning("RunGround: contours: " + e); }
         }
         TvWorldData.Data result = new TvWorldData.Data { mapId = plain.mapId, layer = plain.layer, heights = detailed, look = plain.look, speeds = plain.speeds, town = plain.town };

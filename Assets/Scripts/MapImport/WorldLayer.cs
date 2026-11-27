@@ -117,6 +117,14 @@ namespace MapImport
         public List<WorldLine> lines = new List<WorldLine>();
         public List<WorldArea> areas = new List<WorldArea>();   // empty in layers made before version 3
 
+        // Whether a place is open water (a lake, a pond, a wide river), for the run-yourself ground (RunContours); null
+        // without a layer
+        public static Func<double, double, bool> LakeTest(WorldLayer layer)
+        {
+            if (layer == null || layer.cells == null) return null;
+            return (e, n) => (layer.At(e, n) & WorldCell.BaseMask) == WorldCell.Water;
+        }
+
         // What is at a place; outside the layer it is plain forest
         public byte At(double e, double n)
         {
@@ -288,7 +296,16 @@ namespace MapImport
         {
             string name = (s.name ?? "").ToLowerInvariant();
             if (name.Contains("rotvälta") || name.Contains("root stock") || name.Contains("rootstock")) return WorldPointKind.RootStock;
-            switch (SymbolRules.Isom2017Major(s))
+            int contourMajor = SymbolRules.Isom2017Major(s);
+            // A knoll or a hollow too small to draw as a ring, drawn as a point of the contour symbols (2026-11-27: Nya
+            // Slogebo has 101.2 "Höjd (minimimått)", 101.3 "Grop (minimimått)", 103.2 "Hjälpkurvehöjd", ...). The slope
+            // ticks are points of the same symbols and are left alone.
+            if (contourMajor >= 101 && contourMajor <= 103 && !(name.Contains("lutning") || name.Contains("streck") || name.Contains("slope") || name.Contains("tick")))
+            {
+                if (name.Contains("grop") || name.Contains("sänk") || name.Contains("depression") || name.Contains("hollow") || name.Contains("pit")) return WorldPointKind.Depression;
+                if (name.Contains("höjd") || name.Contains("kulle") || name.Contains("knoll") || name.Contains("hill")) return WorldPointKind.Knoll;
+            }
+            switch (contourMajor)
             {
                 case 109: return WorldPointKind.Knoll;
                 case 110: return WorldPointKind.LongKnoll;
