@@ -240,6 +240,7 @@ public class MapEditPanel : MonoBehaviour
         HoverTip.Add(cancelButton, "Closes this window without saving.");
         HoverTip.Add(saveButton, "Saves your changes to the map.");
 
+        busy = BusyOverlay.Add(card.transform);
         Refresh();
     }
 
@@ -364,9 +365,16 @@ public class MapEditPanel : MonoBehaviour
         statusText.color = error ? CourseUI.Danger : CourseUI.Forest;
     }
 
+    BusyOverlay busy;   // over the card while the map is worked on, so it never looks frozen (2026-11-27, Anders)
+
     void Update()
     {
         if (working && progressStep != null) SetStatus($"{progressStep} ... {Mathf.RoundToInt(progressShare * 100)} %", false);
+        if (busy != null)
+        {
+            if (working) busy.Show(statusText.color == CourseUI.Danger ? "" : statusText.text);
+            else busy.Hide();
+        }
         // The "Sure? Click again" on the delete button goes back after a while
         if (deleteConfirmUntil > 0f && Time.unscaledTime >= deleteConfirmUntil)
         {
@@ -391,6 +399,7 @@ public class MapEditPanel : MonoBehaviour
         deleteConfirmUntil = -1f;
         working = true;
         Refresh();
+        SetStatus("Deleting the map ...", false);
         string cloudNote = "";
         try
         {
@@ -515,6 +524,7 @@ public class MapEditPanel : MonoBehaviour
         if (working) return;
         working = true;
         Refresh();
+        SetStatus("Opening the map edge ...", false);
         try
         {
             if (preview == null)
@@ -674,6 +684,7 @@ public class MapEditPanel : MonoBehaviour
         if (working) return;
         working = true;
         Refresh();
+        SetStatus("Putting your answers into the map and making the 3D ground again ...", false);
         string folder = map.folder;
         MapPackageInfo current = info;
         double[] answers = HeightAnswers.Clean(heightAnswers);
@@ -762,6 +773,7 @@ public class MapEditPanel : MonoBehaviour
         }
         working = true;
         Refresh();
+        SetStatus("Saving the map ...", false);
         string folder = map.folder;
         MapPackageInfo updated = info;
         string cloudNote = "";
