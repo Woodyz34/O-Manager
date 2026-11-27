@@ -36,9 +36,22 @@ public static class RunContourField
         public int votesUp, votesDown, orientation;
     }
 
+    // A contour whose slope nothing on the map says for certain (no slope tick, no knoll ring, no answer), with the
+    // contour next to it, for the player to answer in Edit map whether it is higher or lower (HeightQuestions).
+    // In game metres: a point on each where they face each other, and both lines whole for drawing.
+    public class HeightQuestion
+    {
+        public double ax, ay, bx, by;
+        public double[] a, b;
+        public double length;        // metres of contour whose slope the answer settles
+    }
+
     // The fine heights, or null when the contours can't be solved (then the 10 m grid is used)
+    // answers: the player's answers in Edit map (ReadAnswers), certain as a slope tick.
+    // questions: when given, nothing is built: it is filled with the contours that are still uncertain, biggest first.
     public static TvHeights Build(TvHeights grid, List<Line> lines, List<double[]> ticks, double eq, Action<string> log = null,
-                                   List<double[]> water = null, Func<double, double, bool> lakeAt = null)
+                                   List<double[]> water = null, Func<double, double, bool> lakeAt = null,
+                                   List<double[]> answers = null, List<HeightQuestion> questions = null)
     {
         if (grid == null || lines == null || eq <= 0) return null;
         ticks = RealTicks(lines, ticks);
@@ -120,6 +133,26 @@ public static class RunContourField
             else if (side < 0) tickUp[cid]++;
             directed[cid] = true;
         }
+        // The player's answers (Edit map, 2026-11-27): contour A higher than, lower than or as high as contour B next
+        // to it. Higher or lower says which side of each is down, as sure as several slope ticks; the pair itself is
+        // held to it below (forced).
+        var answered = new List<(int a, int b, int rel, double ax, double ay, double bx, double by)>();
+        if (answers != null)
+            foreach (double[] t in answers)
+            {
+                if (t.Length < 5) continue;
+                double ax = (t[0] - ox) / res, ay = (t[1] - oy) / res, bx = (t[2] - ox) / res, by = (t[3] - oy) / res;
+                int a = ContourHeights.Nearest(ids, C, R, ax, ay, 2), b = ContourHeights.Nearest(ids, C, R, bx, by, 2);
+                if (a == 0 || b == 0 || a == b) continue;
+                int rel = Math.Sign(t[4]);
+                answered.Add((a, b, rel, ax, ay, bx, by));
+                if (rel == 0) continue;
+                bool leftDownA = (ContourHeights.SideOf(contours[a - 1].p, bx, by) > 0) == (rel > 0);
+                bool leftDownB = (ContourHeights.SideOf(contours[b - 1].p, ax, ay) > 0) == (rel < 0);
+                if (leftDownA) tickDown[a] += AnswerWeight; else tickUp[a] += AnswerWeight;
+                if (leftDownB) tickDown[b] += AnswerWeight; else tickUp[b] += AnswerWeight;
+                directed[a] = directed[b] = true;
+            }
         foreach (Contour c in contours)
         {
             if (!directed[c.id]) continue;
@@ -182,6 +215,8 @@ public static class RunContourField
         // and, on the way to it, water: the side of a contour where a stream or a marsh lies before the next contour is
         // down (on a slope the contour below sees the same water uphill, so the two cancel; in a valley they agree)
         var seen = new Dictionary<long, int[]>();
+        // Where each pair of contours comes closest along the rays (cell coordinates): ray start, hit, length
+        var closest = questions != null ? new Dictionary<long, double[]>() : null;
         var wetVote = new double[contours.Count + 1];
         int maxSteps = (int)(200 / res);
         foreach (Contour c in contours)
@@ -213,6 +248,8 @@ public static class RunContourField
                             long key = (long)c.id << 32 | (uint)v;
                             if (!seen.TryGetValue(key, out int[] cnt)) seen[key] = cnt = new int[2];
                             cnt[side > 0 ? 0 : 1]++;
+                            if (closest != null && (!closest.TryGetValue(key, out double[] near) || t < near[4]))
+                                closest[key] = new[] { px, py, px + nx * side * t, py + ny * side * t, t };
                             break;
                         }
                         if (wetOnWay) wetVote[c.id] -= side * 0.5;
@@ -233,12 +270,26 @@ public static class RunContourField
             double w = Math.Min(Math.Max(kv.Value[0], kv.Value[1]), Math.Max(back[0], back[1]));
             edges.Add((a, b, sa, sb, w));
         }
+        // An answered pair is a pair even where the rays missed it, and it is settled first, as the player said
+        var forced = new int[edges.Count + answered.Count];   // 1: one interval apart (higher or lower), 2: the same level
+        foreach (var an in answered)
+        {
+            int lo = Math.Min(an.a, an.b), hi = Math.Max(an.a, an.b);
+            int e = edges.FindIndex(x => x.a == lo && x.b == hi);
+            int sLo = ContourHeights.SideOf(contours[lo - 1].p, lo == an.a ? an.bx : an.ax, lo == an.a ? an.by : an.ay);
+            int sHi = ContourHeights.SideOf(contours[hi - 1].p, hi == an.a ? an.bx : an.ax, hi == an.a ? an.by : an.ay);
+            if (sLo == 0 || sHi == 0) continue;
+            if (e < 0) { e = edges.Count; edges.Add((lo, hi, sLo, sHi, 0)); }
+            edges[e] = (lo, hi, sLo, sHi, Forced);
+            forced[e] = an.rel == 0 ? 2 : 1;
+        }
         if (edges.Count == 0) return null;
         var adj = new List<int>[contours.Count + 1];
         for (int i = 0; i <= contours.Count; i++) adj[i] = new List<int>();
         for (int e = 0; e < edges.Count; e++) { adj[edges[e].a].Add(e); adj[edges[e].b].Add(e); }
 
-        bool[] accepted = Orient(contours, edges, ev, strong, anyIndex, out int dropped, out int[] pieceOf);
+        bool[] accepted = Orient(contours, edges, forced, ev, strong, anyIndex, out int dropped, out int[] pieceOf);
+        if (questions != null) AskPieces(contours, edges, forced, strong, pieceOf, closest, ox, oy, res, questions);
         int knownSlope = 0;
         foreach (Contour c in contours)
         {
@@ -272,6 +323,11 @@ public static class RunContourField
             }
         }
         if (anyIndex) AlignIndex(contours, edges, diff, baseWeight, level, pieceOf);
+        if (questions != null)
+        {
+            AskMisfits(contours, edges, forced, diff, level, closest, ox, oy, res, questions);
+            return null;
+        }
         var lakes = LakeLevels(lake, contours, level, ids, C, R, res);
         ids = null;
         var known = new bool[contours.Count + 1];
@@ -383,6 +439,146 @@ public static class RunContourField
         foreach (Line l in lines) if (l.solved) l.level -= min;
         log?.Invoke($"{contours.Count} contours ({knownSlope} with known slope, {dropped} pairs left apart, {nested} set by the ring round them, {moved} small rings moved to the ground round them), {forms} form lines, {edges.Count} pairs, {C}x{R} cells");
         return fine;
+    }
+
+    const int AnswerWeight = 4;      // an answer counts as four slope ticks on each of the two contours
+    const double Forced = 10000;     // an answered pair's weight: above any pair the rays found (they sort first)
+    const double AskAbove = 25;      // metres: shorter uncertain pieces are not asked about
+    const double MisfitBy = 0.75;    // intervals: a pair whose solved levels are this far from what the map says
+    const double MisfitFacing = 2;   // rays (10 m each) the pair must face each other along to be asked about
+
+    // The pieces of the map (Orient) whose slope nothing certain says: no slope tick, no knoll ring and no answer in
+    // any of their contours. Each is asked about once, with its contour that faces a neighbour the most and that
+    // neighbour (one in a certain piece when there is one, so the player compares it with a slope that is known).
+    static void AskPieces(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, int[] forced, double[] strong, int[] pieceOf,
+                          Dictionary<long, double[]> closest, double ox, double oy, double res, List<HeightQuestion> questions)
+    {
+        int n = contours.Count + 1;
+        var sure = new bool[n];
+        var length = new double[n];
+        foreach (Contour c in contours)
+        {
+            int r = pieceOf[c.id];
+            if (Math.Abs(strong[c.id]) >= 3) sure[r] = true;
+            length[r] += Length(c.line.xy);
+        }
+        // The best pair for each uncertain piece
+        var best = new int[n];
+        var score = new double[n];
+        for (int i = 0; i < n; i++) best[i] = -1;
+        for (int e = 0; e < edges.Count; e++)
+        {
+            var ed = edges[e];
+            if (forced[e] != 0) continue;
+            for (int end = 0; end < 2; end++)
+            {
+                int a = end == 0 ? ed.a : ed.b, b = end == 0 ? ed.b : ed.a, r = pieceOf[a];
+                if (sure[r]) continue;
+                double s = ed.w * (sure[pieceOf[b]] ? 2 : 1);
+                if (s <= score[r]) continue;
+                score[r] = s;
+                best[r] = e * 2 + end;
+            }
+        }
+        var found = new List<HeightQuestion>();
+        for (int r = 1; r < n; r++)
+        {
+            if (best[r] < 0 || length[r] < AskAbove) continue;
+            var ed = edges[best[r] / 2];
+            bool first = best[r] % 2 == 0;
+            HeightQuestion q = Question(contours, first ? ed.a : ed.b, first ? ed.b : ed.a, closest, ox, oy, res);
+            if (q == null) continue;
+            q.length = length[r];
+            found.Add(q);
+        }
+        found.Sort((x, y) => y.length.CompareTo(x.length));
+        questions.AddRange(found);
+    }
+
+    // Pairs of contours that face each other well and whose solved levels are far from what the map says they must
+    // be (one interval apart or the same level): the map's marks pull them two ways, and the ground there comes out
+    // as a step or a narrow ridge or trench along a contour. Asked about after the uncertain pieces, worst first.
+    static void AskMisfits(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, int[] forced, double[] diff, double[] level,
+                           Dictionary<long, double[]> closest, double ox, double oy, double res, List<HeightQuestion> questions)
+    {
+        var found = new List<(double score, HeightQuestion q)>();
+        for (int e = 0; e < edges.Count; e++)
+        {
+            var ed = edges[e];
+            if (forced[e] != 0 || ed.w < MisfitFacing) continue;
+            if (contours[ed.a - 1].orientation == 0 || contours[ed.b - 1].orientation == 0) continue;
+            double r = Math.Abs(level[ed.b] - level[ed.a] - diff[e]);
+            if (r < MisfitBy) continue;
+            HeightQuestion q = Question(contours, ed.a, ed.b, closest, ox, oy, res);
+            if (q == null) continue;
+            q.length = ed.w * 10;
+            found.Add((ed.w * r, q));
+        }
+        found.Sort((x, y) => y.score.CompareTo(x.score));
+        foreach (var f in found)
+        {
+            // One question for each place: a misfit usually shows on several pairs side by side
+            bool near = false;
+            foreach (HeightQuestion q in questions)
+                if (MapGeometry.Dist(q.ax, q.ay, f.q.ax, f.q.ay) < 40 || MapGeometry.Dist(q.bx, q.by, f.q.ax, f.q.ay) < 40) { near = true; break; }
+            if (!near) questions.Add(f.q);
+        }
+    }
+
+    // The question for contour a and its neighbour b, at the place they face each other most closely
+    static HeightQuestion Question(List<Contour> contours, int a, int b, Dictionary<long, double[]> closest, double ox, double oy, double res)
+    {
+        if (closest == null) return null;
+        if (!closest.TryGetValue((long)a << 32 | (uint)b, out double[] at))
+        {
+            // Only the other contour's rays met this one: turn that round
+            if (!closest.TryGetValue((long)b << 32 | (uint)a, out double[] back)) return null;
+            at = new[] { back[2], back[3], back[0], back[1], back[4] };
+        }
+        return new HeightQuestion
+        {
+            ax = ox + at[0] * res, ay = oy + at[1] * res, bx = ox + at[2] * res, by = oy + at[3] * res,
+            a = contours[a - 1].line.xy, b = contours[b - 1].line.xy
+        };
+    }
+
+    // The contours still uncertain on a map, biggest first (an empty list when there are none; null when the contours
+    // can't be read at all). Slow on a big map: run it on a background thread.
+    public static List<HeightQuestion> Questions(TvHeights grid, byte[] linesJson, byte[] pointsJson, double eq, Func<double, double, bool> lakeAt,
+                                                 List<double[]> answers)
+    {
+        if (grid == null || grid.h == null || linesJson == null) return null;
+        var questions = new List<HeightQuestion>();
+        Build(grid, ReadLines(linesJson), ReadTicks(pointsJson), eq > 0.5 ? eq : 5, null, ReadWater(linesJson, pointsJson), lakeAt, answers, questions);
+        return questions;
+    }
+
+    // An answer: a point on contour A, a point on contour B (game metres) and 1 when A is higher, -1 lower, 0 as high
+    public static double[] Answer(HeightQuestion q, int relation)
+    {
+        return new[] { Math.Round(q.ax, 2), Math.Round(q.ay, 2), Math.Round(q.bx, 2), Math.Round(q.by, 2), Math.Sign(relation) };
+    }
+
+    // The answers kept in points.json ("HeightAnswers": [ax, ay, bx, by, relation, ...] after the features, written by
+    // the import from MapPackageInfo.heightAnswers), so the 3D ground made from the file is remade when they change
+    public static List<double[]> ReadAnswers(byte[] pointsJson)
+    {
+        var list = new List<double[]>();
+        if (pointsJson == null) return list;
+        string text = System.Text.Encoding.UTF8.GetString(pointsJson);
+        int at = text.LastIndexOf("\"HeightAnswers\":[", StringComparison.Ordinal);
+        if (at < 0) return list;
+        int close = text.IndexOf(']', at);
+        if (close < 0) return list;
+        string[] parts = text.Substring(at + 17, close - at - 17).Split(',');
+        for (int i = 0; i + 4 < parts.Length; i += 5)
+        {
+            var v = new double[5];
+            bool ok = true;
+            for (int k = 0; k < 5; k++) ok &= double.TryParse(parts[i + k], NumberStyles.Float, CultureInfo.InvariantCulture, out v[k]);
+            if (ok) list.Add(v);
+        }
+        return list;
     }
 
     // Only the points that are real slope ticks, on a contour or form line and across it (ContourHeights.RealTicks)
@@ -570,7 +766,9 @@ public static class RunContourField
     //   - turn ticks or knoll rings in one piece against those in the other.
     // The slope ticks counted here are only real ones (RealTicks). Sets every contour's orientation (1: the left side is
     // up, -1: the right, 0: nothing says); returns which pairs were joined as they were seen.
-    static bool[] Orient(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, double[] ev, double[] strong,
+    // forced: pairs the player answered in Edit map (1: one interval apart, 2: the same level); they come first and
+    // nothing above keeps them apart.
+    static bool[] Orient(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, int[] forced, double[] ev, double[] strong,
                          bool useIndex, out int dropped, out int[] pieceOf)
     {
         int n = contours.Count + 1;
@@ -629,8 +827,10 @@ public static class RunContourField
             {
                 // The slope going on from one to the other first, then a ridge or valley between them
                 bool slope = pass == 0;
-                if (useIndex && slope && ia && ib) continue;          // two index contours next to each other: same level
-                if (useIndex && !slope && ia != ib) continue;          // an index contour and a plain one: never the same level
+                int f = forced[e];
+                if (f == 1 && !slope || f == 2 && slope) continue;
+                if (f == 0 && useIndex && slope && ia && ib) continue;          // two index contours next to each other: same level
+                if (f == 0 && useIndex && !slope && ia != ib) continue;          // an index contour and a plain one: never the same level
                 int k = slope ? -sa * sb : sa * sb;                    // o_b = k o_a
                 int d = slope ? sa : 0;                                // L_b = L_a + d o_a
                 if (ra == rb)
@@ -644,7 +844,7 @@ public static class RunContourField
                 int P = pb * k * pa, Q = qa + d * pa - qb * P;          // rb's orientation and level from ra's
                 // Marks in the two pieces that would turn against each other
                 double sA = sumStrong[ra], sB = P * sumStrong[rb];
-                if (Math.Abs(sA) >= 5 && Math.Abs(sB) >= 5 && Math.Sign(sA) != Math.Sign(sB)) continue;
+                if (f == 0 && Math.Abs(sA) >= 5 && Math.Abs(sB) >= 5 && Math.Sign(sA) != Math.Sign(sB)) continue;
                 if (useIndex)
                 {
                     int[] A = broken[ra], B = broken[rb];
@@ -654,7 +854,7 @@ public static class RunContourField
                             int o = oi == 0 ? 1 : -1, rr = ((r + Q * o) % 5 + 5) % 5, oo = P * o;
                             merged[r * 2 + oi] = A[r * 2 + oi] + B[rr * 2 + (oo > 0 ? 0 : 1)];
                         }
-                    if (Min(merged) > Min(A) + Min(B)) continue;
+                    if (f == 0 && Min(merged) > Min(A) + Min(B)) continue;
                     Array.Copy(merged, A, 10);
                 }
                 parent[rb] = ra;

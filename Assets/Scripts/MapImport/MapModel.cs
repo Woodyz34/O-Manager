@@ -125,6 +125,9 @@ namespace MapImport
         public TerrainSpeeds terrain;
         // What the terrain looks like in 3D (the choices at import), or null for the normal look
         public TerrainLook look;
+        // The player's answers about contours the game was unsure of (Edit map: higher, lower or as high as the one
+        // next to it), five numbers each: see RunContourField.Answer. Null when none.
+        public double[] heightAnswers;
 
         public double MetersPerMm => scale / 1000.0;
 

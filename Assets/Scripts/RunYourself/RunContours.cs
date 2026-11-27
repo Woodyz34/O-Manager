@@ -52,6 +52,12 @@ public static class RunContours
         return fine;
     }
 
+    // Forgets the ground kept in memory (the map's answers about uncertain contours changed in Edit map)
+    public static void Forget()
+    {
+        lock (typeof(RunContours)) { cachedFor = null; cached = null; }
+    }
+
     // ---- Made once with the map (2026-11-25, Anders: Fossum took 7 minutes on every computer, the first race) ----
     // The import (and every rebuild of a map: Edit map, a shared map downloaded, the built-in maps) works the ground out
     // here and keeps it in the map package as runheights.bytes, so a race only reads it. The file says which version of
@@ -123,7 +129,7 @@ public static class RunContours
         List<RunContourField.Line> lines = RunContourField.ReadLines(linesJson);
         TvHeights fine = null;
         try { fine = RunContourField.Build(grid, lines, RunContourField.ReadTicks(pointsJson), eq, log, RunContourField.ReadWater(linesJson, pointsJson),
-                                                 lakeAt); }
+                                                 lakeAt, RunContourField.ReadAnswers(pointsJson)); }
         catch (Exception e) { log?.Invoke("contour field failed: " + e.Message); }
         exact = fine != null;
         if (!exact) fine = Upsampled(grid);
