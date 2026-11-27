@@ -87,6 +87,7 @@ public class MapEditPanel : MonoBehaviour
             panel.SaveHeightsNow();
         }
         else if (pending != null) DeletePending(map.folder);
+        if (info.hasHeights) panel.CountQuestions();
     }
 
     static MapPackageInfo ReadInfo(string folder)
@@ -242,6 +243,48 @@ public class MapEditPanel : MonoBehaviour
         Refresh();
     }
 
+    // ---- How many contours still need an answer, shown in the Heights row (2026-11-27, Anders: make it clear,
+    // in the same colour as "the map needs saving") ----
+
+    int questionsLeft = -1;            // -1: not counted yet (or could not be)
+    bool counting;
+    Task<Func<double[], List<RunContourField.HeightQuestion>>> finder;
+
+    Task<Func<double[], List<RunContourField.HeightQuestion>>> Finder()
+    {
+        if (finder == null || finder.IsFaulted)
+        {
+            string folder = map.folder;
+            float interval = info.contourInterval;
+            finder = Task.Run(() => QuestionFinder(folder, interval));
+        }
+        return finder;
+    }
+
+    async void CountQuestions()
+    {
+        if (counting) return;
+        counting = true;
+        questionsLeft = -1;
+        Refresh();
+        try
+        {
+            Func<double[], List<RunContourField.HeightQuestion>> find = await Finder();
+            double[] now = heightAnswers;
+            List<RunContourField.HeightQuestion> found = await Task.Run(() => find(now));
+            if (this == null) return;
+            questionsLeft = found != null ? found.Count : -1;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("MapEditPanel: counting uncertain contours: " + e.Message);
+            if (this == null) return;
+            questionsLeft = -1;
+        }
+        counting = false;
+        Refresh();
+    }
+
     static TMP_InputField LabelledInput(Transform parent, string label, string placeholder, int limit, string value)
     {
         RectTransform row = CourseUI.Rect(label, parent);
@@ -289,9 +332,14 @@ public class MapEditPanel : MonoBehaviour
         if (heightsText != null)
         {
             int count = HeightAnswers.Count(heightAnswers);
-            heightsText.text = "Heights: " + (count == 0 ? "no answers about uncertain contours yet." : count == 1 ? "1 answer about an uncertain contour." : count + " answers about uncertain contours.")
-                               + (HeightsChanged ? " The 3D ground is made again when you save." : "");
-            heightsText.color = HeightsChanged ? CourseUI.Accent : CourseUI.Ink;
+            string given = count == 0 ? "" : count == 1 ? " (1 answered)" : " (" + count + " answered)";
+            if (counting) heightsText.text = "Heights: checking the contours ...";
+            else if (questionsLeft > 0)
+                heightsText.text = "Heights: " + (questionsLeft == 1 ? "1 contour needs" : questionsLeft + " contours need") + " an answer: higher or lower?" + given;
+            else if (questionsLeft == 0) heightsText.text = "Heights: every contour is settled." + given;
+            else heightsText.text = "Heights: " + (count == 0 ? "no answers about uncertain contours yet." : count == 1 ? "1 answer about an uncertain contour." : count + " answers about uncertain contours.");
+            if (HeightsChanged) heightsText.text += " The 3D ground is made again when you save.";
+            heightsText.color = HeightsChanged || questionsLeft > 0 ? CourseUI.Accent : CourseUI.Ink;
         }
         foreach (Selectable s in new Selectable[] { publicButton, privateButton, forestButton, sprintButton, deleteButton, edgeButton, terrainButton, lookButton, fileButton, heightsButton, cancelButton, nameField, clubField, senderField, contactField })
             if (s != null) s.interactable = !working;
@@ -542,7 +590,7 @@ public class MapEditPanel : MonoBehaviour
         float interval = info.contourInterval;
         try
         {
-            Func<double[], List<RunContourField.HeightQuestion>> find = await Task.Run(() => QuestionFinder(folder, interval));
+            Func<double[], List<RunContourField.HeightQuestion>> find = await Finder();
             double[] now = heightAnswers;
             List<RunContourField.HeightQuestion> questions = await Task.Run(() => find(now));
             if (this == null) return;
@@ -553,6 +601,8 @@ public class MapEditPanel : MonoBehaviour
                 SetStatus("The contours of this map could not be read.", true);
                 return;
             }
+            questionsLeft = questions.Count;
+            Refresh();
             if (questions.Count == 0)
             {
                 SetStatus("The game is sure of every contour on this map. Nothing to answer.", false);
@@ -565,6 +615,7 @@ public class MapEditPanel : MonoBehaviour
                 heightAnswers = HeightAnswers.Clean(chosen);
                 Refresh();
                 if (HeightsChanged) SaveHeightsNow();
+                CountQuestions();
             }, chosen => WritePending(pendingFolder, chosen));
         }
         catch (Exception e)
