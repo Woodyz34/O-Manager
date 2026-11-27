@@ -225,7 +225,11 @@ public partial class RunSession
         int punched = watching.run3dPunched;
         // The finish counts in run3dPunched too, but its beep comes with raceFinished
         int controls = world != null ? world.FlagCount - 1 : int.MaxValue;
-        if (punched > watchedPunched && watchedPunched < controls) sounds.Punch();
+        if (punched > watchedPunched && watchedPunched < controls)
+        {
+            sounds.Punch();
+            if (punchGlow != null) punchGlow.Pulse();
+        }
         watchedPunched = punched;
     }
 
