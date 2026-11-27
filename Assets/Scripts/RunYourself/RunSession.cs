@@ -490,6 +490,9 @@ public partial class RunSession : MonoBehaviour
 
         long p0 = System.Diagnostics.Stopwatch.GetTimestamp();
         player.Tick(dt);
+        // Also where the runner stands now, every frame: a flag is moved to where it really stands (beside its stone)
+        // only when its piece of forest is built, and a runner already standing there, or not moving, then still punches
+        if (phase == Phase.Running) CheckPunch(player.e, player.n, player.e, player.n);
         long p1 = System.Diagnostics.Stopwatch.GetTimestamp();
         handMap.Tick(dt, phase == Phase.Running && !menuOpen);
         RunPerf.Add(RunPerf.Part.Runner, p1 - p0);
@@ -588,6 +591,8 @@ public partial class RunSession : MonoBehaviour
                 return;
             }
             sounds.Punch();
+            if (punchGlow != null) punchGlow.Pulse();
+            Debug.Log("[Run] Punched control " + (i + 1) + " at " + RaceTime(player.raceSeconds));
             // The map shows the next leg from the control just punched
             if (handMap != null && i + 1 > handMap.Leg) handMap.FrameLeg(i + 1);
             return;   // one punch per step (two controls of the course can stand close together)
@@ -921,6 +926,8 @@ public partial class RunSession : MonoBehaviour
         }
     }
 
+    RunPunchGlow punchGlow;
+
     void BuildHud()
     {
         hud = new GameObject("Run HUD", typeof(Canvas), typeof(CanvasScaler)).GetComponent<Canvas>();
@@ -938,6 +945,9 @@ public partial class RunSession : MonoBehaviour
         CourseUI.Place(loadingTitle.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 80f), new Vector2(1400f, 240f));
 
         LoadingSpinner.Add(backdrop.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -110f), 40f, 14f, new Color(0.96f, 0.94f, 0.86f));
+
+        // Under the clock and the texts, over the forest: the edges glow at a punch
+        punchGlow = RunPunchGlow.Create(hud.transform);
 
         Image clockBack = CourseUI.Panel("Clock", hud.transform, new Color(0.1f, 0.14f, 0.12f, 0.7f));
         CourseUI.Place(clockBack.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(220f, 64f));

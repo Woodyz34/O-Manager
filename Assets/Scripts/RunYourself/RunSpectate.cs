@@ -24,6 +24,8 @@ public partial class RunSession
     bool watchOpen = true;
     float watchSlide = 1f;       // 1 = pushed out, 0 = pushed in
     int inOrder;                 // controls punched in order so far (for "Leg 3 of 7" on the others' lists)
+    int watchedPunched;          // the controls the runner watched had punched, to beep when they punch the next
+    bool watchedIn;              // the runner watched was in, to beep once at their finish
 
     bool Watching => watching != null && remotes.ContainsKey(watching);
 
@@ -126,6 +128,9 @@ public partial class RunSession
         }
         watching = p;
         watchedDoneSince = -1f;
+        // Their punches from now on: no beep for those already made
+        watchedPunched = p.run3dPunched;
+        watchedIn = p.raceFinished;
         shownPitch = p.run3dPitch;
         nextWatchRefresh = 0f;
     }
@@ -175,6 +180,9 @@ public partial class RunSession
             autoPicked = false;
             return;
         }
+        // Their beeps, heard as if standing beside them (2026-11-27, Anders): a control punched, and the finish
+        BeepForWatched();
+
         // A runner who is in: stay a moment, then on to someone still running
         if (watching.raceFinished)
         {
@@ -201,6 +209,28 @@ public partial class RunSession
         bool up = (watching.run3dFlags & FlagMapUp) != 0 && !watching.raceFinished;
         if (handMap.Up != up) handMap.SetUp(up);
         handMap.Follow(watching.run3dMapLeg, watching.run3dMapTurn, watching.run3dMapAt, watching.run3dMapSize);
+    }
+
+    // The runner watched punched a control (run3dPunched went up) or came in (raceFinished): the same beep as their own
+    void BeepForWatched()
+    {
+        if (sounds == null || watching == null) return;
+        if (watching.raceFinished)
+        {
+            if (!watchedIn) sounds.Finish();
+            watchedIn = true;
+            watchedPunched = watching.run3dPunched;
+            return;
+        }
+        int punched = watching.run3dPunched;
+        // The finish counts in run3dPunched too, but its beep comes with raceFinished
+        int controls = world != null ? world.FlagCount - 1 : int.MaxValue;
+        if (punched > watchedPunched && watchedPunched < controls)
+        {
+            sounds.Punch();
+            if (punchGlow != null) punchGlow.Pulse();
+        }
+        watchedPunched = punched;
     }
 
     // The first runner still out, after the one watched now in the list's order
