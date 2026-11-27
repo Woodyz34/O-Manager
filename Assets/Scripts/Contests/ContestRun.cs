@@ -22,6 +22,8 @@ public static class ContestRun
     public static bool StartPending { get; private set; }
     // Set when a contest race was left, so the main menu opens the contests page again
     public static bool ReturnToContests;
+    // The contest whose race was finished (not just left), so the contests page opens on its leaderboard (2026-11-27, the user)
+    public static ContestInfo JustFinished;
     static bool resultSent;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -31,6 +33,7 @@ public static class ContestRun
         ActiveCourse = null;
         StartPending = false;
         ReturnToContests = false;
+        JustFinished = null;
         resultSent = false;
     }
 
@@ -210,6 +213,7 @@ public static class ContestRun
         ActiveCourse = course;
         StartPending = true;
         resultSent = false;
+        JustFinished = null;
         SceneManager.LoadScene("SingelPlayer");
     }
 
@@ -236,6 +240,7 @@ public static class ContestRun
     {
         if (!InRace || resultSent || Active.RouteChoice) return;
         resultSent = true;
+        JustFinished = Active;
         Send(Active, 0, seconds, EncodeRace(track, legEnds));
         PayTime(Active);
     }
@@ -245,6 +250,7 @@ public static class ContestRun
     {
         if (!InRace || resultSent || !Active.RouteChoice) return;
         resultSent = true;
+        JustFinished = Active;
         Send(Active, score, 0, EncodeChoices(legs));
         PayTime(Active);
     }
