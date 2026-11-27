@@ -28,7 +28,8 @@ public class HeightQuestionPanel : MonoBehaviour
     List<RunContourField.HeightQuestion> rest = new List<RunContourField.HeightQuestion>();
     int answeredNow;
     readonly List<RunContourField.HeightQuestion> skipped = new List<RunContourField.HeightQuestion>();
-    int skippedBefore;   // skips from earlier visits (heightskips.txt)
+    int skippedBefore;
+    string change = "";  // what the last check did to the count: "+2 new questions from your answer" or "3 settled ..."    // skips from earlier visits (heightskips.txt)
     readonly Stack<(double[] answers, RunContourField.HeightQuestion q, bool skip)> undo = new Stack<(double[], RunContourField.HeightQuestion, bool)>();
     bool checking, checkAgain;         // the map is being checked again with the answers (and should be once more after)
     double viewWidth;                  // metres across the picture
@@ -130,10 +131,11 @@ public class HeightQuestionPanel : MonoBehaviour
 
         hint = CourseUI.Text("Hint", card.transform,
             "<color=#E0158F><b>Pink</b></color>: the contour the game is unsure of.   <color=#1E50E0><b>Blue</b></color>: the contour next to it.\n"
-            + "Drag the map with the mouse and zoom with the wheel. Look at the slope ticks, knolls, hollows, streams and marshes.",
-            18, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
+            + "Drag the map with the mouse and zoom with the wheel. Look at the slope ticks, knolls, hollows, streams and marshes.\n"
+            + "The count can go up as well as down: an answer can show that contours further away need a look too.",
+            17, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
         hint.textWrappingMode = TextWrappingModes.Normal;
-        CourseUI.Place(hint.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -754), new Vector2(1100, 54));
+        CourseUI.Place(hint.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -754), new Vector2(1100, 78));
 
         // Higher, lower, same height
         RectTransform answerRect = CourseUI.Rect("Answers", card.transform);
@@ -256,6 +258,7 @@ public class HeightQuestionPanel : MonoBehaviour
     {
         int left = rest.Count + (current != null ? 1 : 0);
         progress.text = (left == 1 ? "1 question left" : left + " questions left") + (checking ? " (checking your answers ...)" : "")
+                        + (!checking && change.Length > 0 ? " (" + change + ")" : "")
                         + (answeredNow > 0 || skipped.Count > skippedBefore ? "   ·   " + Summary() : "");
     }
 
@@ -338,6 +341,12 @@ public class HeightQuestionPanel : MonoBehaviour
         checking = false;
         if (found != null)
         {
+            // The count can go up as well as down (2026-11-27, Anders: keep every question for a really good map,
+            // but make it clear): an answer can turn a piece of contours round, and contours further off then need a look
+            int before = rest.Count + (current != null ? 1 : 0), after = 0;
+            foreach (RunContourField.HeightQuestion q in found) if (!WasSkipped(q)) after++;
+            change = after > before ? "<color=#E8742A>+" + (after - before) + (after - before == 1 ? " new question" : " new questions") + " from your answer</color>"
+                   : after < before ? (before - after) + " settled by your answer" : "";
             rest.Clear();
             foreach (RunContourField.HeightQuestion q in found)
                 if (!WasSkipped(q) && (current == null || !Same(q, current))) rest.Add(q);
