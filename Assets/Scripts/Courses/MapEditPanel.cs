@@ -79,6 +79,15 @@ public class MapEditPanel : MonoBehaviour
         panel.heightAnswers = HeightAnswers.Clean(info.heightAnswers);
         panel.Build(dim.transform);
         IsOpen = true;
+        // Answers given before the game stopped (they are written after every answer): saved now
+        double[] pending = ReadPending(map.folder);
+        if (pending != null && !SameEdge(pending, panel.heightAnswers))
+        {
+            panel.heightAnswers = pending;
+            panel.SaveHeightsNow();
+        }
+        else if (pending != null) DeletePending(map.folder);
+        if (info.hasHeights) panel.CountQuestions();
     }
 
     static MapPackageInfo ReadInfo(string folder)
@@ -234,6 +243,48 @@ public class MapEditPanel : MonoBehaviour
         Refresh();
     }
 
+    // ---- How many contours still need an answer, shown in the Heights row (2026-11-27, Anders: make it clear,
+    // in the same colour as "the map needs saving") ----
+
+    int questionsLeft = -1;            // -1: not counted yet (or could not be)
+    bool counting;
+    Task<Func<double[], List<RunContourField.HeightQuestion>>> finder;
+
+    Task<Func<double[], List<RunContourField.HeightQuestion>>> Finder()
+    {
+        if (finder == null || finder.IsFaulted)
+        {
+            string folder = map.folder;
+            float interval = info.contourInterval;
+            finder = Task.Run(() => QuestionFinder(folder, interval));
+        }
+        return finder;
+    }
+
+    async void CountQuestions()
+    {
+        if (counting) return;
+        counting = true;
+        questionsLeft = -1;
+        Refresh();
+        try
+        {
+            Func<double[], List<RunContourField.HeightQuestion>> find = await Finder();
+            double[] now = heightAnswers;
+            List<RunContourField.HeightQuestion> found = await Task.Run(() => find(now));
+            if (this == null) return;
+            questionsLeft = found != null ? found.Count : -1;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("MapEditPanel: counting uncertain contours: " + e.Message);
+            if (this == null) return;
+            questionsLeft = -1;
+        }
+        counting = false;
+        Refresh();
+    }
+
     static TMP_InputField LabelledInput(Transform parent, string label, string placeholder, int limit, string value)
     {
         RectTransform row = CourseUI.Rect(label, parent);
@@ -281,9 +332,14 @@ public class MapEditPanel : MonoBehaviour
         if (heightsText != null)
         {
             int count = HeightAnswers.Count(heightAnswers);
-            heightsText.text = "Heights: " + (count == 0 ? "no answers about uncertain contours yet." : count == 1 ? "1 answer about an uncertain contour." : count + " answers about uncertain contours.")
-                               + (HeightsChanged ? " The 3D ground is made again when you save." : "");
-            heightsText.color = HeightsChanged ? CourseUI.Accent : CourseUI.Ink;
+            string given = count == 0 ? "" : count == 1 ? " (1 answered)" : " (" + count + " answered)";
+            if (counting) heightsText.text = "Heights: checking the contours ...";
+            else if (questionsLeft > 0)
+                heightsText.text = "Heights: " + (questionsLeft == 1 ? "1 contour needs" : questionsLeft + " contours need") + " an answer: higher or lower?" + given;
+            else if (questionsLeft == 0) heightsText.text = "Heights: every contour is settled." + given;
+            else heightsText.text = "Heights: " + (count == 0 ? "no answers about uncertain contours yet." : count == 1 ? "1 answer about an uncertain contour." : count + " answers about uncertain contours.");
+            if (HeightsChanged) heightsText.text += " The 3D ground is made again when you save.";
+            heightsText.color = HeightsChanged || questionsLeft > 0 ? CourseUI.Accent : CourseUI.Ink;
         }
         foreach (Selectable s in new Selectable[] { publicButton, privateButton, forestButton, sprintButton, deleteButton, edgeButton, terrainButton, lookButton, fileButton, heightsButton, cancelButton, nameField, clubField, senderField, contactField })
             if (s != null) s.interactable = !working;
@@ -534,7 +590,7 @@ public class MapEditPanel : MonoBehaviour
         float interval = info.contourInterval;
         try
         {
-            Func<double[], List<RunContourField.HeightQuestion>> find = await Task.Run(() => QuestionFinder(folder, interval));
+            Func<double[], List<RunContourField.HeightQuestion>> find = await Finder();
             double[] now = heightAnswers;
             List<RunContourField.HeightQuestion> questions = await Task.Run(() => find(now));
             if (this == null) return;
@@ -545,18 +601,22 @@ public class MapEditPanel : MonoBehaviour
                 SetStatus("The contours of this map could not be read.", true);
                 return;
             }
+            questionsLeft = questions.Count;
+            Refresh();
             if (questions.Count == 0)
             {
                 SetStatus("The game is sure of every contour on this map. Nothing to answer.", false);
                 return;
             }
             SetStatus("", false);
+            string pendingFolder = folder;
             HeightQuestionPanel.Open(transform, map, questions, heightAnswers, find, chosen =>
             {
                 heightAnswers = HeightAnswers.Clean(chosen);
                 Refresh();
-                if (HeightsChanged) SetStatus("Press Save to keep your answers about the contours.", false);
-            });
+                if (HeightsChanged) SaveHeightsNow();
+                CountQuestions();
+            }, chosen => WritePending(pendingFolder, chosen));
         }
         catch (Exception e)
         {
@@ -565,6 +625,85 @@ public class MapEditPanel : MonoBehaviour
             working = false;
             Refresh();
             SetStatus("Could not look at the contours: " + e.Message, true);
+        }
+    }
+
+    // ---- Answers kept at once (2026-11-27, Anders: the game crashed before "Stop for now", and the answers were lost) ----
+    // Every answer is written to heightanswers.pending in the map's folder; when the questions close (or Edit map opens
+    // and finds the file) the answers go into the map straight away, without pressing Save. A public map's new answers
+    // are sent to the other players with the next Save.
+
+    const string PendingFile = "heightanswers.pending";
+
+    static void WritePending(string folder, double[] answers)
+    {
+        try
+        {
+            double[] clean = HeightAnswers.Clean(answers);
+            var parts = new List<string>();
+            if (clean != null) foreach (double v in clean) parts.Add(v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+            File.WriteAllText(Path.Combine(folder, PendingFile), string.Join(",", parts));
+        }
+        catch (Exception e) { Debug.LogWarning("MapEditPanel: could not keep the answers: " + e.Message); }
+    }
+
+    static double[] ReadPending(string folder)
+    {
+        try
+        {
+            string file = Path.Combine(folder, PendingFile);
+            if (!File.Exists(file)) return null;
+            var values = new List<double>();
+            foreach (string part in File.ReadAllText(file).Split(','))
+                if (double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v)) values.Add(v);
+            return values.Count == 0 ? new double[0] : HeightAnswers.Clean(values.ToArray()) ?? new double[0];
+        }
+        catch (Exception) { return null; }
+    }
+
+    static void DeletePending(string folder)
+    {
+        try { File.Delete(Path.Combine(folder, PendingFile)); } catch (Exception) { }
+    }
+
+    bool heightsToShare;   // answers saved here that a public map has not sent to the other players yet
+
+    // Puts the answers into the map now: points.json and the 3D ground are made again (no Save needed)
+    async void SaveHeightsNow()
+    {
+        if (working) return;
+        working = true;
+        Refresh();
+        string folder = map.folder;
+        MapPackageInfo current = info;
+        double[] answers = HeightAnswers.Clean(heightAnswers);
+        try
+        {
+            await Task.Run(() =>
+            {
+                MapPackageBuilder.ApplyHeightAnswers(folder, current, answers, (step, share) => { progressShare = share; progressStep = step; });
+                MapPackageBuilder.WriteInfo(folder, current);
+            });
+            progressStep = null;
+            DeletePending(folder);
+            TvWorldData.Forget();
+            RunContours.Forget();
+            heightsToShare = !info.isPrivate;
+            if (this == null) return;
+            working = false;
+            Refresh();
+            int count = HeightAnswers.Count(answers);
+            SetStatus((count == 1 ? "1 answer" : count + " answers") + " about the contours saved in the map."
+                      + (info.isPrivate ? "" : " Press Save to send them to the other players too."), false);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("MapEditPanel: could not save the answers: " + e);
+            progressStep = null;
+            if (this == null) return;
+            working = false;
+            Refresh();
+            SetStatus("Could not save the answers now (" + e.Message + "). Press Save to try again.", true);
         }
     }
 
@@ -614,7 +753,7 @@ public class MapEditPanel : MonoBehaviour
         bool rebuild = edgeChanged || terrainChanged || TypeChanged || FileChanged || OldRules;
         bool lookChanged = !look.SameAs(info.look);
         bool heightsChanged = HeightsChanged;
-        bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild || lookChanged || heightsChanged
+        bool changed = name != info.name || club != (info.ownerClub ?? "") || rebuild || lookChanged || heightsChanged || heightsToShare
                        || (!isPrivate && (sender != (info.sender ?? "") || contact != (info.contact ?? "")));
         if (!changed && !goPrivate && !goPublic)
         {
@@ -754,6 +893,7 @@ public class MapEditPanel : MonoBehaviour
             MapDefinition saved = MapDefinition.All.Find(m => m.id == updated.id);
             UIToast.Show("Saved " + name + "." + cloudNote, 7f);
             working = false;
+            DeletePending(folder);
             onSaved?.Invoke(saved, rebuild);
             Destroy(gameObject);
         }

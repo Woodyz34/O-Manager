@@ -4,14 +4,17 @@ using System.Threading.Tasks;
 using MapImport;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 // "Uncertain contours" in Edit map (2026-11-27, Anders: "Ska den vara högre eller lägre än den här höjdkurvan? ...
-// det ska vara extremt simpelt"). The game shows one contour it is unsure of (orange) and the contour next to it
-// (blue) on the map, and the player answers Higher, Lower or Same height; then the next one comes. Nothing is drawn by
-// hand. Skip asks first whether the player knows the map may become a little uncertain there. When the list is done
-// the map is checked again with the answers (they can show more places to check), until nothing is left. The answers
-// go back to Edit map, which keeps them with the map when it is saved (MapPackageInfo.heightAnswers).
+// det ska vara extremt simpelt"). The game shows one contour it is unsure of (pink) and the contour next to it (blue)
+// on the map, and the player answers Higher, Lower or Same height; then the next one comes. Nothing is drawn by hand.
+// Skip asks first whether the player knows the map may become a little uncertain there. After every answer the map
+// is checked again in the background with all the answers, and the questions the answers have settled are taken away
+// (2026-11-27, Anders: "varje svar man ger så ta bort vissa höjdkurvor"). The map is dragged with the mouse and zoomed
+// with the wheel. The answers go back to Edit map, which keeps them with the map when it is saved
+// (MapPackageInfo.heightAnswers).
 public class HeightQuestionPanel : MonoBehaviour
 {
     public static bool IsOpen { get; private set; }
@@ -19,30 +22,33 @@ public class HeightQuestionPanel : MonoBehaviour
     MapDefinition map;
     Func<double[], List<RunContourField.HeightQuestion>> find;   // the questions left with these answers (background thread)
     Action<double[]> onDone;
+    Action<double[]> onChange;   // after every answer: kept on disk at once, so nothing is lost if the game stops
     double[] answers;
-    List<RunContourField.HeightQuestion> queue = new List<RunContourField.HeightQuestion>();
-    int index;
+    RunContourField.HeightQuestion current;                       // the question on screen, or null
+    List<RunContourField.HeightQuestion> rest = new List<RunContourField.HeightQuestion>();
     int answeredNow;
     readonly List<RunContourField.HeightQuestion> skipped = new List<RunContourField.HeightQuestion>();
-    readonly Stack<(double[] answers, int index, bool skip)> undo = new Stack<(double[], int, bool)>();
-    bool busy;
+    readonly Stack<(double[] answers, RunContourField.HeightQuestion q, bool skip)> undo = new Stack<(double[], RunContourField.HeightQuestion, bool)>();
+    bool checking, checkAgain;         // the map is being checked again with the answers (and should be once more after)
     double viewWidth;                  // metres across the picture
+    double centreE, centreN;           // the middle of the picture, game metres
 
     TextMeshProUGUI question, progress, hint, confirmText;
     RectTransform frameRect;
     RawImage picture;
-    ContourLinesGraphic orangeLines, blueLines;
+    ContourLinesGraphic pinkLines, blueLines;
     Button higher, lower, same, skip, back, stop;
     GameObject confirm, answerRow;
     Sprite sprite;
     MapBackground background;
 
-    static readonly Color Orange = CourseUI.Hex("E8742A");
-    static readonly Color Blue = CourseUI.Hex("1E6FD9");
+    // Not orange: the map's own contours are orange-brown (2026-11-27, Anders could not tell which contour was meant)
+    static readonly Color Pink = CourseUI.Hex("E0158F");
+    static readonly Color Blue = CourseUI.Hex("1E50E0");
     static readonly Vector2 Area = new Vector2(1100, 600);
 
     public static void Open(Transform canvas, MapDefinition map, List<RunContourField.HeightQuestion> questions, double[] answers,
-                            Func<double[], List<RunContourField.HeightQuestion>> find, Action<double[]> onDone)
+                            Func<double[], List<RunContourField.HeightQuestion>> find, Action<double[]> onDone, Action<double[]> onChange = null)
     {
         if (IsOpen) return;
         var dim = CourseUI.Panel("Uncertain contours", canvas, new Color(0.08f, 0.14f, 0.1f, 0.7f), false);
@@ -51,11 +57,12 @@ public class HeightQuestionPanel : MonoBehaviour
         panel.map = map;
         panel.find = find;
         panel.onDone = onDone;
+        panel.onChange = onChange;
         panel.answers = answers;
-        panel.queue = questions ?? new List<RunContourField.HeightQuestion>();
+        if (questions != null) panel.rest.AddRange(questions);
         panel.Build(dim.transform);
         IsOpen = true;
-        panel.Show();
+        panel.Next();
     }
 
     void OnDestroy()
@@ -85,8 +92,13 @@ public class HeightQuestionPanel : MonoBehaviour
         picture = CourseUI.Rect("Picture", frame.transform).gameObject.AddComponent<RawImage>();
         picture.raycastTarget = false;
         CourseUI.Stretch(picture.rectTransform);
-        blueLines = Lines("Blue", frame.transform, Blue);
-        orangeLines = Lines("Orange", frame.transform, Orange);
+        // Behind the lines: drag the map (either mouse button) and zoom with the wheel
+        Image view = CourseUI.Panel("View", frame.transform, new Color(1, 1, 1, 0), false);
+        CourseUI.Stretch(view.rectTransform);
+        view.raycastTarget = true;
+        view.gameObject.AddComponent<HeightQuestionView>().panel = this;
+        blueLines = Lines("Blue", frame.transform, Blue, 7f);
+        pinkLines = Lines("Pink", frame.transform, Pink, 9f);
         background = map.GetBackground(map.defaultBackground);
         try { sprite = MapPackages.LoadSprite(background); }
         catch (Exception e) { Debug.LogWarning("HeightQuestionPanel: no map picture: " + e.Message); }
@@ -97,14 +109,14 @@ public class HeightQuestionPanel : MonoBehaviour
         RectTransform zoom = CourseUI.Rect("Zoom", frame.transform);
         CourseUI.Place(zoom, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-10, -10), new Vector2(130, 56));
         CourseUI.Row(zoom.gameObject, 8, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
-        Button zoomOut = CourseUI.Button("Zoom out", zoom, "-", CourseUI.ButtonKind.Light, () => { viewWidth = Math.Min(2000, viewWidth * 1.5); Draw(); }, 28);
-        Button zoomIn = CourseUI.Button("Zoom in", zoom, "+", CourseUI.ButtonKind.Light, () => { viewWidth = Math.Max(30, viewWidth / 1.5); Draw(); }, 28);
+        Button zoomOut = CourseUI.Button("Zoom out", zoom, "-", CourseUI.ButtonKind.Light, () => Zoom(1.5), 28);
+        Button zoomIn = CourseUI.Button("Zoom in", zoom, "+", CourseUI.ButtonKind.Light, () => Zoom(1 / 1.5), 28);
         HoverTip.Add(zoomOut, "See more of the map round the two contours.");
         HoverTip.Add(zoomIn, "See the two contours closer.");
 
         hint = CourseUI.Text("Hint", card.transform,
-            "<color=#E8742A><b>Orange</b></color>: the contour the game is unsure of.   <color=#1E6FD9><b>Blue</b></color>: the contour next to it.\n"
-            + "Look at the slope ticks, knolls, hollows, streams and marshes round them.",
+            "<color=#E0158F><b>Pink</b></color>: the contour the game is unsure of.   <color=#1E50E0><b>Blue</b></color>: the contour next to it.\n"
+            + "Drag the map with the mouse and zoom with the wheel. Look at the slope ticks, knolls, hollows, streams and marshes.",
             18, CourseUI.InkMuted, FontStyles.Normal, TextAlignmentOptions.Center);
         hint.textWrappingMode = TextWrappingModes.Normal;
         CourseUI.Place(hint.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -754), new Vector2(1100, 54));
@@ -117,8 +129,8 @@ public class HeightQuestionPanel : MonoBehaviour
         higher = CourseUI.Button("Higher", answerRect, "Higher", CourseUI.ButtonKind.Primary, () => Answer(1), 28);
         lower = CourseUI.Button("Lower", answerRect, "Lower", CourseUI.ButtonKind.Primary, () => Answer(-1), 28);
         same = CourseUI.Button("Same", answerRect, "Same height", CourseUI.ButtonKind.Secondary, () => Answer(0), 24);
-        HoverTip.Add(higher, "The orange contour is one contour higher than the blue one.");
-        HoverTip.Add(lower, "The orange contour is one contour lower than the blue one.");
+        HoverTip.Add(higher, "The pink contour is one contour higher than the blue one.");
+        HoverTip.Add(lower, "The pink contour is one contour lower than the blue one.");
         HoverTip.Add(same, "They are at the same height: a ridge or a valley lies between them.");
 
         RectTransform more = CourseUI.Rect("More", card.transform);
@@ -150,46 +162,61 @@ public class HeightQuestionPanel : MonoBehaviour
         confirm.SetActive(false);
     }
 
-    static ContourLinesGraphic Lines(string name, Transform parent, Color color)
+    static ContourLinesGraphic Lines(string name, Transform parent, Color color, float thickness)
     {
         RectTransform rect = CourseUI.Rect(name, parent);
         rect.gameObject.AddComponent<CanvasRenderer>();     // before the Graphic, or it caches a missing renderer and draws nothing
         ContourLinesGraphic g = rect.gameObject.AddComponent<ContourLinesGraphic>();
         CourseUI.Stretch(g.rectTransform);
         g.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        g.color = new Color(color.r, color.g, color.b, 0.8f);
-        g.thickness = 6f;
+        g.color = new Color(color.r, color.g, color.b, 0.85f);
+        g.thickness = thickness;
         g.raycastTarget = false;
         return g;
     }
 
     // ---- One question ----
 
-    RunContourField.HeightQuestion Current => index >= 0 && index < queue.Count ? queue[index] : null;
-
     void Show()
     {
-        RunContourField.HeightQuestion q = Current;
-        bool asking = q != null && !busy;
+        RunContourField.HeightQuestion q = current;
+        bool asking = q != null;
         foreach (Button b in new[] { higher, lower, same, skip }) b.interactable = asking;
-        back.interactable = !busy && undo.Count > 0;
-        stop.interactable = !busy;
-        if (busy) return;
+        back.interactable = undo.Count > 0;
         if (q == null)
         {
+            pinkLines.SetRuns(null);
+            blueLines.SetRuns(null);
+            if (checking)
+            {
+                question.text = "Checking the map again with your answers ...";
+                progress.text = Summary();
+                stop.interactable = false;
+                return;
+            }
+            stop.interactable = true;
             question.text = "Every uncertain contour is answered.";
             progress.text = Summary();
-            orangeLines.SetRuns(null);
-            blueLines.SetRuns(null);
             CourseUI.SetButtonText(stop, "Done");
             return;
         }
+        stop.interactable = true;
         CourseUI.SetButtonText(stop, "Stop for now");
-        question.text = "Is the <color=#E8742A>orange</color> contour higher or lower than the <color=#1E6FD9>blue</color> one?";
-        progress.text = $"Question {index + 1} of {queue.Count}" + (answeredNow > 0 || skipped.Count > 0 ? "   ·   " + Summary() : "");
+        question.text = "Is the <color=#E0158F>pink</color> contour higher or lower than the <color=#1E50E0>blue</color> one?";
+        ShowProgress();
+        // Wide enough to see the hill or the slope round the two (2026-11-27, Anders: it started too close)
         double d = MapGeometry.Dist(q.ax, q.ay, q.bx, q.by);
-        viewWidth = Math.Max(90, d * 6);
+        viewWidth = Math.Max(260, d * 16);
+        centreE = (q.ax + q.bx) / 2;
+        centreN = (q.ay + q.by) / 2;
         Draw();
+    }
+
+    void ShowProgress()
+    {
+        int left = rest.Count + (current != null ? 1 : 0);
+        progress.text = (left == 1 ? "1 question left" : left + " questions left") + (checking ? " (checking your answers ...)" : "")
+                        + (answeredNow > 0 || skipped.Count > 0 ? "   ·   " + Summary() : "");
     }
 
     string Summary()
@@ -201,63 +228,93 @@ public class HeightQuestionPanel : MonoBehaviour
 
     void Answer(int relation)
     {
-        RunContourField.HeightQuestion q = Current;
-        if (q == null || busy) return;
-        undo.Push((answers, index, false));
+        RunContourField.HeightQuestion q = current;
+        if (q == null) return;
+        undo.Push((answers, q, false));
         answers = HeightAnswers.With(answers, RunContourField.Answer(q, relation));
         answeredNow++;
+        onChange?.Invoke(answers);
+        current = null;
         Next();
+        Recheck();
     }
 
     void Skip()
     {
-        RunContourField.HeightQuestion q = Current;
-        if (q == null || busy) return;
-        undo.Push((answers, index, true));
+        RunContourField.HeightQuestion q = current;
+        if (q == null) return;
+        undo.Push((answers, q, true));
         skipped.Add(q);
+        current = null;
         Next();
     }
 
     void Back()
     {
-        if (busy || undo.Count == 0) return;
+        if (undo.Count == 0) return;
         var last = undo.Pop();
-        if (last.skip) skipped.RemoveAt(skipped.Count - 1);
+        if (last.skip) skipped.Remove(last.q);
         else answeredNow--;
+        bool answersChanged = !ReferenceEquals(answers, last.answers);
         answers = last.answers;
-        index = last.index;
+        if (answersChanged) onChange?.Invoke(answers);
+        if (current != null) rest.Insert(0, current);
+        current = last.q;
         Show();
+        if (answersChanged) Recheck();
     }
 
+    // The next question in the list; when the list is empty the map is checked again before saying it is done
     void Next()
     {
-        index++;
-        if (index < queue.Count) Show();
-        else Recheck();
+        current = null;
+        while (rest.Count > 0 && current == null)
+        {
+            RunContourField.HeightQuestion q = rest[0];
+            rest.RemoveAt(0);
+            if (!WasSkipped(q)) current = q;
+        }
+        Show();
     }
 
-    // The list is done: the map is checked again with the answers, which can settle more or show new places to check
+    // The map is checked again with all the answers, in the background, while the player goes on. The questions the
+    // answers have settled go away; ones that came up are added.
     async void Recheck()
     {
-        busy = true;
-        question.text = "Checking the map again with your answers ...";
-        progress.text = Summary();
-        Show();
+        if (checking) { checkAgain = true; return; }
+        checking = true;
+        if (current != null) ShowProgress(); else Show();
         List<RunContourField.HeightQuestion> found = null;
-        double[] now = answers;
-        try { found = await Task.Run(() => find(now)); }
-        catch (Exception e) { Debug.LogWarning("HeightQuestionPanel: " + e); }
-        if (this == null) return;
-        busy = false;
-        var left = new List<RunContourField.HeightQuestion>();
+        while (true)
+        {
+            checkAgain = false;
+            double[] now = answers;
+            try { found = await Task.Run(() => find(now)); }
+            catch (Exception e) { Debug.LogWarning("HeightQuestionPanel: " + e); found = null; }
+            if (this == null) return;
+            if (!checkAgain) break;
+        }
+        checking = false;
         if (found != null)
+        {
+            rest.Clear();
             foreach (RunContourField.HeightQuestion q in found)
-                if (!WasSkipped(q)) left.Add(q);
-        queue = left;
-        index = 0;
-        undo.Clear();   // the old questions are gone
-        Show();
-        if (left.Count > 0) progress.text = $"Your answers showed {left.Count} more {(left.Count == 1 ? "place" : "places")} to check.   ·   " + Summary();
+                if (!WasSkipped(q) && (current == null || !Same(q, current))) rest.Add(q);
+            // The question on screen was settled by the answers before it: on to the next
+            if (current != null && !found.Exists(q => Same(q, current)))
+            {
+                current = null;
+                Next();
+                return;
+            }
+        }
+        if (current == null) Next();
+        else ShowProgress();
+    }
+
+    static bool Same(RunContourField.HeightQuestion a, RunContourField.HeightQuestion b)
+    {
+        return MapGeometry.Dist(a.ax, a.ay, b.ax, b.ay) < 5 && MapGeometry.Dist(a.bx, a.by, b.bx, b.by) < 5;
     }
 
     bool WasSkipped(RunContourField.HeightQuestion q)
@@ -270,26 +327,56 @@ public class HeightQuestionPanel : MonoBehaviour
 
     void Finish()
     {
-        if (busy) return;
+        if (checking && current == null) return;
         onDone?.Invoke(answers);
         Destroy(gameObject);
     }
 
     // ---- The map and the two lines ----
 
+    void Zoom(double factor)
+    {
+        if (current == null) return;
+        viewWidth = Math.Max(30, Math.Min(3000, viewWidth * factor));
+        Draw();
+    }
+
+    // Called by HeightQuestionView: the map dragged by this many frame units
+    public void Drag(Vector2 by)
+    {
+        if (current == null) return;
+        double perUnit = viewWidth / Area.x;
+        centreE -= by.x * perUnit;
+        centreN -= by.y * perUnit;
+        Draw();
+    }
+
+    // Called by HeightQuestionView: the wheel, zooming round the point under the mouse (frame units from its middle)
+    public void Wheel(float steps, Vector2 at)
+    {
+        if (current == null || steps == 0) return;
+        double perUnit = viewWidth / Area.x;
+        double e = centreE + at.x * perUnit, n = centreN + at.y * perUnit;
+        double factor = Math.Pow(1.25, -steps);
+        viewWidth = Math.Max(30, Math.Min(3000, viewWidth * factor));
+        perUnit = viewWidth / Area.x;
+        centreE = e - at.x * perUnit;
+        centreN = n - at.y * perUnit;
+        Draw();
+    }
+
     void Draw()
     {
-        RunContourField.HeightQuestion q = Current;
-        if (q == null) return;
-        double cx = (q.ax + q.bx) / 2, cy = (q.ay + q.by) / 2;
+        if (current == null) return;
+        double cx = centreE, cy = centreN;
         double w = viewWidth, h = viewWidth * Area.y / Area.x;
         if (sprite != null && background != null)
         {
             Vector2 lo = TextureUV(cx - w / 2, cy - h / 2), hi = TextureUV(cx + w / 2, cy + h / 2);
             picture.uvRect = new Rect(lo.x, lo.y, hi.x - lo.x, hi.y - lo.y);
         }
-        orangeLines.SetRuns(Runs(q.a, cx, cy, w, h));
-        blueLines.SetRuns(Runs(q.b, cx, cy, w, h));
+        pinkLines.SetRuns(Runs(current.a, cx, cy, w, h));
+        blueLines.SetRuns(Runs(current.b, cx, cy, w, h));
     }
 
     // Where a place (game metres) is in the map picture's texture (0..1, from the bottom left)
