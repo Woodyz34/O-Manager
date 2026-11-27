@@ -490,6 +490,9 @@ public partial class RunSession : MonoBehaviour
 
         long p0 = System.Diagnostics.Stopwatch.GetTimestamp();
         player.Tick(dt);
+        // Also where the runner stands now, every frame: a flag is moved to where it really stands (beside its stone)
+        // only when its piece of forest is built, and a runner already standing there, or not moving, then still punches
+        if (phase == Phase.Running) CheckPunch(player.e, player.n, player.e, player.n);
         long p1 = System.Diagnostics.Stopwatch.GetTimestamp();
         handMap.Tick(dt, phase == Phase.Running && !menuOpen);
         RunPerf.Add(RunPerf.Part.Runner, p1 - p0);
@@ -588,6 +591,7 @@ public partial class RunSession : MonoBehaviour
                 return;
             }
             sounds.Punch();
+            Debug.Log("[Run] Punched control " + (i + 1) + " at " + RaceTime(player.raceSeconds));
             // The map shows the next leg from the control just punched
             if (handMap != null && i + 1 > handMap.Leg) handMap.FrameLeg(i + 1);
             return;   // one punch per step (two controls of the course can stand close together)

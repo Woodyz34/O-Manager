@@ -14,7 +14,14 @@ public class RunSounds : MonoBehaviour
     const int Rate = 44100;
     public const string Credit = "Footsteps and voices: \"Oculus Audio Pack 01\" by Oculus VR, LLC, CC BY 4.0";
 
-    AudioSource steps, under, breath, voice, beeps;
+    AudioSource steps, under, breath, voice;
+    // The beeps have their own sources, each playing one beep at a time on the audio clock (PlayScheduled), so a beep
+    // is never cut, stolen by the footsteps or swallowed by the next one: two controls punched a moment apart give
+    // two beeps, the second just after the first (2026-11-27, Anders: some controls gave no beep)
+    readonly List<AudioSource> beepSources = new List<AudioSource>();
+    int nextBeepSource;
+    double beepFreeAt;
+    const double BeepGap = 0.08;   // seconds of quiet between two beeps that follow each other
     AudioClip[] dirt, grass, hard, landDirt, landGrass, landHard, brush, squelch, splash;
     AudioClip[] inhale, exhale, wholeBreaths, groans, grunts;
     AudioClip punch, finish, startShort, startLong;
@@ -60,7 +67,16 @@ public class RunSounds : MonoBehaviour
         under = Source(0.45f, RunSettings.Sound.Steps);
         breath = Source(0.32f, RunSettings.Sound.Breathing);
         voice = Source(0.85f, RunSettings.Sound.Voice);
-        beeps = Source(0.6f, RunSettings.Sound.Beeps);
+        for (int i = 0; i < 4; i++)
+        {
+            AudioSource b = Source(0.6f, RunSettings.Sound.Beeps);
+            // The most important sound of the race: first in line for Unity's voices, and no effects on it
+            b.priority = 0;
+            b.bypassEffects = true;
+            b.bypassListenerEffects = true;
+            b.bypassReverbZones = true;
+            beepSources.Add(b);
+        }
 
         dirt = Load("run_dirt", 5);
         grass = Load("run_grass", 5);
@@ -218,9 +234,23 @@ public class RunSounds : MonoBehaviour
         voice.PlayOneShot(clip, 0.55f);
     }
 
-    public void Punch() => beeps.PlayOneShot(punch, 1f);
-    public void Finish() => beeps.PlayOneShot(finish, 1f);
-    public void StartBeep(bool last) => beeps.PlayOneShot(last ? startLong : startShort, 1f);
+    public void Punch() => Beep(punch);
+    public void Finish() => Beep(finish);
+    public void StartBeep(bool last) => Beep(last ? startLong : startShort);
+
+    // A beep at once, or right after the one still sounding
+    void Beep(AudioClip clip)
+    {
+        if (clip == null || beepSources.Count == 0) return;
+        double now = AudioSettings.dspTime + 0.01;
+        double at = Math.Max(now, beepFreeAt);
+        AudioSource source = beepSources[nextBeepSource];
+        nextBeepSource = (nextBeepSource + 1) % beepSources.Count;
+        source.Stop();
+        source.clip = clip;
+        source.PlayScheduled(at);
+        beepFreeAt = at + clip.length + BeepGap;
+    }
 
     // ---- Making the sounds ----
 
