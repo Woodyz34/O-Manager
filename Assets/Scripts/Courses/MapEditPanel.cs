@@ -747,7 +747,8 @@ public class MapEditPanel : MonoBehaviour
         if (grid == null || lines == null) return _ => null;
         TvHeights heights = TvHeights.Read(grid);
         Func<double, double, bool> lakeAt = WorldLayer.LakeTest(world != null ? WorldLayer.FromBytes(world) : null);
-        return answers => RunContourField.Questions(heights, lines, points, interval, lakeAt, HeightAnswers.AsList(answers));
+        Func<double, double, bool> closedAt = RunContourField.ClosedTest(grid);
+        return answers => RunContourField.Questions(heights, lines, points, interval, lakeAt, HeightAnswers.AsList(answers), closedAt);
     }
 
     static bool SameEdge(double[] a, double[] b)
