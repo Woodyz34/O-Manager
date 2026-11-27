@@ -25,7 +25,7 @@ MonoBehaviour:
   cols: 756
   pointsPath: MapPackages/tranas-sprint/points
   linesPath: MapPackages/tranas-sprint/lines
-  editedAt: 1795434688
+  editedAt: 1795807118
   defaultBackground: map
   backgrounds:
   - id: map
@@ -36,5 +36,5 @@ MonoBehaviour:
     scale: 1
     courseInPicture: 0
     pixelSize: {x: 4536, y: 7416}
-    pivotPixels: {x: 2268.0, y: 3708.0}
-    pixelsPerUnit: 300.0
+    pivotPixels: {x: 2268, y: 3708}
+    pixelsPerUnit: 300

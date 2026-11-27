@@ -25,7 +25,7 @@ MonoBehaviour:
   cols: 606
   pointsPath: MapPackages/angarydsprint/points
   linesPath: MapPackages/angarydsprint/lines
-  editedAt: 1795434703
+  editedAt: 1795807291
   defaultBackground: map
   backgrounds:
   - id: map
@@ -36,5 +36,5 @@ MonoBehaviour:
     scale: 1
     courseInPicture: 0
     pixelSize: {x: 3636, y: 7208}
-    pivotPixels: {x: 1818.0, y: 3603.0}
-    pixelsPerUnit: 300.0
+    pivotPixels: {x: 1818, y: 3603}
+    pixelsPerUnit: 300
