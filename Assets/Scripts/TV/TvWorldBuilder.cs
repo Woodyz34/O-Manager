@@ -2651,7 +2651,9 @@ public partial class TvWorldBuilder
                     Along(c, 1f, (x, z, yaw, len) =>
                     {
                         thingMesh.Add(hedge, x, H(x, z) - 0.1f, z, len + 0.1f, Rr(1.7f, 1.95f), Rr(0.95f, 1.1f), -yaw, Rr(0.9f, 1.05f));
-                        world.solids.Add(new TvSolid { x = x, z = z, r = 0.6f });
+                        // The run-yourself runner is kept off it by the line itself (RunTerrain.Hits), square at its
+                        // ends as the map draws it; round solids here closed the gaps beside its ends (2026-11-27)
+                        if (input.passable == null) world.solids.Add(new TvSolid { x = x, z = z, r = 0.6f });
                     });
                     break;
                 }
@@ -2688,7 +2690,10 @@ public partial class TvWorldBuilder
                         float tall = Math.Max(0.5f, top - (lo - 0.1f));
                         thingMesh.Add(wallPiece, x, lo - 0.1f, z, len + 0.05f, tall, 1f, -yaw, Rr(0.94f, 1.04f));
                         thingMesh.Add(wallCap, x, top - 0.02f, z, len + 0.05f, 1f, 1f, -yaw);
-                        world.solids.Add(new TvSolid { x = x, z = z, r = 0.55f });
+                        // Run-yourself: the line itself keeps the runner off (RunTerrain.Hits); a solid of 0.55 m
+                        // here (0.85 m from the wall's middle with the runner's reach) shut a gap between two walls
+                        // that is open on the map (2026-11-27, Anders)
+                        if (input.passable == null) world.solids.Add(new TvSolid { x = x, z = z, r = 0.55f });
                     });
                     break;
                 case WorldLineKind.Wall:

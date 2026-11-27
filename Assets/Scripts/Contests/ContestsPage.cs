@@ -555,6 +555,14 @@ public class ContestsPage : MonoBehaviour
         ShowBoardSheet(c, board);
     }
 
+    // After a finished run: the leaderboard of that contest on top, once your result has reached the cloud
+    public static async void ShowAfterRun(ContestInfo c)
+    {
+        try { await ContestRun.Sending; }
+        catch (Exception) { }
+        if (open != null) open.ShowBoard(c);
+    }
+
     // From the prize pop-up (over any screen): the contests page with that contest's leaderboard on top
     public static void OpenPast(string id)
     {

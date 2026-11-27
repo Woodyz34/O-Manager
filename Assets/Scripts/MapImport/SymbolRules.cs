@@ -47,7 +47,7 @@ namespace MapImport
         //    edges (hedges, walls, fences) run straight along them instead of the zigzag of the 2 m cells.
         // 7 (2026-11-24): forest maps: a road close beside a cliff, fence or shore it does not cross is no longer cut
         //    off by it (GridBuilder.OpenPathsAlongLines; the road over the water at Delsjön).
-        public const int RulesVersion = 11;  // 11 (2026-11-27): only real slope ticks set which way is up in the heights; 8 (2026-11-26): small buildings and ruins drawn as points; 9 (2026-11-26): forest buildings drawn as areas keep their outline (3D houses); 10 (2026-11-26): sprint maps too (straight town walls)
+        public const int RulesVersion = 12;  // 12 (2026-11-27): only real slope ticks set which way is up in the heights; 8 (2026-11-26): small buildings and ruins drawn as points; 9 (2026-11-26): forest buildings drawn as areas keep their outline (3D houses); 10 (2026-11-26): sprint maps too (straight town walls); 11 (2026-11-27): sprint maps: narrow passages also found on 0.5 m cells with the walls as wide as drawn (GridBuilder.Build)
 
         // Stairs: up (and on the flat) as quick as a road (Anders, 2026-11-20: running up stairs is quick), down slowly.
         // Which way is down is worked out from the heights when the grid is loaded (StairsSlopes).
