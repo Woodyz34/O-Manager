@@ -323,11 +323,6 @@ public static class RunContourField
             }
         }
         if (anyIndex) AlignIndex(contours, edges, diff, baseWeight, level, pieceOf);
-        if (questions != null)
-        {
-            AskMisfits(contours, edges, forced, diff, level, closest, ox, oy, res, questions);
-            return null;
-        }
         var lakes = LakeLevels(lake, contours, level, ids, C, R, res);
         ids = null;
         var known = new bool[contours.Count + 1];
@@ -336,6 +331,11 @@ public static class RunContourField
         for (int e = 0; e < edges.Count; e++)
             if (baseWeight[e] > 0) known[edges[e].a] = known[edges[e].b] = true;
         int nested = NestLevels(contours, level, known, out bool[] certain, out bool[] hasInside);
+        if (questions != null)
+        {
+            AskMisfits(contours, edges, forced, diff, level, certain, closest, ox, oy, res, questions);
+            return null;
+        }
 
         // ---- The ground: fixed on every contour, smooth in between ----
         var z = new double[R * C];
@@ -498,17 +498,24 @@ public static class RunContourField
     // Pairs of contours that face each other well and whose solved levels are far from what the map says they must
     // be (one interval apart or the same level): the map's marks pull them two ways, and the ground there comes out
     // as a step or a narrow ridge or trench along a contour. Asked about after the uncertain pieces, worst first.
+    // A ring straight inside another ring is settled by the ring round it (NestLevels: a hilltop's rings each one higher),
+    // so a pair with such a ring is not asked about (2026-11-27, Anders: "det är ju toppen av höjden").
     static void AskMisfits(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, int[] forced, double[] diff, double[] level,
+                           bool[] certain,
                            Dictionary<long, double[]> closest, double ox, double oy, double res, List<HeightQuestion> questions)
     {
         var found = new List<(double score, HeightQuestion q)>();
         for (int e = 0; e < edges.Count; e++)
         {
             var ed = edges[e];
-            if (forced[e] != 0 || ed.w < MisfitFacing) continue;
+            if (forced[e] != 0 || ed.w < MisfitFacing || certain[ed.a] || certain[ed.b]) continue;
             if (contours[ed.a - 1].orientation == 0 || contours[ed.b - 1].orientation == 0) continue;
-            double r = Math.Abs(level[ed.b] - level[ed.a] - diff[e]);
+            double got = level[ed.b] - level[ed.a], r = Math.Abs(got - diff[e]);
             if (r < MisfitBy) continue;
+            // Two or more intervals apart where the map says one, the same way up: the slope is right and only steeper
+            // (contours crowd at a cliff and a ray skips one). Higher or lower would not change it, so it is not asked
+            // (2026-11-27, Anders: questions the game should have worked out itself)
+            if (diff[e] != 0 && Math.Sign(got) == Math.Sign(diff[e])) continue;
             HeightQuestion q = Question(contours, ed.a, ed.b, closest, ox, oy, res);
             if (q == null) continue;
             q.length = ed.w * 10;
