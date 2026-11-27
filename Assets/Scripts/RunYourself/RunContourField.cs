@@ -23,7 +23,7 @@ public static class RunContourField
     public class Line
     {
         public double[] xy;          // metres
-        public bool closed, formLine, hollow;
+        public bool closed, formLine, hollow, index;   // index: an index contour (102)
         public double level;         // metres, once solved
         public bool solved;
     }
@@ -37,9 +37,11 @@ public static class RunContourField
     }
 
     // The fine heights, or null when the contours can't be solved (then the 10 m grid is used)
-    public static TvHeights Build(TvHeights grid, List<Line> lines, List<double[]> ticks, double eq, Action<string> log = null)
+    public static TvHeights Build(TvHeights grid, List<Line> lines, List<double[]> ticks, double eq, Action<string> log = null,
+                                   List<double[]> water = null)
     {
         if (grid == null || lines == null || eq <= 0) return null;
+        ticks = RealTicks(lines, ticks);
         int k = Math.Max(1, (int)Math.Round(grid.cell / Res));
         double res = grid.cell / k;
         int C = (grid.cols - 1) * k + 1, R = (grid.rows - 1) * k + 1;
@@ -47,12 +49,14 @@ public static class RunContourField
         double ox = grid.minx - res * 0.5, oy = grid.miny - res * 0.5;   // cell (0, 0) is centred on minx, miny
 
         var contours = new List<Contour>();
+        bool anyIndex = false;
         foreach (Line l in lines)
         {
             if (l.formLine || l.xy.Length < 4) continue;
             var q = new double[l.xy.Length];
             for (int i = 0; i < q.Length; i += 2) { q[i] = (l.xy[i] - ox) / res; q[i + 1] = (l.xy[i + 1] - oy) / res; }
             contours.Add(new Contour { id = contours.Count + 1, line = l, p = q });
+            anyIndex |= l.index;
         }
         if (contours.Count < 3) return null;
 
@@ -61,9 +65,37 @@ public static class RunContourField
             for (int i = 0; i + 3 < c.p.Length; i += 2)
                 GridBuilder.Supercover(c.p[i], c.p[i + 1], c.p[i + 2], c.p[i + 3], C, R, (x, y) => ids[y * C + x] = c.id);
 
-        // ---- Which way is up: a closed contour is a hill, unless it has a tick (a hollow) ----
+        // Streams, ditches, narrow marshes, lake shores and small marshes: water lies low
+        bool[] wet = null;
+        if (water != null && water.Count > 0)
+        {
+            wet = new bool[R * C];
+            foreach (double[] w in water)
+            {
+                if (w.Length == 2)
+                {
+                    int cx = (int)Math.Floor((w[0] - ox) / res), cy = (int)Math.Floor((w[1] - oy) / res);
+                    for (int y = cy - 1; y <= cy + 1; y++)
+                        for (int x = cx - 1; x <= cx + 1; x++)
+                            if (x >= 0 && y >= 0 && x < C && y < R) wet[y * C + x] = true;
+                    continue;
+                }
+                for (int i = 0; i + 3 < w.Length; i += 2)
+                    GridBuilder.Supercover((w[i] - ox) / res, (w[i + 1] - oy) / res, (w[i + 2] - ox) / res, (w[i + 3] - oy) / res, C, R,
+                                           (x, y) => wet[y * C + x] = true);
+            }
+        }
+
+        // ---- What the map says about which way is up, contour by contour ----
+        // ev > 0: the contour's left side is up. "strong" is what is certain enough to keep two pieces of the slope apart:
+        // the slope ticks and the rings round knolls and hollows; the import's 10 m heights and the water only tip the
+        // balance where nothing else says anything.
+        var ev = new double[contours.Count + 1];
+        var strong = new double[contours.Count + 1];
         // A tick with its direction (maps imported from 2026-11-23) says for certain which side is down
         var directed = new bool[contours.Count + 1];
+        var tickUp = new int[contours.Count + 1];
+        var tickDown = new int[contours.Count + 1];
         foreach (double[] t in ticks)
         {
             if (t.Length < 5 || t[2] > 0 || double.IsNaN(t[3])) continue;
@@ -71,14 +103,16 @@ public static class RunContourField
             int cid = ContourHeights.Nearest(ids, C, R, px, py, 2);
             if (cid == 0) continue;
             int side = ContourHeights.SideOf(contours[cid - 1].p, px + t[3] * 0.8, py + t[4] * 0.8);
-            if (side > 0) contours[cid - 1].votesDown += 5;   // the tick's side is downhill
-            else if (side < 0) contours[cid - 1].votesUp += 5;
+            if (side > 0) tickDown[cid]++;   // the tick's side is downhill
+            else if (side < 0) tickUp[cid]++;
             directed[cid] = true;
         }
         foreach (Contour c in contours)
         {
-            if (!directed[c.id] || !c.line.closed || c.votesUp == c.votesDown) continue;
-            bool insideLeft = MapGeometry.SignedArea(c.p) > 0, leftUp = c.votesUp > c.votesDown;
+            if (!directed[c.id]) continue;
+            ev[c.id] = strong[c.id] = 5 * (tickUp[c.id] - tickDown[c.id]);
+            if (!c.line.closed || tickUp[c.id] == tickDown[c.id]) continue;
+            bool insideLeft = MapGeometry.SignedArea(c.p) > 0, leftUp = tickUp[c.id] > tickDown[c.id];
             c.line.hollow = insideLeft != leftUp;
         }
         // Without its direction, a tick on a closed contour marks a hollow
@@ -104,18 +138,20 @@ public static class RunContourField
         }
         foreach (Contour c in contours)
         {
-            if (directed[c.id]) { }
-            else if (c.line.closed)
+            if (directed[c.id]) continue;
+            if (c.line.closed)
             {
-                // The inside is on the left when the ring runs counter-clockwise
+                // A ring is a knoll unless it is marked a hollow. The inside is on the left when the ring runs
+                // counter-clockwise.
                 bool insideLeft = MapGeometry.SignedArea(c.p) > 0;
-                bool insideUp = !c.line.hollow;
-                if (insideLeft == insideUp) c.votesUp += 3; else c.votesDown += 3;
+                double v = insideLeft == !c.line.hollow ? 3 : -3;
+                ev[c.id] += v;
+                strong[c.id] += v;
             }
             else if (grid.h != null)
             {
-                // An open contour: which side is up, from the import's 10 m heights (the import read the ticks'
-                // directions from the OCAD file) a few metres either side of the whole line, when they say it clearly
+                // An open contour: which side is up, from the import's 10 m heights a few metres either side of the
+                // whole line, when they say it clearly. Only a hint: the import guessed too where the map says nothing
                 double vote = 0, total = 0, reach = 6 / res;
                 for (int i = 0; i + 3 < c.p.Length; i += 2)
                 {
@@ -125,13 +161,15 @@ public static class RunContourField
                     vote += l * (grid.At(ox + (mx + nx) * res, oy + (my + ny) * res) - grid.At(ox + (mx - nx) * res, oy + (my - ny) * res));
                     total += l;
                 }
-                if (total * res > 15 && Math.Abs(vote) > 0.4 * total) { if (vote > 0) c.votesUp += 3; else c.votesDown += 3; }
+                if (total * res > 15 && Math.Abs(vote) > 0.4 * total) ev[c.id] += vote > 0 ? 1 : -1;
             }
-            c.orientation = c.votesUp > c.votesDown ? 1 : c.votesDown > c.votesUp ? -1 : 0;
         }
 
         // ---- Neighbours: the first other contour straight out to each side (as ContourHeights) ----
+        // and, on the way to it, water: the side of a contour where a stream or a marsh lies before the next contour is
+        // down (on a slope the contour below sees the same water uphill, so the two cancel; in a valley they agree)
         var seen = new Dictionary<long, int[]>();
+        var wetVote = new double[contours.Count + 1];
         int maxSteps = (int)(200 / res);
         foreach (Contour c in contours)
         {
@@ -148,22 +186,29 @@ public static class RunContourField
                     double px = x0 + tx * s, py = y0 + ty * s;
                     for (int side = 1; side >= -1; side -= 2)
                     {
+                        bool wetOnWay = false;
                         for (double t = 1.5; t < maxSteps; t += 0.5)
                         {
                             int cx = (int)Math.Floor(px + nx * side * t), cy = (int)Math.Floor(py + ny * side * t);
                             if (cx < 0 || cy < 0 || cx >= C || cy >= R) break;
+                            if (wet != null && wet[cy * C + cx]) wetOnWay = true;
                             int v = ids[cy * C + cx];
-                            if (v == 0 || v == c.id) continue;
+                            if (v == 0) continue;
+                            // The ray met this contour again (across a small ring, round a bend): what lies beyond is
+                            // not its neighbour on this side (as ContourHeights since 2026-11-20)
+                            if (v == c.id) { if (t > 3.0) break; continue; }
                             long key = (long)c.id << 32 | (uint)v;
                             if (!seen.TryGetValue(key, out int[] cnt)) seen[key] = cnt = new int[2];
                             cnt[side > 0 ? 0 : 1]++;
                             break;
                         }
+                        if (wetOnWay) wetVote[c.id] -= side * 0.5;
                     }
                 }
                 next = s - len;
             }
         }
+        foreach (Contour c in contours) ev[c.id] += Math.Max(-4, Math.Min(4, wetVote[c.id]));
         var edges = new List<(int a, int b, int sa, int sb, double w)>();
         foreach (var kv in seen)
         {
@@ -173,34 +218,22 @@ public static class RunContourField
             int sa = kv.Value[0] >= kv.Value[1] ? 1 : -1;
             int sb = back[0] >= back[1] ? 1 : -1;
             double w = Math.Min(Math.Max(kv.Value[0], kv.Value[1]), Math.Max(back[0], back[1]));
-            edges.Add((a, b, sa, sb, Math.Min(w, 20)));
+            edges.Add((a, b, sa, sb, w));
         }
         if (edges.Count == 0) return null;
         var adj = new List<int>[contours.Count + 1];
         for (int i = 0; i <= contours.Count; i++) adj[i] = new List<int>();
         for (int e = 0; e < edges.Count; e++) { adj[edges[e].a].Add(e); adj[edges[e].b].Add(e); }
 
-        // Open contours: the slope goes on the same way as next door
-        for (int pass = 0; pass < 8; pass++)
-        {
-            foreach (Contour c in contours)
-            {
-                if (c.orientation != 0) continue;
-                double vote = 0;
-                foreach (int e in adj[c.id])
-                {
-                    var ed = edges[e];
-                    int other = ed.a == c.id ? ed.b : ed.a;
-                    int mySide = ed.a == c.id ? ed.sa : ed.sb, otherSide = ed.a == c.id ? ed.sb : ed.sa;
-                    int o = contours[other - 1].orientation;
-                    if (o == 0) continue;
-                    vote += ed.w * -o * otherSide * mySide;
-                }
-                if (vote != 0) c.orientation = vote > 0 ? 1 : -1;
-            }
-        }
+        bool[] accepted = Orient(contours, edges, ev, strong, anyIndex, out int dropped);
         int knownSlope = 0;
-        foreach (Contour c in contours) if (c.orientation != 0) knownSlope++;
+        foreach (Contour c in contours)
+        {
+            if (c.orientation == 0) continue;
+            knownSlope++;
+            // A ring's knoll or hollow follows from the way its slope was found to go
+            if (c.line.closed) c.line.hollow = (MapGeometry.SignedArea(c.p) > 0) != (c.orientation > 0);
+        }
         if (knownSlope < contours.Count / 4) return null;
 
         var diff = new double[edges.Count];
@@ -211,7 +244,8 @@ public static class RunContourField
             int oa = contours[ed.a - 1].orientation, ob = contours[ed.b - 1].orientation;
             if (oa == 0 || ob == 0) continue;
             diff[e] = (oa * ed.sa - ob * ed.sb) / 2.0;
-            weight[e] = ed.w;
+            // A pair left out of the pieces above still ties the levels, but lightly
+            weight[e] = ed.w * (accepted[e] ? 1 : 0.25);
         }
         var level = new double[contours.Count + 1];
         var baseWeight = (double[])weight.Clone();
@@ -325,8 +359,151 @@ public static class RunContourField
         var fine = new TvHeights { cell = (float)res, minx = grid.minx, miny = grid.miny, cols = C, rows = R, h = new float[R * C] };
         for (int i = 0; i < z.Length; i++) fine.h[i] = (float)(z[i] - min);
         foreach (Line l in lines) if (l.solved) l.level -= min;
-        log?.Invoke($"{contours.Count} contours ({knownSlope} with known slope, {nested} set by the ring round them, {moved} small rings moved to the ground round them), {forms} form lines, {edges.Count} pairs, {C}x{R} cells");
+        log?.Invoke($"{contours.Count} contours ({knownSlope} with known slope, {dropped} pairs left apart, {nested} set by the ring round them, {moved} small rings moved to the ground round them), {forms} form lines, {edges.Count} pairs, {C}x{R} cells");
         return fine;
+    }
+
+    // Only the points that are real slope ticks, on a contour or form line and across it (ContourHeights.RealTicks)
+    static List<double[]> RealTicks(List<Line> lines, List<double[]> ticks)
+    {
+        if (ticks == null || ticks.Count == 0) return ticks ?? new List<double[]>();
+        var xy = new List<double[]>();
+        foreach (Line l in lines) xy.Add(l.xy);
+        int n = ticks.Count;
+        double[] px = new double[n], py = new double[n], dx = new double[n], dy = new double[n];
+        var code = new int[n];
+        for (int t = 0; t < n; t++)
+        {
+            double[] k = ticks[t];
+            px[t] = k[0]; py[t] = k[1];
+            dx[t] = k.Length >= 5 ? k[3] : double.NaN;
+            dy[t] = k.Length >= 5 ? k[4] : double.NaN;
+            code[t] = k.Length >= 6 ? (int)k[5] : (k.Length > 2 && k[2] > 0 ? 103001 : 101001);
+        }
+        bool[] ok = ContourHeights.RealTicks(xy, px, py, dx, dy, code, 2.0);
+        var kept = new List<double[]>();
+        for (int t = 0; t < n; t++) if (ok[t]) kept.Add(ticks[t]);
+        return kept;
+    }
+
+    // ---- Which way is up, for the whole map at once (2026-11-27, Anders: "höjdkurvorna ska vara 100 %") ----
+    // Two contours next to each other (no contour between) are either one interval apart, the slope going on from one
+    // to the other, or at the same level with a ridge or a valley between them. Which of the two, and so which way the
+    // slope goes, is settled for pairs of contours in the order of how much of them face each other, joining them into
+    // pieces of the map whose ups and downs are known relative to each other; each piece then turns the way the map's
+    // own marks in it say (ticks, knoll rings, water). Before, every contour without a mark took its slope from its
+    // neighbours one by one, so a single ridge or valley read as a slope turned a whole hillside upside down (Nya
+    // Slogebo: the slope from the marsh up to the hill went down). A pair is not joined, or joined the other way (a
+    // ridge or valley), when that would
+    //   - break the index contours: every fifth contour is an index contour, so two index contours next to each other
+    //     are always at the same level and an index contour and a plain one never are, and the plain ones in between
+    //     must count up (or down) to the next index contour,
+    //   - turn the slope round a loop of pairs the other way than the pairs already joined, or
+    //   - turn ticks or knoll rings in one piece against those in the other.
+    // The slope ticks counted here are only real ones (RealTicks). Sets every contour's orientation (1: the left side is
+    // up, -1: the right, 0: nothing says); returns which pairs were joined as they were seen.
+    static bool[] Orient(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, double[] ev, double[] strong,
+                         bool useIndex, out int dropped)
+    {
+        int n = contours.Count + 1;
+        // Union-find: a contour's orientation is p times its root's, its level its root's plus q times the root's orientation
+        var parent = new int[n];
+        var p = new int[n];
+        var q = new int[n];
+        var sumEv = new double[n];
+        var sumStrong = new double[n];
+        // For each root: how many of the piece's contours would break the index rule, for each of the root's level
+        // (mod 5) and orientation: [r * 2 + (o > 0 ? 0 : 1)]
+        var broken = new int[n][];
+        for (int i = 0; i < n; i++) { parent[i] = i; p[i] = 1; }
+        foreach (Contour c in contours)
+        {
+            sumEv[c.id] = ev[c.id];
+            sumStrong[c.id] = strong[c.id];
+            var b = new int[10];
+            for (int r = 0; r < 5; r++) b[r * 2] = b[r * 2 + 1] = (r == 0) != c.line.index ? 1 : 0;
+            broken[c.id] = b;
+        }
+        var path = new List<int>();
+        int Find(int x, out int px, out int qx)
+        {
+            path.Clear();
+            int root = x;
+            while (parent[root] != root) { path.Add(root); root = parent[root]; }
+            for (int i = path.Count - 1; i >= 0; i--)
+            {
+                int v = path[i], u = parent[v];
+                if (u == root) continue;
+                q[v] = q[u] + q[v] * p[u];
+                p[v] *= p[u];
+                parent[v] = root;
+            }
+            px = x == root ? 1 : p[x];
+            qx = x == root ? 0 : q[x];
+            return root;
+        }
+        int Min(int[] b) { int m = int.MaxValue; foreach (int v in b) m = Math.Min(m, v); return m; }
+
+        var order = new int[edges.Count];
+        for (int e = 0; e < order.Length; e++) order[e] = e;
+        Array.Sort(order, (x, y) => { int c = edges[y].w.CompareTo(edges[x].w); return c != 0 ? c : x.CompareTo(y); });
+        var accepted = new bool[edges.Count];
+        var merged = new int[10];
+        dropped = 0;
+        foreach (int e in order)
+        {
+            var (a, b, sa, sb, _) = edges[e];
+            bool ia = contours[a - 1].line.index, ib = contours[b - 1].line.index;
+            int ra = Find(a, out int pa, out int qa), rb = Find(b, out int pb, out int qb);
+            bool done = false;
+            for (int pass = 0; pass < 2 && !done; pass++)
+            {
+                // The slope going on from one to the other first, then a ridge or valley between them
+                bool slope = pass == 0;
+                if (useIndex && slope && ia && ib) continue;          // two index contours next to each other: same level
+                if (useIndex && !slope && ia != ib) continue;          // an index contour and a plain one: never the same level
+                int k = slope ? -sa * sb : sa * sb;                    // o_b = k o_a
+                int d = slope ? sa : 0;                                // L_b = L_a + d o_a
+                if (ra == rb)
+                {
+                    // Already joined: the slope must go the same way. The levels round a loop of pairs may not add up
+                    // where contours crowd together at a cliff (one ray skips a contour); the levels are solved below
+                    // with every pair, so a loop that doesn't add up only weighs less there
+                    if (pb == k * pa) done = true;
+                    continue;
+                }
+                int P = pb * k * pa, Q = qa + d * pa - qb * P;          // rb's orientation and level from ra's
+                // Marks in the two pieces that would turn against each other
+                double sA = sumStrong[ra], sB = P * sumStrong[rb];
+                if (Math.Abs(sA) >= 5 && Math.Abs(sB) >= 5 && Math.Sign(sA) != Math.Sign(sB)) continue;
+                if (useIndex)
+                {
+                    int[] A = broken[ra], B = broken[rb];
+                    for (int r = 0; r < 5; r++)
+                        for (int oi = 0; oi < 2; oi++)
+                        {
+                            int o = oi == 0 ? 1 : -1, rr = ((r + Q * o) % 5 + 5) % 5, oo = P * o;
+                            merged[r * 2 + oi] = A[r * 2 + oi] + B[rr * 2 + (oo > 0 ? 0 : 1)];
+                        }
+                    if (Min(merged) > Min(A) + Min(B)) continue;
+                    Array.Copy(merged, A, 10);
+                }
+                parent[rb] = ra;
+                p[rb] = P;
+                q[rb] = Q;
+                sumEv[ra] += P * sumEv[rb];
+                sumStrong[ra] += P * sumStrong[rb];
+                done = true;
+            }
+            accepted[e] = done;
+            if (!done) dropped++;
+        }
+        foreach (Contour c in contours)
+        {
+            int r = Find(c.id, out int pc, out _);
+            c.orientation = sumEv[r] > 0 ? pc : sumEv[r] < 0 ? -pc : 0;
+        }
+        return accepted;
     }
 
     // A closed contour straight inside another, with no other contour between them, is one interval above it when
@@ -578,18 +755,23 @@ public static class RunContourField
         var list = new List<Line>();
         if (json == null) return list;
         var contours = new List<double[]>();
+        var indexes = new List<double[]>();
         var forms = new List<double[]>();
         foreach (var (code, xy, _) in Features(json))
         {
             if (code.Length < 3 || xy.Count < 4) continue;
             string major = code.Substring(0, 3);
             if (major != "101" && major != "102" && major != "103") continue;
-            (major == "103" ? forms : contours).Add(xy.ToArray());
+            (major == "103" ? forms : major == "102" ? indexes : contours).Add(xy.ToArray());
         }
         // A contour is often drawn as several lines (cut at a tick, a text or a cliff): joined end to end again, so a
-        // ring round a knoll or a hollow is known as closed (2026-11-20, as ContourHeights does at the import)
+        // ring round a knoll or a hollow is known as closed (2026-11-20, as ContourHeights does at the import). Index
+        // contours and plain ones are joined each on their own: they are never the same contour, and an end of one
+        // that happened to lie by an end of the other made one line at two levels (2026-11-27)
         foreach (double[] p in ContourHeights.StitchContours(contours, 1.0))
             list.Add(new Line { xy = CloseSmallGap(p, out bool closed), closed = closed });
+        foreach (double[] p in ContourHeights.StitchContours(indexes, 1.0))
+            list.Add(new Line { xy = CloseSmallGap(p, out bool closed), closed = closed, index = true });
         foreach (double[] p in ContourHeights.StitchContours(forms, 1.0))
             list.Add(new Line { xy = CloseSmallGap(p, out bool closed), closed = closed, formLine = true });
         return list;
@@ -614,8 +796,31 @@ public static class RunContourField
         return q;
     }
 
-    // Slope ticks: points of the contour and form line symbols: x, y, 1 for a form line's tick, and the way the tick
-    // points downhill (x, y; NaN for a map imported before 2026-11-23, which did not save it)
+    // Water, which lies low: streams, ditches and narrow marshes (304-306, 309), the edges of lakes and ponds (301, 302)
+    // as lines, and small marshes, water holes and springs (308, 303, 312) as single points (x, y)
+    public static List<double[]> ReadWater(byte[] linesJson, byte[] pointsJson)
+    {
+        var list = new List<double[]>();
+        if (linesJson != null)
+            foreach (var (code, xy, _) in Features(linesJson))
+            {
+                if (code.Length < 3 || xy.Count < 4) continue;
+                string major = code.Substring(0, 3);
+                if (major == "301" || major == "302" || major == "304" || major == "305" || major == "306" || major == "309")
+                    list.Add(xy.ToArray());
+            }
+        if (pointsJson != null)
+            foreach (var (code, xy, _) in Features(pointsJson))
+            {
+                if (code.Length < 3 || xy.Count < 2) continue;
+                string major = code.Substring(0, 3);
+                if (major == "308" || major == "303" || major == "312") list.Add(new[] { xy[0], xy[1] });
+            }
+        return list;
+    }
+
+    // Slope ticks: points of the contour and form line symbols: x, y, 1 for a form line's tick, the way the tick points
+    // downhill (x, y; NaN for a map imported before 2026-11-23, which did not save it) and the symbol (101001)
     public static List<double[]> ReadTicks(byte[] json)
     {
         var list = new List<double[]>();
@@ -627,7 +832,10 @@ public static class RunContourField
             // Any point of the contour symbols is a tick: most maps number it 101.1 or 103.1, but some (Stora Stöeryd,
             // Ängaryd) draw it as a point of 101.0 itself, and those ticks were not read before (2026-11-22)
             if (major == "101" || major == "102" || major == "103")
-                list.Add(new[] { xy[0], xy[1], major == "103" ? 1.0 : 0.0, down != null ? down[0] : double.NaN, down != null ? down[1] : double.NaN });
+            {
+                int.TryParse(code.Substring(0, 6), NumberStyles.Integer, CultureInfo.InvariantCulture, out int symbol);
+                list.Add(new[] { xy[0], xy[1], major == "103" ? 1.0 : 0.0, down != null ? down[0] : double.NaN, down != null ? down[1] : double.NaN, symbol });
+            }
         }
         return list;
     }

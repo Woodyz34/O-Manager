@@ -55,7 +55,8 @@ public static class RunContours
     // here and keeps it in the map package as runheights.bytes, so a race only reads it. The file says which version of
     // this code made it and how long the lines and points it was made from were, so a stale one is never used.
 
-    public const int Version = 4;          // raise when the ground comes out differently (the old files are then remade)
+    public const int Version = 5;          // raise when the ground comes out differently (the old files are then remade)
+                                           // 5 (2026-11-27): only real slope ticks, which way is up solved for the whole map at once
     const int PackageMagic = 0x32485552;   // "RUH2"
 
     // The ground for a map package (gzipped), or null when the map has no heights or the contours can't be solved
@@ -115,7 +116,7 @@ public static class RunContours
         float eq = interval > 0.5f ? interval : 5f;
         List<RunContourField.Line> lines = RunContourField.ReadLines(linesJson);
         TvHeights fine = null;
-        try { fine = RunContourField.Build(grid, lines, RunContourField.ReadTicks(pointsJson), eq, log); }
+        try { fine = RunContourField.Build(grid, lines, RunContourField.ReadTicks(pointsJson), eq, log, RunContourField.ReadWater(linesJson, pointsJson)); }
         catch (Exception e) { log?.Invoke("contour field failed: " + e.Message); }
         exact = fine != null;
         if (!exact) fine = Upsampled(grid);
