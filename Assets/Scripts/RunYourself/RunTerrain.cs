@@ -36,6 +36,10 @@ public class RunTerrain
         public WorldLineKind kind;
         public float ax, az, bx, bz;     // metres from the layer's lower left corner
         public float way;                // a bridge or tunnel: metres from its middle line that are on it
+        public int line;                 // which line it is a piece of
+        // The line really ends at a / b (not a bend, not joined to another line): its end is square there, as the map
+        // draws it, so the runner may pass close by the end (a gap between two walls) (RunTerrain.Hits)
+        public bool capA, capB;
     }
 
     // Bridges and tunnels of a town (TvTown): a way over water and through houses, fences and walls
@@ -142,13 +146,19 @@ public class RunTerrain
                 outOfBounds.Add(local);
             }
         }
-        foreach (var line in all)
+        for (int li = 0; li < all.Count; li++)
         {
+            var line = all[li];
+            int last = line.xy.Length - 4;
+            bool ring = line.xy.Length >= 6 && line.xy[0] == line.xy[line.xy.Length - 2] && line.xy[1] == line.xy[line.xy.Length - 1];
             for (int i = 0; i + 3 < line.xy.Length; i += 2)
             {
                 var p = new Piece
                 {
                     kind = line.kind,
+                    line = li,
+                    capA = i == 0 && !ring,
+                    capB = i == last && !ring,
                     way = wayHalf.TryGetValue(line.xy, out float wh) ? (line.kind == TownPathKind ? wh : Math.Max(0.8f, wh)) : 1.4f,
                     ax = (float)(line.xy[i] - layer.minE), az = (float)(line.xy[i + 1] - layer.minN),
                     bx = (float)(line.xy[i + 2] - layer.minE), bz = (float)(line.xy[i + 3] - layer.minN)
@@ -163,6 +173,119 @@ public class RunTerrain
                         (buckets[j * bucketCols + k] ?? (buckets[j * bucketCols + k] = new List<int>())).Add(index);
             }
         }
+        Joints(town);
+    }
+
+    // ---- Where a line ends at another (2026-11-27, Anders: in a 3D sprint one often could not get between two walls) ----
+    // The runner passes close by a wall's or fence's end (RunTerrain.Hits). Where the map draws a line ending against
+    // another line or a house, though, there is no gap: the mapper only ended it a little short of the other's middle
+    // (the drawn lines overlap). Such an end is joined to the other with a short piece of its own kind, so nobody
+    // slips through there; a real opening, one that shows on the map, is left open.
+
+    // About half the width the map draws a line of this kind (sprint maps, 1:4000), in metres: an end closer to the
+    // other line's middle than this and a little more touches it on the map
+    static float DrawnHalf(WorldLineKind k)
+    {
+        switch (k)
+        {
+            case WorldLineKind.HighWall: return 0.65f;
+            case WorldLineKind.Hedge: return 0.75f;
+            case WorldLineKind.HighFence: return 0.5f;
+            case WorldLineKind.Cliff: return 0.3f;
+            default: return 0.2f;
+        }
+    }
+
+    // A visible gap narrower than this (metres) is no way through: half a metre is an eighth of a millimetre on the map
+    // (1:4000), too little to see; the drawn widths are rough, so this also covers a mapper's wider symbols
+    const float JoinGap = 0.5f;
+
+    void Joints(TvTown town)
+    {
+        // The houses' outlines, only to find the ends that meet a house (the house walls themselves stop the runner, RunWorld)
+        var houses = new List<Piece>();
+        var houseBuckets = new Dictionary<int, List<int>>();
+        if (town != null)
+            foreach (float[] xy in town.houseEdges)
+            {
+                if (xy == null) continue;
+                for (int i = 0; i + 3 < xy.Length; i += 2)
+                {
+                    var h = new Piece
+                    {
+                        ax = (float)(xy[i] - layer.minE), az = (float)(xy[i + 1] - layer.minN),
+                        bx = (float)(xy[i + 2] - layer.minE), bz = (float)(xy[i + 3] - layer.minN)
+                    };
+                    int index = houses.Count;
+                    houses.Add(h);
+                    int i0 = (int)Math.Floor((Math.Min(h.ax, h.bx) - 2f) / Bucket), i1 = (int)Math.Floor((Math.Max(h.ax, h.bx) + 2f) / Bucket);
+                    int j0 = (int)Math.Floor((Math.Min(h.az, h.bz) - 2f) / Bucket), j1 = (int)Math.Floor((Math.Max(h.az, h.bz) + 2f) / Bucket);
+                    for (int j = j0; j <= j1; j++)
+                        for (int k = i0; k <= i1; k++)
+                        {
+                            int key = j * 100003 + k;
+                            if (!houseBuckets.TryGetValue(key, out List<int> list)) houseBuckets[key] = list = new List<int>();
+                            list.Add(index);
+                        }
+                }
+            }
+        int count = pieces.Count;
+        var joins = new List<Piece>();
+        for (int index = 0; index < count; index++)
+        {
+            Piece p = pieces[index];
+            if (!Squared(p.kind) || (!p.capA && !p.capB)) continue;
+            for (int end = 0; end < 2; end++)
+            {
+                if (end == 0 ? !p.capA : !p.capB) continue;
+                float x = end == 0 ? p.ax : p.bx, z = end == 0 ? p.az : p.bz;
+                float best = float.MaxValue, qx = 0f, qz = 0f;
+                List<int> near = BucketAt(x, z);
+                if (near != null)
+                    foreach (int other in near)
+                    {
+                        Piece o = pieces[other];
+                        if (o.line == p.line || !Impassable(o.kind)) continue;
+                        float d = Nearest(x, z, o, out float nx, out float nz, out float t);
+                        // Against the other's square end (two walls in a row with a gap between): the map shows
+                        // the whole gap, none of it hidden under the other's width
+                        bool square = Squared(o.kind) && ((t <= 0f && o.capA) || (t >= 1f && o.capB));
+                        if (d < (square ? 0f : DrawnHalf(o.kind)) + JoinGap && d < best) { best = d; qx = nx; qz = nz; }
+                    }
+                if (houseBuckets.TryGetValue((int)Math.Floor(z / Bucket) * 100003 + (int)Math.Floor(x / Bucket), out List<int> hs))
+                    foreach (int other in hs)
+                    {
+                        float d = Nearest(x, z, houses[other], out float nx, out float nz, out _);
+                        if (d < DrawnHalf(WorldLineKind.None) + JoinGap && d < best) { best = d; qx = nx; qz = nz; }
+                    }
+                if (best == float.MaxValue) continue;
+                // Joined: the end is round again (as a bend is), and a piece of the same kind closes the gap
+                if (end == 0) p.capA = false; else p.capB = false;
+                if (best > 0.02f) joins.Add(new Piece { kind = p.kind, line = p.line, ax = x, az = z, bx = qx, bz = qz, way = 1.4f });
+            }
+            pieces[index] = p;
+        }
+        foreach (Piece j in joins)
+        {
+            int index = pieces.Count;
+            pieces.Add(j);
+            int i0 = Math.Max(0, (int)((Math.Min(j.ax, j.bx) - 4f) / Bucket)), i1 = Math.Min(bucketCols - 1, (int)((Math.Max(j.ax, j.bx) + 4f) / Bucket));
+            int j0 = Math.Max(0, (int)((Math.Min(j.az, j.bz) - 4f) / Bucket)), j1 = Math.Min(bucketRows - 1, (int)((Math.Max(j.az, j.bz) + 4f) / Bucket));
+            for (int r = j0; r <= j1; r++)
+                for (int k = i0; k <= i1; k++)
+                    (buckets[r * bucketCols + k] ?? (buckets[r * bucketCols + k] = new List<int>())).Add(index);
+        }
+    }
+
+    // The nearest point of a piece to (x, z) (t: 0 at a, 1 at b), and how far it is
+    static float Nearest(float x, float z, Piece p, out float nx, out float nz, out float t)
+    {
+        float dx = p.bx - p.ax, dz = p.bz - p.az, l = dx * dx + dz * dz;
+        t = l > 0f ? ((x - p.ax) * dx + (z - p.az) * dz) / l : 0f;
+        t = t < 0f ? 0f : t > 1f ? 1f : t;
+        nx = p.ax + dx * t;
+        nz = p.az + dz * t;
+        return (float)Math.Sqrt((nx - x) * (nx - x) + (nz - z) * (nz - z));
     }
 
     static bool Matters(WorldLineKind kind)
@@ -399,10 +522,51 @@ public class RunTerrain
         foreach (int index in near)
         {
             Piece p = pieces[index];
-            if (Impassable(p.kind) && Dist(x, z, p) < reach + 0.15f)
+            if (Impassable(p.kind) && Hits(x, z, p, reach))
                 return true;
         }
         return false;
+    }
+
+    // How far from a line's middle the runner (reach metres to its side) stops: its own reach and about half of what
+    // the 3D world builds there (TvWorldBuilder.Structures: a high wall 0.68 m wide with its cap, a hedge about 1 m, a
+    // fence's posts and mesh), so the eyes stay just out of it. Before 2026-11-27 every line kept 0.45 m and a high
+    // wall or hedge also had solids of 0.55 and 0.6 m round it (0.85-0.9 m from its middle): two walls 1.5 m apart on
+    // the map, an opening that shows, were shut in 3D.
+    static float Side(WorldLineKind k, float reach)
+    {
+        switch (k)
+        {
+            case WorldLineKind.HighWall: return reach + 0.3f;
+            case WorldLineKind.Hedge: return reach + 0.45f;
+            case WorldLineKind.Cliff: return Math.Max(0.45f, reach + 0.2f);
+            default: return reach + 0.1f;       // a high fence, tape, a course boundary
+        }
+    }
+
+    // Lines whose ends are square, as the map draws them (a cliff tapers off, so it keeps a round end)
+    static bool Squared(WorldLineKind k) => k == WorldLineKind.HighWall || k == WorldLineKind.HighFence || k == WorldLineKind.Hedge;
+
+    // The runner at (x, z) is too close to a piece of a blocking line. Beside the line it keeps Side(); past a real
+    // end of the line (capA/capB) only its own reach and a little more, so it gets through the gap between two
+    // walls or a wall and a house that the map shows (2026-11-27, Anders)
+    static bool Hits(float x, float z, Piece p, float reach)
+    {
+        float side = Side(p.kind, reach);
+        float dx = p.bx - p.ax, dz = p.bz - p.az, len = (float)Math.Sqrt(dx * dx + dz * dz);
+        if (len < 1e-4f) return (x - p.ax) * (x - p.ax) + (z - p.az) * (z - p.az) < side * side;
+        float ux = dx / len, uz = dz / len;
+        float u = (x - p.ax) * ux + (z - p.az) * uz, v = Math.Abs(-(x - p.ax) * uz + (z - p.az) * ux);
+        if (u >= 0f && u <= len) return v < side;
+        float over = u < 0f ? -u : u - len;
+        bool square = Squared(p.kind) && (u < 0f ? p.capA : p.capB);
+        if (!square) return over * over + v * v < side * side;
+        // Past the square end: kept reach and 5 cm from its end face, and round its corners
+        float end = reach + 0.05f;
+        if (over >= end) return false;
+        if (v <= side - end) return true;
+        float cv = v - (side - end);
+        return over * over + cv * cv < end * end;
     }
 
     // True when the step from a to b goes over something a runner jumps (a stone wall, a fence, a fallen trunk), or

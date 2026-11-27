@@ -36,6 +36,8 @@ namespace MapImport
     {
         // The most cells a map's grid may have (the sprint pass uses cells half the size, so four times as many)
         const double MaxCells = 400e6;
+        // The quarter-size pass for narrow passages is made this many cells square at a time
+        const int QuarterTile = 300;
 
         public static MapGrid2 Build(MapFile map, MapExtent extent, bool sprint, float cellSize, Action<string> log = null)
         {
@@ -48,7 +50,28 @@ namespace MapImport
             {
                 var passSw = System.Diagnostics.Stopwatch.StartNew();
                 MapGrid2 fine = BuildSpeed(map, extent, sprint, cellSize / 2f, null);
-                int opened = OpenNarrowPassages(g, fine);
+                int opened = OpenNarrowPassages(g, fine, 2);
+                fine = null;
+                // Then with cells a quarter of the size, the impassable lines (walls, high fences, hedges) as wide as
+                // the map draws them and square at their ends (2026-11-27, Anders: a gap between two walls that shows
+                // on the map was often shut: a 1 m cell is not always free in a 1.4 m gap). Drawn as wide as on the
+                // map, a line that ends against another one leaves no way through, as on the map.
+                // Built a square of the map at a time, so a big town map needs little memory
+                double mpm = map.MetersPerMm;
+                for (int r0 = 0; r0 < g.rows; r0 += QuarterTile)
+                    for (int c0 = 0; c0 < g.cols; c0 += QuarterTile)
+                    {
+                        int r1 = Math.Min(g.rows, r0 + QuarterTile), c1 = Math.Min(g.cols, c0 + QuarterTile);
+                        // A few cells more all round, so the cells at the square's edge see their neighbours
+                        int mr0 = Math.Max(0, r0 - 4), mc0 = Math.Max(0, c0 - 4), mr1 = Math.Min(g.rows, r1 + 4), mc1 = Math.Min(g.cols, c1 + 4);
+                        var part = new MapExtent
+                        {
+                            minX = extent.minX + mc0 * cellSize / mpm, maxX = extent.minX + mc1 * cellSize / mpm,
+                            minY = extent.minY + mr0 * cellSize / mpm, maxY = extent.minY + mr1 * cellSize / mpm
+                        };
+                        MapGrid2 quarter = BuildSpeed(map, part, sprint, cellSize / 4f, null, true);
+                        opened += OpenNarrowPassages(g, quarter, 4, r0, c0, r1, c1, mr0, mc0);
+                    }
                 log?.Invoke($"Narrow passages: {opened} cells opened in {passSw.ElapsedMilliseconds} ms");
             }
 
@@ -65,7 +88,8 @@ namespace MapImport
         }
 
         // Steps 1 to 6: the speed of every cell
-        public static MapGrid2 BuildSpeed(MapFile map, MapExtent extent, bool sprint, float cellSize, Action<string> log)
+        // drawnLines: the impassable lines are as wide as the map draws them (the narrow-passage pass), not one cell
+        public static MapGrid2 BuildSpeed(MapFile map, MapExtent extent, bool sprint, float cellSize, Action<string> log, bool drawnLines = false)
         {
             double mpm = map.MetersPerMm;
             var g = new MapGrid2
@@ -179,7 +203,7 @@ namespace MapImport
                 if (((!sprint && path[idx]) || stairs[idx]) && !lineSpeed.ContainsKey(idx)) lineSpeed[idx] = g.speed[idx];
                 g.speed[idx] = 0f;
                 hard[idx] = true;
-            });
+            }, drawnLines);
             if (lineSpeed.Count > 0)
             {
                 bool[] crossers = path;
@@ -241,29 +265,48 @@ namespace MapImport
             return g;
         }
 
-        // Opens closed cells of g where the grid with half-size cells (fine, same corner) has a way through.
-        // A closed cell is opened only when, inside the 3 x 3 cells around it, the open fine cells of it and of
-        // every open neighbour are all joined up in the fine grid. So the opened cell joins only ground that really
-        // is joined there, and a fence or wall through the middle of a cell (open fine cells on both sides, but not
-        // joined) stays shut. Opening one cell can make its neighbour openable too, so it repeats until nothing changes.
-        public static int OpenNarrowPassages(MapGrid2 g, MapGrid2 fine)
+        // Opens closed cells of g where the grid with cells f times smaller (fine, same corner: 2 = half the size,
+        // 4 = a quarter) has a way through. A closed cell is opened only when, inside the 3 x 3 cells around it, the
+        // open fine cells of it and of every open neighbour are all joined up in the fine grid. So the opened cell
+        // joins only ground that really is joined there, and a fence or wall through the middle of a cell (open fine
+        // cells on both sides, but not joined) stays shut. Opening one cell can make its neighbour openable too, so it
+        // repeats until nothing changes.
+        // Only the cells of rows r0..r1-1 and columns c0..c1-1 are opened (all when r1 is 0); fine starts at cell
+        // (fineRow, fineCol) of g (a part of the map, GridBuilder.Build)
+        public static int OpenNarrowPassages(MapGrid2 g, MapGrid2 fine, int f = 2, int r0 = 0, int c0 = 0, int r1 = 0, int c1 = 0,
+                                             int fineRow = 0, int fineCol = 0)
         {
             int rows = g.rows, cols = g.cols, fr = fine.rows, fc = fine.cols;
-            bool FineOpen(int r, int c) => r >= 0 && c >= 0 && r < fr && c < fc && fine.speed[r * fc + c] > 0f;
+            if (r1 <= 0) { r1 = rows; c1 = cols; }
+            int fro = f * fineRow, fco = f * fineCol;
+            bool FineOpen(int r, int c)
+            {
+                r -= fro;
+                c -= fco;
+                return r >= 0 && c >= 0 && r < fr && c < fc && fine.speed[r * fc + c] > 0f;
+            }
+            float FineSpeed(int r, int c) => fine.speed[(r - fro) * fc + c - fco];
+            bool AnyFineOpen(int r, int c)
+            {
+                for (int i = 0; i < f; i++)
+                    for (int j = 0; j < f; j++)
+                        if (FineOpen(f * r + i, f * c + j)) return true;
+                return false;
+            }
 
             // Closed cells with at least one open fine cell are the ones that can be opened
             var candidates = new List<int>();
-            for (int r = 0; r < rows; r++)
-                for (int c = 0; c < cols; c++)
+            for (int r = Math.Max(0, r0); r < Math.Min(rows, r1); r++)
+                for (int c = Math.Max(0, c0); c < Math.Min(cols, c1); c++)
                 {
                     if (g.speed[r * cols + c] > 0f) continue;
-                    if (FineOpen(2 * r, 2 * c) || FineOpen(2 * r + 1, 2 * c) || FineOpen(2 * r, 2 * c + 1) || FineOpen(2 * r + 1, 2 * c + 1))
-                        candidates.Add(r * cols + c);
+                    if (AnyFineOpen(r, c)) candidates.Add(r * cols + c);
                 }
 
-            // Window: 6 x 6 fine cells = the 3 x 3 cells around the candidate
-            var label = new int[36];
-            var stack = new int[36];
+            // Window: 3f x 3f fine cells = the 3 x 3 cells around the candidate
+            int side = 3 * f, size = side * side;
+            var label = new int[size];
+            var stack = new int[size];
             int opened = 0;
             for (int pass = 0; pass < 6; pass++)
             {
@@ -272,12 +315,12 @@ namespace MapImport
                 {
                     if (g.speed[idx] > 0f) continue;
                     int r = idx / cols, c = idx % cols;
-                    int fr0 = 2 * r - 2, fc0 = 2 * c - 2;
+                    int fr0 = f * r - f, fc0 = f * c - f;
                     // Fine cells that take part: open ones inside the candidate or inside an open neighbour
-                    for (int k = 0; k < 36; k++)
+                    for (int k = 0; k < size; k++)
                     {
-                        int wr = k / 6, wc = k % 6;
-                        int cr = r - 1 + wr / 2, cc = c - 1 + wc / 2;
+                        int wr = k / side, wc = k % side;
+                        int cr = r - 1 + wr / f, cc = c - 1 + wc / f;
                         bool inCell = cr == r && cc == c;
                         bool inOpenNeighbour = !inCell && cr >= 0 && cc >= 0 && cr < rows && cc < cols && g.speed[cr * cols + cc] > 0f;
                         label[k] = (inCell || inOpenNeighbour) && FineOpen(fr0 + wr, fc0 + wc) ? 0 : -1;
@@ -293,14 +336,14 @@ namespace MapImport
                             if (cr < 0 || cc < 0 || cr >= rows || cc >= cols || g.speed[cr * cols + cc] <= 0f) continue;
                             openNeighbours++;
                             bool any = false;
-                            for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++)
-                                    if (label[(2 * (dr + 1) + i) * 6 + 2 * (dc + 1) + j] == 0) any = true;
+                            for (int i = 0; i < f; i++) for (int j = 0; j < f; j++)
+                                    if (label[(f * (dr + 1) + i) * side + f * (dc + 1) + j] == 0) any = true;
                             if (!any) ok = false;
                         }
                     if (!ok || openNeighbours == 0) continue;
                     // Flood the fine cells (8 directions, no cutting between two closed cells)
                     int components = 0;
-                    for (int k = 0; k < 36 && components <= 1; k++)
+                    for (int k = 0; k < size && components <= 1; k++)
                     {
                         if (label[k] != 0) continue;
                         components++;
@@ -310,16 +353,16 @@ namespace MapImport
                         while (top > 0)
                         {
                             int q = stack[--top];
-                            int qr = q / 6, qc = q % 6;
+                            int qr = q / side, qc = q % side;
                             for (int dr = -1; dr <= 1; dr++)
                                 for (int dc = -1; dc <= 1; dc++)
                                 {
                                     if (dr == 0 && dc == 0) continue;
                                     int nr = qr + dr, nc = qc + dc;
-                                    if (nr < 0 || nc < 0 || nr >= 6 || nc >= 6) continue;
-                                    int nk = nr * 6 + nc;
+                                    if (nr < 0 || nc < 0 || nr >= side || nc >= side) continue;
+                                    int nk = nr * side + nc;
                                     if (label[nk] != 0) continue;
-                                    if (dr != 0 && dc != 0 && label[qr * 6 + nc] == -1 && label[nr * 6 + qc] == -1) continue;
+                                    if (dr != 0 && dc != 0 && label[qr * side + nc] == -1 && label[nr * side + qc] == -1) continue;
                                     label[nk] = components;
                                     stack[top++] = nk;
                                 }
@@ -328,8 +371,8 @@ namespace MapImport
                     if (components != 1) continue;
                     // The speed of the open fine cells inside it
                     float best = 0f;
-                    for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++)
-                            if (FineOpen(2 * r + i, 2 * c + j)) best = Math.Max(best, fine.speed[(2 * r + i) * fc + 2 * c + j]);
+                    for (int i = 0; i < f; i++) for (int j = 0; j < f; j++)
+                            if (FineOpen(f * r + i, f * c + j)) best = Math.Max(best, FineSpeed(f * r + i, f * c + j));
                     g.speed[idx] = best;
                     openedThisPass++;
                 }
@@ -361,7 +404,7 @@ namespace MapImport
         }
 
         static void ForLines(MapFile map, bool sprint, TerrainRole role, MapGrid2 g, double ox, double oy, double scale,
-                             Action<int, TerrainRule> visit)
+                             Action<int, TerrainRule> visit, bool drawnLines = false)
         {
             foreach (MapObject o in map.objects)
             {
@@ -374,7 +417,9 @@ namespace MapImport
                 }
                 if (rule.role != role) continue;
                 // Lines wider than a cell (streets on sprint maps) cover several cells across
-                double halfCells = role == TerrainRole.Path || role == TerrainRole.Stairs ? LineWidthMm(o.symbol) * scale / 2 : 0;
+                // (and, in the narrow-passage pass, the impassable lines: drawnLines)
+                double halfCells = role == TerrainRole.Path || role == TerrainRole.Stairs || (drawnLines && role == TerrainRole.BlockingLine)
+                    ? LineWidthMm(o.symbol) * scale / 2 : 0;
                 int offsets = (int)Math.Floor(halfCells / 0.5);
                 foreach (double[] p in o.parts)
                 {
