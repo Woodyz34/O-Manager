@@ -114,6 +114,17 @@ public class HeightQuestionPanel : MonoBehaviour
         HoverTip.Add(zoomOut, "See more of the map round the two contours.");
         HoverTip.Add(zoomIn, "See the two contours closer.");
 
+        // Find the lines again when they are small or out of sight (2026-11-27, Anders)
+        RectTransform find = CourseUI.Rect("Find", frame.transform);
+        CourseUI.Place(find, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(10, -10), new Vector2(330, 48));
+        CourseUI.Row(find.gameObject, 8, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
+        Button findPink = CourseUI.Button("Find pink", find, "Show pink", CourseUI.ButtonKind.Primary, () => GoTo(true), 19);
+        findPink.GetComponent<Image>().color = Pink;
+        Button findBlue = CourseUI.Button("Find blue", find, "Show blue", CourseUI.ButtonKind.Primary, () => GoTo(false), 19);
+        findBlue.GetComponent<Image>().color = Blue;
+        HoverTip.Add(findPink, "Move the map to the pink contour and show all of it.");
+        HoverTip.Add(findBlue, "Move the map to the blue contour and show all of it.");
+
         hint = CourseUI.Text("Hint", card.transform,
             "<color=#E0158F><b>Pink</b></color>: the contour the game is unsure of.   <color=#1E50E0><b>Blue</b></color>: the contour next to it.\n"
             + "Drag the map with the mouse and zoom with the wheel. Look at the slope ticks, knolls, hollows, streams and marshes.",
@@ -126,11 +137,14 @@ public class HeightQuestionPanel : MonoBehaviour
         answerRow = answerRect.gameObject;
         CourseUI.Place(answerRect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 96), new Vector2(1100, 66));
         CourseUI.Row(answerRow, 14, new RectOffset(0, 0, 0, 0)).childForceExpandWidth = true;
-        higher = CourseUI.Button("Higher", answerRect, "Higher", CourseUI.ButtonKind.Primary, () => Answer(1), 28);
-        lower = CourseUI.Button("Lower", answerRect, "Lower", CourseUI.ButtonKind.Primary, () => Answer(-1), 28);
+        // Which is higher? The buttons have the lines' own colours (2026-11-27, Anders: just think which one is higher up)
+        higher = CourseUI.Button("Pink", answerRect, "Pink", CourseUI.ButtonKind.Primary, () => Answer(1), 28);
+        higher.GetComponent<Image>().color = Pink;
+        lower = CourseUI.Button("Blue", answerRect, "Blue", CourseUI.ButtonKind.Primary, () => Answer(-1), 28);
+        lower.GetComponent<Image>().color = Blue;
         same = CourseUI.Button("Same", answerRect, "Same height", CourseUI.ButtonKind.Secondary, () => Answer(0), 24);
-        HoverTip.Add(higher, "The pink contour is one contour higher than the blue one.");
-        HoverTip.Add(lower, "The pink contour is one contour lower than the blue one.");
+        HoverTip.Add(higher, "The pink contour is the higher one.");
+        HoverTip.Add(lower, "The blue contour is the higher one.");
         HoverTip.Add(same, "They are at the same height: a ridge or a valley lies between them.");
 
         RectTransform more = CourseUI.Rect("More", card.transform);
@@ -202,7 +216,7 @@ public class HeightQuestionPanel : MonoBehaviour
         }
         stop.interactable = true;
         CourseUI.SetButtonText(stop, "Stop for now");
-        question.text = "Is the <color=#E0158F>pink</color> contour higher or lower than the <color=#1E50E0>blue</color> one?";
+        question.text = "Which contour is higher: <color=#E0158F>pink</color> or <color=#1E50E0>blue</color>?";
         ShowProgress();
         // Wide enough to see the hill or the slope round the two (2026-11-27, Anders: it started too close)
         double d = MapGeometry.Dist(q.ax, q.ay, q.bx, q.by);
@@ -333,6 +347,26 @@ public class HeightQuestionPanel : MonoBehaviour
     }
 
     // ---- The map and the two lines ----
+
+    // The whole of one line in view (or the part round the question when the line is very long), a little round it
+    void GoTo(bool pinkLine)
+    {
+        if (current == null) return;
+        double[] xy = pinkLine ? current.a : current.b;
+        double px = pinkLine ? current.ax : current.bx, py = pinkLine ? current.ay : current.by;
+        if (xy == null || xy.Length < 2) return;
+        double minX = px, maxX = px, minY = py, maxY = py;
+        for (int i = 0; i + 1 < xy.Length; i += 2)
+        {
+            if (Math.Abs(xy[i] - px) > 600 || Math.Abs(xy[i + 1] - py) > 600) continue;
+            minX = Math.Min(minX, xy[i]); maxX = Math.Max(maxX, xy[i]);
+            minY = Math.Min(minY, xy[i + 1]); maxY = Math.Max(maxY, xy[i + 1]);
+        }
+        centreE = (minX + maxX) / 2;
+        centreN = (minY + maxY) / 2;
+        viewWidth = Math.Max(120, Math.Min(3000, Math.Max(maxX - minX, (maxY - minY) * Area.x / Area.y) * 1.3));
+        Draw();
+    }
 
     void Zoom(double factor)
     {

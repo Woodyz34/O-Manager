@@ -44,6 +44,7 @@ public static class RunContourField
         public double ax, ay, bx, by;
         public double[] a, b;
         public double length;        // metres of contour whose slope the answer settles
+        public bool misfit;          // asked because the levels don't fit (AskMisfits), not because the slope is unknown
     }
 
     // The fine heights, or null when the contours can't be solved (then the 10 m grid is used)
@@ -272,6 +273,7 @@ public static class RunContourField
         }
         // An answered pair is a pair even where the rays missed it, and it is settled first, as the player said
         var forced = new int[edges.Count + answered.Count];   // 1: one interval apart (higher or lower), 2: the same level
+        var rayWeight = new double[edges.Count + answered.Count];   // an answered pair's own weight from the rays
         foreach (var an in answered)
         {
             int lo = Math.Min(an.a, an.b), hi = Math.Max(an.a, an.b);
@@ -279,7 +281,8 @@ public static class RunContourField
             int sLo = ContourHeights.SideOf(contours[lo - 1].p, lo == an.a ? an.bx : an.ax, lo == an.a ? an.by : an.ay);
             int sHi = ContourHeights.SideOf(contours[hi - 1].p, hi == an.a ? an.bx : an.ax, hi == an.a ? an.by : an.ay);
             if (sLo == 0 || sHi == 0) continue;
-            if (e < 0) { e = edges.Count; edges.Add((lo, hi, sLo, sHi, 0)); }
+            if (e < 0) { e = edges.Count; edges.Add((lo, hi, sLo, sHi, 1)); }
+            rayWeight[e] = Math.Max(1, edges[e].w);
             edges[e] = (lo, hi, sLo, sHi, Forced);
             forced[e] = an.rel == 0 ? 2 : 1;
         }
@@ -288,8 +291,12 @@ public static class RunContourField
         for (int i = 0; i <= contours.Count; i++) adj[i] = new List<int>();
         for (int e = 0; e < edges.Count; e++) { adj[edges[e].a].Add(e); adj[edges[e].b].Add(e); }
 
+        // Which side the nearest hilltop is on, counted in contours (2026-11-27, Anders: the contour with fewer contours
+        // to climb to the top is the higher one)
+        int[] topSide = TopSides(contours, edges, adj);
+        foreach (Contour c in contours) ev[c.id] += TopVote * topSide[c.id];
         bool[] accepted = Orient(contours, edges, forced, ev, strong, anyIndex, out int dropped, out int[] pieceOf);
-        if (questions != null) AskPieces(contours, edges, forced, strong, pieceOf, closest, ox, oy, res, questions);
+        if (questions != null) AskPieces(contours, edges, forced, strong, topSide, pieceOf, closest, ox, oy, res, questions);
         int knownSlope = 0;
         foreach (Contour c in contours)
         {
@@ -310,19 +317,23 @@ public static class RunContourField
             diff[e] = (oa * ed.sa - ob * ed.sb) / 2.0;
             // A pair left out of the pieces above still ties the levels, but lightly
             weight[e] = ed.w * (accepted[e] ? 1 : 0.25);
+            // An answer says which way, not by how much: at a cliff the higher contour can be two or three intervals
+            // up. Held as hard as the rays say, so it does not pull the levels round it out of place (2026-11-27:
+            // 26 answers on Nya Slogebo held at exactly one interval made 16 questions into 64)
+            if (forced[e] != 0) weight[e] = rayWeight[e];
         }
         var level = new double[contours.Count + 1];
         var baseWeight = (double[])weight.Clone();
-        for (int outer = 0; outer < 5; outer++)
+        for (int outer = 0; outer < (answered.Count > 0 ? 9 : 5); outer++)
         {
             ContourHeights.SolveLevels(level, edges, diff, weight);
             for (int e = 0; e < edges.Count; e++)
             {
                 double r = level[edges[e].b] - level[edges[e].a] - diff[e];
-                weight[e] = baseWeight[e] / (1 + (r / 0.5) * (r / 0.5));
+                weight[e] = HoldAnswer(forced[e], level[edges[e].b] - level[edges[e].a], diff[e], baseWeight[e] / (1 + (r / 0.5) * (r / 0.5)));
             }
         }
-        if (anyIndex) AlignIndex(contours, edges, diff, baseWeight, level, pieceOf);
+        if (anyIndex) AlignIndex(contours, edges, diff, baseWeight, level, pieceOf, forced);
         var lakes = LakeLevels(lake, contours, level, ids, C, R, res);
         ids = null;
         var known = new bool[contours.Count + 1];
@@ -333,7 +344,7 @@ public static class RunContourField
         int nested = NestLevels(contours, level, known, out bool[] certain, out bool[] hasInside);
         if (questions != null)
         {
-            AskMisfits(contours, edges, forced, diff, level, certain, closest, ox, oy, res, questions);
+            AskMisfits(contours, edges, forced, diff, level, certain, topSide, closest, ox, oy, res, questions);
             return null;
         }
 
@@ -441,6 +452,78 @@ public static class RunContourField
         return fine;
     }
 
+    const double TopVote = 2;        // the hilltop's side: more than the 10 m grid's hint, less than a tick or a ring
+    const int TopSteps = 15;         // contours walked at most to find a top
+
+    // For each contour, which side is up from the nearest top or bottom: walking from contour to contour straight out
+    // to each side (always on, away from the one before), a knoll ring with nothing inside it is a top, a hollow ring
+    // with nothing inside it a bottom. 1: the left side is up, -1: the right, 0: not clear (tops on both sides, or
+    // none found). Uses only the map: the rings and their ticks.
+    static int[] TopSides(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, List<int>[] adj)
+    {
+        var result = new int[contours.Count + 1];
+        var innermost = new int[contours.Count + 1];   // 1 a top, -1 a bottom, 0 not an innermost ring
+        foreach (Contour c in contours)
+        {
+            if (!c.line.closed) continue;
+            int inside = MapGeometry.SignedArea(c.p) > 0 ? 1 : -1;
+            bool any = false;
+            foreach (int e in adj[c.id])
+            {
+                var ed = edges[e];
+                int side = ed.a == c.id ? ed.sa : ed.sb;
+                if (side == inside) { any = true; break; }
+            }
+            if (!any) innermost[c.id] = c.line.hollow ? -1 : 1;
+        }
+        var seen = new HashSet<int>();
+        // What lies that way: 1 a top, -1 a bottom, 0 nothing found; and after how many contours
+        int Walk(int start, int side, out int steps)
+        {
+            seen.Clear();
+            seen.Add(start);
+            int cur = start, s = side;
+            steps = 0;
+            for (int step = 0; step < TopSteps; step++)
+            {
+                steps = step + 1;
+                int bestE = -1;
+                double bestW = 0;
+                foreach (int e in adj[cur])
+                {
+                    var ed = edges[e];
+                    int mine = ed.a == cur ? ed.sa : ed.sb;
+                    if (mine != s || ed.w <= bestW) continue;
+                    bestW = ed.w;
+                    bestE = e;
+                }
+                if (bestE < 0) return 0;
+                var be = edges[bestE];
+                int next = be.a == cur ? be.b : be.a;
+                int back = be.a == cur ? be.sb : be.sa;     // the side of next where cur lies
+                if (!seen.Add(next)) return 0;
+                if (innermost[next] != 0)
+                {
+                    int inside = MapGeometry.SignedArea(contours[next - 1].p) > 0 ? 1 : -1;
+                    if (back != inside) return innermost[next];   // came in from outside: the top or bottom itself
+                }
+                cur = next;
+                s = -back;
+            }
+            return 0;
+        }
+        foreach (Contour c in contours)
+        {
+            if (innermost[c.id] != 0) continue;   // its own ring says it already
+            int left = Walk(c.id, 1, out int nl), right = Walk(c.id, -1, out int nr);
+            // Going on past the bottom of a valley climbs the next hill, so a top can lie both ways: the nearer top,
+            // fewer contours to climb, is the one this contour belongs to (and the nearer bottom likewise)
+            double l = left == 0 ? 0 : left / (double)nl, r = right == 0 ? 0 : right / (double)nr;
+            result[c.id] = l > r + 1e-9 ? 1 : r > l + 1e-9 ? -1 : 0;
+        }
+        return result;
+    }
+
     const int AnswerWeight = 4;      // an answer counts as four slope ticks on each of the two contours
     const double Forced = 10000;     // an answered pair's weight: above any pair the rays found (they sort first)
     const double AskAbove = 25;      // metres: shorter uncertain pieces are not asked about
@@ -450,18 +533,25 @@ public static class RunContourField
     // The pieces of the map (Orient) whose slope nothing certain says: no slope tick, no knoll ring and no answer in
     // any of their contours. Each is asked about once, with its contour that faces a neighbour the most and that
     // neighbour (one in a certain piece when there is one, so the player compares it with a slope that is known).
-    static void AskPieces(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, int[] forced, double[] strong, int[] pieceOf,
-                          Dictionary<long, double[]> closest, double ox, double oy, double res, List<HeightQuestion> questions)
+    static void AskPieces(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, int[] forced, double[] strong, int[] topSide,
+                          int[] pieceOf, Dictionary<long, double[]> closest, double ox, double oy, double res, List<HeightQuestion> questions)
     {
         int n = contours.Count + 1;
         var sure = new bool[n];
         var length = new double[n];
+        var topsFor = new int[n];
+        var topsAgainst = new int[n];
         foreach (Contour c in contours)
         {
             int r = pieceOf[c.id];
             if (Math.Abs(strong[c.id]) >= 3) sure[r] = true;
             length[r] += Length(c.line.xy);
+            if (topSide[c.id] == 0 || c.orientation == 0) continue;
+            if (topSide[c.id] == c.orientation) topsFor[r]++; else topsAgainst[r]++;
         }
+        // A piece whose contours all see the hilltop on the side the slope was found to go up is sure too
+        for (int r = 1; r < n; r++)
+            if (topsFor[r] > 0 && topsAgainst[r] == 0) sure[r] = true;
         // The best pair for each uncertain piece
         var best = new int[n];
         var score = new double[n];
@@ -501,7 +591,7 @@ public static class RunContourField
     // A ring straight inside another ring is settled by the ring round it (NestLevels: a hilltop's rings each one higher),
     // so a pair with such a ring is not asked about (2026-11-27, Anders: "det är ju toppen av höjden").
     static void AskMisfits(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, int[] forced, double[] diff, double[] level,
-                           bool[] certain,
+                           bool[] certain, int[] topSide,
                            Dictionary<long, double[]> closest, double ox, double oy, double res, List<HeightQuestion> questions)
     {
         var found = new List<(double score, HeightQuestion q)>();
@@ -516,9 +606,19 @@ public static class RunContourField
             // (contours crowd at a cliff and a ray skips one). Higher or lower would not change it, so it is not asked
             // (2026-11-27, Anders: questions the game should have worked out itself)
             if (diff[e] != 0 && Math.Sign(got) == Math.Sign(diff[e])) continue;
+            // The way to the nearest hilltop agrees with the levels found: the contour nearer the top (fewer contours
+            // to climb) is the higher one, so the pair's own rays were what was off, and there is nothing to ask
+            // (2026-11-27, Anders: "den som har kortast linjer upp till toppen, det är ju den som ligger högst upp")
+            int byTop = TopVerdict(ed.a, ed.b, ed.sa, ed.sb, topSide);
+            if (byTop != 0 && byTop == Math.Sign(got)) continue;
+            // A tiny ring (a small knoll or pit, raised or sunk by itself in RunContours) is not worth a question
+            if (TinyRing(contours[ed.a - 1]) || TinyRing(contours[ed.b - 1])) continue;
             HeightQuestion q = Question(contours, ed.a, ed.b, closest, ox, oy, res);
             if (q == null) continue;
+            // Far apart where they face each other: the rays crossed open ground, not a slope between the two
+            if (MapGeometry.Dist(q.ax, q.ay, q.bx, q.by) > 60) continue;
             q.length = ed.w * 10;
+            q.misfit = true;
             found.Add((ed.w * r, q));
         }
         found.Sort((x, y) => y.score.CompareTo(x.score));
@@ -530,6 +630,27 @@ public static class RunContourField
                 if (MapGeometry.Dist(q.ax, q.ay, f.q.ax, f.q.ay) < 40 || MapGeometry.Dist(q.bx, q.by, f.q.ax, f.q.ay) < 40) { near = true; break; }
             if (!near) questions.Add(f.q);
         }
+    }
+
+    // An answered pair's weight in the level solve: as the rays say while the levels go the way the player said
+    // (higher may be more than one interval up), very hard when they don't, or when the answer was the same height
+    static double HoldAnswer(int forced, double got, double want, double usual)
+    {
+        if (forced == 0) return usual;
+        if (want == 0 || Math.Sign(Math.Round(got)) != Math.Sign(want)) return Forced;
+        return Math.Max(usual, 1);
+    }
+
+    static bool TinyRing(Contour c) => c.line.closed && Length(c.line.xy) < 60;
+
+    // Whether b is higher (1) or lower (-1) than its neighbour a by the way to the nearest top from each; 0 when that
+    // says nothing or the two disagree. sa: the side of a that b is on, sb: the side of b that a is on.
+    static int TopVerdict(int a, int b, int sa, int sb, int[] topSide)
+    {
+        int fromA = topSide[a] == 0 ? 0 : topSide[a] == sa ? 1 : -1;     // b's side of a is up: b higher
+        int fromB = topSide[b] == 0 ? 0 : topSide[b] == sb ? -1 : 1;     // a's side of b is up: b lower
+        if (fromA != 0 && fromB != 0 && fromA != fromB) return 0;
+        return fromA != 0 ? fromA : fromB;
     }
 
     // The question for contour a and its neighbour b, at the place they face each other most closely
@@ -689,7 +810,7 @@ public static class RunContourField
     // is moved the fewest whole intervals that bring its index contours to the level (mod 5) most index contours have,
     // and the levels solved again with every index contour held at its own index level.
     static void AlignIndex(List<Contour> contours, List<(int a, int b, int sa, int sb, double w)> edges, double[] diff,
-                           double[] baseWeight, double[] level, int[] pieceOf)
+                           double[] baseWeight, double[] level, int[] pieceOf, int[] forced)
     {
         int Mod5(double v) => (((int)Math.Round(v)) % 5 + 5) % 5;
         // Index contour length at each level mod 5, for each piece and for the whole map
@@ -736,13 +857,13 @@ public static class RunContourField
         }
         level[0] = 0;
         double[] dArr = extDiff.ToArray(), w = extW.ToArray(), w0 = (double[])w.Clone();
-        for (int outer = 0; outer < 5; outer++)
+        for (int outer = 0; outer < 9; outer++)
         {
             ContourHeights.SolveLevels(level, ext, dArr, w);
             for (int e = 0; e < edges.Count; e++)
             {
                 double r = level[ext[e].b] - level[ext[e].a] - dArr[e];
-                w[e] = w0[e] / (1 + (r / 0.5) * (r / 0.5));
+                w[e] = HoldAnswer(forced[e], level[ext[e].b] - level[ext[e].a], dArr[e], w0[e] / (1 + (r / 0.5) * (r / 0.5)));
             }
         }
         double zero = level[0];
